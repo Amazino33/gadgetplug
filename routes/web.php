@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Session;
 use App\Models\Order;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
 use Livewire\Volt\Volt;
 
@@ -48,6 +49,14 @@ Route::get('/payment/callback', function (Request $request) {
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::view('dashboard', 'dashboard')->name('dashboard');
+});
+
+Route::get('/nuke-cache', function () {
+    Artisan::call('optimize:clear');
+    if (function_exists('opcache_reset')) {
+        opcache_reset();
+    }
+    return 'Web cache and OPcache destroyed!';
 });
 
 require __DIR__.'/settings.php';
