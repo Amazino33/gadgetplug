@@ -13,11 +13,12 @@ use Filament\Models\Contracts\HasTenants;
 use Filament\Panel;
 use Illuminate\Support\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable implements HasTenants
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, TwoFactorAuthenticatable;
+    use HasFactory, Notifiable, TwoFactorAuthenticatable, HasRoles;
 
     /**
      * The attributes that are mass assignable.
@@ -80,5 +81,20 @@ class User extends Authenticatable implements HasTenants
     public function canAccessTenant(Model $tenant): bool
     {
         return $this->vendors()->whereKey($tenant)->exists();
+    }
+
+    public function canAccessPanel(Panel $panel): bool
+    {
+        // 1. Admin Panel Access (Only for users with the super_admin role)
+        if ($panel->getId() === 'admin') {
+            return $this->hasRole('super_admin');
+        }
+
+        // 2. Vendor Panel Access (Admins and Vendors can access)
+        if ($panel->getId() === 'vendor') {
+            return $this->hasAnyRole(['super_admin', 'vendor']);
+        }
+
+        return false;
     }
 }
