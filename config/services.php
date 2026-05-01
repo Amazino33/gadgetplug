@@ -40,4 +40,9 @@ return [
         'secret_key' => env('PAYSTACK_SECRET_KEY'),
     ],
 
+    'telegram' => [
+        'token' => env('TELEGRAM_BOT_TOKEN'),
+        'chat_id' => env('TELEGRAM_CHAT_ID'),
+    ],
+
 ];
