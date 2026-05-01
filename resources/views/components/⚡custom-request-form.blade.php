@@ -3,6 +3,7 @@
 use Livewire\Component;
 use Livewire\Attributes\Rule;
 use Illuminate\Support\Facades\Http;
+use App\Models\ClientRequest;
 
 new class extends Component
 {
@@ -19,14 +20,20 @@ new class extends Component
         $name = $user ? $user->name : 'Guest Visitor';
         $email = $user ? $user->email : 'No email provided';
 
+        ClientRequest::create([
+            'client_name' => $name,
+            'client_email' => $email,
+            'request_text' => $this->clientRequest,
+            'is_completed' => false,
+        ]);
+
         $token = config('services.telegram.token');
         $chatId = config('services.telegram.chat_id');
         
         // Switched to HTML tags to prevent user-input crashes
-        $text = "💬 <b>New Floating Chat Request</b>\n";
-        $text .= "👤 <b>Client:</b> {$name}\n";
-        $text .= "📧 <b>Email:</b> {$email}\n\n";
-        $text .= "📝 <b>Message:</b>\n" . htmlspecialchars($this->clientRequest);
+        $text = "💬 <b>New To-do Request</b>\n";
+        $text .= "👤 <b>Client:</b> {$name}\n\n";
+        $text .= "📝 <b>Task:</b>\n" . htmlspecialchars($this->clientRequest);
 
         $response = Http::post("https://api.telegram.org/bot{$token}/sendMessage", [
             'chat_id' => $chatId,
