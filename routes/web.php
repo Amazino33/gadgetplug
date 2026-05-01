@@ -20,8 +20,8 @@ Route::get('/payment/callback', function (Request $request) {
     }
 
     // Verify the transaction with Paystack
-    $response = Http::withToken(env('PAYSTACK_SECRET_KEY'))
-        ->get("http://api.paystack.co/transaction/verify/{$reference}");
+    $response = Http::withToken(config('services.paystack.secret_key'))
+        ->get("https://api.paystack.co/transaction/verify/{$reference}");
 
     if ($response->successful() && $response->json('data.status') === 'success') {
         // Find the order and mark it as paid

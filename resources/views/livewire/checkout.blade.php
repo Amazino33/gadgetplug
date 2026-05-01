@@ -73,34 +73,57 @@ new class extends Component {
             ]);
         }
 
-        // 3. Initialize paystact payment
+        // 3. Initialize paystack payment
         try{
+            $paystackKey = config('services.paystack.secret_key');
+            
+            if (!$paystackKey) {
+                \Log::error('Paystack secret key is missing');
+                session()->flash('error', 'Payment configuration error. Please contact support.');
+                return;
+            }
+            
             $response = Http::withoutVerifying()
                 ->timeout(30)
                 ->withOptions([
                     CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4,
                 ])
-                ->withToken(env('PAYSTACK_SECRET_KEY'))
+                ->withToken($paystackKey)
                 ->post('https://api.paystack.co/transaction/initialize', [
-                    'amount' => (int) ($this->total * 100), 
+                    'amount' => (int) ($this->total * 100),
                     'email' => $this->email,
                     'reference' => $reference,
                     'callback_url' => route('payment.callback'),
                 ]);
 
+            \Log::info('Paystack API response', [
+                'status' => $response->status(),
+                'successful' => $response->successful(),
+                'body' => $response->json(),
+            ]);
+
             if ($response->successful()) {
-                // Redirect the user to the paystack payment page
-                $this->redirect($response->json('data.authorisation_url'));
+                $authorizationUrl = $response->json('data.authorization_url');
+                if ($authorizationUrl) {
+                    // Redirect the user to the paystack payment page
+                    $this->redirect($authorizationUrl);
+                    return;
+                } else {
+                    \Log::error('Paystack response missing authorization_url', $response->json());
+                    session()->flash('error', 'Payment gateway returned invalid response. Please try again.');
+                }
             } else {
-                dd([
+                // Log error instead of dd() for production
+                \Log::error('Paystack API error', [
                     'status' => $response->status(),
                     'error' => $response->json(),
-                    'key_used' => env('PAYSTACK_SECRET_KEY') ? 'Key is present' : 'Key is missing',
+                    'key_used' => $paystackKey ? 'Key is present' : 'Key is missing',
                 ]);
-                session()->flash('error', 'Could not connect to payment gateway, Please try again.');
+                session()->flash('error', 'Could not connect to payment gateway. Please try again.');
             }
         } catch (\Exception $e) {
-            dd('SYSTEM CRASH BEFORE REACHING PAYSTACK:'.$e->getMessage());
+            \Log::error('Paystack initialization error: ' . $e->getMessage());
+            session()->flash('error', 'Payment system error. Please try again later.');
         }
     }
 }; ?>
