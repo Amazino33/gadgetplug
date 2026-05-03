@@ -2,7 +2,7 @@
         {{ $slot }}
 
         @auth
-            @if(auth()->user()->hasRole('client_tester'))
+            @if(auth()->user()->hasRole('super_admin'))
                 <livewire:custom-request-form />
             @endif
         @endauth

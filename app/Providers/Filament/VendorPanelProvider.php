@@ -56,10 +56,6 @@ class VendorPanelProvider extends PanelProvider
             ->authMiddleware([
                 Authenticate::class,
             ])
-            ->tenant(Vendor::class)
-            ->renderHook(
-                PanelsRenderHook::BODY_END,
-                fn (): string => Blade::render('<livewire:custom-request-form />')
-            );
+            ->tenant(Vendor::class);
     }
 }

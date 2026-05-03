@@ -52,64 +52,67 @@ new class extends Component
 };
 ?>
 
-<div x-data="{ open: false }" class="fixed bottom-6 right-6 z-50 font-sans">
-    
+<div x-data="{ open: false }" style="position: fixed; bottom: 24px; right: 24px; z-index: 99999; font-family: sans-serif;">
+
     <!-- Chat Window Panel -->
-    <div 
-        x-show="open" 
+    <div
+        x-show="open"
         x-transition:enter="transition ease-out duration-200"
         x-transition:enter-start="opacity-0 translate-y-4"
         x-transition:enter-end="opacity-100 translate-y-0"
         x-transition:leave="transition ease-in duration-150"
         x-transition:leave-start="opacity-100 translate-y-0"
         x-transition:leave-end="opacity-0 translate-y-4"
-        class="bg-white w-80 rounded-2xl shadow-2xl border border-gray-100 mb-4 overflow-hidden"
-        style="display: none;"
+        style="display: none; background: white; width: 320px; border-radius: 16px; box-shadow: 0 25px 50px rgba(0,0,0,0.2); border: 1px solid #f0f0f0; margin-bottom: 16px; overflow: hidden;"
     >
-        <!-- Chat Header -->
-        <div class="bg-blue-600 p-4 text-white flex justify-between items-center">
+        <!-- Header -->
+        <div style="background: #2563eb; padding: 16px; color: white; display: flex; justify-content: space-between; align-items: center;">
             <div>
-                <h3 class="font-bold text-sm">GadgetPlug Support</h3>
-                <p class="text-xs text-blue-200">Usually replies instantly</p>
+                <div style="font-weight: 700; font-size: 14px;">GadgetPlug Support</div>
+                <div style="font-size: 12px; color: #bfdbfe;">Usually replies instantly</div>
             </div>
-            <button @click="open = false" class="text-white hover:text-gray-200 focus:outline-none">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <button @click="open = false" style="background: none; border: none; color: white; cursor: pointer; padding: 4px;">
+                <svg style="width: 20px; height: 20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                 </svg>
             </button>
         </div>
 
-        <!-- Chat Body -->
-        <div class="p-4 bg-gray-50">
+        <!-- Body -->
+        <div style="padding: 16px; background: #f9fafb;">
             @if ($successMessage)
-                <div class="mb-4 p-3 bg-green-100 border border-green-400 text-green-700 text-sm rounded-lg">
+                <div style="margin-bottom: 16px; padding: 12px; background: #dcfce7; border: 1px solid #4ade80; color: #166534; font-size: 14px; border-radius: 8px;">
                     {{ $successMessage }}
                 </div>
             @else
-                <p class="text-xs text-gray-500 mb-3 text-center">Send us a message below.</p>
-                
+                <p style="font-size: 12px; color: #6b7280; margin-bottom: 12px; text-align: center;">Send us a message below.</p>
+
                 <form wire:submit="submitRequest">
-                    <div class="mb-3">
-                        <textarea 
-                            wire:model="clientRequest" 
-                            rows="3" 
-                            class="w-full text-sm border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 resize-none p-3" 
-                            placeholder="I'm looking for..."></textarea>
-                        
-                        @error('clientRequest') 
-                            <span class="text-red-500 text-xs mt-1 block">{{ $message }}</span> 
+                    <div style="margin-bottom: 12px;">
+                        <textarea
+                            wire:model="clientRequest"
+                            rows="3"
+                            style="width: 100%; font-size: 14px; border: 1px solid #d1d5db; border-radius: 8px; padding: 10px; resize: none; box-sizing: border-box; outline: none; font-family: sans-serif;"
+                            placeholder="I'm looking for..."
+                        ></textarea>
+
+                        @error('clientRequest')
+                            <span style="color: #ef4444; font-size: 12px; margin-top: 4px; display: block;">{{ $message }}</span>
                         @enderror
                     </div>
 
-                    <button 
-                        type="submit" 
-                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg focus:outline-none transition-colors flex justify-center items-center"
+                    <button
+                        type="submit"
+                        style="width: 100%; background: #2563eb; color: white; font-weight: 700; padding: 10px 16px; border-radius: 8px; border: none; cursor: pointer; font-size: 14px; display: flex; justify-content: center; align-items: center;"
                         wire:loading.attr="disabled"
                         wire:target="submitRequest"
                     >
                         <span wire:loading.remove wire:target="submitRequest">Send Message</span>
-                        <span wire:loading wire:target="submitRequest" class="flex items-center">
-                            <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        <span wire:loading wire:target="submitRequest">
+                            <svg style="animation: spin 1s linear infinite; width: 16px; height: 16px; margin-right: 8px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle style="opacity: 0.25;" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path style="opacity: 0.75;" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
                             Sending...
                         </span>
                     </button>
@@ -119,17 +122,24 @@ new class extends Component
     </div>
 
     <!-- Floating Toggle Button -->
-    <button 
-        @click="open = !open" 
-        class="bg-blue-600 hover:bg-blue-700 text-white rounded-full p-4 shadow-lg focus:outline-none transition-transform hover:scale-105 flex items-center justify-center ml-auto"
+    <button
+        @click="open = !open"
+        style="background: #2563eb; color: white; border-radius: 9999px; padding: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; margin-left: auto; transition: transform 0.2s;"
+        onmouseover="this.style.transform='scale(1.05)'"
+        onmouseout="this.style.transform='scale(1)'"
     >
-        <!-- Open Icon (Chat Bubble) -->
-        <svg x-show="!open" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg x-show="!open" style="width: 24px; height: 24px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>
         </svg>
-        <!-- Close Icon (X) -->
-        <svg x-show="open" style="display: none;" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg x-show="open" style="display: none; width: 24px; height: 24px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
         </svg>
     </button>
+
+    <style>
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+    </style>
 </div>
