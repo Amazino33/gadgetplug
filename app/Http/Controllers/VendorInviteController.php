@@ -70,6 +70,6 @@ class VendorInviteController extends Controller
         // Log them in
         Auth::login($user);
 
-        return redirect()->route('filament.vendor.home', ['tenant' => $vendor]);
+        return redirect()->route('filament.vendor.pages.dashboard', ['tenant' => $vendor]);
     }
 }
