@@ -94,7 +94,7 @@ new class extends Component {
                             {{-- Price & Stock --}}
                             <div class="mt-4 flex items-center justify-between">
                                 <span class="text-xl font-bold dark:text-white">
-                                    ${{ number_format($product->price, 2) }}
+                                    ₦{{ number_format($product->price, 2) }}
                                 </span>
                                 <span
                                     class="text-sm {{ $product->stock_quantity > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400' }}">

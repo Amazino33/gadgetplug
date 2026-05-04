@@ -111,7 +111,7 @@ new class extends Component {
                             {{-- Price & Stock --}}
                             <div class="flex items-center gap-4 mb-6">
                                 <span class="text-3xl font-bold text-gray-900 dark:text-white">
-                                    ${{ number_format($product->price, 2) }}
+                                    ₦{{ number_format($product->price, 2) }}
                                 </span>
                                 <span class="px-3 py-1 rounded-full text-sm font-medium
                                     {{ $product->stock_quantity > 0 ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' }}">

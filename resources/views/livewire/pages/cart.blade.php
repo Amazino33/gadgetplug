@@ -92,7 +92,7 @@ new class extends Component {
                                         <div class="text-sm font-medium text-gray-900 dark:text-white">{{ $item['name'] }}</div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="text-sm text-gray-900 dark:text-white">${{ number_format($item['price'], 2) }}</div>
+                                        <div class="text-sm text-gray-900 dark:text-white">₦{{ number_format($item['price'], 2) }}</div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap">
                                         <div class="flex items-center gap-2">
@@ -106,7 +106,7 @@ new class extends Component {
                                         </div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap">
-                                        <div class="text-sm font-medium text-gray-900 dark:text-white">${{ number_format($item['subtotal'], 2) }}</div>
+                                        <div class="text-sm font-medium text-gray-900 dark:text-white">₦{{ number_format($item['subtotal'], 2) }}</div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-right">
                                         <button class="text-red-600 hover:text-red-900 dark:hover:text-red-400" wire:click="removeItem({{ $item['id'] }})">Remove</button>
@@ -117,7 +117,7 @@ new class extends Component {
                         <tfoot class="bg-gray-50 dark:bg-gray-900">
                             <tr>
                                 <td colspan="3" class="px-6 px-4 text-right text-sm font-medium text-gray-900 dark:text-white">Total:</td>
-                                <td class="px-6 px-4 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-white">${{ number_format($total, 2) }}</td>
+                                <td class="px-6 px-4 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-white">₦{{ number_format($total, 2) }}</td>
                                 <td></td>
                             </tr>
                         </tfoot>
