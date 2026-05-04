@@ -59,4 +59,10 @@ Route::get('/nuke-cache', function () {
     return 'Web cache and OPcache destroyed!';
 });
 
+Route::get('/invite/{token}', [App\Http\Controllers\VendorInviteController::class, 'accept'])
+    ->name('vendor.invite.accept');
+
+Route::post('/invite/{token}', [App\Http\Controllers\VendorInviteController::class, 'store'])
+    ->name('vendor.invite.store');
+
 require __DIR__.'/settings.php';

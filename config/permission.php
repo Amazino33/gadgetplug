@@ -35,7 +35,7 @@ return [
          * Eloquent model should be used to retrieve your teams. Of course, it
          * is often just the "Team" model but you may use whatever you like.
          */
-        'team' => null,
+        'team' => \App\Models\Vendor::class,
 
         /*
          * When using the "HasModels" trait and passing raw IDs to syncModels,
@@ -148,12 +148,12 @@ return [
      * (view the latest version of this package's migration file)
      */
 
-    'teams' => false,
+    'teams' => true,
 
     /*
      * The class to use to resolve the permissions team id
      */
-    'team_resolver' => DefaultTeamResolver::class,
+    'team_resolver' => \App\Auth\VendorTeamResolver::class,
 
     /*
      * Passport Client Credentials Grant
