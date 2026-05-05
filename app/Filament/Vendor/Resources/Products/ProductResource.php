@@ -18,7 +18,7 @@ use Illuminate\Database\Eloquent\Builder;
 class ProductResource extends Resource
 {
     protected static ?string $model = Product::class;
-
+    protected static ?string $tenantOwnershipRelationshipName = 'vendor';
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
     public static function form(Schema $schema): Schema
@@ -50,5 +50,19 @@ class ProductResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()->with('media');
+    }
+
+    public static function canAccess(): bool
+    {
+        $vendor = filament()->getTenant();
+        $user = auth()->user();
+
+        if (!$vendor) return false;
+
+        setPermissionsTeamId($vendor->id);
+
+        return $user->hasRole('super_admin')
+            || $vendor->isOwner($user)
+            || $user->hasPermissionTo('view_any_products');
     }
 }

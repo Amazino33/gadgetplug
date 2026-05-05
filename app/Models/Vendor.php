@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Collection;
 
 class Vendor extends Model
 {
@@ -50,5 +51,20 @@ class Vendor extends Model
     public function canManage(User $user): bool
     {
         return $user->hasRole('super_admin') || $this->isOwner($user);
+    }
+
+    public static function getTenantsForUser(\App\Models\User $user): Collection
+    {
+        if ($user->hasRole('super_admin')) {
+            return static::all();
+        }
+
+        // Vendors the user owns
+        $owned = static::where('user_id', $user->id)->get();
+
+        // Vendors the user is a team member of
+        $member = $user->vendors()->get();
+
+        return $owned->merge($member)->unique('id');
     }
 }

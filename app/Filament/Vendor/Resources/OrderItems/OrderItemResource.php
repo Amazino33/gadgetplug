@@ -22,6 +22,8 @@ class OrderItemResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
+    protected static ?string $tenantOwnershipRelationshipName = 'vendor';
+
     public static function form(Schema $schema): Schema
     {
         return OrderItemForm::configure($schema);
@@ -51,5 +53,19 @@ class OrderItemResource extends Resource
             'view' => ViewOrderItem::route('/{record}'),
             'edit' => EditOrderItem::route('/{record}/edit'),
         ];
+    }
+
+    public static function canAccess(): bool
+    {
+        $vendor = filament()->getTenant();
+        $user = auth()->user();
+
+        if (!$vendor) return false;
+
+        setPermissionsTeamId($vendor->id);
+
+        return $user->hasRole('super_admin')
+            || $vendor->isOwner($user)
+            || $user->hasPermissionTo('view_any_order_items');
     }
 }

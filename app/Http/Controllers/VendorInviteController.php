@@ -70,6 +70,15 @@ class VendorInviteController extends Controller
         // Log them in
         Auth::login($user);
 
+        session()->flash('success', 'Welcome to ' . $vendor->name . '! Your account has been set up successfully.');
+
+        // Queue a notification to show after redirect
+        session()->put('filament.notification', [
+            'title' => 'Welcome to ' . $vendor->name . '!',
+            'body'  => 'Your account has been set up successfully.',
+            'status' => 'success',
+        ]);
+
         return redirect()->route('filament.vendor.pages.dashboard', ['tenant' => $vendor]);
     }
 }

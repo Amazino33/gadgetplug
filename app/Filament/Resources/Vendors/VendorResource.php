@@ -45,4 +45,10 @@ class VendorResource extends Resource
             'edit' => EditVendor::route('/{record}/edit'),
         ];
     }
+
+    public static function canAccess(): bool
+    {
+        $user = auth()->user();
+        return $user->hasRole('super_admin');
+    }
 }

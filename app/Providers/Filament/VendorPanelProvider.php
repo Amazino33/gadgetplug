@@ -52,10 +52,11 @@ class VendorPanelProvider extends PanelProvider
                 SubstituteBindings::class,
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
+                \App\Http\Middleware\EnsureUserBelongsToVendor::class,
             ])
             ->authMiddleware([
                 Authenticate::class,
             ])
-            ->tenant(Vendor::class);
+            ->tenant(Vendor::class, ownershipRelationship: 'vendors');
     }
 }

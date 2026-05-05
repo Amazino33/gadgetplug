@@ -69,19 +69,36 @@ class User extends Authenticatable implements HasTenants, FilamentUser
             ->implode('');
     }
 
-    public function vendors()
+    // Vendors this user owns
+    public function ownedVendors()
     {
         return $this->hasMany(Vendor::class);
     }
 
+    // Vendors this user is a team member of
+    public function memberVendors()
+    {
+        return $this->belongsToMany(Vendor::class, 'vendor_users')
+            ->withPivot('role')
+            ->withTimestamps();
+    }
+
+    // All vendors (owned + member) — used by Filament tenant resolution
+    public function vendors()
+    {
+        $owned = $this->ownedVendors()->get();
+        $member = $this->memberVendors()->get();
+        return $owned->merge($member)->unique('id');
+    }
+
     public function getTenants(Panel $panel): Collection
     {
-        return $this->vendors;
+        return $this->vendors();
     }
 
     public function canAccessTenant(Model $tenant): bool
     {
-        return $this->vendors()->whereKey($tenant)->exists();
+        return $this->vendors()->contains($tenant);
     }
 
     public function canAccessPanel(Panel $panel): bool

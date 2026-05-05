@@ -26,7 +26,6 @@ class TeamMembers extends Page
     public ?string $inviteEmail = '';
     public array $invitePermissions = [];
 
-    // Only owner can see this page
     public static function canAccess(): bool
     {
         $vendor = filament()->getTenant();
@@ -41,10 +40,13 @@ class TeamMembers extends Page
     public function getViewData(): array
     {
         $vendor = filament()->getTenant();
+        setPermissionsTeamId($vendor->id);
 
         return [
             'members' => $vendor->users()->withPivot('role')->get(),
-            'permissions' => Permission::where('guard_name', 'web')->get(),
+            'permissions' => Permission::where('guard_name', 'web')
+                ->where('name', 'not like', '%:%')
+                ->get(),
         ];
     }
 
@@ -53,7 +55,7 @@ class TeamMembers extends Page
         return [
             Action::make('invite')
                 ->label('Invite Member')
-                ->icon('heroicon-o-envelope')
+                ->icon(Heroicon::OutlinedEnvelope)
                 ->form([
                     TextInput::make('email')
                         ->email()
@@ -64,6 +66,7 @@ class TeamMembers extends Page
                         ->multiple()
                         ->options(
                             Permission::where('guard_name', 'web')
+                                ->where('name', 'not like', '%:%')
                                 ->pluck('name', 'name')
                                 ->map(fn($name) => str_replace('_', ' ', ucfirst($name)))
                         )
@@ -72,6 +75,48 @@ class TeamMembers extends Page
                 ])
                 ->action(function (array $data): void {
                     $this->inviteMember($data['email'], $data['permissions']);
+                }),
+
+            // ← new: edit permissions action
+            Action::make('editPermissions')
+                ->label('Edit Permissions')
+                ->icon(Heroicon::OutlinedPencilSquare)
+                ->form([
+                    Select::make('user_id')
+                        ->label('Member')
+                        ->options(
+                            filament()->getTenant()
+                                ->users()
+                                ->get()
+                                ->pluck('name', 'id')
+                        )
+                        ->required()
+                        ->live()
+                        ->afterStateUpdated(function (callable $set, $state) {
+                            if (!$state) return;
+
+                            $vendor = filament()->getTenant();
+                            setPermissionsTeamId($vendor->id);
+
+                            $user = \App\Models\User::find($state);
+                            if (!$user) return;
+
+                            $set('permissions', $user->getAllPermissions()->pluck('name')->toArray());
+                        }),
+
+                    Select::make('permissions')
+                        ->label('Permissions')
+                        ->multiple()
+                        ->options(
+                            Permission::where('guard_name', 'web')
+                                ->where('name', 'not like', '%:%')
+                                ->pluck('name', 'name')
+                                ->map(fn($name) => str_replace('_', ' ', ucfirst($name)))
+                        )
+                        ->required(),
+                ])
+                ->action(function (array $data): void {
+                    $this->updateMemberPermissions($data['user_id'], $data['permissions']);
                 }),
         ];
     }
@@ -82,12 +127,10 @@ class TeamMembers extends Page
         $user = User::where('email', $email)->first();
 
         if ($user) {
-            // Existing user — attach directly
-if (!$vendor->users()->where('user_id', $user->id)->exists()) {
-    $vendor->users()->attach($user->id, ['role' => 'member']); // member is now valid
-}
+            if (!$vendor->users()->where('user_id', $user->id)->exists()) {
+                $vendor->users()->attach($user->id, ['role' => 'member']);
+            }
 
-            // Set team context then assign permissions
             setPermissionsTeamId($vendor->id);
             $user->givePermissionTo($permissions);
 
@@ -96,7 +139,6 @@ if (!$vendor->users()->where('user_id', $user->id)->exists()) {
                 ->success()
                 ->send();
         } else {
-            // New user — store invite in session and send email
             $token = Str::random(32);
 
             cache()->put("vendor_invite_{$token}", [
@@ -105,7 +147,6 @@ if (!$vendor->users()->where('user_id', $user->id)->exists()) {
                 'permissions' => $permissions,
             ], now()->addDays(7));
 
-            // Send invite email
             Mail::to($email)->send(new \App\Mail\VendorInviteMail(
                 $vendor,
                 $token,
@@ -117,6 +158,31 @@ if (!$vendor->users()->where('user_id', $user->id)->exists()) {
                 ->success()
                 ->send();
         }
+    }
+
+    // ← new: update permissions for existing member
+    protected function updateMemberPermissions(int $userId, array $permissions): void
+    {
+        $vendor = filament()->getTenant();
+        $member = User::find($userId);
+
+        if (!$member) return;
+
+        setPermissionsTeamId($vendor->id);
+
+        $member->revokePermissionTo(
+            Permission::where('guard_name', 'web')
+                ->where('name', 'not like', '%:%')
+                ->get()
+        );
+        $member->givePermissionTo($permissions);
+
+        Notification::make()
+            ->title('Permissions updated for ' . $member->name)
+            ->success()
+            ->send();
+
+        $this->dispatch('$refresh');
     }
 
     public function removeMember(int $userId): void
@@ -136,7 +202,9 @@ if (!$vendor->users()->where('user_id', $user->id)->exists()) {
         if ($member) {
             setPermissionsTeamId($vendor->id);
             $member->revokePermissionTo(
-                Permission::where('guard_name', 'web')->get()
+                Permission::where('guard_name', 'web')
+                    ->where('name', 'not like', '%:%')
+                    ->get()
             );
             $vendor->users()->detach($userId);
 
@@ -147,5 +215,10 @@ if (!$vendor->users()->where('user_id', $user->id)->exists()) {
         }
 
         $this->dispatch('$refresh');
+    }
+
+    public function editMemberPermissions(int $userId): void
+    {
+        $this->dispatch('open-edit-permissions', userId: $userId);
     }
 }

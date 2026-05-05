@@ -16,6 +16,21 @@
         <form method="POST" action="{{ route('vendor.invite.store', $token) }}">
             @csrf
 
+            {{-- Add this at the top of the form div --}}
+            @if(session('error'))
+                <div style="margin-bottom: 16px; padding: 12px; background: #fee2e2; border: 1px solid #fca5a5; color: #dc2626; font-size: 14px; border-radius: 8px;">
+                    {{ session('error') }}
+                </div>
+            @endif
+
+            @if($errors->any())
+                <div style="margin-bottom: 16px; padding: 12px; background: #fee2e2; border: 1px solid #fca5a5; color: #dc2626; font-size: 14px; border-radius: 8px;">
+                    @foreach($errors->all() as $error)
+                        <div>{{ $error }}</div>
+                    @endforeach
+                </div>
+            @endif
+
             <div style="margin-bottom: 16px;">
                 <label style="display: block; font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 4px;">Email</label>
                 <input type="email" value="{{ $email }}" disabled
