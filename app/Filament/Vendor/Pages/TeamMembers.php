@@ -170,12 +170,12 @@ class TeamMembers extends Page
 
         setPermissionsTeamId($vendor->id);
 
-        $member->revokePermissionTo(
-            Permission::where('guard_name', 'web')
-                ->where('name', 'not like', '%:%')
-                ->get()
-        );
-        $member->givePermissionTo($permissions);
+        // Force fresh permission fetch after setting team context
+        $member->unsetRelation('permissions');
+        $member->unsetRelation('roles');
+
+        // Sync instead of revoke+give — cleaner and atomic
+        $member->syncPermissions($permissions);
 
         Notification::make()
             ->title('Permissions updated for ' . $member->name)
