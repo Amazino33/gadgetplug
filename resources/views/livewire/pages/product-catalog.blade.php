@@ -91,7 +91,8 @@ $cardBgs = [
 <div>
 <x-layouts.storefront>
 
-{{-- ─── HERO ──────────────────────────────────────────────────────────────── --}}
+{{-- ─── HERO (home page only) ──────────────────────────────────────────────── --}}
+@if($selectedCategory === null && $search === '')
 <section class="relative overflow-hidden px-4 md:px-6 py-10 md:py-10 flex flex-col md:flex-row items-center gap-8 md:gap-8 bg-gradient-to-br from-[#f0f8f0] via-[#e8f5e9] to-white dark:from-[#0d1a0d] dark:via-[#0f1f0f] dark:to-[#162016]"
     style="min-height: 340px;">
 
@@ -176,6 +177,7 @@ $cardBgs = [
         </div>
     </div>
 </section>
+@endif
 
 {{-- ─── FLASH STRIP ────────────────────────────────────────────────────────── --}}
 <div class="bg-brand-orange px-4 md:px-6 py-2 flex items-center justify-between">
