@@ -1,11 +1,11 @@
 <?php
 
 use Livewire\Volt\Component;
-use Illuminate\Support\Facades\Session;
 use Livewire\Attributes\On;
+use Illuminate\Support\Facades\Session;
 
 new class extends Component {
-    public $count = 0;
+    public int $count = 0;
 
     public function mount(): void
     {
@@ -20,13 +20,16 @@ new class extends Component {
     }
 }; ?>
 
-<a href="{{ route('cart') }}" class="relative inline-block">
-    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 dark:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+<a href="{{ route('cart') }}" class="relative flex flex-col items-center gap-0.5 cursor-pointer text-[#444]">
+    <svg class="w-[22px] h-[22px] fill-none" style="stroke:#333;stroke-width:1.7" viewBox="0 0 24 24">
+        <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
+        <line x1="3" y1="6" x2="21" y2="6"/>
+        <path d="M16 10a4 4 0 0 1-8 0"/>
     </svg>
-    @if($count > 0)
-        <span class="absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold rounded-full h-5 w-5 flex items-conter justify-center">
-            {{ $count }}
-        </span>
+    <span class="text-[10px] text-[#5a7a5c] font-inter">Cart</span>
+    @if ($count > 0)
+    <span class="absolute -top-1 -right-1.5 bg-brand-lime text-brand-dark text-[9px] font-bold font-montserrat w-4 h-4 rounded-full flex items-center justify-center border border-white">
+        {{ $count }}
+    </span>
     @endif
 </a>

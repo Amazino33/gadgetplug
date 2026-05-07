@@ -9,6 +9,18 @@
 
 @theme {
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-montserrat: 'Montserrat', sans-serif;
+    --font-inter: 'Inter', sans-serif;
+
+    /* GadgetPlug brand palette */
+    --color-brand: #068B03;
+    --color-brand-lime: #B1FF00;
+    --color-brand-orange: #F97316;
+    --color-brand-dark: #0a2d09;
+    --color-brand-footer: #0d1f0d;
+    --color-brand-bg: #F2F5F3;
+    --color-brand-muted: #5a7a5c;
+    --color-brand-border: #e8ede9;
 
     --color-zinc-50: #fafafa;
     --color-zinc-100: #f5f5f5;
@@ -63,3 +75,71 @@ select:focus[data-flux-control] {
 /* \[:where(&)\]:size-4 {
     @apply size-4;
 } */
+
+/* ─── Storefront custom utilities ─────────────────────────────────────────── */
+
+.scrollbar-none::-webkit-scrollbar { display: none; }
+.scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ─── Dark mode helpers ────────────────────────────────────────────────────── */
+/* Neutral icon strokes: apply .gp-icon to SVGs with stroke:#333 in light mode */
+.dark .gp-icon { stroke: #8ab08a; }
+/* Inactive mobile-nav icon strokes */
+.dark .gp-icon-inactive { stroke: #4a6a4a; }
+/* Product card image placeholder: overrides inline gradient style */
+.dark .gp-card-img { background: linear-gradient(135deg, #1a2a1a, #1f2f1f) !important; }
+
+@keyframes float-y {
+    0%, 100% { transform: translateY(0); }
+    50%       { transform: translateY(-6px); }
+}
+.animate-float       { animation: float-y 3s ease-in-out infinite; }
+.animate-float-delay { animation: float-y 3s ease-in-out infinite 1.5s; }
+
+/* Hero phone visual */
+.gp-phone-body {
+    width: 140px;
+    height: 270px;
+    background: linear-gradient(145deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    border-radius: 30px;
+    position: relative;
+    box-shadow: 20px 20px 60px rgba(0,0,0,.25), -4px -4px 20px rgba(255,255,255,.08);
+}
+.gp-phone-screen {
+    position: absolute;
+    left: 8px; top: 12px;
+    width: 124px; height: 246px;
+    background: linear-gradient(160deg, #0d0d1a 0%, #1a2940 100%);
+    border-radius: 24px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+.gp-phone-notch {
+    width: 48px; height: 10px;
+    background: #0d0d1a;
+    border-radius: 0 0 10px 10px;
+    position: absolute;
+    top: 0; left: 50%;
+    transform: translateX(-50%);
+    z-index: 2;
+}
+
+/* Hero radial glow blobs */
+.gp-hero-glow-1 {
+    position: absolute;
+    right: -60px; top: -60px;
+    width: 400px; height: 400px;
+    background: radial-gradient(circle, rgba(6,139,3,.07) 0%, transparent 70%);
+    pointer-events: none;
+}
+.gp-hero-glow-2 {
+    position: absolute;
+    bottom: -40px; left: 200px;
+    width: 300px; height: 300px;
+    background: radial-gradient(circle, rgba(177,255,0,.1) 0%, transparent 70%);
+    pointer-events: none;
+}
