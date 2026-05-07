@@ -49,10 +49,17 @@ class ProductForm
                                     ->required()
                                     ->columnSpanFull(),
 
+                                TextInput::make('cost_price')
+                                    ->numeric()
+                                    ->prefix('₦')
+                                    ->default(0)
+                                    ->required(),
+
                                 TextInput::make('price')
                                     ->numeric()
                                     ->required()
-                                    ->prefix('₦'),
+                                    ->prefix('₦')
+                                    ->gt('cost_price'),
 
                                 TextInput::make('stock_quantity')
                                     ->numeric()

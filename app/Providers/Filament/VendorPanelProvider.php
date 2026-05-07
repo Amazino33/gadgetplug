@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Vendor\Resources\AuditSessionResource;
 use App\Models\Vendor;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -21,6 +22,8 @@ use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Support\Facades\Blade;
+use App\Filament\Widgets\StoreMetricsOverview;
+use App\Filament\Widgets\SalesChannelChart; 
 
 class VendorPanelProvider extends PanelProvider
 {
@@ -39,8 +42,8 @@ class VendorPanelProvider extends PanelProvider
             ])
             ->discoverWidgets(in: app_path('Filament/Vendor/Widgets'), for: 'App\Filament\Vendor\Widgets')
             ->widgets([
-                AccountWidget::class,
-                FilamentInfoWidget::class,
+                StoreMetricsOverview::class,
+                SalesChannelChart::class,
             ])
             ->middleware([
                 EncryptCookies::class,
@@ -57,6 +60,9 @@ class VendorPanelProvider extends PanelProvider
             ->authMiddleware([
                 Authenticate::class,
             ])
-            ->tenant(Vendor::class, ownershipRelationship: 'vendors');
+            ->tenant(Vendor::class, ownershipRelationship: 'vendors')
+            ->resources([
+                AuditSessionResource::class, // Explicitly tell Filament to load this!
+            ]);
     }
 }

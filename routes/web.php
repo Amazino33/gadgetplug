@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Payment\PaystackCallbackController;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Session;
 use App\Models\Order;
@@ -13,38 +14,7 @@ Volt::route('/product/{product:slug}', 'pages.product-detail')->name('product.sh
 Volt::route('/cart', 'pages.cart')->name('cart');
 Volt::route('/checkout', 'checkout')->name('checkout');
 
-Route::get('/payment/callback', function (Request $request) {
-    $reference = $request->query('reference');
-
-    if (!$reference) {
-        abort(400, 'No reference supplied');
-    }
-
-    // Verify the transaction with Paystack
-    $response = Http::withToken(config('services.paystack.secret_key'))
-        ->get("https://api.paystack.co/transaction/verify/{$reference}");
-
-    if ($response->successful() && $response->json('data.status') === 'success') {
-        // Find the order and mark it as paid
-        $order = Order::where('reference', $reference)->firstOrFail();
-
-        if ($order->status === 'pending') {
-            $order->update(['status' => 'paid']);
-
-            // Deduct stock from product
-            foreach ($order->items as $item) {
-                $item->product->decrement('stock_quantity', $item->quantity);
-            }
-        }
-
-        // Clear the cart
-        Session::forget('cart');
-        
-        return redirect()->route('home')->with('success', 'Payment successful! Your order is being processed.');
-    }
-
-    return redirect()->route('cart')->with('error', 'Payment failed or was cancelled.');
-})->name('payment.callback');
+Route::get('/payment/callback', PaystackCallbackController::class)->name('payment.callback');
 
 
 Route::middleware(['auth', 'verified'])->group(function () {
