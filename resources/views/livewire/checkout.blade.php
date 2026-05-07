@@ -118,7 +118,8 @@ new class extends Component {
 <div>
 <x-layouts.storefront>
 
-<div class="px-4 md:px-6 py-7 max-w-[1000px] mx-auto bg-[#f8fcf8] dark:bg-[#0d1a0d] min-h-screen">
+<div class="bg-[#f8fcf8] dark:bg-[#0d1a0d] min-h-screen">
+<div class="px-4 md:px-6 py-7 max-w-[1000px] mx-auto">
 
     {{-- ─── PAGE HEADER ─────────────────────────────────────────────────────── --}}
     <div class="flex items-center gap-3 mb-7">
@@ -360,6 +361,7 @@ new class extends Component {
         </div>
     </div>
     </form>
+</div>
 </div>
 
 </x-layouts.storefront>
