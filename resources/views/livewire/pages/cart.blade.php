@@ -95,7 +95,7 @@ new class extends Component {
 <div>
 <x-layouts.storefront>
 
-<div class="px-4 md:px-6 py-7 max-w-[1100px] mx-auto">
+<div class="px-4 md:px-6 py-7 max-w-[1100px] mx-auto bg-[#f8fcf8] dark:bg-[#0d1a0d] min-h-screen">
 
     {{-- ─── PAGE HEADER ─────────────────────────────────────────────────────── --}}
     <div class="flex items-center justify-between mb-6">
