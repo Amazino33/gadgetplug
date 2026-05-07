@@ -133,15 +133,16 @@
         </div>
 
         {{-- Nav strip (desktop only) --}}
+        @php $navCategories = \App\Models\Category::orderBy('name')->get(['name', 'slug']); @endphp
         <nav class="hidden md:flex items-center h-[34px] border-t border-[#f0f4f1] dark:border-[#2a3a2a] overflow-x-auto scrollbar-none">
             <a href="{{ route('home') }}"
                class="px-3.5 h-full flex items-center text-[12px] font-semibold text-brand-orange whitespace-nowrap border-b-2 border-transparent hover:border-brand-orange transition-colors cursor-pointer">
                 🔥 Flash Sale
             </a>
-            @foreach(['Phones','Laptops','Audio','Wearables','Gaming','Accessories','Smart Home','Cameras','Refurbished'] as $cat)
-            <a href="{{ route('home', ['category' => strtolower($cat)]) }}"
-               class="px-3.5 h-full flex items-center text-[12px] font-medium text-[#333] dark:text-[#b0c8b0] whitespace-nowrap border-b-2 border-transparent hover:text-brand hover:border-brand transition-colors cursor-pointer {{ request('category') === strtolower($cat) ? '!text-brand border-brand' : '' }}">
-                {{ $cat }}
+            @foreach($navCategories as $cat)
+            <a href="{{ route('home', ['category' => $cat->slug]) }}"
+               class="px-3.5 h-full flex items-center text-[12px] font-medium text-[#333] dark:text-[#b0c8b0] whitespace-nowrap border-b-2 border-transparent hover:text-brand hover:border-brand transition-colors cursor-pointer {{ request('category') === $cat->slug ? '!text-brand border-brand' : '' }}">
+                {{ $cat->name }}
             </a>
             @endforeach
             <a href="#"

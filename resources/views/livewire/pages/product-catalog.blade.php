@@ -18,6 +18,11 @@ new class extends Component {
     public function mount(): void
     {
         $this->search = request('search', '');
+
+        if ($slug = request('category')) {
+            $category = Category::where('slug', $slug)->first();
+            $this->selectedCategory = $category?->id;
+        }
     }
 
     public function with(): array
