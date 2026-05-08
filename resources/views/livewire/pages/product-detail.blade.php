@@ -37,7 +37,7 @@ new class extends Component {
 @php
 $allImages  = $product->getMedia('product-images');
 $firstImage = $allImages->first();
-$defaultUrl = $firstImage ? $firstImage->getUrl('preview') : '';
+$defaultUrl = $firstImage ? $firstImage->getUrl() : '';
 
 $categoryEmojis = [
     'phones' => '📱', 'mobile' => '📱', 'smartphones' => '📱',
@@ -109,7 +109,7 @@ $emoji = $categoryEmojis[strtolower($product->category?->name ?? '')] ?? '📦';
             @if ($allImages->count() > 1)
             <div class="grid grid-cols-4 gap-2">
                 @foreach ($allImages as $image)
-                @php $previewUrl = $image->getUrl('preview'); @endphp
+                @php $previewUrl = $image->getUrl(); @endphp
                 <button @click="current = '{{ $previewUrl }}'"
                     class="aspect-square rounded-xl overflow-hidden border-2 transition-all duration-200 focus:outline-none"
                     :class="current === '{{ $previewUrl }}' ? 'border-brand opacity-100' : 'border-transparent opacity-60 hover:opacity-100 hover:border-brand-border'">

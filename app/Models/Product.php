@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\Image\Enums\Fit;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class Product extends Model implements HasMedia
@@ -39,14 +40,15 @@ class Product extends Model implements HasMedia
     public function registerMediaConversions(Media $media = null): void
     {
         $this->addMediaConversion('thumb')
-            ->width(300)
-            ->height(300)
-            ->sharpen(5)
-            ->nonQueued();  // run synchronously for now, can queue later
+            ->fit(Fit::Crop, 300, 300)
+            ->quality(90)
+            ->sharpen(10)
+            ->nonQueued();
 
         $this->addMediaConversion('preview')
-            ->width(800)
-            ->height(800)
+            ->fit(Fit::Crop, 800, 800)
+            ->quality(90)
+            ->sharpen(5)
             ->nonQueued();
     }
 }
