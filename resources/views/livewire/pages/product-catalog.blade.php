@@ -265,7 +265,7 @@ $cardBgs = [
             @php
                 $bg = $cardBgs[$product->id % count($cardBgs)];
                 $isNew = $product->created_at->diffInDays(now()) <= 14;
-                $thumbUrl = $product->getFirstMediaUrl('product-images', 'thumb');
+                $thumbUrl = $product->getFirstMediaUrl('product-images', 'preview');
                 $emoji = $categoryEmojis[strtolower($product->category?->name ?? '')] ?? '📦';
             @endphp
 
