@@ -4,6 +4,9 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
     <title>GadgetPlug — Nigeria's #1 Tech Marketplace</title>
+    <link rel="icon" type="image/svg+xml" href="/images/logo.svg">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
     {{-- Dark mode: prevent flash of unstyled content --}}
     <script>
         (function() {
@@ -28,15 +31,8 @@
         <div class="flex items-center gap-3 md:gap-4 h-[58px]">
 
             {{-- Logo --}}
-            <a href="{{ route('home') }}" class="flex items-center gap-2 flex-shrink-0">
-                <div class="w-8 h-8 bg-brand rounded-lg flex items-center justify-center">
-                    <svg class="w-[18px] h-[18px] fill-brand-lime" viewBox="0 0 24 24">
-                        <path d="M13 2L4 14h8l-1 8 9-12h-8z"/>
-                    </svg>
-                </div>
-                <span class="font-montserrat font-black text-[18px] text-brand tracking-tight leading-none">
-                    Gadget<span class="text-brand-orange">Plug</span>
-                </span>
+            <a href="{{ route('home') }}" class="flex items-center flex-shrink-0">
+                <img src="/images/logo.svg" alt="GadgetPlug" class="h-9 w-auto" draggable="false">
             </a>
 
             {{-- Search bar (md+) --}}
