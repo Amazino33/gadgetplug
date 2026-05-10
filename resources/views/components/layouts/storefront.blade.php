@@ -4,10 +4,6 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
     <title>GadgetPlug — Nigeria's #1 Tech Marketplace</title>
-    <link rel="icon" type="image/x-icon"  href="/favicon.ico">
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
     {{-- Dark mode: prevent flash of unstyled content --}}
     <script>
         (function() {
@@ -32,13 +28,14 @@
         <div class="flex items-center gap-3 md:gap-4 h-[58px]">
 
             {{-- Logo --}}
-            <a href="{{ route('home') }}" class="flex items-center flex-shrink-0">
-                {{-- White-bg logo: shown as-is in light mode; wrapped in a white pill in dark mode --}}
-                <span class="inline-flex items-center dark:bg-white dark:rounded-lg dark:px-2 dark:py-0.5">
-                    <img src="/images/logo.png"
-                         alt="GadgetPlug"
-                         class="h-8 w-auto object-contain"
-                         onerror="this.parentElement.innerHTML='<span class=\'font-montserrat font-black text-[18px] text-brand tracking-tight\'>Gadget<span class=\'text-brand-orange\'>Plug</span></span>'">
+            <a href="{{ route('home') }}" class="flex items-center gap-2 flex-shrink-0">
+                <div class="w-8 h-8 bg-brand rounded-lg flex items-center justify-center">
+                    <svg class="w-[18px] h-[18px] fill-brand-lime" viewBox="0 0 24 24">
+                        <path d="M13 2L4 14h8l-1 8 9-12h-8z"/>
+                    </svg>
+                </div>
+                <span class="font-montserrat font-black text-[18px] text-brand tracking-tight leading-none">
+                    Gadget<span class="text-brand-orange">Plug</span>
                 </span>
             </a>
 
