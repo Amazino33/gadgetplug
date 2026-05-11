@@ -32,6 +32,13 @@ new class extends Component {
         app(CartService::class)->add($this->product, $this->quantity);
         $this->dispatch('cart-updated');
     }
+
+    public function buyNow(): void
+    {
+        app(CartService::class)->add($this->product, $this->quantity);
+        $this->dispatch('cart-updated');
+        $this->redirectRoute('checkout');
+    }
 }; ?>
 
 @php
@@ -186,19 +193,27 @@ $emoji = $categoryEmojis[strtolower($product->category?->name ?? '')] ?? '📦';
             </div>
             @endif
 
-            {{-- Add to cart --}}
-            <div class="flex gap-3 mb-6">
+            {{-- Add to cart + Buy Now --}}
+            <div class="flex gap-2.5 mb-6">
                 <button wire:click="addToCart"
-                    class="flex-1 flex items-center justify-center gap-2 bg-brand hover:bg-[#055002] text-white font-montserrat font-bold text-[14px] py-3.5 rounded-xl border-0 cursor-pointer transition-all hover:-translate-y-px disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+                    class="flex-1 flex items-center justify-center gap-2 bg-brand hover:bg-[#055002] text-white font-montserrat font-bold text-[13px] py-3.5 rounded-xl border-0 cursor-pointer transition-all hover:-translate-y-px disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
                     @disabled($product->stock_quantity < 1)>
-                    <svg class="w-4 h-4 fill-none" style="stroke:currentColor;stroke-width:2.5" viewBox="0 0 24 24">
+                    <svg class="w-4 h-4 fill-none flex-shrink-0" style="stroke:currentColor;stroke-width:2.5" viewBox="0 0 24 24">
                         <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
                         <line x1="3" y1="6" x2="21" y2="6"/>
                         <path d="M16 10a4 4 0 0 1-8 0"/>
                     </svg>
                     Add to Cart
                 </button>
-                <button class="w-12 h-[50px] bg-brand-bg dark:bg-[#1a2a1a] border border-brand-border dark:border-[#2a3a2a] rounded-xl flex items-center justify-center hover:border-brand transition-colors cursor-pointer">
+                <button wire:click="buyNow"
+                    class="flex-1 flex items-center justify-center gap-2 bg-brand-orange hover:bg-[#e06610] text-white font-montserrat font-bold text-[13px] py-3.5 rounded-xl border-0 cursor-pointer transition-all hover:-translate-y-px disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+                    @disabled($product->stock_quantity < 1)>
+                    <svg class="w-4 h-4 fill-none flex-shrink-0" style="stroke:currentColor;stroke-width:2" viewBox="0 0 24 24">
+                        <path d="M5 12h14M12 5l7 7-7 7"/>
+                    </svg>
+                    Buy Now
+                </button>
+                <button class="w-12 h-[50px] bg-brand-bg dark:bg-[#1a2a1a] border border-brand-border dark:border-[#2a3a2a] rounded-xl flex items-center justify-center hover:border-brand transition-colors cursor-pointer flex-shrink-0">
                     <svg class="w-5 h-5 fill-none" style="stroke:#5a7a5c;stroke-width:1.8" viewBox="0 0 24 24">
                         <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
                     </svg>

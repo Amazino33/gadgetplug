@@ -5,15 +5,17 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Services\CartService;
+use App\Actions\Inventory\AdjustStockAction;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
 
 new class extends Component {
-    public string $name    = '';
-    public string $email   = '';
-    public string $phone   = '';
-    public string $address = '';
+    public string $name          = '';
+    public string $email         = '';
+    public string $phone         = '';
+    public string $address       = '';
+    public string $paymentMethod = 'paystack';
 
     public array $cartItems = [];
     public float $total = 0;
@@ -52,10 +54,11 @@ new class extends Component {
     public function processCheckout(): void
     {
         $this->validate([
-            'name'    => 'required|string|max:255',
-            'email'   => 'required|email|max:255',
-            'phone'   => 'required|string|max:20',
-            'address' => 'required|string|min:10',
+            'name'          => 'required|string|max:255',
+            'email'         => 'required|email|max:255',
+            'phone'         => 'required|string|max:20',
+            'address'       => 'required|string|min:10',
+            'paymentMethod' => 'required|in:paystack,pay_on_delivery',
         ]);
 
         $reference = 'GP-' . strtoupper(Str::random(10));
@@ -68,7 +71,7 @@ new class extends Component {
             'shipping_address' => $this->address,
             'total_amount'     => $this->total,
             'status'           => 'pending',
-            'payment_method'   => 'paystack',
+            'payment_method'   => $this->paymentMethod,
         ]);
 
         foreach ($this->cartItems as $item) {
@@ -81,6 +84,34 @@ new class extends Component {
             ]);
         }
 
+        if ($this->paymentMethod === 'pay_on_delivery') {
+            $adjustStock = app(AdjustStockAction::class);
+
+            try {
+                foreach ($this->cartItems as $item) {
+                    $adjustStock->execute(
+                        productId:       $item['product']->id,
+                        quantityChanged: -$item['quantity'],
+                        transactionType: 'online_sale',
+                        userId:          null,
+                        reference:       $reference,
+                        description:     'Pay-on-delivery order placed.',
+                    );
+                }
+            } catch (\Exception $e) {
+                $order->delete();
+                session()->flash('error', 'One or more items went out of stock. Please review your cart.');
+                return;
+            }
+
+            Session::forget('cart');
+            $this->dispatch('cart-updated');
+            session()->flash('pod_success', $reference);
+            $this->redirectRoute('home');
+            return;
+        }
+
+        // Paystack path
         try {
             $paystackKey = config('services.paystack.secret_key');
 
@@ -130,7 +161,7 @@ new class extends Component {
         </a>
         <div>
             <h1 class="font-montserrat font-black text-[24px] md:text-[28px] text-brand-dark dark:text-[#e8f5e9]">Checkout</h1>
-            <p class="text-[12px] text-brand-muted">Secure checkout powered by Paystack</p>
+            <p class="text-[12px] text-brand-muted">Secure checkout · Pay online or on delivery</p>
         </div>
     </div>
 
@@ -242,25 +273,63 @@ new class extends Component {
                         Payment Method
                     </h2>
                 </div>
-                <div class="p-5">
-                    <div class="flex items-center gap-3 p-4 bg-[#f8fcf8] dark:bg-[#162016] rounded-xl border-2 border-brand">
+                <div class="p-5 space-y-3">
+
+                    {{-- Paystack option --}}
+                    <label class="flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all
+                        {{ $paymentMethod === 'paystack' ? 'border-brand bg-[#f8fcf8] dark:bg-[#162016]' : 'border-brand-border dark:border-[#2a3a2a] hover:border-brand/50' }}">
+                        <input type="radio" wire:model.live="paymentMethod" value="paystack" class="sr-only">
                         <div class="w-10 h-10 bg-brand rounded-xl flex items-center justify-center flex-shrink-0">
                             <svg class="w-5 h-5 fill-brand-lime" viewBox="0 0 24 24">
                                 <path d="M13 2L4 14h8l-1 8 9-12h-8z"/>
                             </svg>
                         </div>
                         <div class="flex-1">
-                            <div class="font-montserrat font-bold text-[13px] text-brand-dark dark:text-[#e8f5e9]">Paystack</div>
+                            <div class="font-montserrat font-bold text-[13px] text-brand-dark dark:text-[#e8f5e9]">Pay with Paystack</div>
                             <div class="text-[11px] text-brand-muted">Cards, bank transfer, USSD & more</div>
                         </div>
-                        <div class="w-5 h-5 rounded-full bg-brand flex items-center justify-center">
+                        <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all
+                            {{ $paymentMethod === 'paystack' ? 'border-brand bg-brand' : 'border-[#ccc] dark:border-[#4a6a4a]' }}">
+                            @if ($paymentMethod === 'paystack')
                             <svg class="w-3 h-3 fill-none" style="stroke:#fff;stroke-width:2.5" viewBox="0 0 24 24">
                                 <polyline points="20 6 9 17 4 12"/>
                             </svg>
+                            @endif
                         </div>
-                    </div>
-                    <p class="text-[11px] text-brand-muted mt-2.5 text-center">
-                        🔒 Your payment is secured by Paystack. We never store card details.
+                    </label>
+
+                    {{-- Pay on Delivery option --}}
+                    <label class="flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all
+                        {{ $paymentMethod === 'pay_on_delivery' ? 'border-brand-orange bg-[#fff8f3] dark:bg-[#1f1a0d]' : 'border-brand-border dark:border-[#2a3a2a] hover:border-brand-orange/50' }}">
+                        <input type="radio" wire:model.live="paymentMethod" value="pay_on_delivery" class="sr-only">
+                        <div class="w-10 h-10 bg-brand-orange rounded-xl flex items-center justify-center flex-shrink-0">
+                            <svg class="w-5 h-5 fill-none" style="stroke:#fff;stroke-width:2" viewBox="0 0 24 24">
+                                <rect x="1" y="3" width="15" height="13" rx="1"/>
+                                <path d="M16 8h4l3 3v5h-7V8z"/>
+                                <circle cx="5.5" cy="18.5" r="2.5"/>
+                                <circle cx="18.5" cy="18.5" r="2.5"/>
+                            </svg>
+                        </div>
+                        <div class="flex-1">
+                            <div class="font-montserrat font-bold text-[13px] text-brand-dark dark:text-[#e8f5e9]">Pay on Delivery</div>
+                            <div class="text-[11px] text-brand-muted">Cash to rider — inspect before you pay</div>
+                        </div>
+                        <div class="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all
+                            {{ $paymentMethod === 'pay_on_delivery' ? 'border-brand-orange bg-brand-orange' : 'border-[#ccc] dark:border-[#4a6a4a]' }}">
+                            @if ($paymentMethod === 'pay_on_delivery')
+                            <svg class="w-3 h-3 fill-none" style="stroke:#fff;stroke-width:2.5" viewBox="0 0 24 24">
+                                <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                            @endif
+                        </div>
+                    </label>
+
+                    <p class="text-[11px] text-brand-muted text-center">
+                        @if ($paymentMethod === 'pay_on_delivery')
+                            🚴 Our rider will bring your order. Pay cash on arrival after inspection.
+                        @else
+                            🔒 Your payment is secured by Paystack. We never store card details.
+                        @endif
                     </p>
                 </div>
             </div>
@@ -345,6 +414,18 @@ new class extends Component {
             </div>
 
             {{-- PAY BUTTON --}}
+            @if ($paymentMethod === 'pay_on_delivery')
+            <button type="submit"
+                class="w-full flex items-center justify-center gap-2 bg-brand-orange hover:bg-[#e06610] text-white font-montserrat font-bold text-[15px] py-4 rounded-xl border-0 cursor-pointer transition-all hover:-translate-y-px shadow-lg">
+                <svg class="w-5 h-5 fill-none" style="stroke:#fff;stroke-width:2" viewBox="0 0 24 24">
+                    <rect x="1" y="3" width="15" height="13" rx="1"/>
+                    <path d="M16 8h4l3 3v5h-7V8z"/>
+                    <circle cx="5.5" cy="18.5" r="2.5"/>
+                    <circle cx="18.5" cy="18.5" r="2.5"/>
+                </svg>
+                Place Order — Pay on Delivery
+            </button>
+            @else
             <button type="submit"
                 class="w-full flex items-center justify-center gap-2 bg-brand-orange hover:bg-[#e06610] text-white font-montserrat font-bold text-[15px] py-4 rounded-xl border-0 cursor-pointer transition-all hover:-translate-y-px shadow-lg">
                 <svg class="w-5 h-5 fill-none" style="stroke:currentColor;stroke-width:2" viewBox="0 0 24 24">
@@ -353,6 +434,7 @@ new class extends Component {
                 </svg>
                 Pay ₦{{ number_format($total) }} with Paystack
             </button>
+            @endif
 
             <p class="text-center text-[10px] text-brand-muted">
                 By completing your purchase you agree to our

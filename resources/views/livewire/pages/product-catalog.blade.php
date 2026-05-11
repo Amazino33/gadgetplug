@@ -60,6 +60,15 @@ new class extends Component {
         app(CartService::class)->add($product);
         $this->dispatch('cart-updated');
     }
+
+    public function buyNow(int $productId): void
+    {
+        $product = Product::find($productId);
+        if (!$product) return;
+        app(CartService::class)->add($product);
+        $this->dispatch('cart-updated');
+        $this->redirectRoute('checkout');
+    }
 }
 
 ?>
@@ -312,16 +321,26 @@ $cardBgs = [
                         <span class="font-montserrat font-black text-[15px] text-brand">₦{{ number_format($product->price) }}</span>
                     </div>
 
-                    <button wire:click="addToCart({{ $product->id }})"
-                        class="flex items-center justify-center gap-1.5 w-full bg-brand hover:bg-[#055002] text-white border-0 rounded-lg py-1.5 text-[11px] font-semibold font-montserrat cursor-pointer transition-colors"
-                        @disabled($product->stock_quantity < 1)>
-                        <svg class="w-3 h-3 fill-none" style="stroke:currentColor;stroke-width:2.5" viewBox="0 0 24 24">
-                            <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
-                            <line x1="3" y1="6" x2="21" y2="6"/>
-                            <path d="M16 10a4 4 0 0 1-8 0"/>
-                        </svg>
-                        Add to Cart
-                    </button>
+                    <div class="flex gap-1.5">
+                        <button wire:click="addToCart({{ $product->id }})"
+                            class="flex-1 flex items-center justify-center gap-1 bg-brand hover:bg-[#055002] text-white border-0 rounded-lg py-1.5 text-[10px] font-semibold font-montserrat cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            @disabled($product->stock_quantity < 1)>
+                            <svg class="w-3 h-3 fill-none flex-shrink-0" style="stroke:currentColor;stroke-width:2.5" viewBox="0 0 24 24">
+                                <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
+                                <line x1="3" y1="6" x2="21" y2="6"/>
+                                <path d="M16 10a4 4 0 0 1-8 0"/>
+                            </svg>
+                            Cart
+                        </button>
+                        <button wire:click="buyNow({{ $product->id }})"
+                            class="flex-1 flex items-center justify-center gap-1 bg-brand-orange hover:bg-[#e06610] text-white border-0 rounded-lg py-1.5 text-[10px] font-semibold font-montserrat cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            @disabled($product->stock_quantity < 1)>
+                            <svg class="w-3 h-3 fill-none flex-shrink-0" style="stroke:currentColor;stroke-width:2" viewBox="0 0 24 24">
+                                <path d="M5 12h14M12 5l7 7-7 7"/>
+                            </svg>
+                            Buy Now
+                        </button>
+                    </div>
                 </div>
             </div>
             @endforeach

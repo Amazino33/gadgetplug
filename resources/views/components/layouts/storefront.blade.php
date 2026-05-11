@@ -29,16 +29,8 @@
             this.dark = !this.dark;
             document.documentElement.classList.toggle('dark', this.dark);
             localStorage.setItem('gp-theme', this.dark ? 'dark' : 'light');
-        },
-        navVisible: true,
-        lastScrollY: 0,
-        handleScroll() {
-            const y = window.scrollY;
-            this.navVisible = y < this.lastScrollY || y < 60;
-            this.lastScrollY = y;
         }
     }"
-    @scroll.window="handleScroll()"
     class="bg-brand-bg dark:bg-[#0d1a0d] font-inter text-[#111] dark:text-[#e8f5e9] overflow-x-hidden text-[13px] antialiased transition-colors duration-200">
 
 @php $navCategories = \App\Models\Category::orderBy('name')->get(['name', 'slug']); @endphp
@@ -53,6 +45,47 @@
             <a href="{{ route('home') }}" class="flex items-center flex-shrink-0">
                 <img src="/images/logo.svg" alt="GadgetPlug" class="h-11 w-auto" draggable="false">
             </a>
+
+            {{-- All Categories dropdown (desktop only) --}}
+            <div x-data="{ catOpen: false }" @click.outside="catOpen = false" class="hidden md:block relative flex-shrink-0">
+                <button @click="catOpen = !catOpen"
+                    class="flex items-center gap-1.5 h-10 px-3.5 bg-brand hover:bg-[#055002] text-white rounded-xl text-[12px] font-semibold font-montserrat transition-colors">
+                    <svg class="w-4 h-4 fill-none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                        <line x1="3" y1="6" x2="21" y2="6" stroke-linecap="round"/>
+                        <line x1="3" y1="12" x2="21" y2="12" stroke-linecap="round"/>
+                        <line x1="3" y1="18" x2="21" y2="18" stroke-linecap="round"/>
+                    </svg>
+                    All
+                    <svg class="w-3 h-3 fill-none transition-transform duration-200" :class="catOpen ? 'rotate-180' : ''" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                        <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                </button>
+                <div x-show="catOpen"
+                     x-transition:enter="transition ease-out duration-150"
+                     x-transition:enter-start="opacity-0 -translate-y-1 scale-95"
+                     x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                     x-transition:leave="transition ease-in duration-100"
+                     x-transition:leave-start="opacity-100 scale-100"
+                     x-transition:leave-end="opacity-0 scale-95"
+                     class="absolute top-[46px] left-0 z-[200] bg-white dark:bg-[#162016] border border-brand-border dark:border-[#2a3a2a] rounded-xl shadow-xl w-[200px] py-2"
+                     style="display:none">
+                    <a href="{{ route('home') }}" @click="catOpen = false"
+                       class="flex items-center gap-2 px-4 py-2.5 text-[12px] font-semibold text-brand-orange hover:bg-brand-bg dark:hover:bg-[#1a2a1a] transition-colors">
+                        🔥 Flash Sale
+                    </a>
+                    @foreach($navCategories as $cat)
+                    <a href="{{ route('home', ['category' => $cat->slug]) }}" @click="catOpen = false"
+                       class="flex items-center px-4 py-2.5 text-[12px] transition-colors
+                           {{ request('category') === $cat->slug ? 'text-brand font-semibold bg-[#f0f8f0] dark:bg-[#1a2a1a]' : 'text-[#333] dark:text-[#b0c8b0] hover:bg-brand-bg dark:hover:bg-[#1a2a1a] hover:text-brand' }}">
+                        {{ $cat->name }}
+                    </a>
+                    @endforeach
+                    <a href="#" @click="catOpen = false"
+                       class="flex items-center gap-2 px-4 py-2.5 text-[12px] font-semibold text-brand-orange hover:bg-brand-bg dark:hover:bg-[#1a2a1a] transition-colors">
+                        Verified Plugs
+                    </a>
+                </div>
+            </div>
 
             {{-- Search bar (md+) --}}
             <div class="hidden md:block flex-1 max-w-[520px] mx-auto">
@@ -161,31 +194,26 @@
             </form>
         </div>
 
-        {{-- Nav strip (desktop only, hides on scroll down) --}}
-        <nav x-show="navVisible"
-             x-transition:enter="transition-all duration-200"
-             x-transition:enter-start="opacity-0 max-h-0"
-             x-transition:enter-end="opacity-100 max-h-[34px]"
-             x-transition:leave="transition-all duration-150"
-             x-transition:leave-start="opacity-100 max-h-[34px]"
-             x-transition:leave-end="opacity-0 max-h-0"
-             class="hidden md:flex items-center h-[34px] border-t border-[#f0f4f1] dark:border-[#2a3a2a] overflow-x-auto scrollbar-none overflow-hidden">
-            <a href="{{ route('home') }}"
-               class="px-3.5 h-full flex items-center text-[12px] font-semibold text-brand-orange whitespace-nowrap border-b-2 border-transparent hover:border-brand-orange transition-colors cursor-pointer">
-                🔥 Flash Sale
-            </a>
-            @foreach($navCategories as $cat)
-            <a href="{{ route('home', ['category' => $cat->slug]) }}"
-               class="px-3.5 h-full flex items-center text-[12px] font-medium text-[#333] dark:text-[#b0c8b0] whitespace-nowrap border-b-2 border-transparent hover:text-brand hover:border-brand transition-colors cursor-pointer {{ request('category') === $cat->slug ? '!text-brand border-brand' : '' }}">
-                {{ $cat->name }}
-            </a>
-            @endforeach
-            <a href="#"
-               class="px-3.5 h-full flex items-center text-[12px] font-semibold text-brand-orange whitespace-nowrap border-b-2 border-transparent hover:border-brand-orange transition-colors cursor-pointer">
-                Verified Plugs
-            </a>
-        </nav>
     </header>
+
+    {{-- ─── CATEGORY NAV STRIP (non-sticky, scrolls with page, desktop only) ─── --}}
+    <nav id="category-nav" class="hidden md:flex items-center bg-white dark:bg-[#162016] border-b border-[#f0f4f1] dark:border-[#2a3a2a] px-6 overflow-x-auto scrollbar-none h-[36px]">
+        <a href="{{ route('home') }}"
+           class="px-3.5 h-full flex items-center text-[12px] font-semibold text-brand-orange whitespace-nowrap border-b-2 border-transparent hover:border-brand-orange transition-colors">
+            🔥 Flash Sale
+        </a>
+        @foreach($navCategories as $cat)
+        <a href="{{ route('home', ['category' => $cat->slug]) }}"
+           class="px-3.5 h-full flex items-center text-[12px] font-medium whitespace-nowrap border-b-2 border-transparent hover:text-brand hover:border-brand transition-colors
+               {{ request('category') === $cat->slug ? 'text-brand border-brand' : 'text-[#333] dark:text-[#b0c8b0]' }}">
+            {{ $cat->name }}
+        </a>
+        @endforeach
+        <a href="#"
+           class="px-3.5 h-full flex items-center text-[12px] font-semibold text-brand-orange whitespace-nowrap border-b-2 border-transparent hover:border-brand-orange transition-colors">
+            Verified Plugs
+        </a>
+    </nav>
 
     {{-- ─── MOBILE MENU BACKDROP ───────────────────────────────────────────────── --}}
     <div
@@ -259,6 +287,23 @@
             </a>
         </div>
     </div>
+
+    {{-- ─── PAY-ON-DELIVERY SUCCESS BANNER ─────────────────────────────────── --}}
+    @if (session('pod_success'))
+    <div class="bg-brand text-white px-4 py-4">
+        <div class="max-w-[1200px] mx-auto flex items-start gap-3">
+            <svg class="w-6 h-6 fill-brand-lime flex-shrink-0 mt-0.5" viewBox="0 0 24 24">
+                <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <div>
+                <p class="font-montserrat font-bold text-[14px]">Order placed! Your rider is on the way.</p>
+                <p class="text-[12px] text-[#b0e8b0] mt-0.5">
+                    Reference: <strong>{{ session('pod_success') }}</strong> · Pay cash to the rider after inspecting your item.
+                </p>
+            </div>
+        </div>
+    </div>
+    @endif
 
     {{-- ─── PAGE CONTENT ────────────────────────────────────────────────────── --}}
     <main class="pb-16 md:pb-0">
