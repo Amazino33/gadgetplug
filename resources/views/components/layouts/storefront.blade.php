@@ -29,8 +29,16 @@
             this.dark = !this.dark;
             document.documentElement.classList.toggle('dark', this.dark);
             localStorage.setItem('gp-theme', this.dark ? 'dark' : 'light');
+        },
+        navVisible: true,
+        lastScrollY: 0,
+        handleScroll() {
+            const y = window.scrollY;
+            this.navVisible = y < this.lastScrollY || y < 60;
+            this.lastScrollY = y;
         }
     }"
+    @scroll.window="handleScroll()"
     class="bg-brand-bg dark:bg-[#0d1a0d] font-inter text-[#111] dark:text-[#e8f5e9] overflow-x-hidden text-[13px] antialiased transition-colors duration-200">
 
 @php $navCategories = \App\Models\Category::orderBy('name')->get(['name', 'slug']); @endphp
@@ -39,11 +47,11 @@
     <header class="bg-white dark:bg-[#162016] border-b border-brand-border dark:border-[#2a3a2a] px-4 md:px-6 sticky top-0 z-[100] transition-colors duration-200">
 
         {{-- Row 1: Logo · Search · Icons --}}
-        <div class="flex items-center gap-3 md:gap-4 h-[58px]">
+        <div class="flex items-center gap-3 md:gap-4 py-3">
 
             {{-- Logo --}}
             <a href="{{ route('home') }}" class="flex items-center flex-shrink-0">
-                <img src="/images/logo.svg" alt="GadgetPlug" class="h-9 w-auto" draggable="false">
+                <img src="/images/logo.svg" alt="GadgetPlug" class="h-11 w-auto" draggable="false">
             </a>
 
             {{-- Search bar (md+) --}}
@@ -79,34 +87,34 @@
 
                 {{-- Account (desktop only) --}}
                 <a href="{{ auth()->check() ? route('dashboard') : route('login') }}"
-                   class="hidden md:flex flex-col items-center gap-0.5 cursor-pointer">
-                    <svg class="gp-icon w-[22px] h-[22px] fill-none" style="stroke:#333;stroke-width:1.7" viewBox="0 0 24 24">
+                   class="hidden md:flex flex-col items-center gap-0.5 cursor-pointer text-[#444] dark:text-[#c0d8c0] hover:text-brand dark:hover:text-brand transition-colors">
+                    <svg class="gp-icon w-[22px] h-[22px] fill-none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
                         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
                     </svg>
-                    <span class="text-[10px] text-brand-muted">Account</span>
+                    <span class="text-[10px]">Account</span>
                 </a>
 
                 {{-- Wishlist (desktop only) --}}
-                <div class="hidden md:flex flex-col items-center gap-0.5 cursor-pointer">
-                    <svg class="gp-icon w-[22px] h-[22px] fill-none" style="stroke:#333;stroke-width:1.7" viewBox="0 0 24 24">
+                <div class="hidden md:flex flex-col items-center gap-0.5 cursor-pointer text-[#444] dark:text-[#c0d8c0] hover:text-brand dark:hover:text-brand transition-colors">
+                    <svg class="gp-icon w-[22px] h-[22px] fill-none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
                         <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
                     </svg>
-                    <span class="text-[10px] text-brand-muted">Wishlist</span>
+                    <span class="text-[10px]">Wishlist</span>
                 </div>
 
                 {{-- Dark mode toggle (desktop only) --}}
-                <div class="hidden md:flex flex-col items-center gap-0.5 cursor-pointer" @click="toggleDark()">
-                    <svg x-show="!dark" class="w-[22px] h-[22px] fill-none" style="stroke:#333;stroke-width:1.7" viewBox="0 0 24 24">
+                <div class="hidden md:flex flex-col items-center gap-0.5 cursor-pointer text-[#444] dark:text-[#c0d8c0] hover:text-brand dark:hover:text-brand transition-colors" @click="toggleDark()">
+                    <svg x-show="!dark" class="w-[22px] h-[22px] fill-none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
                         <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
                     </svg>
-                    <svg x-show="dark" class="w-[22px] h-[22px] fill-none" style="stroke:#8ab08a;stroke-width:1.7" viewBox="0 0 24 24">
+                    <svg x-show="dark" class="w-[22px] h-[22px] fill-none" style="stroke:#8ab08a;stroke-width:1.8" viewBox="0 0 24 24">
                         <circle cx="12" cy="12" r="5"/>
                         <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
                         <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
                         <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
                         <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
                     </svg>
-                    <span class="text-[10px] text-brand-muted" x-text="dark ? 'Light' : 'Dark'"></span>
+                    <span class="text-[10px]" x-text="dark ? 'Light' : 'Dark'"></span>
                 </div>
 
                 {{-- Dark mode toggle (mobile only) --}}
@@ -153,8 +161,15 @@
             </form>
         </div>
 
-        {{-- Nav strip (desktop only) --}}
-        <nav class="hidden md:flex items-center h-[34px] border-t border-[#f0f4f1] dark:border-[#2a3a2a] overflow-x-auto scrollbar-none">
+        {{-- Nav strip (desktop only, hides on scroll down) --}}
+        <nav x-show="navVisible"
+             x-transition:enter="transition-all duration-200"
+             x-transition:enter-start="opacity-0 max-h-0"
+             x-transition:enter-end="opacity-100 max-h-[34px]"
+             x-transition:leave="transition-all duration-150"
+             x-transition:leave-start="opacity-100 max-h-[34px]"
+             x-transition:leave-end="opacity-0 max-h-0"
+             class="hidden md:flex items-center h-[34px] border-t border-[#f0f4f1] dark:border-[#2a3a2a] overflow-x-auto scrollbar-none overflow-hidden">
             <a href="{{ route('home') }}"
                class="px-3.5 h-full flex items-center text-[12px] font-semibold text-brand-orange whitespace-nowrap border-b-2 border-transparent hover:border-brand-orange transition-colors cursor-pointer">
                 🔥 Flash Sale
@@ -254,11 +269,8 @@
     <footer class="bg-brand-footer pt-9 pb-5 px-4 md:px-6">
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1.8fr_1fr_1fr_1fr] gap-7 mb-7">
             <div>
-                <div class="flex items-center gap-2 mb-3">
-                    <div class="w-8 h-8 bg-brand rounded-lg flex items-center justify-center">
-                        <svg class="w-[18px] h-[18px] fill-brand-lime" viewBox="0 0 24 24"><path d="M13 2L4 14h8l-1 8 9-12h-8z"/></svg>
-                    </div>
-                    <span class="font-montserrat font-black text-[18px] text-white">Gadget<span class="text-brand-lime">Plug</span></span>
+                <div class="mb-3">
+                    <img src="/images/logo.svg" alt="GadgetPlug" class="h-14 w-auto" draggable="false">
                 </div>
                 <p class="text-[12px] text-[#7a9e7c] leading-relaxed max-w-[220px] mb-3.5">
                     Nigeria's premium tech marketplace. Verified vendors, authentic products, localized trust.

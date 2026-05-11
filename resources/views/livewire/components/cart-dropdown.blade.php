@@ -60,13 +60,13 @@ new class extends Component {
 
     {{-- Cart icon trigger --}}
     <button @click="open = !open"
-        class="relative flex flex-col items-center gap-0.5 cursor-pointer text-[#444] dark:text-[#b0c8b0] focus:outline-none">
-        <svg class="w-[22px] h-[22px] fill-none" style="stroke:#333;stroke-width:1.7" viewBox="0 0 24 24">
+        class="relative flex flex-col items-center gap-0.5 cursor-pointer text-[#444] dark:text-[#c0d8c0] hover:text-brand dark:hover:text-brand focus:outline-none transition-colors">
+        <svg class="w-[22px] h-[22px] fill-none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
             <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
             <line x1="3" y1="6" x2="21" y2="6"/>
             <path d="M16 10a4 4 0 0 1-8 0"/>
         </svg>
-        <span class="text-[10px] text-[#5a7a5c] dark:text-[#7a9e7c] font-inter">Cart</span>
+        <span class="hidden md:block text-[10px]">Cart</span>
         @if ($count > 0)
         <span class="absolute -top-1 -right-1.5 bg-brand-lime text-brand-dark text-[9px] font-bold font-montserrat w-4 h-4 rounded-full flex items-center justify-center border border-white dark:border-[#1a2a1a]">
             {{ $count > 9 ? '9+' : $count }}
