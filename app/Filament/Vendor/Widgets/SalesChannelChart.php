@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Filament\Widgets;
+namespace App\Filament\Vendor\Widgets;
 
 use App\Models\Order;
 use Filament\Widgets\ChartWidget;
@@ -12,7 +12,8 @@ use Illuminate\Support\Carbon;
 class SalesChannelChart extends ChartWidget
 {
     protected null|string $heading = 'Sales Channel Breakdown (Today)';
-    protected static ?int $sort = 2; // Puts this below the metrics overview
+    protected static ?int $sort = 2;
+    protected int|string|array $columnSpan = 'full';
 
     protected function getType(): string
     {

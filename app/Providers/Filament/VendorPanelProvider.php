@@ -22,8 +22,11 @@ use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Support\Facades\Blade;
-use App\Filament\Widgets\StoreMetricsOverview;
-use App\Filament\Widgets\SalesChannelChart; 
+use App\Filament\Vendor\Widgets\StoreMetricsOverview;
+use App\Filament\Vendor\Widgets\SalesChannelChart;
+use App\Filament\Vendor\Widgets\InventoryOverviewWidget;
+use App\Filament\Vendor\Widgets\StockMovementChart;
+use App\Filament\Vendor\Widgets\InventoryTableWidget;
 
 class VendorPanelProvider extends PanelProvider
 {
@@ -40,10 +43,10 @@ class VendorPanelProvider extends PanelProvider
             ->pages([
                 Dashboard::class,
             ])
-            ->discoverWidgets(in: app_path('Filament/Vendor/Widgets'), for: 'App\Filament\Vendor\Widgets')
             ->widgets([
                 StoreMetricsOverview::class,
                 SalesChannelChart::class,
+                InventoryOverviewWidget::class,
             ])
             ->middleware([
                 EncryptCookies::class,

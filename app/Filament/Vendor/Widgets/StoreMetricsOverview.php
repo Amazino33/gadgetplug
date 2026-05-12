@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Filament\Widgets;
+namespace App\Filament\Vendor\Widgets;
 
 use App\Models\Product;
 use App\Models\Order;
@@ -14,7 +14,7 @@ use Filament\Facades\Filament;
 
 class StoreMetricsOverview extends BaseWidget
 {
-    // This makes the widget refresh automatically every 15 seconds without reloading the page!
+    protected static ?int $sort = 1;
     protected null|string $pollingInterval = '15s';
 
     protected function getStats(): array
