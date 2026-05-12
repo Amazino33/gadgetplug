@@ -17,9 +17,7 @@ Volt::route('/checkout', 'checkout')->name('checkout');
 Route::get('/payment/callback', PaystackCallbackController::class)->name('payment.callback');
 
 
-Route::middleware(['auth', 'verified'])->group(function () {
-    Route::view('dashboard', 'dashboard')->name('dashboard');
-});
+Route::redirect('/dashboard', '/account')->name('dashboard');
 
 Route::middleware(['auth'])->prefix('account')->group(function () {
     Volt::route('/',               'pages.account.profile')->name('account.profile');
