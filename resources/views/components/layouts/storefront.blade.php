@@ -118,22 +118,79 @@
             {{-- Right icons --}}
             <div class="flex items-center gap-2 md:gap-[18px] flex-shrink-0 ml-auto md:ml-0">
 
-                {{-- Account (desktop only) --}}
-                <a href="{{ auth()->check() ? route('dashboard') : route('login') }}"
-                   class="hidden md:flex flex-col items-center gap-0.5 cursor-pointer text-[#444] dark:text-[#c0d8c0] hover:text-brand dark:hover:text-brand transition-colors">
-                    <svg class="gp-icon w-[22px] h-[22px] fill-none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
-                    </svg>
-                    <span class="text-[10px]">Account</span>
-                </a>
+                {{-- Account dropdown (desktop only) --}}
+                <div x-data="{ acctOpen: false }" @click.outside="acctOpen = false" class="hidden md:block relative">
+                    <button @click="acctOpen = !acctOpen"
+                        class="flex flex-col items-center gap-0.5 cursor-pointer text-[#444] dark:text-[#c0d8c0] hover:text-brand dark:hover:text-brand transition-colors focus:outline-none">
+                        @auth
+                        <div class="w-[22px] h-[22px] rounded-full bg-brand flex items-center justify-center text-white text-[9px] font-black font-montserrat">
+                            {{ auth()->user()->initials() }}
+                        </div>
+                        @else
+                        <svg class="w-[22px] h-[22px] fill-none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                        </svg>
+                        @endauth
+                        <span class="text-[10px]">Account</span>
+                    </button>
+
+                    <div x-show="acctOpen"
+                         x-transition:enter="transition ease-out duration-150"
+                         x-transition:enter-start="opacity-0 -translate-y-1 scale-95"
+                         x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                         x-transition:leave="transition ease-in duration-100"
+                         x-transition:leave-start="opacity-100 scale-100"
+                         x-transition:leave-end="opacity-0 scale-95"
+                         class="absolute right-0 top-[46px] z-[200] w-[220px] bg-white dark:bg-[#162016] border border-brand-border dark:border-[#2a3a2a] rounded-2xl shadow-xl py-2"
+                         style="display:none">
+
+                        @auth
+                        {{-- User header --}}
+                        <div class="px-4 py-2.5 border-b border-brand-border dark:border-[#2a3a2a] mb-1">
+                            <p class="text-[12px] font-bold text-brand-dark dark:text-[#e8f5e9] truncate">{{ auth()->user()->name }}</p>
+                            <p class="text-[10px] text-brand-muted truncate">{{ auth()->user()->email }}</p>
+                        </div>
+                        @foreach([
+                            ['href' => route('account.profile'),      'label' => 'My Profile'],
+                            ['href' => route('account.orders'),        'label' => 'My Orders'],
+                            ['href' => route('account.wishlist'),      'label' => 'Wishlist'],
+                            ['href' => route('account.vendor-apply'),  'label' => 'Become a Plug'],
+                        ] as $link)
+                        <a href="{{ $link['href'] }}" @click="acctOpen = false"
+                           class="flex items-center px-4 py-2 text-[12px] text-[#333] dark:text-[#b0c8b0] hover:bg-brand-bg dark:hover:bg-[#1a2a1a] hover:text-brand transition-colors">
+                            {{ $link['label'] }}
+                        </a>
+                        @endforeach
+                        <div class="border-t border-brand-border dark:border-[#2a3a2a] mt-1 pt-1">
+                            <form method="POST" action="{{ route('logout') }}">
+                                @csrf
+                                <button type="submit" @click="acctOpen = false"
+                                    class="w-full text-left px-4 py-2 text-[12px] text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                                    Sign Out
+                                </button>
+                            </form>
+                        </div>
+                        @else
+                        <a href="{{ route('login') }}" @click="acctOpen = false"
+                           class="flex items-center px-4 py-2.5 text-[12px] font-semibold text-brand hover:bg-brand-bg dark:hover:bg-[#1a2a1a] transition-colors">
+                            Sign In
+                        </a>
+                        <a href="{{ route('register') }}" @click="acctOpen = false"
+                           class="flex items-center px-4 py-2.5 text-[12px] text-[#333] dark:text-[#b0c8b0] hover:bg-brand-bg dark:hover:bg-[#1a2a1a] hover:text-brand transition-colors">
+                            Create Account
+                        </a>
+                        @endauth
+                    </div>
+                </div>
 
                 {{-- Wishlist (desktop only) --}}
-                <div class="hidden md:flex flex-col items-center gap-0.5 cursor-pointer text-[#444] dark:text-[#c0d8c0] hover:text-brand dark:hover:text-brand transition-colors">
+                <a href="{{ auth()->check() ? route('account.wishlist') : route('login') }}"
+                   class="hidden md:flex flex-col items-center gap-0.5 cursor-pointer text-[#444] dark:text-[#c0d8c0] hover:text-brand dark:hover:text-brand transition-colors">
                     <svg class="gp-icon w-[22px] h-[22px] fill-none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
                         <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
                     </svg>
                     <span class="text-[10px]">Wishlist</span>
-                </div>
+                </a>
 
                 {{-- Dark mode toggle (desktop only) --}}
                 <div class="hidden md:flex flex-col items-center gap-0.5 cursor-pointer text-[#444] dark:text-[#c0d8c0] hover:text-brand dark:hover:text-brand transition-colors" @click="toggleDark()">
@@ -277,7 +334,7 @@
 
         {{-- Account row --}}
         <div class="px-4 py-3 border-t border-brand-border dark:border-[#2a3a2a]">
-            <a href="{{ auth()->check() ? route('dashboard') : route('login') }}"
+            <a href="{{ auth()->check() ? route('account.profile') : route('login') }}"
                @click="mobileMenu = false"
                class="flex items-center gap-3 px-3 py-3 rounded-xl text-[13px] font-semibold text-brand-dark dark:text-[#e8f5e9] hover:bg-brand-bg dark:hover:bg-[#1a2a1a] transition-colors">
                 <svg class="w-5 h-5 fill-none flex-shrink-0" style="stroke:#5a7a5c;stroke-width:1.7" viewBox="0 0 24 24">
@@ -420,7 +477,7 @@
             </svg>
             <span class="text-[9px] text-[#aaa] dark:text-[#4a6a4a] font-montserrat font-semibold">Cart</span>
         </a>
-        <a href="{{ auth()->check() ? route('dashboard') : route('login') }}" class="flex-1 flex flex-col items-center gap-0.5 py-2 cursor-pointer">
+        <a href="{{ auth()->check() ? route('account.profile') : route('login') }}" class="flex-1 flex flex-col items-center gap-0.5 py-2 cursor-pointer">
             <svg class="gp-icon-inactive w-[22px] h-[22px] fill-none" style="stroke:#aaa;stroke-width:1.8" viewBox="0 0 24 24">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
             </svg>

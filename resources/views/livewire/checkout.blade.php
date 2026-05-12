@@ -44,10 +44,12 @@ new class extends Component {
             ];
         }
 
-        // Pre-fill from auth if available
         if (auth()->check()) {
-            $this->name  = auth()->user()->name;
-            $this->email = auth()->user()->email;
+            $user          = auth()->user();
+            $this->name    = $user->name;
+            $this->email   = $user->email;
+            $this->phone   = $user->phone   ?? '';
+            $this->address = $user->address ?? '';
         }
     }
 
@@ -64,6 +66,7 @@ new class extends Component {
         $reference = 'GP-' . strtoupper(Str::random(10));
 
         $order = Order::create([
+            'user_id'          => auth()->id(),
             'reference'        => $reference,
             'customer_name'    => $this->name,
             'customer_email'   => $this->email,

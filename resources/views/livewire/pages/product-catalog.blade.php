@@ -2,6 +2,7 @@
 
 use App\Models\Product;
 use App\Models\Category;
+use App\Models\Wishlist;
 use App\Services\CartService;
 use Livewire\Volt\Component;
 use Livewire\WithPagination;
@@ -22,6 +23,37 @@ new class extends Component {
         if ($slug = request('category')) {
             $category = Category::where('slug', $slug)->first();
             $this->selectedCategory = $category?->id;
+        }
+    }
+
+    public array $wishlistIds = [];
+
+    public function boot(): void
+    {
+        if (auth()->check()) {
+            $this->wishlistIds = Wishlist::where('user_id', auth()->id())
+                ->pluck('product_id')
+                ->toArray();
+        }
+    }
+
+    public function toggleWishlist(int $productId): void
+    {
+        if (! auth()->check()) {
+            $this->redirectRoute('login');
+            return;
+        }
+
+        $exists = Wishlist::where('user_id', auth()->id())
+            ->where('product_id', $productId)
+            ->exists();
+
+        if ($exists) {
+            Wishlist::where('user_id', auth()->id())->where('product_id', $productId)->delete();
+            $this->wishlistIds = array_values(array_diff($this->wishlistIds, [$productId]));
+        } else {
+            Wishlist::create(['user_id' => auth()->id(), 'product_id' => $productId]);
+            $this->wishlistIds[] = $productId;
         }
     }
 
@@ -339,6 +371,14 @@ $cardBgs = [
                                 <path d="M5 12h14M12 5l7 7-7 7"/>
                             </svg>
                             Buy Now
+                        </button>
+                        <button wire:click="toggleWishlist({{ $product->id }})"
+                            class="w-7 flex items-center justify-center border-0 rounded-lg cursor-pointer transition-colors
+                                {{ in_array($product->id, $wishlistIds) ? 'bg-red-50 dark:bg-red-900/20 text-red-500' : 'bg-brand-bg dark:bg-[#1a2a1a] text-[#aaa] hover:text-red-400' }}"
+                            title="{{ in_array($product->id, $wishlistIds) ? 'Remove from wishlist' : 'Add to wishlist' }}">
+                            <svg class="w-3.5 h-3.5" fill="{{ in_array($product->id, $wishlistIds) ? 'currentColor' : 'none' }}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                            </svg>
                         </button>
                     </div>
                 </div>

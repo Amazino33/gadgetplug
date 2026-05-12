@@ -2,15 +2,38 @@
 
 use Livewire\Volt\Component;
 use App\Models\Product;
+use App\Models\Wishlist;
 use App\Services\CartService;
 
 new class extends Component {
     public Product $product;
     public int $quantity = 1;
+    public bool $wishlisted = false;
 
     public function mount(Product $product): void
     {
         $this->product = $product->load(['vendor', 'category', 'media']);
+        if (auth()->check()) {
+            $this->wishlisted = Wishlist::where('user_id', auth()->id())
+                ->where('product_id', $product->id)
+                ->exists();
+        }
+    }
+
+    public function toggleWishlist(): void
+    {
+        if (! auth()->check()) {
+            $this->redirectRoute('login');
+            return;
+        }
+
+        if ($this->wishlisted) {
+            Wishlist::where('user_id', auth()->id())->where('product_id', $this->product->id)->delete();
+            $this->wishlisted = false;
+        } else {
+            Wishlist::create(['user_id' => auth()->id(), 'product_id' => $this->product->id]);
+            $this->wishlisted = true;
+        }
     }
 
     public function incrementQty(): void
@@ -213,8 +236,13 @@ $emoji = $categoryEmojis[strtolower($product->category?->name ?? '')] ?? '📦';
                     </svg>
                     Buy Now
                 </button>
-                <button class="w-12 h-[50px] bg-brand-bg dark:bg-[#1a2a1a] border border-brand-border dark:border-[#2a3a2a] rounded-xl flex items-center justify-center hover:border-brand transition-colors cursor-pointer flex-shrink-0">
-                    <svg class="w-5 h-5 fill-none" style="stroke:#5a7a5c;stroke-width:1.8" viewBox="0 0 24 24">
+                <button wire:click="toggleWishlist"
+                    class="w-12 h-[50px] rounded-xl flex items-center justify-center transition-colors cursor-pointer flex-shrink-0 border
+                        {{ $wishlisted
+                            ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-500'
+                            : 'bg-brand-bg dark:bg-[#1a2a1a] border-brand-border dark:border-[#2a3a2a] text-[#5a7a5c] hover:border-red-300 hover:text-red-400' }}"
+                    :title="$wishlisted ? 'Remove from wishlist' : 'Add to wishlist'">
+                    <svg class="w-5 h-5" fill="{{ $wishlisted ? 'currentColor' : 'none' }}" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
                         <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
                     </svg>
                 </button>

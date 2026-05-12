@@ -1,17 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class Order extends Model
+class VendorApplication extends Model
 {
     protected $guarded = [];
-
-    public function items()
-    {
-        return $this->hasMany(OrderItem::class);
-    }
 
     public function user()
     {

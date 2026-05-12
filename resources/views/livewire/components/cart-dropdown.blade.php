@@ -56,7 +56,7 @@ new class extends Component {
     }
 }; ?>
 
-<div x-data="{ open: false }" @click.outside="open = false" class="relative">
+<div x-data="{ open: false }" @click.outside="open = false" class="relative hidden md:block">
 
     {{-- Cart icon trigger --}}
     <button @click="open = !open"

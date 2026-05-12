@@ -30,6 +30,8 @@ class User extends Authenticatable implements HasTenants, FilamentUser
         'name',
         'email',
         'password',
+        'phone',
+        'address',
     ];
 
     /**
@@ -99,6 +101,21 @@ class User extends Authenticatable implements HasTenants, FilamentUser
     public function canAccessTenant(Model $tenant): bool
     {
         return $this->vendors()->contains($tenant);
+    }
+
+    public function orders()
+    {
+        return $this->hasMany(Order::class);
+    }
+
+    public function wishlistedProducts()
+    {
+        return $this->belongsToMany(Product::class, 'wishlists')->withTimestamps();
+    }
+
+    public function vendorApplication()
+    {
+        return $this->hasOne(VendorApplication::class);
     }
 
     public function canAccessPanel(Panel $panel): bool
