@@ -79,6 +79,6 @@ class VendorInviteController extends Controller
             'status' => 'success',
         ]);
 
-        return redirect()->route('filament.vendor.pages.dashboard', ['tenant' => $vendor]);
+        return redirect()->route('filament.vendor.home', ['tenant' => $vendor]);
     }
 }

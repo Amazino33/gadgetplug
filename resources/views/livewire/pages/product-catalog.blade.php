@@ -310,24 +310,35 @@ $cardBgs = [
                 $emoji = $categoryEmojis[strtolower($product->category?->name ?? '')] ?? '📦';
             @endphp
 
-            <div class="bg-white dark:bg-[#1a2a1a] rounded-2xl border border-brand-border dark:border-[#2a3a2a] overflow-hidden cursor-pointer transition-all hover:-translate-y-[3px] hover:shadow-[0_8px_30px_rgba(6,139,3,0.1)]">
+            <div class="group bg-white dark:bg-[#1a2a1a] rounded-2xl border border-brand-border dark:border-[#2a3a2a] overflow-hidden cursor-pointer transition-all hover:-translate-y-[3px] hover:shadow-[0_8px_30px_rgba(6,139,3,0.1)]">
 
-                {{-- Image --}}
-                <a href="{{ route('product.show', $product) }}" class="block relative">
-                    <div class="gp-card-img h-[140px] flex items-center justify-center relative" style="{{ $bg }}">
-                        @if ($isNew)
-                        <div class="absolute top-2.5 left-2.5 bg-brand-lime text-brand-dark text-[9px] font-bold font-montserrat px-2 py-0.5 rounded-full tracking-[0.3px]">NEW</div>
-                        @endif
-                        <div class="absolute top-2.5 right-2.5 w-7 h-7 bg-white dark:bg-[#1a2a1a] rounded-full flex items-center justify-center shadow-md text-sm">🤍</div>
-
-                        @if ($thumbUrl)
-                        <img src="{{ $thumbUrl }}" alt="{{ $product->name }}"
-                            class="w-full h-full object-cover transition-transform duration-300 hover:scale-105">
-                        @else
-                        <span class="text-5xl opacity-70">{{ $emoji }}</span>
-                        @endif
-                    </div>
-                </a>
+                {{-- Image + wishlist overlay --}}
+                <div class="relative">
+                    <a href="{{ route('product.show', $product) }}" class="block">
+                        <div class="gp-card-img h-[140px] flex items-center justify-center relative" style="{{ $bg }}">
+                            @if ($isNew)
+                            <div class="absolute top-2.5 left-2.5 bg-brand-lime text-brand-dark text-[9px] font-bold font-montserrat px-2 py-0.5 rounded-full tracking-[0.3px]">NEW</div>
+                            @endif
+                            @if ($thumbUrl)
+                            <img src="{{ $thumbUrl }}" alt="{{ $product->name }}"
+                                class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105">
+                            @else
+                            <span class="text-5xl opacity-70">{{ $emoji }}</span>
+                            @endif
+                        </div>
+                    </a>
+                    {{-- Heart button — always visible when wishlisted, appears on hover otherwise --}}
+                    <button wire:click="toggleWishlist({{ $product->id }})"
+                        class="absolute top-2.5 right-2.5 w-7 h-7 rounded-full shadow-md flex items-center justify-center transition-all duration-200
+                            {{ in_array($product->id, $wishlistIds)
+                                ? 'bg-white dark:bg-[#1a2a1a] opacity-100 text-red-500'
+                                : 'bg-white dark:bg-[#1a2a1a] opacity-0 group-hover:opacity-100 text-[#aaa] hover:text-red-400' }}"
+                        title="{{ in_array($product->id, $wishlistIds) ? 'Remove from wishlist' : 'Add to wishlist' }}">
+                        <svg class="w-3.5 h-3.5" fill="{{ in_array($product->id, $wishlistIds) ? 'currentColor' : 'none' }}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                        </svg>
+                    </button>
+                </div>
 
                 {{-- Info --}}
                 <div class="p-3">
@@ -371,14 +382,6 @@ $cardBgs = [
                                 <path d="M5 12h14M12 5l7 7-7 7"/>
                             </svg>
                             Buy Now
-                        </button>
-                        <button wire:click="toggleWishlist({{ $product->id }})"
-                            class="w-7 flex items-center justify-center border-0 rounded-lg cursor-pointer transition-colors
-                                {{ in_array($product->id, $wishlistIds) ? 'bg-red-50 dark:bg-red-900/20 text-red-500' : 'bg-brand-bg dark:bg-[#1a2a1a] text-[#aaa] hover:text-red-400' }}"
-                            title="{{ in_array($product->id, $wishlistIds) ? 'Remove from wishlist' : 'Add to wishlist' }}">
-                            <svg class="w-3.5 h-3.5" fill="{{ in_array($product->id, $wishlistIds) ? 'currentColor' : 'none' }}" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-                            </svg>
                         </button>
                     </div>
                 </div>
@@ -448,35 +451,35 @@ $cardBgs = [
 </section>
 
 {{-- ─── TRENDING BAND ───────────────────────────────────────────────────────── --}}
-<section class="bg-brand-dark px-4 md:px-6 py-9">
+<section class="bg-[#e8f0e9] dark:bg-brand-dark px-4 md:px-6 py-9 transition-colors duration-200">
     <div class="flex items-center justify-between mb-5">
-        <h2 class="font-montserrat font-black text-[22px] text-white tracking-[-0.5px]">
-            Trending <span class="text-brand-lime">Right Now</span>
+        <h2 class="font-montserrat font-black text-[22px] text-brand-dark dark:text-white tracking-[-0.5px]">
+            Trending <span class="text-brand dark:text-brand-lime">Right Now</span>
         </h2>
-        <a href="#" class="text-[12px] text-brand-lime font-semibold font-montserrat cursor-pointer hover:underline">See All Categories →</a>
+        <a href="#" class="text-[12px] text-brand dark:text-brand-lime font-semibold font-montserrat cursor-pointer hover:underline">See All Categories →</a>
     </div>
 
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
         @php
         $trendCards = [
-            ['bg'=>'#1a1a2e','emoji'=>'💻','cat'=>'Category','name'=>'Laptops & Ultrabooks','count'=>'820 products','badge'=>'From ₦450,000','span'=>true],
-            ['bg'=>'#1a0a2e','emoji'=>'🎧','cat'=>'Category','name'=>'Premium Audio','count'=>'640 products','badge'=>'From ₦18,000','span'=>false],
-            ['bg'=>'#0d1a0d','emoji'=>'📱','cat'=>'Trending','name'=>'Flagship Phones','count'=>'1,240 products','badge'=>'🔥 Hottest','span'=>false],
-            ['bg'=>'#2d1a00','emoji'=>'⌚','cat'=>'Category','name'=>'Wearables','count'=>'380 products','badge'=>'New Arrivals','span'=>false],
-            ['bg'=>'#1a0a0a','emoji'=>'🎮','cat'=>'Gaming','name'=>'Consoles & Accessories','count'=>'290 products','badge'=>'PS5 In Stock','span'=>false],
+            ['bg'=>'#1a1a2e','lightBg'=>'#dde0f5','emoji'=>'💻','cat'=>'Category','name'=>'Laptops & Ultrabooks','count'=>'820 products','badge'=>'From ₦450,000','span'=>true],
+            ['bg'=>'#1a0a2e','lightBg'=>'#ede0f5','emoji'=>'🎧','cat'=>'Category','name'=>'Premium Audio','count'=>'640 products','badge'=>'From ₦18,000','span'=>false],
+            ['bg'=>'#0d1a0d','lightBg'=>'#d8eeda','emoji'=>'📱','cat'=>'Trending','name'=>'Flagship Phones','count'=>'1,240 products','badge'=>'🔥 Hottest','span'=>false],
+            ['bg'=>'#2d1a00','lightBg'=>'#fdecd0','emoji'=>'⌚','cat'=>'Category','name'=>'Wearables','count'=>'380 products','badge'=>'New Arrivals','span'=>false],
+            ['bg'=>'#1a0a0a','lightBg'=>'#f5dde0','emoji'=>'🎮','cat'=>'Gaming','name'=>'Consoles & Accessories','count'=>'290 products','badge'=>'PS5 In Stock','span'=>false],
         ];
         @endphp
 
         @foreach ($trendCards as $i => $card)
-        <div class="rounded-2xl overflow-hidden cursor-pointer relative transition-transform hover:scale-[1.02]
+        <div class="rounded-2xl overflow-hidden cursor-pointer relative transition-all hover:scale-[1.02] hover:shadow-lg
             {{ $card['span'] ? 'col-span-2 h-[240px]' : 'h-[200px]' }}"
-            style="background:{{ $card['bg'] }}">
+            :style="`background: ${dark ? '{{ $card['bg'] }}' : '{{ $card['lightBg'] }}'}`">
             <div class="absolute inset-0 flex items-end justify-start p-4">
-                <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-30 text-[{{ $card['span'] ? '90' : '60' }}px] leading-none select-none">{{ $card['emoji'] }}</div>
+                <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-25 text-[{{ $card['span'] ? '90' : '60' }}px] leading-none select-none">{{ $card['emoji'] }}</div>
                 <div class="relative z-10">
-                    <div class="text-[9px] text-[rgba(177,255,0,0.8)] font-bold font-montserrat tracking-[1px] uppercase mb-1">{{ $card['cat'] }}</div>
-                    <div class="font-montserrat font-black text-[{{ $card['span'] ? '20' : '15' }}px] text-white leading-[1.2]">{{ $card['name'] }}</div>
-                    <div class="text-[10px] text-[rgba(255,255,255,0.5)] mt-0.5">{{ $card['count'] }}</div>
+                    <div class="text-[9px] text-brand dark:text-brand-lime font-bold font-montserrat tracking-[1px] uppercase mb-1">{{ $card['cat'] }}</div>
+                    <div class="font-montserrat font-black text-[{{ $card['span'] ? '20' : '15' }}px] text-[#111] dark:text-white leading-[1.2]">{{ $card['name'] }}</div>
+                    <div class="text-[10px] text-[#5a7a5c] dark:text-white/50 mt-0.5">{{ $card['count'] }}</div>
                     <div class="inline-block bg-brand-orange text-white text-[9px] font-bold font-montserrat px-1.5 py-0.5 rounded-full mt-1.5">{{ $card['badge'] }}</div>
                 </div>
             </div>

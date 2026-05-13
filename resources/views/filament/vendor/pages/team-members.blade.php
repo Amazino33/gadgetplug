@@ -1,58 +1,76 @@
 <x-filament-panels::page>
-    <div style="display: flex; flex-direction: column; gap: 24px;">
 
-        @if($members->isEmpty())
-            <div style="text-align: center; padding: 48px; color: #6b7280;">
-                No team members yet. Use the Invite Member button to add someone.
-            </div>
-        @else
-            <div style="background: white; border-radius: 12px; border: 1px solid #e5e7eb; overflow: hidden;">
-                <table style="width: 100%; border-collapse: collapse;">
-                    <thead>
-                        <tr style="background: #f9fafb; border-bottom: 1px solid #e5e7eb;">
-                            <th style="padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 600; color: #374151;">Member</th>
-                            <th style="padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 600; color: #374151;">Email</th>
-                            <th style="padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 600; color: #374151;">Permissions</th>
-                            <th style="padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 600; color: #374151;">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @foreach($members as $member)
-                            @php
-                                setPermissionsTeamId(filament()->getTenant()->id);
-                                $memberPermissions = $member->getAllPermissions();
-                            @endphp
-                            <tr style="border-bottom: 1px solid #f3f4f6;">
-                                <td style="padding: 12px 16px; font-size: 14px; color: #111827; font-weight: 500;">
-                                    {{ $member->name }}
-                                </td>
-                                <td style="padding: 12px 16px; font-size: 14px; color: #6b7280;">
-                                    {{ $member->email }}
-                                </td>
-                                <td style="padding: 12px 16px;">
-                                    <div style="display: flex; flex-wrap: wrap; gap: 6px;">
-                                        @foreach($memberPermissions as $permission)
-                                            <span style="background: #dbeafe; color: #1d4ed8; font-size: 11px; padding: 2px 8px; border-radius: 9999px;">
-                                                {{ str_replace('_', ' ', $permission->name) }}
-                                            </span>
-                                        @endforeach
-                                    </div>
-                                </td>
-                                <td style="padding: 12px 16px;">
+    @if($members->isEmpty())
+        <div class="rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 p-12 text-center shadow-sm">
+            <x-filament::icon
+                icon="heroicon-o-users"
+                class="mx-auto h-10 w-10 mb-3 text-gray-300 dark:text-gray-600"
+            />
+            <p class="font-medium text-gray-600 dark:text-gray-300">No team members yet.</p>
+            <p class="text-sm mt-1 text-gray-400 dark:text-gray-500">Use the Invite Member button above to add someone.</p>
+        </div>
+    @else
+        <div class="rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 overflow-hidden shadow-sm">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="border-b border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-white/5">
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Member</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Email</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Role</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Permissions</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 dark:divide-white/5">
+                    @foreach($members as $member)
+                        @php
+                            setPermissionsTeamId(filament()->getTenant()->id);
+                            $memberPermissions = $member->getAllPermissions();
+                            $role = $member->pivot->role ?? 'member';
+                        @endphp
+                        <tr class="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                            <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">
+                                {{ $member->name }}
+                            </td>
+                            <td class="px-4 py-3 text-gray-500 dark:text-gray-400">
+                                {{ $member->email }}
+                            </td>
+                            <td class="px-4 py-3">
+                                <x-filament::badge
+                                    :color="$role === 'owner' ? 'warning' : 'gray'"
+                                >
+                                    {{ ucfirst($role) }}
+                                </x-filament::badge>
+                            </td>
+                            <td class="px-4 py-3">
+                                <div class="flex flex-wrap gap-1">
+                                    @forelse($memberPermissions as $permission)
+                                        <x-filament::badge color="info" size="sm">
+                                            {{ str_replace('_', ' ', $permission->name) }}
+                                        </x-filament::badge>
+                                    @empty
+                                        <span class="text-xs text-gray-400 dark:text-gray-500">—</span>
+                                    @endforelse
+                                </div>
+                            </td>
+                            <td class="px-4 py-3">
+                                @if($role !== 'owner')
                                     <button
                                         wire:click="removeMember({{ $member->id }})"
-                                        wire:confirm="Are you sure you want to remove this member?"
-                                        style="background: #fee2e2; color: #dc2626; border: none; padding: 6px 12px; border-radius: 6px; font-size: 12px; cursor: pointer;"
+                                        wire:confirm="Remove {{ $member->name }} from this store?"
+                                        class="text-xs font-medium text-danger-600 dark:text-danger-400 hover:text-danger-700 dark:hover:text-danger-300 transition-colors"
                                     >
                                         Remove
                                     </button>
-                                </td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-        @endif
+                                @else
+                                    <span class="text-xs text-gray-300 dark:text-gray-600">Owner</span>
+                                @endif
+                            </td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    @endif
 
-    </div>
 </x-filament-panels::page>

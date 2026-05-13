@@ -11,8 +11,6 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\KeyValue;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
-use Filament\Schemas\Components\Utilities\Set;
-use Illuminate\Support\Str;
 
 class ProductForm
 {
@@ -35,17 +33,6 @@ class ProductForm
                                     ->placeholder('e.g., Apple, Samsung'),
 
                                 TextInput::make('name')
-                                    ->required()
-                                    ->live(onBlur: true)
-                                    ->afterStateUpdated(
-                                        fn (string $operation, $state, Set $set) =>
-                                        $operation === 'create'
-                                            ? $set('slug', Str::slug($state))
-                                            : null
-                                    )
-                                    ->columnSpanFull(),
-
-                                TextInput::make('slug')
                                     ->required()
                                     ->columnSpanFull(),
 

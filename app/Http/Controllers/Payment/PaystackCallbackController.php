@@ -38,14 +38,15 @@ class PaystackCallbackController extends Controller
         // if it is already paid (e.g., webhook and redirect hit at the same time), just return success
         if ($order->status !== 'pending') {
             Session::forget('cart');
-            return redirect()->route('home')->with('success', 'Payment was already processed successfully.');
+            session()->put('payment_success', $order->reference);
+            return redirect()->route('checkout');
         }
 
         try {
             // 1. Deduct stock safely using our "Bouncer" Action class
             foreach ($order->items as $item) {
                 $adjustStock->execute(
-                    productId: $item->productId,
+                    productId: $item->product_id,
                     quantityChanged: -$item->quantity, // Negative for sale
                     transactionType: 'online_sale',
                     userId: null,
@@ -60,7 +61,8 @@ class PaystackCallbackController extends Controller
             // 3. Clear the cart
             Session::forget('cart');
 
-            return redirect()->route('home')->with('success', 'Payment successful! Your order has been processed.');
+            session()->put('payment_success', $order->reference);
+            return redirect()->route('checkout');
         } catch (Exception $e) {
             // 4. Race condition caught
             // Someone bought the last item while this user was typing their card details

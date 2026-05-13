@@ -8,12 +8,29 @@ use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\Image\Enums\Fit;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
+use Spatie\Sluggable\HasSlug;
+use Spatie\Sluggable\SlugOptions;
 
 class Product extends Model implements HasMedia
 {
-    use InteractsWithMedia;
+    use InteractsWithMedia, HasSlug;
 
     protected $guarded = [];
+
+    public function getSlugOptions(): SlugOptions
+    {
+        return SlugOptions::create()
+            ->generateSlugsFrom('name')
+            ->saveSlugsTo('slug')
+            ->slugsShouldBeNoLongerThan(80)
+            ->doNotGenerateSlugsOnUpdate()
+            ->extraScope(fn ($builder) => $builder->where('vendor_id', $this->vendor_id));
+    }
+
+    public function getRouteKeyName(): string
+    {
+        return 'slug';
+    }
 
     protected $casts = [
         'price' => 'decimal:2',

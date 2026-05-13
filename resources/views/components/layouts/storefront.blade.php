@@ -12,6 +12,8 @@
         (function() {
             if (localStorage.getItem('gp-theme') === 'dark') {
                 document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
             }
         })();
     </script>
@@ -36,7 +38,8 @@
 @php $navCategories = \App\Models\Category::orderBy('name')->get(['name', 'slug']); @endphp
 
     {{-- ─── HEADER ──────────────────────────────────────────────────────────── --}}
-    <header class="bg-white dark:bg-[#162016] border-b border-brand-border dark:border-[#2a3a2a] px-4 md:px-6 sticky top-0 z-[100] transition-colors duration-200">
+    <header class="bg-white dark:bg-[#162016] border-b border-brand-border dark:border-[#2a3a2a] sticky top-0 z-[100] transition-colors duration-200">
+      <div class="max-w-[1440px] mx-auto px-4 md:px-6">
 
         {{-- Row 1: Logo · Search · Icons --}}
         <div class="flex items-center gap-3 md:gap-4 py-3">
@@ -251,10 +254,12 @@
             </form>
         </div>
 
+      </div>{{-- /max-w header inner --}}
     </header>
 
     {{-- ─── CATEGORY NAV STRIP (non-sticky, scrolls with page, desktop only) ─── --}}
-    <nav id="category-nav" class="hidden md:flex items-center bg-white dark:bg-[#162016] border-b border-[#f0f4f1] dark:border-[#2a3a2a] px-6 overflow-x-auto scrollbar-none h-[36px]">
+    <nav id="category-nav" class="hidden md:block bg-white dark:bg-[#162016] border-b border-[#f0f4f1] dark:border-[#2a3a2a] h-[36px]">
+      <div class="max-w-[1440px] mx-auto px-6 flex items-center overflow-x-auto scrollbar-none h-full">
         <a href="{{ route('home') }}"
            class="px-3.5 h-full flex items-center text-[12px] font-semibold text-brand-orange whitespace-nowrap border-b-2 border-transparent hover:border-brand-orange transition-colors">
             🔥 Flash Sale
@@ -270,6 +275,7 @@
            class="px-3.5 h-full flex items-center text-[12px] font-semibold text-brand-orange whitespace-nowrap border-b-2 border-transparent hover:border-brand-orange transition-colors">
             Verified Plugs
         </a>
+      </div>{{-- /max-w nav inner --}}
     </nav>
 
     {{-- ─── MOBILE MENU BACKDROP ───────────────────────────────────────────────── --}}
@@ -348,7 +354,7 @@
     {{-- ─── PAY-ON-DELIVERY SUCCESS BANNER ─────────────────────────────────── --}}
     @if (session('pod_success'))
     <div class="bg-brand text-white px-4 py-4">
-        <div class="max-w-[1200px] mx-auto flex items-start gap-3">
+        <div class="max-w-[1440px] mx-auto flex items-start gap-3">
             <svg class="w-6 h-6 fill-brand-lime flex-shrink-0 mt-0.5" viewBox="0 0 24 24">
                 <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
@@ -364,66 +370,70 @@
 
     {{-- ─── PAGE CONTENT ────────────────────────────────────────────────────── --}}
     <main class="pb-16 md:pb-0">
-        {{ $slot }}
+        <div class="max-w-[1440px] mx-auto">
+            {{ $slot }}
+        </div>
     </main>
 
     {{-- ─── FOOTER ──────────────────────────────────────────────────────────── --}}
-    <footer class="bg-brand-footer pt-9 pb-5 px-4 md:px-6">
+    <footer class="bg-[#e8f0e9] dark:bg-brand-footer transition-colors duration-200">
+      <div class="max-w-[1440px] mx-auto px-4 md:px-6 pt-9 pb-5">
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1.8fr_1fr_1fr_1fr] gap-7 mb-7">
             <div>
                 <div class="mb-3">
-                    <img src="/images/logo.svg" alt="GadgetPlug" class="h-14 w-auto" draggable="false">
+                    <img src="/images/logo.svg" alt="GadgetPlug" class="h-14 w-auto dark:brightness-[1.1]" draggable="false">
                 </div>
-                <p class="text-[12px] text-[#7a9e7c] leading-relaxed max-w-[220px] mb-3.5">
+                <p class="text-[12px] text-[#4a6a4c] dark:text-[#7a9e7c] leading-relaxed max-w-[220px] mb-3.5">
                     Nigeria's premium tech marketplace. Verified vendors, authentic products, localized trust.
                 </p>
                 <div class="flex gap-2">
                     @foreach(['𝕏', 'f', 'in', '▶'] as $s)
-                    <div class="w-8 h-8 bg-[#1a3a1a] rounded-lg flex items-center justify-center cursor-pointer hover:bg-brand transition-colors text-sm text-white select-none">{{ $s }}</div>
+                    <div class="w-8 h-8 bg-[#c8deca] dark:bg-[#1a3a1a] rounded-lg flex items-center justify-center cursor-pointer hover:bg-brand transition-colors text-sm text-[#2a5a2c] dark:text-white hover:text-white select-none">{{ $s }}</div>
                     @endforeach
                 </div>
             </div>
             <div>
-                <h4 class="font-montserrat font-bold text-[12px] text-brand-lime tracking-[0.8px] uppercase mb-3">Corporate</h4>
+                <h4 class="font-montserrat font-bold text-[12px] text-brand dark:text-brand-lime tracking-[0.8px] uppercase mb-3">Corporate</h4>
                 <ul class="space-y-2">
                     @foreach(['About GadgetPlug','Careers','Press & Media','Investor Relations','Sustainability','CAC Registration'] as $link)
-                    <li><a href="#" class="text-[12px] text-[#7a9e7c] hover:text-white transition-colors">{{ $link }}</a></li>
+                    <li><a href="#" class="text-[12px] text-[#4a6a4c] dark:text-[#7a9e7c] hover:text-brand dark:hover:text-white transition-colors">{{ $link }}</a></li>
                     @endforeach
                 </ul>
             </div>
             <div>
-                <h4 class="font-montserrat font-bold text-[12px] text-brand-lime tracking-[0.8px] uppercase mb-3">Sell on GadgetPlug</h4>
+                <h4 class="font-montserrat font-bold text-[12px] text-brand dark:text-brand-lime tracking-[0.8px] uppercase mb-3">Sell on GadgetPlug</h4>
                 <ul class="space-y-2">
                     @foreach(['Become a Vendor','Vendor Verification','Seller Dashboard','Fees & Commissions','Vendor Success Stories','Partner Program'] as $link)
-                    <li><a href="#" class="text-[12px] text-[#7a9e7c] hover:text-white transition-colors">{{ $link }}</a></li>
+                    <li><a href="#" class="text-[12px] text-[#4a6a4c] dark:text-[#7a9e7c] hover:text-brand dark:hover:text-white transition-colors">{{ $link }}</a></li>
                     @endforeach
                 </ul>
             </div>
             <div>
-                <h4 class="font-montserrat font-bold text-[12px] text-brand-lime tracking-[0.8px] uppercase mb-3">Support</h4>
+                <h4 class="font-montserrat font-bold text-[12px] text-brand dark:text-brand-lime tracking-[0.8px] uppercase mb-3">Support</h4>
                 <ul class="space-y-2">
                     @foreach(['Help Centre','Track My Order','Returns & Refunds','Dispute Resolution','Payment Issues','Contact Us'] as $link)
-                    <li><a href="#" class="text-[12px] text-[#7a9e7c] hover:text-white transition-colors">{{ $link }}</a></li>
+                    <li><a href="#" class="text-[12px] text-[#4a6a4c] dark:text-[#7a9e7c] hover:text-brand dark:hover:text-white transition-colors">{{ $link }}</a></li>
                     @endforeach
                 </ul>
             </div>
         </div>
-        <div class="border-t border-[#1a3a1a] pt-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
-            <span class="text-[11px] text-[#4a6a4c]">© {{ date('Y') }} GadgetPlug Nigeria Ltd. All rights reserved. RC: 1234567</span>
+        <div class="border-t border-[#c0d4c2] dark:border-[#1a3a1a] pt-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+            <span class="text-[11px] text-[#5a7a5c] dark:text-[#4a6a4c]">© {{ date('Y') }} GadgetPlug Nigeria Ltd. All rights reserved. RC: 1234567</span>
             <div class="flex items-center gap-2 flex-wrap">
-                <div class="flex items-center gap-1 bg-[#1a3a1a] rounded-md px-2 py-1 text-[10px] text-[#7a9e7c]">
+                <div class="flex items-center gap-1 bg-[#c8deca] dark:bg-[#1a3a1a] rounded-md px-2 py-1 text-[10px] text-[#3a6a3c] dark:text-[#7a9e7c]">
                     <svg class="w-3 h-3 fill-brand" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                     SSL Secured
                 </div>
-                <div class="flex items-center gap-1 bg-[#1a3a1a] rounded-md px-2 py-1 text-[10px] text-[#7a9e7c]">
+                <div class="flex items-center gap-1 bg-[#c8deca] dark:bg-[#1a3a1a] rounded-md px-2 py-1 text-[10px] text-[#3a6a3c] dark:text-[#7a9e7c]">
                     <svg class="w-3 h-3 fill-brand" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                     CAC Verified
                 </div>
-                <div class="flex items-center gap-1 bg-[#1a3a1a] rounded-md px-2 py-1 text-[10px] text-brand-orange">
+                <div class="flex items-center gap-1 bg-[#c8deca] dark:bg-[#1a3a1a] rounded-md px-2 py-1 text-[10px] text-brand-orange">
                     🇳🇬 Made for Nigeria
                 </div>
             </div>
         </div>
+      </div>{{-- /max-w footer inner --}}
     </footer>
 
     {{-- ─── CART TOAST ──────────────────────────────────────────────────────── --}}

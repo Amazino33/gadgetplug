@@ -4,10 +4,32 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Collection;
+use App\Models\VendorPayout;
+use Spatie\Sluggable\HasSlug;
+use Spatie\Sluggable\SlugOptions;
 
 class Vendor extends Model
 {
-    protected $guarded = [];
+    use HasSlug;
+
+    protected $fillable = [
+        'user_id', 'name', 'slug', 'logo', 'is_verified',
+        'description', 'whatsapp', 'bank_name', 'account_number', 'account_name',
+    ];
+
+    public function getSlugOptions(): SlugOptions
+    {
+        return SlugOptions::create()
+            ->generateSlugsFrom('name')
+            ->saveSlugsTo('slug')
+            ->slugsShouldBeNoLongerThan(80)
+            ->doNotGenerateSlugsOnUpdate(); // preserve existing slugs unless name changes via StoreProfile
+    }
+
+    public function getRouteKeyName(): string
+    {
+        return 'slug';
+    }
 
     // Original owner
     public function user()
@@ -26,6 +48,11 @@ class Vendor extends Model
     public function products()
     {
         return $this->hasMany(Product::class);
+    }
+
+    public function payouts()
+    {
+        return $this->hasMany(VendorPayout::class);
     }
 
     public function isOwner(User $user): bool

@@ -20,8 +20,40 @@ new class extends Component {
     public array $cartItems = [];
     public float $total = 0;
 
+    public bool   $paid          = false;
+    public string $paidReference = '';
+    public string $paidMethod    = '';
+    public float  $paidTotal     = 0.0;
+    public string $paidName      = '';
+    public array  $paidItems     = [];
+
     public function mount(): void
     {
+        // Show success screen after Paystack or Pay-on-Delivery completion
+        if ($ref = session()->pull('payment_success')) {
+            $this->paid          = true;
+            $this->paidReference = $ref;
+
+            $order = Order::with('items.product.media')
+                ->where('reference', $this->paidReference)
+                ->first();
+
+            if ($order) {
+                $this->paidMethod = $order->payment_method;
+                $this->paidTotal  = (float) $order->total_amount;
+                $this->paidName   = $order->customer_name;
+                foreach ($order->items as $item) {
+                    $this->paidItems[] = [
+                        'name'     => $item->product->name ?? 'Unknown',
+                        'quantity' => $item->quantity,
+                        'subtotal' => $item->unit_price * $item->quantity,
+                        'thumb'    => $item->product?->getFirstMediaUrl('product-images', 'thumb') ?? '',
+                    ];
+                }
+            }
+            return;
+        }
+
         $cart = Session::get('cart', []);
         if (empty($cart)) {
             $this->redirectRoute('home');
@@ -107,10 +139,11 @@ new class extends Component {
                 return;
             }
 
+            $order->update(['status' => 'confirmed']);
             Session::forget('cart');
             $this->dispatch('cart-updated');
-            session()->flash('pod_success', $reference);
-            $this->redirectRoute('home');
+            session()->put('payment_success', $reference);
+            $this->redirectRoute('checkout');
             return;
         }
 
@@ -155,22 +188,32 @@ new class extends Component {
 <div class="bg-[#f8fcf8] dark:bg-[#0d1a0d] min-h-screen">
 <div class="px-4 md:px-6 py-7 max-w-[1000px] mx-auto">
 
-    {{-- ─── PAGE HEADER ─────────────────────────────────────────────────────── --}}
+    {{-- ─── PAGE HEADER ────────────────────────────────────────────────────── --}}
     <div class="flex items-center gap-3 mb-7">
-        <a href="{{ route('cart') }}" class="w-8 h-8 rounded-full bg-brand-bg dark:bg-[#1a2a1a] border border-brand-border dark:border-[#2a3a2a] flex items-center justify-center hover:border-brand transition-colors">
+        <a href="{{ $paid ? route('home') : route('cart') }}"
+           class="w-8 h-8 rounded-full bg-brand-bg dark:bg-[#1a2a1a] border border-brand-border dark:border-[#2a3a2a] flex items-center justify-center hover:border-brand transition-colors">
             <svg class="w-4 h-4 fill-none" style="stroke:#5a7a5c;stroke-width:2" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
             </svg>
         </a>
         <div>
-            <h1 class="font-montserrat font-black text-[24px] md:text-[28px] text-brand-dark dark:text-[#e8f5e9]">Checkout</h1>
-            <p class="text-[12px] text-brand-muted">Secure checkout · Pay online or on delivery</p>
+            <h1 class="font-montserrat font-black text-[24px] md:text-[28px] text-brand-dark dark:text-[#e8f5e9]">
+                {{ $paid ? 'Order Confirmed' : 'Checkout' }}
+            </h1>
+            <p class="text-[12px] text-brand-muted">
+                {{ $paid ? 'Thank you for shopping with GadgetPlug' : 'Secure checkout · Pay online or on delivery' }}
+            </p>
         </div>
     </div>
 
-    {{-- ─── PROGRESS STEPS ──────────────────────────────────────────────────── --}}
+    {{-- ─── PROGRESS STEPS ─────────────────────────────────────────────────── --}}
     <div class="flex items-center gap-0 mb-8">
-        @foreach([['1','Cart','done'],['2','Details','active'],['3','Payment','pending']] as [$n,$lbl,$state])
+        @php
+        $steps = $paid
+            ? [['1','Cart','done'],['2','Details','done'],['3','Payment','done']]
+            : [['1','Cart','done'],['2','Details','active'],['3','Payment','pending']];
+        @endphp
+        @foreach($steps as [$n,$lbl,$state])
         <div class="flex items-center {{ !$loop->last ? 'flex-1' : '' }}">
             <div class="flex items-center gap-2">
                 <div class="w-7 h-7 rounded-full flex items-center justify-center font-montserrat font-bold text-[11px] flex-shrink-0
@@ -188,11 +231,168 @@ new class extends Component {
                 </span>
             </div>
             @if (!$loop->last)
-            <div class="flex-1 h-px bg-[#e0e8e1] dark:bg-[#2a3a2a] mx-3"></div>
+            <div class="flex-1 h-px {{ $paid ? 'bg-brand' : 'bg-[#e0e8e1] dark:bg-[#2a3a2a]' }} mx-3 transition-colors duration-500"></div>
             @endif
         </div>
         @endforeach
     </div>
+
+    {{-- ════════════════════════════════════════════════════════════════════ --}}
+    @if ($paid)
+    {{-- ─── SUCCESS STATE ───────────────────────────────────────────────── --}}
+    <div class="flex flex-col items-center text-center">
+
+        {{-- Animated checkmark circle --}}
+        <div class="w-24 h-24 rounded-full bg-brand flex items-center justify-center mb-5 shadow-[0_8px_40px_rgba(6,139,3,0.35)]"
+             style="animation: scaleIn .4s cubic-bezier(.175,.885,.32,1.275) both">
+            <svg class="w-12 h-12 fill-none" style="stroke:#fff;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round" viewBox="0 0 24 24">
+                <polyline points="20 6 9 17 4 12"/>
+            </svg>
+        </div>
+        <style>
+            @keyframes scaleIn { from { transform: scale(0); opacity: 0 } to { transform: scale(1); opacity: 1 } }
+        </style>
+
+        <h2 class="font-montserrat font-black text-[26px] md:text-[30px] text-brand-dark dark:text-[#e8f5e9] mb-1">
+            {{ $paidMethod === 'pay_on_delivery' ? 'Order Placed!' : 'Payment Successful!' }}
+        </h2>
+        <p class="text-[14px] text-brand-muted mb-3">
+            {{ $paidMethod === 'pay_on_delivery' ? 'Your order is confirmed. Our rider will be with you soon.' : 'Your payment was processed and your order is on its way.' }}
+        </p>
+
+        <div class="inline-flex items-center gap-2 bg-[#e8f5e9] dark:bg-[#1a2a1a] border border-[#c0e8c0] dark:border-[#2a3a2a] rounded-full px-4 py-2 mb-8">
+            <span class="text-[11px] text-brand-muted font-medium">Order Reference:</span>
+            <span class="font-montserrat font-black text-[12px] text-brand tracking-wide">{{ $paidReference }}</span>
+        </div>
+
+        <div class="w-full max-w-[620px] space-y-4 text-left">
+
+            {{-- What happens next timeline --}}
+            <div class="bg-white dark:bg-[#1a2a1a] rounded-2xl border border-brand-border dark:border-[#2a3a2a] overflow-hidden">
+                <div class="px-5 py-4 border-b border-brand-border dark:border-[#2a3a2a] bg-gradient-to-br from-[#f0f8f0] to-[#e8f5e9] dark:from-[#1a2a1a] dark:to-[#162016]">
+                    <h3 class="font-montserrat font-bold text-[14px] text-brand-dark dark:text-[#e8f5e9]">What Happens Next?</h3>
+                </div>
+                <div class="p-5">
+                    @php
+                    $timeline = [
+                        [
+                            'title' => 'Order Confirmed',
+                            'desc'  => 'Your order ' . $paidReference . ' is confirmed and being prepared for dispatch.',
+                            'done'  => true,
+                        ],
+                        [
+                            'title' => 'Rider Dispatched',
+                            'desc'  => 'Our rider will pick up your item and head to your address within 2 hours.',
+                            'done'  => false,
+                        ],
+                        [
+                            'title' => 'Inspect Your Item',
+                            'desc'  => 'When the rider arrives, take your time to inspect the item before accepting.',
+                            'done'  => false,
+                        ],
+                        [
+                            'title' => $paidMethod === 'pay_on_delivery' ? 'Pay Cash to Rider' : 'Enjoy Your Gadget ✓',
+                            'desc'  => $paidMethod === 'pay_on_delivery'
+                                        ? 'Pay the exact amount in cash to the rider once you are satisfied with the item.'
+                                        : 'Your payment is complete. Welcome to the GadgetPlug family!',
+                            'done'  => false,
+                        ],
+                    ];
+                    @endphp
+                    <div class="space-y-0">
+                        @foreach ($timeline as $i => $step)
+                        <div class="flex gap-4 {{ !$loop->last ? 'pb-4' : '' }}">
+                            {{-- Icon + connector line --}}
+                            <div class="flex flex-col items-center flex-shrink-0">
+                                <div class="w-8 h-8 rounded-full flex items-center justify-center
+                                    {{ $step['done'] ? 'bg-brand shadow-[0_2px_10px_rgba(6,139,3,0.3)]' : 'bg-brand-bg dark:bg-[#0d1a0d] border-2 border-[#c0d4c2] dark:border-[#2a3a2a]' }}">
+                                    @if ($step['done'])
+                                    <svg class="w-4 h-4 fill-none" style="stroke:#fff;stroke-width:2.5" viewBox="0 0 24 24">
+                                        <polyline points="20 6 9 17 4 12"/>
+                                    </svg>
+                                    @else
+                                    <span class="text-[11px] font-bold font-montserrat text-brand-muted">{{ $i + 1 }}</span>
+                                    @endif
+                                </div>
+                                @if (!$loop->last)
+                                <div class="w-px flex-1 mt-1 {{ $step['done'] ? 'bg-brand' : 'bg-[#d0dcd2] dark:bg-[#2a3a2a]' }}"></div>
+                                @endif
+                            </div>
+                            {{-- Text --}}
+                            <div class="pt-0.5 {{ !$loop->last ? 'pb-4' : '' }}">
+                                <div class="font-semibold text-[13px] text-brand-dark dark:text-[#e8f5e9]">{{ $step['title'] }}</div>
+                                <div class="text-[11px] text-brand-muted mt-0.5 leading-relaxed">{{ $step['desc'] }}</div>
+                            </div>
+                        </div>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+
+            {{-- Items in this order --}}
+            @if (count($paidItems))
+            <div class="bg-white dark:bg-[#1a2a1a] rounded-2xl border border-brand-border dark:border-[#2a3a2a] overflow-hidden">
+                <div class="px-5 py-4 border-b border-brand-border dark:border-[#2a3a2a] bg-gradient-to-br from-[#f0f8f0] to-[#e8f5e9] dark:from-[#1a2a1a] dark:to-[#162016]">
+                    <h3 class="font-montserrat font-bold text-[14px] text-brand-dark dark:text-[#e8f5e9]">Items in Your Order</h3>
+                </div>
+                <div class="p-5 space-y-3">
+                    @foreach ($paidItems as $item)
+                    <div class="flex gap-3 items-center">
+                        <div class="w-11 h-11 rounded-lg bg-brand-bg dark:bg-[#0d1a0d] border border-brand-border dark:border-[#2a3a2a] flex items-center justify-center flex-shrink-0 overflow-hidden">
+                            @if ($item['thumb'])
+                            <img src="{{ $item['thumb'] }}" alt="{{ $item['name'] }}" class="w-full h-full object-cover">
+                            @else
+                            <span class="text-xl">📦</span>
+                            @endif
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <div class="text-[12px] font-medium text-[#111] dark:text-[#e8f5e9] line-clamp-1">{{ $item['name'] }}</div>
+                            <div class="text-[10px] text-brand-muted">Qty: {{ $item['quantity'] }}</div>
+                        </div>
+                        <div class="font-montserrat font-bold text-[13px] text-brand flex-shrink-0">
+                            ₦{{ number_format($item['subtotal']) }}
+                        </div>
+                    </div>
+                    @endforeach
+
+                    <div class="border-t border-brand-border dark:border-[#2a3a2a] pt-3 flex justify-between items-center">
+                        <span class="font-montserrat font-bold text-[14px] text-brand-dark dark:text-[#e8f5e9]">
+                            {{ $paidMethod === 'pay_on_delivery' ? 'Total (Pay on Delivery)' : 'Total Paid' }}
+                        </span>
+                        <span class="font-montserrat font-black text-[20px] text-brand">₦{{ number_format($paidTotal) }}</span>
+                    </div>
+                </div>
+            </div>
+            @endif
+
+            {{-- CTA buttons --}}
+            <div class="flex flex-col sm:flex-row gap-3 pb-6">
+                <a href="{{ route('home') }}"
+                   class="flex-1 flex items-center justify-center gap-2 bg-brand hover:bg-[#055002] text-white font-montserrat font-bold text-[14px] py-3.5 rounded-xl transition-all hover:-translate-y-px shadow-md">
+                    <svg class="w-4 h-4 fill-none" style="stroke:currentColor;stroke-width:2" viewBox="0 0 24 24">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                        <polyline points="9 22 9 12 15 12 15 22"/>
+                    </svg>
+                    Continue Shopping
+                </a>
+                @auth
+                <a href="{{ route('account.orders') }}"
+                   class="flex-1 flex items-center justify-center gap-2 bg-white dark:bg-[#1a2a1a] border-2 border-brand text-brand font-montserrat font-bold text-[14px] py-3.5 rounded-xl transition-all hover:bg-brand hover:text-white">
+                    <svg class="w-4 h-4 fill-none" style="stroke:currentColor;stroke-width:2" viewBox="0 0 24 24">
+                        <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
+                        <line x1="3" y1="6" x2="21" y2="6"/>
+                        <path d="M16 10a4 4 0 0 1-8 0"/>
+                    </svg>
+                    View My Orders
+                </a>
+                @endauth
+            </div>
+
+        </div>
+    </div>
+
+    @else
+    {{-- ─── CHECKOUT FORM ───────────────────────────────────────────────── --}}
 
     @if (session()->has('error'))
     <div class="bg-[#fce4ec] border border-[#f8bbd0] text-red-700 px-4 py-3 rounded-xl mb-5 text-[13px] flex items-start gap-2">
@@ -446,6 +646,8 @@ new class extends Component {
         </div>
     </div>
     </form>
+    @endif
+
 </div>
 </div>
 

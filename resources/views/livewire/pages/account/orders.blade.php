@@ -49,14 +49,28 @@ new class extends Component {
                         </span>
                     </div>
                     <div class="flex items-center gap-2">
-                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-[0.5px]
-                            {{ match($order->status) {
-                                'paid'      => 'bg-[#e8f5e8] text-brand dark:bg-[#1a2a1a] dark:text-brand-lime',
-                                'pending'   => 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400',
-                                'cancelled' => 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400',
-                                default     => 'bg-gray-100 text-gray-600 dark:bg-[#1a2a1a] dark:text-[#b0c8b0]',
-                            } }}">
-                            {{ ucfirst($order->status) }}
+                        @php
+                        $statusLabel = match($order->status) {
+                            'pending'               => 'Pending Payment',
+                            'confirmed'             => 'Confirmed',
+                            'paid'                  => 'Paid',
+                            'shipped'               => 'On the Way',
+                            'delivered'             => 'Delivered',
+                            'cancelled'             => 'Cancelled',
+                            'paid_but_failed_stock' => 'Action Needed',
+                            default                 => ucfirst($order->status),
+                        };
+                        $statusClass = match($order->status) {
+                            'paid', 'delivered'     => 'bg-[#e8f5e8] text-brand dark:bg-[#1a2a1a] dark:text-brand-lime',
+                            'confirmed'             => 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400',
+                            'shipped'               => 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400',
+                            'pending'               => 'bg-gray-100 text-gray-600 dark:bg-[#1a2a1a] dark:text-[#b0c8b0]',
+                            'cancelled', 'paid_but_failed_stock' => 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400',
+                            default                 => 'bg-gray-100 text-gray-600 dark:bg-[#1a2a1a] dark:text-[#b0c8b0]',
+                        };
+                        @endphp
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-[0.5px] {{ $statusClass }}">
+                            {{ $statusLabel }}
                         </span>
                         <span class="text-[11px] text-brand-muted">via {{ ucfirst(str_replace('_', ' ', $order->payment_method)) }}</span>
                     </div>
