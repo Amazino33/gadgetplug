@@ -33,10 +33,7 @@
 
         <div>
             <label class="block text-[11px] font-semibold text-brand-muted uppercase tracking-[0.6px] mb-1.5">Password</label>
-            <input name="password" type="password" required autocomplete="new-password"
-                placeholder="At least 8 characters"
-                class="w-full h-11 px-3.5 bg-brand-bg dark:bg-[#0d1a0d] border border-[#d0d9d2] dark:border-[#2a3a2a] rounded-xl text-[13px] text-[#111] dark:text-[#e8f5e9] focus:outline-none focus:border-brand transition-colors @error('password') border-red-400 @enderror">
-            @error('password')<p class="text-red-500 text-[11px] mt-1">{{ $message }}</p>@enderror
+            <x-password-checklist name="password" placeholder="At least 8 characters" />
         </div>
 
         <div>
