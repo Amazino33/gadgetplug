@@ -11,6 +11,8 @@ use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
+use Filament\View\PanelsRenderHook;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
@@ -61,6 +63,10 @@ class VendorPanelProvider extends PanelProvider
                 AuditSessionResource::class,
             ])
             ->databaseNotifications()
-            ->databaseNotificationsPolling('30s');
+            ->databaseNotificationsPolling('30s')
+            ->renderHook(
+                PanelsRenderHook::HEAD_END,
+                fn () => Blade::render("@include('partials.meta-pixel')"),
+            );
     }
 }

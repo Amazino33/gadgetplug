@@ -20,6 +20,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @livewireStyles
+    @include('partials.meta-pixel')
 </head>
 <body class="min-h-screen bg-[#0d1f0d] font-inter text-[#111] antialiased flex flex-col items-center justify-center px-4 py-10">
 
