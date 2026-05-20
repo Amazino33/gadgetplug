@@ -15,17 +15,19 @@ class CartService
         $cart = Session::get('cart', []);
         $productId = $product->id;
 
+        $available = $product->available_stock;
+
         if (isset($cart[$productId])) {
             $cart[$productId]['quantity'] += $quantity;
         } else {
             $cart[$productId] = [
                 'quantity'  => $quantity,
-                'max'       => $product->stock_quantity,
+                'max'       => $available,
             ];
         }
 
-        // Ensure the cart quantity never exceeds the actual stock
-        $cart[$productId]['quantity'] = min($cart[$productId]['quantity'], $product->stock_quantity);
+        // Cap at available stock (physical minus already reserved for other orders)
+        $cart[$productId]['quantity'] = min($cart[$productId]['quantity'], $available);
 
         Session::put('cart', $cart);
     }

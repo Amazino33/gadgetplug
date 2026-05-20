@@ -5,7 +5,7 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Services\CartService;
-use App\Actions\Inventory\AdjustStockAction;
+use App\Actions\Inventory\ReserveStockAction;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
@@ -120,17 +120,15 @@ new class extends Component {
         }
 
         if ($this->paymentMethod === 'pay_on_delivery') {
-            $adjustStock = app(AdjustStockAction::class);
+            $reserveStock = app(ReserveStockAction::class);
 
             try {
                 foreach ($this->cartItems as $item) {
-                    $adjustStock->execute(
-                        productId:       $item['product']->id,
-                        quantityChanged: -$item['quantity'],
-                        transactionType: 'online_sale',
-                        userId:          null,
-                        reference:       $reference,
-                        description:     'Pay-on-delivery order placed.',
+                    $reserveStock->execute(
+                        productId:   $item['product']->id,
+                        quantity:    $item['quantity'],
+                        reference:   $reference,
+                        description: 'Reserved on pay-on-delivery order placed.',
                     );
                 }
             } catch (\Exception $e) {

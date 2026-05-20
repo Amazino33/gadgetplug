@@ -33,9 +33,19 @@ class Product extends Model implements HasMedia
     }
 
     protected $casts = [
-        'price' => 'decimal:2',
-        'specifications' => 'array',
+        'price'           => 'decimal:2',
+        'specifications'  => 'array',
+        'stock_quantity'  => 'integer',
+        'reserved_stock'  => 'integer',
     ];
+
+    /**
+     * Units actually available to sell = physical stock minus those held for pending orders.
+     */
+    public function getAvailableStockAttribute(): int
+    {
+        return max(0, $this->stock_quantity - $this->reserved_stock);
+    }
 
     public function vendor()
     {

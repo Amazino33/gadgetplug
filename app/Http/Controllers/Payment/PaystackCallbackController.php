@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Payment;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Order;
-use App\Actions\Inventory\AdjustStockAction;
+use App\Actions\Inventory\ReserveStockAction;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Session;
@@ -15,7 +15,7 @@ class PaystackCallbackController extends Controller
     /**
      * Handle the incoming Paystack webhook/callback.
      */
-    public function __invoke(Request $request, AdjustStockAction $adjustStock)
+    public function __invoke(Request $request, ReserveStockAction $reserveStock)
     {
         $reference = $request->query('reference');
 
@@ -43,15 +43,13 @@ class PaystackCallbackController extends Controller
         }
 
         try {
-            // 1. Deduct stock safely using our "Bouncer" Action class
+            // 1. Reserve stock — physical item stays on shelf until dispatched
             foreach ($order->items as $item) {
-                $adjustStock->execute(
-                    productId: $item->product_id,
-                    quantityChanged: -$item->quantity, // Negative for sale
-                    transactionType: 'online_sale',
-                    userId: null,
-                    reference: $order->reference,
-                    description: 'Automated deduction from paystack checkout.'
+                $reserveStock->execute(
+                    productId:   $item->product_id,
+                    quantity:    $item->quantity,
+                    reference:   $order->reference,
+                    description: 'Reserved on Paystack payment confirmation.',
                 );
             }
 
