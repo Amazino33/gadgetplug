@@ -12,6 +12,7 @@ use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Notifications\Notification;
 use Spatie\Permission\Models\Permission;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use BackedEnum;
 use Filament\Support\Icons\Heroicon;
@@ -75,6 +76,39 @@ class TeamMembers extends Page
                 ])
                 ->action(function (array $data): void {
                     $this->inviteMember($data['email'], $data['permissions']);
+                }),
+
+            Action::make('setPosPin')
+                ->label('Set POS PIN')
+                ->icon(Heroicon::OutlinedFingerPrint)
+                ->form([
+                    Select::make('user_id')
+                        ->label('Staff Member')
+                        ->options(
+                            filament()->getTenant()
+                                ->users()
+                                ->get()
+                                ->pluck('name', 'id')
+                        )
+                        ->required(),
+
+                    TextInput::make('pin')
+                        ->label('New PIN (4–6 digits)')
+                        ->password()
+                        ->numeric()
+                        ->minLength(4)
+                        ->maxLength(6)
+                        ->required(),
+                ])
+                ->action(function (array $data): void {
+                    $user = User::find($data['user_id']);
+                    if ($user) {
+                        $user->update(['pos_pin' => Hash::make($data['pin'])]);
+                        Notification::make()
+                            ->title('POS PIN set for ' . $user->name)
+                            ->success()
+                            ->send();
+                    }
                 }),
 
             // ← new: edit permissions action

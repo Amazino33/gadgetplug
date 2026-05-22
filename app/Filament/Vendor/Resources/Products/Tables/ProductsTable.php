@@ -2,20 +2,15 @@
 
 namespace App\Filament\Vendor\Resources\Products\Tables;
 
-use Filament\Tables\Actions\BulkActionGroup;
-use Filament\Tables\Actions\DeleteBulkAction;
-use Filament\Tables\Actions\EditAction;
-use Filament\Tables\Table;
-use Filament\Tables\Columns\TextColumn;
 use App\Models\AuditSession;
 use App\Models\Product;
-use Filament\Actions\Action as ActionsAction;
-use Filament\Actions\BulkActionGroup as ActionsBulkActionGroup;
-use Filament\Actions\DeleteBulkAction as ActionsDeleteBulkAction;
-use Filament\Actions\EditAction as ActionsEditAction;
-// 1. FIXED IMPORT: We must use Tables\Actions\Action, not the standalone Action
-use Filament\Tables\Actions\Action; 
+use Filament\Actions\Action;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
+use Filament\Actions\EditAction;
 use Filament\Forms\Components\TextInput;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Table;
 
 class ProductsTable
 {
@@ -25,7 +20,7 @@ class ProductsTable
             ->columns([
                 TextColumn::make('name')
                     ->searchable()
-                    ->sortable(), 
+                    ->sortable(),
 
                 TextColumn::make('category.name')
                     ->sortable(),
@@ -35,8 +30,29 @@ class ProductsTable
                     ->sortable(),
 
                 TextColumn::make('stock_quantity')
+                    ->label('On Shelf')
                     ->numeric()
                     ->sortable(),
+
+                TextColumn::make('reserved_stock')
+                    ->label('Reserved')
+                    ->numeric()
+                    ->sortable()
+                    ->badge()
+                    ->color(fn (int $state): string => $state > 0 ? 'warning' : 'gray'),
+
+                TextColumn::make('available_stock')
+                    ->label('Available')
+                    ->numeric()
+                    ->sortable(query: fn ($query, $direction) =>
+                        $query->orderByRaw("(stock_quantity - reserved_stock) {$direction}")
+                    )
+                    ->badge()
+                    ->color(fn (int $state): string => match (true) {
+                        $state === 0 => 'danger',
+                        $state < 5   => 'warning',
+                        default      => 'success',
+                    }),
 
                 TextColumn::make('brand')
                     ->searchable(),
@@ -44,11 +60,10 @@ class ProductsTable
             ->filters([
                 //
             ])
-            // 2. FIXED PLACEMENT: Row-level actions go here!
             ->recordActions([
-                ActionsEditAction::make(),
-                
-                ActionsAction::make('start_audit')
+                EditAction::make(),
+
+                Action::make('start_audit')
                     ->label('Start Blind Count')
                     ->icon('heroicon-o-clipboard-document-check')
                     ->color('warning')
@@ -63,21 +78,24 @@ class ProductsTable
                             ->required()
                             ->minValue(0),
                     ])
-                    ->visible(fn (?Product $record): bool => $record !== null && !AuditSession::where('product_id', $record->id)->where('status', 'pending')->exists())
+                    ->visible(fn (?Product $record): bool =>
+                        $record !== null &&
+                        !AuditSession::where('product_id', $record->id)->where('status', 'pending')->exists()
+                    )
                     ->action(function (Product $record, array $data): void {
                         AuditSession::create([
-                            'vendor_id' => $record->vendor_id,
-                            'product_id' => $record->id,
-                            'storekeeper_a_id' => auth()->id(),
-                            'count_a' => $data['count_a'],
-                            'status' => 'pending',
+                            'vendor_id'         => $record->vendor_id,
+                            'product_id'        => $record->id,
+                            'storekeeper_a_id'  => auth()->id(),
+                            'count_a'           => $data['count_a'],
+                            'status'            => 'pending',
                         ]);
                     })
-                    ->successNotificationTitle('Audit Started, Waiting for Storekeeper B to verify.'),
+                    ->successNotificationTitle('Audit started — waiting for Storekeeper B to verify.'),
             ])
             ->toolbarActions([
-                ActionsBulkActionGroup::make([
-                    ActionsDeleteBulkAction::make(),
+                BulkActionGroup::make([
+                    DeleteBulkAction::make(),
                 ]),
             ]);
     }

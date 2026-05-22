@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Filament\Vendor\Resources\AuditSessionResource\Pages;
+namespace App\Filament\Vendor\Resources\AuditSessions\AuditSessionResource\Pages;
 
-use App\Filament\Vendor\Resources\AuditSessionResource;
+use App\Filament\Vendor\Resources\AuditSessions\AuditSessionResource;
 
 use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ManageRecords;

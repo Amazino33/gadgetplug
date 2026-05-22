@@ -2,9 +2,9 @@
 
 declare(strict_types=1); // Forces PHP to strictly enforce variable types in this file
 
-namespace App\Filament\Vendor\Resources;
+namespace App\Filament\Vendor\Resources\AuditSessions;
 
-use App\Filament\Vendor\Resources\AuditSessionResource\Pages;
+use App\Filament\Vendor\Resources\AuditSessions\AuditSessionResource\Pages;
 
 use App\Models\AuditSession;
 use App\Actions\Inventory\ProcessAuditCountAction;
@@ -12,12 +12,11 @@ use App\Actions\Inventory\AdjustStockAction;
 use Filament\Resources\Resource;
 use Filament\Tables\Table;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Actions\Action;
+use Filament\Actions\Action;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Exception;
-use BackedEnum; // For strict typing of our icon enum, if we choose to use one
-use Filament\Actions\Action as ActionsAction;
+use BackedEnum;
 use UnitEnum;
 
 class AuditSessionResource extends Resource
@@ -62,7 +61,7 @@ class AuditSessionResource extends Resource
             ->actions([
                 
                 // --- ACTION 1: STOREKEEPER B VERIFIES ---
-                ActionsAction::make('verify_count')
+                Action::make('verify_count')
                     ->label('Submit My Count')
                     ->icon('heroicon-o-check-circle')
                     ->color('success')
@@ -106,7 +105,7 @@ class AuditSessionResource extends Resource
                     }),
 
                 // --- ACTION 2: MANAGER OVERRIDES ---
-                ActionsAction::make('manager_override')
+                Action::make('manager_override')
                     ->label('Resolve Discrepancy')
                     ->icon('heroicon-o-exclamation-triangle')
                     ->color('danger')

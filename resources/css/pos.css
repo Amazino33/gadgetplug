@@ -1,0 +1,27 @@
+@import 'tailwindcss';
+
+@source '../js/pos/**/*.jsx';
+
+/* POS-specific styles — thermal print layout */
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Thermal receipt print — 80mm */
+@media print {
+    body * { visibility: hidden !important; }
+    .print-receipt, .print-receipt * { visibility: visible !important; }
+    .print-receipt {
+        position: fixed;
+        top: 0; left: 0;
+        width: 80mm;
+        font-size: 11px;
+        line-height: 1.4;
+    }
+    @page { size: 80mm auto; margin: 4mm; }
+}

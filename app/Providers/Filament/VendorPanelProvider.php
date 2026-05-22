@@ -2,7 +2,7 @@
 
 namespace App\Providers\Filament;
 
-use App\Filament\Vendor\Resources\AuditSessionResource;
+use App\Filament\Vendor\Resources\AuditSessions\AuditSessionResource;
 use App\Models\Vendor;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -19,6 +19,7 @@ use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use Filament\Navigation\NavigationItem;
 use App\Filament\Vendor\Widgets\StoreMetricsOverview;
 use App\Filament\Vendor\Widgets\SalesChannelChart;
 use App\Filament\Vendor\Widgets\InventoryOverviewWidget;
@@ -61,6 +62,13 @@ class VendorPanelProvider extends PanelProvider
             ->tenant(Vendor::class, slugAttribute: 'slug', ownershipRelationship: 'vendors')
             ->resources([
                 AuditSessionResource::class,
+            ])
+            ->navigationItems([
+                NavigationItem::make('POS Terminal')
+                    ->url(fn (): string => url('/pos/' . (filament()->getTenant()?->slug ?? '')))
+                    ->icon('heroicon-o-computer-desktop')
+                    ->group('Store')
+                    ->sort(99),
             ])
             ->databaseNotifications()
             ->databaseNotificationsPolling('30s')

@@ -36,6 +36,16 @@ class ProductForm
                                     ->required()
                                     ->columnSpanFull(),
 
+                                TextInput::make('sku')
+                                    ->label('SKU')
+                                    ->placeholder('e.g., APL-IP15-128-BLK')
+                                    ->maxLength(100),
+
+                                TextInput::make('barcode')
+                                    ->label('Barcode')
+                                    ->placeholder('e.g., 0123456789012')
+                                    ->maxLength(100),
+
                                 TextInput::make('cost_price')
                                     ->numeric()
                                     ->prefix('₦')

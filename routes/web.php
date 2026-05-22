@@ -40,4 +40,22 @@ Route::get('/invite/{token}', [App\Http\Controllers\VendorInviteController::clas
 Route::post('/invite/{token}', [App\Http\Controllers\VendorInviteController::class, 'store'])
     ->name('vendor.invite.store');
 
+// POS SPA — vendor-scoped entry point from Filament panel
+Route::get('/pos/{vendor:slug}', function (\App\Models\Vendor $vendor) {
+    return view('pos.index', [
+        'vendorId'   => $vendor->id,
+        'vendorSlug' => $vendor->slug,
+        'vendorName' => $vendor->name,
+        'panelUrl'   => url("/plug/{$vendor->slug}"),
+    ]);
+})->name('pos.vendor');
+
+// Fallback — bare /pos with no vendor context
+Route::get('/pos', fn () => view('pos.index', [
+    'vendorId'   => null,
+    'vendorSlug' => null,
+    'vendorName' => null,
+    'panelUrl'   => null,
+]))->name('pos');
+
 require __DIR__.'/settings.php';
