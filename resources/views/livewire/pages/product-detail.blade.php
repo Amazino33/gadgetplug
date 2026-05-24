@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Str;
 use Livewire\Volt\Component;
 use App\Models\Product;
 use App\Models\Wishlist;
@@ -86,7 +87,20 @@ $emoji = $categoryEmojis[strtolower($product->category?->name ?? '')] ?? '📦';
 @endphp
 
 <div>
-<x-layouts.storefront>
+@php
+    $ogTitle       = trim(($product->brand ? $product->brand . ' ' : '') . $product->name) . ' — GadgetPlug';
+    $ogDescription = $product->description
+        ? Str::limit(strip_tags($product->description), 155)
+        : 'Buy ' . $product->name . ' at the best price on GadgetPlug Nigeria. Verified vendor, fast delivery.';
+    $ogImage       = $product->getFirstMediaUrl('product-images', 'preview') ?: asset('images/logo.svg');
+    $ogUrl         = route('product.show', $product->slug);
+@endphp
+<x-layouts.storefront
+    :title="$ogTitle"
+    :description="$ogDescription"
+    :image="$ogImage"
+    :url="$ogUrl"
+>
 
 <div class="px-4 md:px-6 py-6 bg-[#f8fcf8] dark:bg-[#0d1a0d] min-h-screen">
 

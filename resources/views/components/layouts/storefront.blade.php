@@ -1,9 +1,29 @@
+@props([
+    'title'       => "GadgetPlug — Nigeria's #1 Tech Marketplace",
+    'description' => 'Shop verified phones, laptops, accessories and more from trusted vendors across Nigeria.',
+    'image'       => asset('images/logo.svg'),
+    'url'         => request()->url(),
+])
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-    <title>GadgetPlug — Nigeria's #1 Tech Marketplace</title>
+    <title>{{ $title }}</title>
+
+    {{-- Open Graph --}}
+    <meta property="og:type"        content="website">
+    <meta property="og:site_name"   content="GadgetPlug">
+    <meta property="og:title"       content="{{ $title }}">
+    <meta property="og:description" content="{{ $description }}">
+    <meta property="og:image"       content="{{ $image }}">
+    <meta property="og:url"         content="{{ $url }}">
+
+    {{-- Twitter Card --}}
+    <meta name="twitter:card"        content="summary_large_image">
+    <meta name="twitter:title"       content="{{ $title }}">
+    <meta name="twitter:description" content="{{ $description }}">
+    <meta name="twitter:image"       content="{{ $image }}">
     <link rel="icon" type="image/svg+xml" href="/images/logo.svg">
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
