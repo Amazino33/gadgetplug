@@ -10,6 +10,7 @@ use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\TextInput;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 
 class ProductsTable
@@ -56,9 +57,38 @@ class ProductsTable
 
                 TextColumn::make('brand')
                     ->searchable(),
+
+                TextColumn::make('status')
+                    ->badge()
+                    ->getStateUsing(function (Product $record): string {
+                        if ($record->status === 'published' && $record->unpublish_at?->isPast()) {
+                            return 'expired';
+                        }
+                        return $record->status;
+                    })
+                    ->color(fn (string $state): string => match ($state) {
+                        'published' => 'success',
+                        'draft'     => 'gray',
+                        'archived'  => 'warning',
+                        'expired'   => 'danger',
+                        default     => 'gray',
+                    })
+                    ->formatStateUsing(fn (string $state): string => ucfirst($state)),
+
+                TextColumn::make('published_at')
+                    ->label('Goes Live')
+                    ->since()
+                    ->sortable()
+                    ->placeholder('Immediately')
+                    ->toggleable(),
             ])
             ->filters([
-                //
+                SelectFilter::make('status')
+                    ->options([
+                        'draft'     => 'Draft',
+                        'published' => 'Published',
+                        'archived'  => 'Archived',
+                    ]),
             ])
             ->recordActions([
                 EditAction::make(),

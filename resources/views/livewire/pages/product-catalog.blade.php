@@ -59,7 +59,8 @@ new class extends Component {
 
     public function with(): array
     {
-        $query = Product::with(['vendor', 'category', 'media'])
+        $query = Product::published()
+            ->with(['vendor', 'category', 'media'])
             ->whereRaw('(stock_quantity - reserved_stock) > 0')
             ->when($this->selectedCategory, fn($q) => $q->where('category_id', $this->selectedCategory))
             ->when($this->search, fn($q) => $q->where(function ($sq) {

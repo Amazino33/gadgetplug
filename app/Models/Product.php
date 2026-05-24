@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\MediaLibrary\HasMedia;
@@ -37,7 +38,16 @@ class Product extends Model implements HasMedia
         'specifications'  => 'array',
         'stock_quantity'  => 'integer',
         'reserved_stock'  => 'integer',
+        'published_at'    => 'datetime',
+        'unpublish_at'    => 'datetime',
     ];
+
+    public function scopePublished(Builder $query): void
+    {
+        $query->where('status', 'published')
+              ->where(fn($q) => $q->whereNull('published_at')->orWhere('published_at', '<=', now()))
+              ->where(fn($q) => $q->whereNull('unpublish_at')->orWhere('unpublish_at', '>', now()));
+    }
 
     /**
      * Units actually available to sell = physical stock minus those held for pending orders.

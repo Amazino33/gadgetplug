@@ -14,7 +14,7 @@ class PosProductController extends Controller
     {
         $request->validate(['vendor_id' => 'required|integer']);
 
-        $products = Product::query()
+        $products = Product::published()
             ->where('vendor_id', $request->vendor_id)
             ->whereRaw('(stock_quantity - reserved_stock) > 0')
             ->with('media')
@@ -35,7 +35,7 @@ class PosProductController extends Controller
 
         $q = $request->q;
 
-        $products = Product::query()
+        $products = Product::published()
             ->where('vendor_id', $request->vendor_id)
             ->where(fn ($query) => $query
                 ->where('barcode', $q)

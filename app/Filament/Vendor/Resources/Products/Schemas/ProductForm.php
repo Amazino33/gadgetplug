@@ -10,6 +10,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\KeyValue;
 use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 
 class ProductForm
@@ -80,6 +81,33 @@ class ProductForm
                             ->maxFiles(8)
                             ->panelLayout('grid')
                             ->columnSpanFull(),
+                    ]),
+
+                Section::make('Visibility')
+                    ->schema([
+                        Grid::make(2)
+                            ->schema([
+                                Select::make('status')
+                                    ->options([
+                                        'draft'     => 'Draft',
+                                        'published' => 'Published',
+                                        'archived'  => 'Archived',
+                                    ])
+                                    ->default('draft')
+                                    ->required()
+                                    ->live(),
+
+                                DateTimePicker::make('published_at')
+                                    ->label('Publish Date')
+                                    ->placeholder('Publish immediately')
+                                    ->hidden(fn ($get) => $get('status') !== 'published'),
+
+                                DateTimePicker::make('unpublish_at')
+                                    ->label('Unpublish Date')
+                                    ->placeholder('Never (stays live)')
+                                    ->after('published_at')
+                                    ->hidden(fn ($get) => $get('status') !== 'published'),
+                            ]),
                     ]),
 
                 Section::make('Specifications')

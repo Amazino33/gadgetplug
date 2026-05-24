@@ -12,6 +12,10 @@ new class extends Component {
 
     public function mount(Product $product): void
     {
+        if (! Product::published()->where('id', $product->id)->exists()) {
+            abort(404);
+        }
+
         $this->product = $product->load(['vendor', 'category', 'media']);
         if (auth()->check()) {
             $this->wishlisted = Wishlist::where('user_id', auth()->id())
