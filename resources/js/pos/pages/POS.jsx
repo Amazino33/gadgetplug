@@ -116,7 +116,8 @@ export default function POS({ user, vendorId, onLogout }) {
 
     // ── Complete sale ────────────────────────────────────────────────
 
-    const completeSale = async ({ paymentMethod, amountTendered, bankRef }) => {
+    const completeSale = async ({ paymentMethod, amountTendered, bankRef, payments }) => {
+        const isSplit = paymentMethod === 'split';
         const payload = {
             offline_id:     generateOfflineId(),
             vendor_id:      vendorId,
@@ -142,7 +143,8 @@ export default function POS({ user, vendorId, onLogout }) {
             payment_method:          paymentMethod,
             amount_tendered:         amountTendered,
             change_given:            Math.max(0, amountTendered - total),
-            bank_transfer_reference: bankRef ?? null,
+            bank_transfer_reference: isSplit ? null : (bankRef ?? null),
+            payments:                isSplit ? payments : null,
             completed_at:            new Date().toISOString(),
         };
 
@@ -171,7 +173,8 @@ export default function POS({ user, vendorId, onLogout }) {
             payment_method:          paymentMethod,
             amount_tendered:         amountTendered,
             change_given:            Math.max(0, amountTendered - total),
-            bank_transfer_reference: bankRef ?? null,
+            bank_transfer_reference: isSplit ? null : (bankRef ?? null),
+            payments:                isSplit ? payments : null,
             customer,
         };
 

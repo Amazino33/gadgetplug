@@ -51,4 +51,14 @@ class PosSale extends Model
     {
         return $this->hasMany(PosSaleItem::class);
     }
+
+    public function payments(): HasMany
+    {
+        return $this->hasMany(PosSalePayment::class);
+    }
+
+    public function isSplit(): bool
+    {
+        return $this->payment_method === 'split';
+    }
 }

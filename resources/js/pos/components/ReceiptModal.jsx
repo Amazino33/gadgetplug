@@ -6,7 +6,8 @@ const CONFIG = window.POS_CONFIG ?? {};
 export default function ReceiptModal({ sale, onNewSale }) {
     const { items, total, payment_method, amount_tendered, change_given,
             subtotal, discount_amount, vat_amount, reference,
-            customer, bank_transfer_reference } = sale;
+            customer, bank_transfer_reference, payments } = sale;
+    const isSplit = payment_method === 'split';
 
     const printRef = useRef(null);
 
@@ -37,7 +38,7 @@ export default function ReceiptModal({ sale, onNewSale }) {
                     <p className="text-white/70 text-xs mt-1">{reference}</p>
                 </div>
 
-                {/* Change due — shown large for cash */}
+                {/* Change due — cash single payment */}
                 {payment_method === 'cash' && change_given > 0 && (
                     <div className="bg-amber-50 border-b border-amber-100 px-6 py-4 text-center">
                         <p className="text-xs font-semibold text-amber-600 uppercase tracking-wide">Change Due to Customer</p>
@@ -48,11 +49,22 @@ export default function ReceiptModal({ sale, onNewSale }) {
                     </div>
                 )}
 
-                {/* Bank transfer reference confirmation */}
+                {/* Bank transfer reference — single payment */}
                 {payment_method === 'bank_transfer' && bank_transfer_reference && (
                     <div className="bg-purple-50 border-b border-purple-100 px-6 py-3 text-center">
                         <p className="text-xs text-purple-500">Transfer Reference Logged</p>
                         <p className="text-lg font-bold text-purple-700">{bank_transfer_reference}</p>
+                    </div>
+                )}
+
+                {/* Split payment summary banner */}
+                {isSplit && change_given > 0 && (
+                    <div className="bg-amber-50 border-b border-amber-100 px-6 py-4 text-center">
+                        <p className="text-xs font-semibold text-amber-600 uppercase tracking-wide">Change Due to Customer</p>
+                        <p className="text-5xl font-extrabold text-amber-600 mt-1"
+                            style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                            {fmt(change_given)}
+                        </p>
                     </div>
                 )}
 
@@ -104,18 +116,45 @@ export default function ReceiptModal({ sale, onNewSale }) {
                         <div className="flex justify-between text-sm font-bold text-gray-800 pt-1 border-t border-gray-200">
                             <span>TOTAL</span><span>{fmt(total)}</span>
                         </div>
-                        <div className="flex justify-between text-xs text-gray-500 pt-1">
-                            <span>Payment</span>
-                            <span className="capitalize">{payment_method.replace('_', ' ')}</span>
-                        </div>
-                        {payment_method === 'cash' && (
+                        {!isSplit && (
                             <>
-                                <div className="flex justify-between text-xs text-gray-500">
-                                    <span>Tendered</span><span>{fmt(amount_tendered)}</span>
+                                <div className="flex justify-between text-xs text-gray-500 pt-1">
+                                    <span>Payment</span>
+                                    <span className="capitalize">{payment_method.replace('_', ' ')}</span>
                                 </div>
-                                <div className="flex justify-between text-xs font-semibold text-gray-700">
-                                    <span>Change</span><span>{fmt(change_given)}</span>
+                                {payment_method === 'cash' && (
+                                    <>
+                                        <div className="flex justify-between text-xs text-gray-500">
+                                            <span>Tendered</span><span>{fmt(amount_tendered)}</span>
+                                        </div>
+                                        <div className="flex justify-between text-xs font-semibold text-gray-700">
+                                            <span>Change</span><span>{fmt(change_given)}</span>
+                                        </div>
+                                    </>
+                                )}
+                                {payment_method === 'bank_transfer' && bank_transfer_reference && (
+                                    <div className="flex justify-between text-xs text-gray-500">
+                                        <span>Reference</span><span>{bank_transfer_reference}</span>
+                                    </div>
+                                )}
+                            </>
+                        )}
+                        {isSplit && payments?.length > 0 && (
+                            <>
+                                <div className="flex justify-between text-xs text-gray-500 pt-1">
+                                    <span>Payment</span><span>Split</span>
                                 </div>
+                                {payments.map((p, i) => (
+                                    <div key={i} className="flex justify-between text-xs text-gray-500">
+                                        <span className="capitalize">{p.method.replace('_', ' ')}{p.reference ? ` (${p.reference})` : ''}</span>
+                                        <span>{fmt(p.amount)}</span>
+                                    </div>
+                                ))}
+                                {change_given > 0 && (
+                                    <div className="flex justify-between text-xs font-semibold text-gray-700">
+                                        <span>Change</span><span>{fmt(change_given)}</span>
+                                    </div>
+                                )}
                             </>
                         )}
                     </div>

@@ -9,6 +9,7 @@ use App\Models\PosCustomer;
 use App\Models\PosReturn;
 use App\Models\PosSale;
 use App\Models\PosSaleItem;
+use App\Models\PosSalePayment;
 use App\Models\Product;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -37,9 +38,13 @@ class PosSaleController extends Controller
             'discount_scope'             => 'nullable|in:item,cart',
             'discount_approved_by'       => 'nullable|integer',
             'vat_rate'                   => 'nullable|numeric|min:0|max:100',
-            'payment_method'             => 'required|in:cash,card,bank_transfer',
+            'payment_method'             => 'required|in:cash,card,bank_transfer,split',
             'amount_tendered'            => 'nullable|numeric|min:0',
             'bank_transfer_reference'    => 'nullable|string|max:50',
+            'payments'                   => 'required_if:payment_method,split|array|min:2',
+            'payments.*.method'          => 'required_if:payment_method,split|in:cash,card,bank_transfer',
+            'payments.*.amount'          => 'required_if:payment_method,split|numeric|min:0.01',
+            'payments.*.reference'       => 'nullable|string|max:50',
         ]);
 
         $sale = DB::transaction(function () use ($request, $adjustStock) {
@@ -52,8 +57,21 @@ class PosSaleController extends Controller
             $vatRate      = (float) ($request->vat_rate ?? 7.5);
             $vatAmount    = round(($subtotal - $cartDiscount) * ($vatRate / 100), 2);
             $total        = $subtotal - $cartDiscount + $vatAmount;
-            $tendered     = (float) ($request->amount_tendered ?? $total);
-            $change       = max(0, $tendered - $total);
+            $isSplit      = $request->payment_method === 'split';
+
+            // For split: cash tendered = sum of cash portions; change = cash tendered - cash owed
+            $cashTendered = $isSplit
+                ? collect($request->payments)->where('method', 'cash')->sum('amount')
+                : (float) ($request->amount_tendered ?? $total);
+            $change = max(0, $cashTendered - ($isSplit
+                ? collect($request->payments)->where('method', 'cash')->sum('amount') - max(0, collect($request->payments)->sum('amount') - $total)
+                : $total));
+
+            // Simpler change calculation: total tendered minus total due
+            $totalTendered = $isSplit
+                ? collect($request->payments)->sum('amount')
+                : $cashTendered;
+            $change = max(0, $totalTendered - $total);
 
             $sale = PosSale::create([
                 'reference'               => 'POS-' . strtoupper(Str::random(8)),
@@ -69,14 +87,26 @@ class PosSaleController extends Controller
                 'vat_amount'              => $vatAmount,
                 'total'                   => $total,
                 'payment_method'          => $request->payment_method,
-                'amount_tendered'         => $tendered,
+                'amount_tendered'         => $isSplit ? $totalTendered : $cashTendered,
                 'change_given'            => $change,
-                'bank_transfer_reference' => $request->bank_transfer_reference,
+                'bank_transfer_reference' => $isSplit ? null : $request->bank_transfer_reference,
                 'status'                  => 'completed',
                 'synced'                  => true,
                 'synced_at'               => now(),
                 'completed_at'            => now(),
             ]);
+
+            // Write split payment rows
+            if ($isSplit) {
+                foreach ($request->payments as $p) {
+                    PosSalePayment::create([
+                        'pos_sale_id' => $sale->id,
+                        'method'      => $p['method'],
+                        'amount'      => $p['amount'],
+                        'reference'   => $p['reference'] ?? null,
+                    ]);
+                }
+            }
 
             foreach ($request->items as $item) {
                 $lineDiscount = (float) ($item['discount_amount'] ?? 0);
@@ -113,7 +143,7 @@ class PosSaleController extends Controller
             return $sale;
         });
 
-        return response()->json($sale->load('items'), 201);
+        return response()->json($sale->load(['items', 'payments']), 201);
     }
 
     public function void(Request $request, PosSale $sale, AdjustStockAction $adjustStock): JsonResponse
