@@ -105,6 +105,22 @@ class User extends Authenticatable implements HasTenants, FilamentUser
         return $this->vendors()->contains($tenant);
     }
 
+    // Check if this user has a specific role within a vendor (checks pivot + owner)
+    public function hasVendorRole(int $vendorId, array|string $roles): bool
+    {
+        $roles = (array) $roles;
+
+        // Vendor owner has all roles implicitly
+        if ($this->ownedVendors()->where('id', $vendorId)->exists()) {
+            return true;
+        }
+
+        return $this->memberVendors()
+            ->where('vendor_id', $vendorId)
+            ->wherePivotIn('role', $roles)
+            ->exists();
+    }
+
     public function orders()
     {
         return $this->hasMany(Order::class);

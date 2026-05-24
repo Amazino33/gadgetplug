@@ -50,8 +50,8 @@ class AuditSession extends Model
         return $this->status === 'pending';
     }
 
-    public function hasDiscrepency(): bool
+    public function hasDiscrepancy(): bool
     {
-        return $this->status === 'discrepency';
+        return $this->status === 'discrepancy';
     }
 }

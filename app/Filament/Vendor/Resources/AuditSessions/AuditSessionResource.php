@@ -7,6 +7,7 @@ namespace App\Filament\Vendor\Resources\AuditSessions;
 use App\Filament\Vendor\Resources\AuditSessions\AuditSessionResource\Pages;
 
 use App\Models\AuditSession;
+use App\Models\User;
 use App\Actions\Inventory\ProcessAuditCountAction;
 use App\Actions\Inventory\AdjustStockAction;
 use Filament\Resources\Resource;
@@ -50,6 +51,17 @@ class AuditSessionResource extends Resource
                         default => 'gray',
                     }),
 
+                TextColumn::make('count_a')
+                    ->label('Count A')
+                    ->numeric()
+                    ->alignCenter(),
+
+                TextColumn::make('count_b')
+                    ->label('Count B')
+                    ->numeric()
+                    ->alignCenter()
+                    ->placeholder('—'),
+
                 TextColumn::make('storekeeperA.name')
                     ->label('Initiated By'),
 
@@ -80,9 +92,8 @@ class AuditSessionResource extends Resource
                     // Strict typing: Promise this closure returns nothing (void)
                     ->action(function (AuditSession $record, array $data, ProcessAuditCountAction $processAudit): void {
                         try {
-                            // Cast the form data to a strict integer before passing it to our Action class
                             $audit = $processAudit->execute($record, auth()->id(), (int) $data['count_b']);
-                            
+
                             if ($audit->status === 'verified') {
                                 Notification::make()
                                     ->title('Match! Stock Updated.')
@@ -91,9 +102,24 @@ class AuditSessionResource extends Resource
                             } else {
                                 Notification::make()
                                     ->title('Discrepancy Logged')
-                                    ->body('Count did not match. Manager alerted.')
+                                    ->body('Count did not match. A manager must resolve it.')
                                     ->danger()
                                     ->send();
+
+                                // Notify all managers and owners in this vendor
+                                $managers = User::whereHas('ownedVendors', fn ($q) => $q->where('id', $record->vendor_id))
+                                    ->orWhereHas('memberVendors', fn ($q) => $q
+                                        ->where('vendor_id', $record->vendor_id)
+                                        ->wherePivotIn('role', ['owner', 'inventory_manager'])
+                                    )
+                                    ->where('id', '!=', auth()->id())
+                                    ->get();
+
+                                Notification::make()
+                                    ->title('Audit Discrepancy — Action Required')
+                                    ->body("Counts for \"{$record->product->name}\" don't match (A: {$record->count_a}, B: {$audit->count_b}). Please resolve.")
+                                    ->danger()
+                                    ->sendToDatabase($managers);
                             }
                         } catch (Exception $e) {
                             Notification::make()
@@ -121,7 +147,7 @@ class AuditSessionResource extends Resource
                             ->required()
                             ->minValue(0),
                     ])
-                    ->visible(fn (AuditSession $record): bool => $record->status === 'discrepancy' && auth()->user()->hasRole(['owner', 'inventory_manager']))
+                    ->visible(fn (AuditSession $record): bool => $record->status === 'discrepancy' && auth()->user()->hasVendorRole($record->vendor_id, ['owner', 'inventory_manager']))
                     ->action(function (AuditSession $record, array $data, AdjustStockAction $adjustStock): void {
                         
                         // Strict Casting to integers
