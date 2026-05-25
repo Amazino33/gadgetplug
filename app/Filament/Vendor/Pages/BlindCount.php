@@ -12,6 +12,8 @@ use App\Models\Product;
 use App\Models\User;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use BackedEnum;
 use UnitEnum;
 
@@ -28,7 +30,19 @@ class BlindCount extends Page
     {
         $user   = auth()->user();
         $vendor = filament()->getTenant();
-        return $vendor && $user->hasVendorRole($vendor->id, ['owner', 'inventory_manager']);
+        return $vendor && $user->hasVendorRole($vendor->id, ['owner', 'inventory_manager', 'storekeeper']);
+    }
+
+    // Owners and inventory_managers observe; only storekeepers physically count
+    public function canCount(): bool
+    {
+        $user   = auth()->user();
+        $vendor = filament()->getTenant();
+        if ($vendor->isOwner($user)) return false;
+        return $user->memberVendors()
+            ->where('vendor_id', $vendor->id)
+            ->wherePivotIn('role', ['storekeeper'])
+            ->exists();
     }
 
     // ── Livewire state ────────────────────────────────────────────────────────
@@ -121,6 +135,11 @@ class BlindCount extends Page
     // ── Actions ───────────────────────────────────────────────────────────────
     public function startSession(): void
     {
+        if (! $this->canCount()) {
+            Notification::make()->title('Only storekeepers can start a blind count session.')->warning()->send();
+            return;
+        }
+
         $vendor = filament()->getTenant();
 
         if (BlindCountSession::isBlockedFor(auth()->id(), $vendor->id, $this->frequency, $this->customDays)) {
@@ -170,6 +189,11 @@ class BlindCount extends Page
 
     public function joinAsB(): void
     {
+        if (! $this->canCount()) {
+            Notification::make()->title('Only storekeepers can participate in blind counts.')->warning()->send();
+            return;
+        }
+
         $session = $this->getSession();
         if (! $session || $session->status !== 'b_counting') return;
 
@@ -247,8 +271,21 @@ class BlindCount extends Page
             Notification::make()->title('Count submitted. Waiting for Storekeeper B.')->success()->send();
         } elseif ($role === 'b') {
             $session->update(['status' => 'completed', 'b_submitted_at' => now()]);
-            $this->processComparison($session->fresh());
-            Notification::make()->title('Blind count complete. Discrepancies flagged for review.')->success()->send();
+
+            try {
+                $discrepancies = $this->processComparison($session->fresh());
+                $message = $discrepancies > 0
+                    ? "Count complete. {$discrepancies} discrepanc" . ($discrepancies === 1 ? 'y' : 'ies') . " flagged for manager review."
+                    : 'Count complete. All stock levels verified and updated.';
+                Notification::make()->title($message)->success()->send();
+            } catch (\Throwable $e) {
+                Log::error('BlindCount processComparison failed', ['session_id' => $session->id, 'error' => $e->getMessage()]);
+                Notification::make()
+                    ->title('Comparison failed')
+                    ->body('Your count was saved but the audit records could not be created. Contact your administrator. Error: ' . $e->getMessage())
+                    ->danger()
+                    ->send();
+            }
         }
     }
 
@@ -289,7 +326,7 @@ class BlindCount extends Page
         $this->count = $entry?->count ?? 0;
     }
 
-    private function processComparison(BlindCountSession $session): void
+    private function processComparison(BlindCountSession $session): int
     {
         $aEntries = BlindCountEntry::where('blind_count_session_id', $session->id)
             ->where('user_id', $session->storekeeper_a_id)
@@ -302,53 +339,69 @@ class BlindCount extends Page
         $adjustStock   = app(AdjustStockAction::class);
         $discrepancies = 0;
 
-        foreach ($session->product_order as $productId) {
-            $countA  = $aEntries[$productId]?->count ?? 0;
-            $countB  = $bEntries[$productId]?->count ?? 0;
-            $matched = $countA === $countB;
+        // Wrap in a transaction so all AuditSessions are created or none are
+        DB::transaction(function () use ($session, $aEntries, $bEntries, $adjustStock, &$discrepancies) {
+            foreach ($session->product_order as $productId) {
+                $countA  = (int) ($aEntries[$productId]?->count ?? 0);
+                $countB  = (int) ($bEntries[$productId]?->count ?? 0);
+                $matched = $countA === $countB;
 
-            AuditSession::create([
-                'vendor_id'        => $session->vendor_id,
-                'product_id'       => $productId,
-                'storekeeper_a_id' => $session->storekeeper_a_id,
-                'storekeeper_b_id' => $session->storekeeper_b_id,
-                'count_a'          => $countA,
-                'count_b'          => $countB,
-                'status'           => $matched ? 'verified' : 'discrepancy',
-            ]);
+                AuditSession::create([
+                    'vendor_id'        => $session->vendor_id,
+                    'product_id'       => $productId,
+                    'storekeeper_a_id' => $session->storekeeper_a_id,
+                    'storekeeper_b_id' => $session->storekeeper_b_id,
+                    'count_a'          => $countA,
+                    'count_b'          => $countB,
+                    'status'           => $matched ? 'verified' : 'discrepancy',
+                ]);
 
-            if ($matched) {
-                $product    = Product::find($productId);
-                $difference = $countB - $product->stock_quantity;
-                if ($difference !== 0) {
-                    $adjustStock->execute(
-                        productId:       $productId,
-                        quantityChanged: $difference,
-                        transactionType: 'audit_correction',
-                        userId:          $session->storekeeper_b_id,
-                        reference:       "Blind Count #{$session->id}",
-                        description:     "Verified count. System had {$product->stock_quantity}, found {$countB}."
-                    );
+                if ($matched) {
+                    $product    = Product::find($productId);
+                    $difference = $countB - (int) $product->stock_quantity;
+                    if ($difference !== 0) {
+                        $adjustStock->execute(
+                            productId:       $productId,
+                            quantityChanged: $difference,
+                            transactionType: 'audit_correction',
+                            userId:          $session->storekeeper_b_id,
+                            reference:       "Blind Count #{$session->id}",
+                            description:     "Verified count. System had {$product->stock_quantity}, found {$countB}."
+                        );
+                    }
+                } else {
+                    $discrepancies++;
                 }
-            } else {
-                $discrepancies++;
             }
-        }
+        });
 
+        // Notify managers — runs outside the transaction so a notification failure
+        // never rolls back the audit records that were just created
         if ($discrepancies > 0) {
-            $managers = User::whereHas('ownedVendors', fn ($q) => $q->where('id', $session->vendor_id))
-                ->orWhereHas('memberVendors', fn ($q) => $q
-                    ->where('vendor_id', $session->vendor_id)
-                    ->wherePivotIn('role', ['owner', 'inventory_manager'])
-                )
+            try {
+                $vendorId = $session->vendor_id;
+                $managers = User::where(function ($q) use ($vendorId) {
+                    $q->whereHas('ownedVendors', fn ($q) => $q->where('id', $vendorId))
+                      ->orWhereHas('memberVendors', fn ($q) => $q
+                          ->where('vendor_users.vendor_id', $vendorId)
+                          ->whereIn('vendor_users.role', ['owner', 'inventory_manager'])
+                      );
+                })
                 ->where('id', '!=', auth()->id())
                 ->get();
 
-            Notification::make()
-                ->title("{$discrepancies} discrepanc" . ($discrepancies === 1 ? 'y' : 'ies') . " found in blind count")
-                ->body('Review the Audit Sessions page to resolve them.')
-                ->danger()
-                ->sendToDatabase($managers);
+                if ($managers->isNotEmpty()) {
+                    Notification::make()
+                        ->title("{$discrepancies} discrepanc" . ($discrepancies === 1 ? 'y' : 'ies') . " found in blind count")
+                        ->body('Review the Audit Sessions page to resolve them.')
+                        ->danger()
+                        ->sendToDatabase($managers);
+                }
+            } catch (\Throwable $e) {
+                Log::warning('BlindCount manager notification failed', ['error' => $e->getMessage()]);
+            }
         }
+
+        return $discrepancies;
     }
 }

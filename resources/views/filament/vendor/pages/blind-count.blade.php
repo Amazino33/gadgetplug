@@ -7,6 +7,7 @@
     $role          = $this->getRole();
     $total         = $this->getTotalProducts();
     $product       = $this->getCurrentProduct();
+    $canCount      = $this->canCount();
     $isLastProduct = $total > 0 && $this->currentPosition >= $total;
     $isCounting    = $session && (
         ($session->status === 'a_counting' && $role === 'a') ||
@@ -14,8 +15,11 @@
     );
 @endphp
 
-{{-- ── NO SESSION: Start Form ──────────────────────────────────────────── --}}
+{{-- ── NO SESSION ───────────────────────────────────────────────────────── --}}
 @if (!$session)
+
+@if ($canCount)
+{{-- Storekeeper: show start form --}}
 <div class="bg-[#0d1a0d] rounded-2xl border border-[#1a3a1a] p-6 space-y-6">
     <div class="text-center">
         <div class="w-14 h-14 bg-[#1a3a1a] rounded-full flex items-center justify-center mx-auto mb-3">
@@ -64,30 +68,62 @@
     </button>
 </div>
 
+@else
+{{-- Manager / Owner: no active session --}}
+<div class="bg-[#0d1a0d] rounded-2xl border border-[#1a3a1a] p-8 text-center space-y-3">
+    <div class="w-14 h-14 bg-[#1a3a1a] rounded-full flex items-center justify-center mx-auto">
+        <x-heroicon-o-eye class="w-7 h-7 text-[#5a7a5c]"/>
+    </div>
+    <h2 class="text-white font-montserrat font-bold text-lg">No Active Blind Count</h2>
+    <p class="text-[#5a7a5c] text-sm">Blind count sessions are started by storekeepers. Assign the <span class="text-[#4caf50] font-semibold">Storekeeper</span> role to a team member from the Team Members page.</p>
+</div>
+@endif
+
 {{-- ── WAITING: A is still counting ────────────────────────────────────── --}}
 @elseif($session->status === 'a_counting' && $role !== 'a')
 <div class="bg-[#0d1a0d] rounded-2xl border border-[#1a3a1a] p-8 text-center space-y-4">
     <div class="w-14 h-14 bg-[#1a3a1a] rounded-full flex items-center justify-center mx-auto">
         <x-heroicon-o-clock class="w-7 h-7 text-amber-400"/>
     </div>
-    <h2 class="text-white font-montserrat font-bold text-lg">Waiting for Storekeeper A</h2>
-    <p class="text-[#5a7a5c] text-sm">{{ $session->storekeeperA->name }} is currently completing their count. You will be notified when it is your turn.</p>
+    <h2 class="text-white font-montserrat font-bold text-lg">Count in Progress</h2>
+    <p class="text-[#5a7a5c] text-sm">
+        <span class="text-white font-semibold">{{ $session->storekeeperA->name }}</span> is currently completing their count.
+        @if($canCount) You will join as Storekeeper B when they finish. @endif
+    </p>
+    @php
+        $countedSoFar = \App\Models\BlindCountEntry::where('blind_count_session_id', $session->id)->whereNotNull('count')->count();
+    @endphp
+    <div class="bg-[#162016] rounded-xl px-4 py-3 text-left space-y-1">
+        <div class="flex justify-between text-xs">
+            <span class="text-[#5a7a5c]">Products counted so far</span>
+            <span class="text-white font-semibold">{{ $countedSoFar }} / {{ $total }}</span>
+        </div>
+        <div class="h-1.5 bg-[#1a3a1a] rounded-full overflow-hidden mt-1">
+            <div class="h-full bg-amber-400 rounded-full transition-all"
+                style="width: {{ $total > 0 ? round(($countedSoFar / $total) * 100) : 0 }}%"></div>
+        </div>
+    </div>
 </div>
 
 {{-- ── WAITING: A submitted, B hasn't joined yet ───────────────────────── --}}
-@elseif($session->status === 'b_counting' && $role === 'none')
+@elseif($session->status === 'b_counting' && $role === 'observer')
 <div class="bg-[#0d1a0d] rounded-2xl border border-[#1a3a1a] p-8 text-center space-y-5">
     <div class="w-14 h-14 bg-[#1a3a1a] rounded-full flex items-center justify-center mx-auto">
         <x-heroicon-o-shield-check class="w-7 h-7 text-[#4caf50]"/>
     </div>
     <div>
-        <h2 class="text-white font-montserrat font-bold text-lg">Verification Required</h2>
-        <p class="text-[#5a7a5c] text-sm mt-1">Storekeeper A has finished. Join as Storekeeper B to verify the count independently.</p>
+        <h2 class="text-white font-montserrat font-bold text-lg">Awaiting Verification</h2>
+        <p class="text-[#5a7a5c] text-sm mt-1">
+            <span class="text-white font-semibold">{{ $session->storekeeperA->name }}</span> has finished their count.
+            @if($canCount) Join as Storekeeper B to verify independently. @else Waiting for a storekeeper to join as Storekeeper B. @endif
+        </p>
     </div>
+    @if($canCount)
     <button wire:click="joinAsB"
         class="w-full bg-[#4caf50] hover:bg-[#43a047] text-white font-bold py-3.5 rounded-xl transition-colors font-montserrat">
         Join as Storekeeper B
     </button>
+    @endif
 </div>
 
 {{-- ── WAITING: A submitted, waiting for B ─────────────────────────────── --}}

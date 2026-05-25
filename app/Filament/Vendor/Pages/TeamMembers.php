@@ -111,6 +111,37 @@ class TeamMembers extends Page
                     }
                 }),
 
+            Action::make('changeRole')
+                ->label('Change Role')
+                ->icon(Heroicon::OutlinedUserCircle)
+                ->form([
+                    Select::make('user_id')
+                        ->label('Member')
+                        ->options(
+                            filament()->getTenant()
+                                ->users()
+                                ->get()
+                                ->pluck('name', 'id')
+                        )
+                        ->required(),
+
+                    Select::make('role')
+                        ->label('Role')
+                        ->options([
+                            'member'            => 'Member',
+                            'product_manager'   => 'Product Manager',
+                            'order_manager'     => 'Order Manager',
+                            'inventory_manager' => 'Inventory Manager',
+                            'storekeeper'       => 'Storekeeper',
+                        ])
+                        ->required(),
+                ])
+                ->action(function (array $data): void {
+                    $vendor = filament()->getTenant();
+                    $vendor->users()->updateExistingPivot($data['user_id'], ['role' => $data['role']]);
+                    Notification::make()->title('Role updated.')->success()->send();
+                }),
+
             // ← new: edit permissions action
             Action::make('editPermissions')
                 ->label('Edit Permissions')

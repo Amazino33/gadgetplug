@@ -3,7 +3,7 @@
 namespace App\Filament\Vendor\Resources\AuditSessions\AuditSessionResource\Pages;
 
 use App\Filament\Vendor\Resources\AuditSessions\AuditSessionResource;
-
+use App\Filament\Vendor\Widgets\BlindCountInProgressWidget;
 use Filament\Resources\Pages\ManageRecords;
 
 class ManageAuditSessions extends ManageRecords
@@ -13,5 +13,12 @@ class ManageAuditSessions extends ManageRecords
     protected function getHeaderActions(): array
     {
         return [];
+    }
+
+    protected function getHeaderWidgets(): array
+    {
+        return [
+            BlindCountInProgressWidget::class,
+        ];
     }
 }
