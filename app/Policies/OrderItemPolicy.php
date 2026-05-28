@@ -1,55 +1,75 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Policies;
 
+use Illuminate\Foundation\Auth\User as AuthUser;
 use App\Models\OrderItem;
-use App\Models\User;
+use Illuminate\Auth\Access\HandlesAuthorization;
 
 class OrderItemPolicy
 {
-    public function viewAny(User $user): bool
+    use HandlesAuthorization;
+    
+    public function viewAny(AuthUser $authUser): bool
     {
-        $vendor = filament()->getTenant();
-        setPermissionsTeamId($vendor?->id);
-
-        return $user->hasRole('super_admin')
-            || $vendor?->isOwner($user)
-            || $user->hasPermissionTo('view_any_order_items');
+        return $authUser->can('ViewAny:OrderItem');
     }
 
-    public function view(User $user, OrderItem $orderItem): bool
+    public function view(AuthUser $authUser, OrderItem $orderItem): bool
     {
-        $vendor = filament()->getTenant();
-        setPermissionsTeamId($vendor?->id);
-
-        return $user->hasRole('super_admin')
-            || $vendor?->isOwner($user)
-            || $user->hasPermissionTo('view_order_items');
+        return $authUser->can('View:OrderItem');
     }
 
-    public function create(User $user): bool
+    public function create(AuthUser $authUser): bool
     {
-        $vendor = filament()->getTenant();
-        setPermissionsTeamId($vendor?->id);
-
-        return $user->hasRole('super_admin') || $vendor?->isOwner($user);
+        return $authUser->can('Create:OrderItem');
     }
 
-    public function update(User $user, OrderItem $orderItem): bool
+    public function update(AuthUser $authUser, OrderItem $orderItem): bool
     {
-        $vendor = filament()->getTenant();
-        setPermissionsTeamId($vendor?->id);
-
-        return $user->hasRole('super_admin')
-            || $vendor?->isOwner($user)
-            || $user->hasPermissionTo('edit_order_items');
+        return $authUser->can('Update:OrderItem');
     }
 
-    public function delete(User $user, OrderItem $orderItem): bool
+    public function delete(AuthUser $authUser, OrderItem $orderItem): bool
     {
-        $vendor = filament()->getTenant();
-        setPermissionsTeamId($vendor?->id);
-
-        return $user->hasRole('super_admin') || $vendor?->isOwner($user);
+        return $authUser->can('Delete:OrderItem');
     }
+
+    public function deleteAny(AuthUser $authUser): bool
+    {
+        return $authUser->can('DeleteAny:OrderItem');
+    }
+
+    public function restore(AuthUser $authUser, OrderItem $orderItem): bool
+    {
+        return $authUser->can('Restore:OrderItem');
+    }
+
+    public function forceDelete(AuthUser $authUser, OrderItem $orderItem): bool
+    {
+        return $authUser->can('ForceDelete:OrderItem');
+    }
+
+    public function forceDeleteAny(AuthUser $authUser): bool
+    {
+        return $authUser->can('ForceDeleteAny:OrderItem');
+    }
+
+    public function restoreAny(AuthUser $authUser): bool
+    {
+        return $authUser->can('RestoreAny:OrderItem');
+    }
+
+    public function replicate(AuthUser $authUser, OrderItem $orderItem): bool
+    {
+        return $authUser->can('Replicate:OrderItem');
+    }
+
+    public function reorder(AuthUser $authUser): bool
+    {
+        return $authUser->can('Reorder:OrderItem');
+    }
+
 }

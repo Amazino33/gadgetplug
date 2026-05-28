@@ -102,7 +102,7 @@ $emoji = $categoryEmojis[strtolower($product->category?->name ?? '')] ?? '📦';
     :url="$ogUrl"
 >
 
-<div class="px-4 md:px-6 py-6 bg-[#f8fcf8] dark:bg-[#0d1a0d] min-h-screen">
+<div class="px-4 md:px-6 py-6 pb-40 md:pb-6 bg-[#f8fcf8] dark:bg-[#0d1a0d] min-h-screen">
 
     {{-- ─── BREADCRUMB ──────────────────────────────────────────────────────── --}}
     <nav class="flex items-center gap-1.5 text-[12px] text-brand-muted mb-6">
@@ -126,8 +126,8 @@ $emoji = $categoryEmojis[strtolower($product->category?->name ?? '')] ?? '📦';
         {{-- Left: Image Gallery --}}
         <div x-data="{ current: '{{ $defaultUrl }}' }" class="flex flex-col gap-3">
 
-            {{-- Main image --}}
-            <div class="aspect-square w-full bg-brand-bg dark:bg-[#1a2a1a] rounded-2xl border border-brand-border dark:border-[#2a3a2a] overflow-hidden relative">
+            {{-- Main image — 4:3 on mobile to keep title above fold; square on desktop --}}
+            <div class="aspect-[4/3] lg:aspect-square w-full bg-brand-bg dark:bg-[#1a2a1a] rounded-2xl border border-brand-border dark:border-[#2a3a2a] overflow-hidden relative">
                 @if ($firstImage)
                     <img :src="current" alt="{{ $product->name }}"
                         class="w-full h-full object-cover transition-all duration-300">
@@ -200,8 +200,8 @@ $emoji = $categoryEmojis[strtolower($product->category?->name ?? '')] ?? '📦';
                 </span>
                 @if ($product->stock_quantity > 0)
                 <span class="flex items-center gap-1 bg-[#e8f5e9] dark:bg-[#1a2a1a] text-brand text-[11px] font-bold font-montserrat px-2.5 py-1 rounded-full">
-                    <span class="w-1.5 h-1.5 rounded-full bg-brand inline-block"></span>
-                    In Stock ({{ $product->stock_quantity }})
+                    <span class="w-1.5 h-1.5 rounded-full bg-brand inline-block animate-pulse"></span>
+                    Only {{ $product->stock_quantity }} Left — Order Now!
                 </span>
                 @else
                 <span class="flex items-center gap-1 bg-[#fce4ec] text-red-600 text-[11px] font-bold font-montserrat px-2.5 py-1 rounded-full">
@@ -235,7 +235,7 @@ $emoji = $categoryEmojis[strtolower($product->category?->name ?? '')] ?? '📦';
             @endif
 
             {{-- Add to cart + Buy Now --}}
-            <div class="flex gap-2.5 mb-6">
+            <div class="hidden md:flex gap-2.5 mb-6">
                 <button wire:click="addToCart"
                     class="flex-1 flex items-center justify-center gap-2 bg-brand hover:bg-[#055002] text-white font-montserrat font-bold text-[13px] py-3.5 rounded-xl border-0 cursor-pointer transition-all hover:-translate-y-px disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
                     @disabled($product->stock_quantity < 1)>
@@ -259,7 +259,7 @@ $emoji = $categoryEmojis[strtolower($product->category?->name ?? '')] ?? '📦';
                         {{ $wishlisted
                             ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-500'
                             : 'bg-brand-bg dark:bg-[#1a2a1a] border-brand-border dark:border-[#2a3a2a] text-[#5a7a5c] hover:border-red-300 hover:text-red-400' }}"
-                    :title="$wishlisted ? 'Remove from wishlist' : 'Add to wishlist'">
+                    title="{{ $wishlisted ? 'Remove from wishlist' : 'Add to wishlist' }}">
                     <svg class="w-5 h-5" fill="{{ $wishlisted ? 'currentColor' : 'none' }}" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
                         <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
                     </svg>
@@ -323,6 +323,41 @@ $emoji = $categoryEmojis[strtolower($product->category?->name ?? '')] ?? '📦';
         </div>
     </div>
     @endif
+
+    {{-- ─── MOBILE STICKY CTA BAR ──────────────────────────────────────────── --}}
+    <div class="fixed left-0 right-0 md:hidden bg-white dark:bg-[#1a2a1a] border-t border-brand-border dark:border-[#2a3a2a] px-4 py-3"
+         style="bottom: 3rem; z-index: 50;">
+        <div class="flex gap-2.5">
+            <button wire:click="addToCart"
+                class="flex-1 flex items-center justify-center gap-2 bg-brand hover:bg-[#055002] text-white font-montserrat font-bold text-[13px] py-3.5 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                @disabled($product->stock_quantity < 1)>
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                    <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
+                    <line x1="3" y1="6" x2="21" y2="6"/>
+                    <path d="M16 10a4 4 0 0 1-8 0"/>
+                </svg>
+                Add to Cart
+            </button>
+            <button wire:click="buyNow"
+                class="flex-1 flex items-center justify-center gap-2 bg-brand-orange hover:bg-[#e06610] text-white font-montserrat font-bold text-[13px] py-3.5 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                @disabled($product->stock_quantity < 1)>
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path d="M5 12h14M12 5l7 7-7 7"/>
+                </svg>
+                Buy Now
+            </button>
+            <button wire:click="toggleWishlist"
+                class="w-12 h-[50px] rounded-xl flex items-center justify-center flex-shrink-0 border transition-colors
+                    {{ $wishlisted
+                        ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-500'
+                        : 'bg-brand-bg dark:bg-[#0d1a0d] border-brand-border dark:border-[#2a3a2a] text-[#5a7a5c]' }}"
+                title="{{ $wishlisted ? 'Remove from wishlist' : 'Add to wishlist' }}">
+                <svg class="w-5 h-5" fill="{{ $wishlisted ? 'currentColor' : 'none' }}" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                </svg>
+            </button>
+        </div>
+    </div>
 
 </div>
 

@@ -54,12 +54,14 @@
     x-data="{
         mobileMenu: false,
         dark: document.documentElement.classList.contains('dark'),
+        scrolled: false,
         toggleDark() {
             this.dark = !this.dark;
             document.documentElement.classList.toggle('dark', this.dark);
             localStorage.setItem('gp-theme', this.dark ? 'dark' : 'light');
         }
     }"
+    @scroll.window.throttle.100ms="scrolled = window.scrollY > 50"
     class="bg-brand-bg dark:bg-[#0d1a0d] font-inter text-[#111] dark:text-[#e8f5e9] overflow-x-hidden text-[13px] antialiased transition-colors duration-200">
 
 @php $navCategories = \App\Models\Category::orderBy('name')->get(['name', 'slug']); @endphp
@@ -267,18 +269,28 @@
             </div>
         </div>
 
-        {{-- Mobile search row --}}
-        <div class="md:hidden pb-2">
-            <form method="GET" action="{{ route('home') }}">
-                <div class="flex items-center bg-brand-bg dark:bg-[#0d1a0d] border-[1.5px] border-[#d0d9d2] dark:border-[#2a3a2a] rounded-xl px-3 h-9 gap-2 focus-within:border-brand transition-colors">
-                    <svg class="w-4 h-4 text-[#8a9e8c] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-                    </svg>
-                    <input type="text" name="search" placeholder="Search phones, laptops…"
-                        value="{{ request('search') }}"
-                        class="flex-1 bg-transparent border-none outline-none text-[12px] text-[#111] dark:text-[#e8f5e9] placeholder-[#8a9e8c]">
-                </div>
-            </form>
+        {{-- Mobile search row — collapses on scroll --}}
+        <div class="md:hidden overflow-hidden"
+             x-show="!scrolled"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0 max-h-0"
+             x-transition:enter-end="opacity-100 max-h-16"
+             x-transition:leave="transition ease-in duration-150"
+             x-transition:leave-start="opacity-100 max-h-16"
+             x-transition:leave-end="opacity-0 max-h-0"
+             style="max-height: 4rem;">
+            <div class="pb-2">
+                <form method="GET" action="{{ route('home') }}">
+                    <div class="flex items-center bg-brand-bg dark:bg-[#0d1a0d] border-[1.5px] border-[#d0d9d2] dark:border-[#2a3a2a] rounded-xl px-3 h-9 gap-2 focus-within:border-brand transition-colors">
+                        <svg class="w-4 h-4 text-[#8a9e8c] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                        </svg>
+                        <input type="text" name="search" placeholder="Search phones, laptops…"
+                            value="{{ request('search') }}"
+                            class="flex-1 bg-transparent border-none outline-none text-[12px] text-[#111] dark:text-[#e8f5e9] placeholder-[#8a9e8c]">
+                    </div>
+                </form>
+            </div>
         </div>
 
       </div>{{-- /max-w header inner --}}
@@ -474,7 +486,7 @@
         x-transition:leave="transition ease-in duration-200"
         x-transition:leave-start="opacity-100"
         x-transition:leave-end="opacity-0"
-        class="fixed bottom-20 md:bottom-6 right-4 md:right-6 bg-brand-dark text-white px-5 py-3.5 rounded-xl shadow-2xl z-50 flex items-center gap-3 border border-[#1a5a1a]"
+        class="fixed bottom-24 md:bottom-6 right-4 md:right-6 bg-brand-dark text-white px-5 py-3.5 rounded-xl shadow-2xl z-[102] flex items-center gap-3 border border-[#1a5a1a]"
         style="display: none;"
     >
         <svg class="w-5 h-5 text-brand-lime flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">

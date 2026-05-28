@@ -1,59 +1,75 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Policies;
 
+use Illuminate\Foundation\Auth\User as AuthUser;
 use App\Models\Product;
-use App\Models\User;
+use Illuminate\Auth\Access\HandlesAuthorization;
 
 class ProductPolicy
 {
-    public function viewAny(User $user): bool
+    use HandlesAuthorization;
+    
+    public function viewAny(AuthUser $authUser): bool
     {
-        $vendor = filament()->getTenant();
-        setPermissionsTeamId($vendor?->id);
-
-        return $user->hasRole('super_admin')
-            || $vendor?->isOwner($user)
-            || $user->hasPermissionTo('view_any_products');
+        return $authUser->can('ViewAny:Product');
     }
 
-    public function view(User $user, Product $product): bool
+    public function view(AuthUser $authUser, Product $product): bool
     {
-        $vendor = filament()->getTenant();
-        setPermissionsTeamId($vendor?->id);
-
-        return $user->hasRole('super_admin')
-            || $vendor?->isOwner($user)
-            || $user->hasPermissionTo('view_products');
+        return $authUser->can('View:Product');
     }
 
-    public function create(User $user): bool
+    public function create(AuthUser $authUser): bool
     {
-        $vendor = filament()->getTenant();
-        setPermissionsTeamId($vendor?->id);
-
-        return $user->hasRole('super_admin')
-            || $vendor?->isOwner($user)
-            || $user->hasPermissionTo('create_products');
+        return $authUser->can('Create:Product');
     }
 
-    public function update(User $user, Product $product): bool
+    public function update(AuthUser $authUser, Product $product): bool
     {
-        $vendor = filament()->getTenant();
-        setPermissionsTeamId($vendor?->id);
-
-        return $user->hasRole('super_admin')
-            || $vendor?->isOwner($user)
-            || $user->hasPermissionTo('edit_products');
+        return $authUser->can('Update:Product');
     }
 
-    public function delete(User $user, Product $product): bool
+    public function delete(AuthUser $authUser, Product $product): bool
     {
-        $vendor = filament()->getTenant();
-        setPermissionsTeamId($vendor?->id);
-
-        return $user->hasRole('super_admin')
-            || $vendor?->isOwner($user)
-            || $user->hasPermissionTo('delete_products');
+        return $authUser->can('Delete:Product');
     }
+
+    public function deleteAny(AuthUser $authUser): bool
+    {
+        return $authUser->can('DeleteAny:Product');
+    }
+
+    public function restore(AuthUser $authUser, Product $product): bool
+    {
+        return $authUser->can('Restore:Product');
+    }
+
+    public function forceDelete(AuthUser $authUser, Product $product): bool
+    {
+        return $authUser->can('ForceDelete:Product');
+    }
+
+    public function forceDeleteAny(AuthUser $authUser): bool
+    {
+        return $authUser->can('ForceDeleteAny:Product');
+    }
+
+    public function restoreAny(AuthUser $authUser): bool
+    {
+        return $authUser->can('RestoreAny:Product');
+    }
+
+    public function replicate(AuthUser $authUser, Product $product): bool
+    {
+        return $authUser->can('Replicate:Product');
+    }
+
+    public function reorder(AuthUser $authUser): bool
+    {
+        return $authUser->can('Reorder:Product');
+    }
+
 }
