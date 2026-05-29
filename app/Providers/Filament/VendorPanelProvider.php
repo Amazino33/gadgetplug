@@ -2,7 +2,6 @@
 
 namespace App\Providers\Filament;
 
-use App\Filament\Vendor\Resources\AuditSessions\AuditSessionResource;
 use App\Models\Vendor;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -60,9 +59,6 @@ class VendorPanelProvider extends PanelProvider
                 Authenticate::class,
             ])
             ->tenant(Vendor::class, slugAttribute: 'slug', ownershipRelationship: 'vendors')
-            ->resources([
-                AuditSessionResource::class,
-            ])
             ->navigationItems([
                 NavigationItem::make('POS Terminal')
                     ->url(fn (): string => url('/pos/' . (filament()->getTenant()?->slug ?? '')))

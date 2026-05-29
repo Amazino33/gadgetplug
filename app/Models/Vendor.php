@@ -15,7 +15,7 @@ class Vendor extends Model
     protected $fillable = [
         'user_id', 'name', 'slug', 'logo', 'is_verified',
         'description', 'whatsapp', 'bank_name', 'account_number', 'account_name',
-        'pos_vat_enabled', 'pos_vat_rate',
+        'pos_vat_enabled', 'pos_vat_rate', 'pos_blind_count_participants',
     ];
 
     public function getSlugOptions(): SlugOptions
@@ -91,7 +91,7 @@ class Vendor extends Model
         $owned = static::where('user_id', $user->id)->get();
 
         // Vendors the user is a team member of
-        $member = $user->vendors()->get();
+        $member = $user->vendors();
 
         return $owned->merge($member)->unique('id');
     }

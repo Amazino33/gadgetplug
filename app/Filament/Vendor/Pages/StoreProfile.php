@@ -5,6 +5,7 @@ namespace App\Filament\Vendor\Pages;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -37,8 +38,9 @@ class StoreProfile extends Page
             'bank_name'       => $vendor->bank_name,
             'account_number'  => $vendor->account_number,
             'account_name'    => $vendor->account_name,
-            'pos_vat_enabled' => $vendor->pos_vat_enabled ?? true,
-            'pos_vat_rate'    => $vendor->pos_vat_rate ?? 7.5,
+            'pos_vat_enabled'              => $vendor->pos_vat_enabled ?? true,
+            'pos_vat_rate'                 => $vendor->pos_vat_rate ?? 7.5,
+            'pos_blind_count_participants' => $vendor->pos_blind_count_participants ?? 2,
         ]);
     }
 
@@ -75,6 +77,16 @@ class StoreProfile extends Page
                             ->helperText('When off, VAT will not be calculated or shown on any POS receipt.')
                             ->default(true)
                             ->live(),
+
+                        Select::make('pos_blind_count_participants')
+                            ->label('Blind Count Participants')
+                            ->options([
+                                1 => '1 person — single counter (faster)',
+                                2 => '2 people — dual verification (more accurate)',
+                            ])
+                            ->default(2)
+                            ->helperText('With 2 people, a second storekeeper independently verifies the first count before stock is updated.')
+                            ->required(),
 
                         TextInput::make('pos_vat_rate')
                             ->label('VAT Rate (%)')
@@ -123,8 +135,9 @@ class StoreProfile extends Page
             'bank_name'       => $data['bank_name'],
             'account_number'  => $data['account_number'],
             'account_name'    => $data['account_name'],
-            'pos_vat_enabled' => $data['pos_vat_enabled'] ?? false,
-            'pos_vat_rate'    => $data['pos_vat_enabled'] ? ($data['pos_vat_rate'] ?? 7.5) : 0,
+            'pos_vat_enabled'              => $data['pos_vat_enabled'] ?? false,
+            'pos_vat_rate'                 => $data['pos_vat_enabled'] ? ($data['pos_vat_rate'] ?? 7.5) : 0,
+            'pos_blind_count_participants' => (int) ($data['pos_blind_count_participants'] ?? 2),
         ];
 
         // If name changed, let the sluggable trait regenerate a unique slug

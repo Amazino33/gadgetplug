@@ -28,9 +28,17 @@ class AuditSessionResource extends Resource
 
     // You can use a string, or if you install a Blade Icon Enum package, 
     // you would use something like: protected static string|BackedEnum|null $navigationIcon = HeroIcon::ClipboardDocumentList;
-    protected static string|null|BackedEnum $navigationIcon = 'heroicon-o-clipboard-document-list';
-    
-    protected static string|null|UnitEnum $navigationGroup = 'Inventory';
+    protected static string|null|BackedEnum $navigationIcon  = 'heroicon-o-clipboard-document-list';
+    protected static string|null|UnitEnum   $navigationGroup = 'Inventory';
+    protected static ?string                $navigationLabel = 'Audit Sessions';
+    protected static ?int                   $navigationSort  = 4;
+
+    public static function canAccess(): bool
+    {
+        $user   = auth()->user();
+        $vendor = filament()->getTenant();
+        return $vendor && $user->hasVendorRole($vendor->id, ['owner', 'inventory_manager', 'storekeeper']);
+    }
 
     public static function table(Table $table): Table
     {

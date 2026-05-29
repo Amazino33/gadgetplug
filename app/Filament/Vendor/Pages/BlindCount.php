@@ -264,11 +264,34 @@ class BlindCount extends Page
             return;
         }
 
-        $role = $this->getRole();
+        $role        = $this->getRole();
+        $vendor      = filament()->getTenant();
+        $singlePerson = ($vendor->pos_blind_count_participants ?? 2) === 1;
 
         if ($role === 'a') {
-            $session->update(['status' => 'b_counting', 'a_submitted_at' => now()]);
-            Notification::make()->title('Count submitted. Waiting for Storekeeper B.')->success()->send();
+            if ($singlePerson) {
+                // Single-person mode: complete immediately without waiting for a second counter
+                $session->update([
+                    'status'          => 'completed',
+                    'a_submitted_at'  => now(),
+                    'b_submitted_at'  => now(),
+                ]);
+
+                try {
+                    $this->processComparisonSinglePerson($session->fresh());
+                    Notification::make()->title('Count complete. Stock levels updated.')->success()->send();
+                } catch (\Throwable $e) {
+                    Log::error('BlindCount single-person comparison failed', ['session_id' => $session->id, 'error' => $e->getMessage()]);
+                    Notification::make()
+                        ->title('Comparison failed')
+                        ->body('Your count was saved but stock records could not be updated. Error: ' . $e->getMessage())
+                        ->danger()
+                        ->send();
+                }
+            } else {
+                $session->update(['status' => 'b_counting', 'a_submitted_at' => now()]);
+                Notification::make()->title('Count submitted. Waiting for Storekeeper B.')->success()->send();
+            }
         } elseif ($role === 'b') {
             $session->update(['status' => 'completed', 'b_submitted_at' => now()]);
 
@@ -324,6 +347,44 @@ class BlindCount extends Page
             ->where('product_id', $productId)
             ->first();
         $this->count = $entry?->count ?? 0;
+    }
+
+    private function processComparisonSinglePerson(BlindCountSession $session): void
+    {
+        $entries     = BlindCountEntry::where('blind_count_session_id', $session->id)
+            ->where('user_id', $session->storekeeper_a_id)
+            ->get()->keyBy('product_id');
+
+        $adjustStock = app(AdjustStockAction::class);
+
+        DB::transaction(function () use ($session, $entries, $adjustStock) {
+            foreach ($session->product_order as $productId) {
+                $count = (int) ($entries[$productId]?->count ?? 0);
+
+                AuditSession::create([
+                    'vendor_id'        => $session->vendor_id,
+                    'product_id'       => $productId,
+                    'storekeeper_a_id' => $session->storekeeper_a_id,
+                    'storekeeper_b_id' => null,
+                    'count_a'          => $count,
+                    'count_b'          => null,
+                    'status'           => 'verified',
+                ]);
+
+                $product    = Product::find($productId);
+                $difference = $count - (int) $product->stock_quantity;
+                if ($difference !== 0) {
+                    $adjustStock->execute(
+                        productId:       $productId,
+                        quantityChanged: $difference,
+                        transactionType: 'audit_correction',
+                        userId:          $session->storekeeper_a_id,
+                        reference:       "Blind Count #{$session->id}",
+                        description:     "Single-person count. System had {$product->stock_quantity}, found {$count}."
+                    );
+                }
+            }
+        });
     }
 
     private function processComparison(BlindCountSession $session): int

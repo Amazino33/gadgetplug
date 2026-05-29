@@ -5,6 +5,9 @@ namespace App\Filament\Resources\Vendors\Tables;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 
 class VendorsTable
@@ -13,10 +16,51 @@ class VendorsTable
     {
         return $table
             ->columns([
-                //
+                TextColumn::make('name')
+                    ->searchable()
+                    ->sortable()
+                    ->weight('bold'),
+
+                TextColumn::make('user.name')
+                    ->label('Owner')
+                    ->searchable()
+                    ->sortable(),
+
+                TextColumn::make('user.email')
+                    ->label('Owner Email')
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+
+                IconColumn::make('is_verified')
+                    ->label('Verified')
+                    ->boolean()
+                    ->alignCenter(),
+
+                TextColumn::make('products_count')
+                    ->label('Products')
+                    ->counts('products')
+                    ->alignCenter()
+                    ->sortable(),
+
+                IconColumn::make('pos_vat_enabled')
+                    ->label('VAT')
+                    ->boolean()
+                    ->alignCenter()
+                    ->toggleable(isToggledHiddenByDefault: true),
+
+                TextColumn::make('whatsapp')
+                    ->label('WhatsApp')
+                    ->toggleable(isToggledHiddenByDefault: true),
+
+                TextColumn::make('created_at')
+                    ->label('Joined')
+                    ->date('d M Y')
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
             ])
+            ->defaultSort('created_at', 'desc')
             ->filters([
-                //
+                TernaryFilter::make('is_verified')->label('Verified'),
             ])
             ->recordActions([
                 EditAction::make(),
