@@ -17,7 +17,10 @@ import ZReportModal from '../components/ZReportModal';
 import ReceiptModal from '../components/ReceiptModal';
 
 const CONFIG = window.POS_CONFIG ?? {};
-const VAT_RATE = 7.5;
+
+const vendorSettings = JSON.parse(localStorage.getItem('pos_vendor_settings') ?? '{}');
+const VAT_ENABLED = vendorSettings.vat_enabled ?? true;
+const VAT_RATE    = vendorSettings.vat_rate    ?? 7.5;
 
 // Small button used inside the mobile "More" sheet
 const SheetBtn = ({ label, onClick, disabled = false, color = 'gray' }) => {
@@ -118,7 +121,7 @@ export default function POS({ user, vendorId, onLogout }) {
     const discountAmount = cartDiscount.type === 'percentage'
         ? subtotal * (cartDiscount.amount / 100)
         : cartDiscount.amount;
-    const vatAmount = (subtotal - discountAmount) * (VAT_RATE / 100);
+    const vatAmount = VAT_ENABLED ? (subtotal - discountAmount) * (VAT_RATE / 100) : 0;
     const total     = subtotal - discountAmount + vatAmount;
     const cartEmpty = cart.length === 0;
 
@@ -265,9 +268,11 @@ export default function POS({ user, vendorId, onLogout }) {
                             <span>Discount</span><span>− {fmt(discountAmount)}</span>
                         </div>
                     )}
-                    <div className="flex justify-between text-sm text-gray-500 mb-3">
-                        <span>VAT ({VAT_RATE}%)</span><span>{fmt(vatAmount)}</span>
-                    </div>
+                    {VAT_ENABLED && (
+                        <div className="flex justify-between text-sm text-gray-500 mb-3">
+                            <span>VAT ({VAT_RATE}%)</span><span>{fmt(vatAmount)}</span>
+                        </div>
+                    )}
                     <div className="flex justify-between items-baseline">
                         <span className="text-lg font-bold text-gray-700" style={{ fontFamily: 'Montserrat, sans-serif' }}>TOTAL</span>
                         <span className="text-4xl font-extrabold text-gray-900" style={{ fontFamily: 'Montserrat, sans-serif' }}>
@@ -286,7 +291,7 @@ export default function POS({ user, vendorId, onLogout }) {
                             {discountAmount > 0 && (
                                 <div className="text-[#F97316]">Disc: − {fmt(discountAmount)}</div>
                             )}
-                            <div>VAT: <span className="text-gray-600 font-medium">{fmt(vatAmount)}</span></div>
+                            {VAT_ENABLED && <div>VAT: <span className="text-gray-600 font-medium">{fmt(vatAmount)}</span></div>}
                         </div>
                         <div className="text-right">
                             <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total</div>

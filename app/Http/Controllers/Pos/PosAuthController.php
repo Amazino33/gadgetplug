@@ -29,13 +29,18 @@ class PosAuthController extends Controller
             return response()->json(['message' => 'Invalid PIN.'], 401);
         }
 
-        $token = $user->createToken('pos-terminal', ['pos'])->plainTextToken;
+        $token  = $user->createToken('pos-terminal', ['pos'])->plainTextToken;
+        $vendor = \App\Models\Vendor::find($request->vendor_id);
 
         return response()->json([
-            'token' => $token,
-            'user'  => [
+            'token'  => $token,
+            'user'   => [
                 'id'   => $user->id,
                 'name' => $user->name,
+            ],
+            'vendor' => [
+                'vat_enabled' => (bool) ($vendor->pos_vat_enabled ?? true),
+                'vat_rate'    => (float) ($vendor->pos_vat_rate ?? 7.5),
             ],
         ]);
     }

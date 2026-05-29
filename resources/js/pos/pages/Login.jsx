@@ -39,6 +39,7 @@ export default function Login({ onLogin }) {
             localStorage.setItem('pos_token', data.token);
             localStorage.setItem('pos_vendor_id', String(vendorId));
             localStorage.setItem('pos_user', JSON.stringify(data.user));
+            localStorage.setItem('pos_vendor_settings', JSON.stringify(data.vendor ?? { vat_enabled: true, vat_rate: 7.5 }));
 
             const { data: products } = await api.get('/products', { params: { vendor_id: vendorId } });
             await db.products.clear();

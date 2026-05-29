@@ -15,6 +15,7 @@ class Vendor extends Model
     protected $fillable = [
         'user_id', 'name', 'slug', 'logo', 'is_verified',
         'description', 'whatsapp', 'bank_name', 'account_number', 'account_name',
+        'pos_vat_enabled', 'pos_vat_rate',
     ];
 
     public function getSlugOptions(): SlugOptions

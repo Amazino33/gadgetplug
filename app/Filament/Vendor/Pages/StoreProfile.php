@@ -4,6 +4,7 @@ namespace App\Filament\Vendor\Pages;
 
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -30,12 +31,14 @@ class StoreProfile extends Page
         $vendor = filament()->getTenant();
 
         $this->form->fill([
-            'name'           => $vendor->name,
-            'description'    => $vendor->description,
-            'whatsapp'       => $vendor->whatsapp,
-            'bank_name'      => $vendor->bank_name,
-            'account_number' => $vendor->account_number,
-            'account_name'   => $vendor->account_name,
+            'name'            => $vendor->name,
+            'description'     => $vendor->description,
+            'whatsapp'        => $vendor->whatsapp,
+            'bank_name'       => $vendor->bank_name,
+            'account_number'  => $vendor->account_number,
+            'account_name'    => $vendor->account_name,
+            'pos_vat_enabled' => $vendor->pos_vat_enabled ?? true,
+            'pos_vat_rate'    => $vendor->pos_vat_rate ?? 7.5,
         ]);
     }
 
@@ -62,6 +65,27 @@ class StoreProfile extends Page
                             ->rows(4)
                             ->maxLength(1000)
                             ->placeholder('Tell customers what you sell and what makes your store unique…'),
+                    ]),
+
+                Section::make('POS Settings')
+                    ->description('Configure how VAT is applied on Point of Sale transactions.')
+                    ->schema([
+                        Toggle::make('pos_vat_enabled')
+                            ->label('Charge VAT on POS sales')
+                            ->helperText('When off, VAT will not be calculated or shown on any POS receipt.')
+                            ->default(true)
+                            ->live(),
+
+                        TextInput::make('pos_vat_rate')
+                            ->label('VAT Rate (%)')
+                            ->numeric()
+                            ->minValue(0)
+                            ->maxValue(100)
+                            ->step(0.5)
+                            ->suffix('%')
+                            ->default(7.5)
+                            ->visible(fn ($get) => $get('pos_vat_enabled'))
+                            ->required(fn ($get) => $get('pos_vat_enabled')),
                     ]),
 
                 Section::make('Bank Details for Payouts')
@@ -94,11 +118,13 @@ class StoreProfile extends Page
         $vendor = filament()->getTenant();
 
         $updateData = [
-            'description'    => $data['description'],
-            'whatsapp'       => $data['whatsapp'],
-            'bank_name'      => $data['bank_name'],
-            'account_number' => $data['account_number'],
-            'account_name'   => $data['account_name'],
+            'description'     => $data['description'],
+            'whatsapp'        => $data['whatsapp'],
+            'bank_name'       => $data['bank_name'],
+            'account_number'  => $data['account_number'],
+            'account_name'    => $data['account_name'],
+            'pos_vat_enabled' => $data['pos_vat_enabled'] ?? false,
+            'pos_vat_rate'    => $data['pos_vat_enabled'] ? ($data['pos_vat_rate'] ?? 7.5) : 0,
         ];
 
         // If name changed, let the sluggable trait regenerate a unique slug
