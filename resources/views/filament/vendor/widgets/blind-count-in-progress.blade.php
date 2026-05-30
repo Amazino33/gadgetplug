@@ -1,5 +1,6 @@
 @php $sessions = $this->getSessions(); @endphp
 
+<div>
 @if ($sessions->isNotEmpty())
 <div class="mb-4 space-y-2" x-data="{ expanded: null }">
     <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider px-1">Blind Count Sessions — In Progress</p>
@@ -91,3 +92,4 @@
     @endforeach
 </div>
 @endif
+</div>

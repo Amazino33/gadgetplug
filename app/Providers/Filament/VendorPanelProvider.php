@@ -71,6 +71,10 @@ class VendorPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
                 fn () => Blade::render("@include('partials.meta-pixel')"),
+            )
+            ->renderHook(
+                PanelsRenderHook::BODY_END,
+                fn () => Blade::render('<x-barcode-scanner />'),
             );
     }
 }
