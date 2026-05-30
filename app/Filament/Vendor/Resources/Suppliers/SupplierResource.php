@@ -26,6 +26,10 @@ class SupplierResource extends Resource
 
     public static function canAccess(): bool
     {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('suppliers')) {
+            return false;
+        }
+
         $user   = auth()->user();
         $vendor = filament()->getTenant();
         return $vendor && $user->hasVendorRole($vendor->id, ['owner', 'inventory_manager', 'storekeeper']);
