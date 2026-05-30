@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Filament\Vendor\Resources\Suppliers;
 
 use App\Models\Supplier;
