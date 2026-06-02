@@ -14,6 +14,7 @@ new class extends Component {
     public string $name          = '';
     public string $email         = '';
     public string $phone         = '';
+    public string $lga           = '';
     public string $address       = '';
     public string $paymentMethod = 'paystack';
 
@@ -91,6 +92,7 @@ new class extends Component {
             'name'          => 'required|string|max:255',
             'email'         => 'required|email|max:255',
             'phone'         => 'required|string|max:20',
+            'lga'           => 'required|in:Uyo,Mkpat Enin,Eket',
             'address'       => 'required|string|min:10',
             'paymentMethod' => 'required|in:paystack,pay_on_delivery',
         ]);
@@ -103,7 +105,7 @@ new class extends Component {
             'customer_name'    => $this->name,
             'customer_email'   => $this->email,
             'customer_phone'   => $this->phone,
-            'shipping_address' => $this->address,
+            'shipping_address' => $this->lga . ', Akwa Ibom State — ' . $this->address,
             'total_amount'     => $this->total,
             'status'           => 'pending',
             'payment_method'   => $this->paymentMethod,
@@ -451,15 +453,42 @@ new class extends Component {
                         Delivery Address
                     </h2>
                 </div>
-                <div class="p-5">
-                    <label class="block text-[12px] font-semibold text-brand-dark dark:text-[#e8f5e9] mb-1.5">Full Delivery Address *</label>
-                    <textarea wire:model="address" placeholder="Enter your street address, landmark, LGA, State…"
+                <div class="p-5 space-y-4">
+
+                    {{-- State (fixed) --}}
+                    <div>
+                        <label class="block text-[12px] font-semibold text-brand-dark dark:text-[#e8f5e9] mb-1.5">State</label>
+                        <div class="w-full bg-brand-bg dark:bg-[#0d1a0d] border border-[#d0d9d2] dark:border-[#2a3a2a] rounded-xl px-3.5 py-2.5 text-[13px] text-brand-muted dark:text-[#6a8a6a] select-none">
+                            Akwa Ibom State
+                        </div>
+                    </div>
+
+                    {{-- LGA dropdown --}}
+                    <div>
+                        <label class="block text-[12px] font-semibold text-brand-dark dark:text-[#e8f5e9] mb-1.5">Local Government Area *</label>
+                        <select wire:model.live="lga"
+                            class="w-full bg-brand-bg dark:bg-[#0d1a0d] border border-[#d0d9d2] dark:border-[#2a3a2a] rounded-xl px-3.5 py-2.5 text-[13px] text-[#111] dark:text-[#e8f5e9] outline-none focus:border-brand transition-colors appearance-none cursor-pointer">
+                            <option value="" disabled selected>Select your LGA…</option>
+                            <option value="Uyo">Uyo</option>
+                            <option value="Mkpat Enin">Mkpat Enin</option>
+                            <option value="Eket">Eket</option>
+                        </select>
+                        @error('lga') <p class="text-red-500 text-[11px] mt-1">{{ $message }}</p> @enderror
+                        <p class="text-[11px] text-brand-muted mt-1">We currently deliver to Uyo, Mkpat Enin and Eket only.</p>
+                    </div>
+
+                    {{-- Street address --}}
+                    <div>
+                    <label class="block text-[12px] font-semibold text-brand-dark dark:text-[#e8f5e9] mb-1.5">Street Address *</label>
+                    <textarea wire:model="address" placeholder="House number, street name, closest landmark…"
                         rows="4"
                         class="w-full bg-brand-bg dark:bg-[#0d1a0d] border border-[#d0d9d2] dark:border-[#2a3a2a] rounded-xl px-3.5 py-2.5 text-[13px] text-[#111] dark:text-[#e8f5e9] outline-none focus:border-brand transition-colors placeholder-[#8a9e8c] resize-none"></textarea>
                     @error('address') <p class="text-red-500 text-[11px] mt-1">{{ $message }}</p> @enderror
                     <p class="text-[11px] text-brand-muted mt-1.5">
                         💡 Our rider will bring the item to this address. You can inspect before paying.
                     </p>
+                    </div>
+
                 </div>
             </div>
 
