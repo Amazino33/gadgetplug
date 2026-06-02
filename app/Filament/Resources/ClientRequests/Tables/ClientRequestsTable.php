@@ -31,9 +31,9 @@ class ClientRequestsTable
                     ->sortable(),
                 
                 TextColumn::make('created_at')
-                    ->dateTime()
+                    ->label('Date')
+                    ->date('M j, Y')
                     ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true)
             ])
             ->defaultSort('created_at', 'desc')
             ->filters([
