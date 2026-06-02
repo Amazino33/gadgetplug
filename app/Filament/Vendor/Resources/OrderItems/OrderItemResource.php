@@ -62,10 +62,8 @@ class OrderItemResource extends Resource
 
         if (!$vendor) return false;
 
-        setPermissionsTeamId($vendor->id);
-
-        return $user->hasRole('super_admin')
+        return $user->isSuperAdmin()
             || $vendor->isOwner($user)
-            || $user->hasPermissionTo('view_any_order_items');
+            || $user->hasVendorRole($vendor->id, ['order_manager', 'member']);
     }
 }

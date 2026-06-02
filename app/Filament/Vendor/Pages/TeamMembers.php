@@ -33,7 +33,7 @@ class TeamMembers extends Page
         $user = auth()->user();
 
         return $vendor && (
-            $user->hasRole('super_admin') ||
+            $user->isSuperAdmin() ||
             $vendor->isOwner($user)
         );
     }
@@ -44,7 +44,8 @@ class TeamMembers extends Page
         setPermissionsTeamId($vendor->id);
 
         return [
-            'members' => $vendor->users()->withPivot('role')->get(),
+            'owner'       => $vendor->user,
+            'members'     => $vendor->users()->withPivot('role')->get(),
             'permissions' => Permission::where('guard_name', 'web')
                 ->where('name', 'not like', '%:%')
                 ->get(),
@@ -255,7 +256,7 @@ class TeamMembers extends Page
         $vendor = filament()->getTenant();
         $user = auth()->user();
 
-        if (!$vendor->isOwner($user) && !$user->hasRole('super_admin')) {
+        if (!$vendor->isOwner($user) && !$user->isSuperAdmin()) {
             Notification::make()
                 ->title('Unauthorized')
                 ->danger()

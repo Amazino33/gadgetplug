@@ -64,6 +64,22 @@ class User extends Authenticatable implements HasTenants, FilamentUser
     /**
      * Get the user's initials
      */
+    // Checks for the super_admin role ignoring the Spatie team scope entirely.
+    // hasRole() and roles() both filter by team_id when teams are enabled, and
+    // VendorTeamResolver always falls back to filament()->getTenant() even after
+    // setPermissionsTeamId(null), so the only reliable way is a raw DB check.
+    public function isSuperAdmin(): bool
+    {
+        return \Illuminate\Support\Facades\DB::table('model_has_roles')
+            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+            ->where('model_has_roles.model_id', $this->id)
+            ->where('model_has_roles.model_type', get_class($this))
+            ->whereNull('model_has_roles.team_id')
+            ->where('roles.name', 'super_admin')
+            ->where('roles.guard_name', 'web')
+            ->exists();
+    }
+
     public function initials(): string
     {
         return Str::of($this->name)

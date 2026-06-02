@@ -55,14 +55,40 @@ class ProductResource extends Resource
     public static function canAccess(): bool
     {
         $vendor = filament()->getTenant();
-        $user = auth()->user();
+        $user   = auth()->user();
+        return $vendor && (
+            $user->isSuperAdmin() ||
+            $user->hasVendorRole($vendor->id, ['owner', 'product_manager', 'member'])
+        );
+    }
 
-        if (!$vendor) return false;
+    public static function canCreate(): bool
+    {
+        $vendor = filament()->getTenant();
+        $user   = auth()->user();
+        return $vendor && (
+            $user->isSuperAdmin() ||
+            $user->hasVendorRole($vendor->id, ['owner', 'product_manager'])
+        );
+    }
 
-        setPermissionsTeamId($vendor->id);
+    public static function canEdit($record): bool
+    {
+        $vendor = filament()->getTenant();
+        $user   = auth()->user();
+        return $vendor && (
+            $user->isSuperAdmin() ||
+            $user->hasVendorRole($vendor->id, ['owner', 'product_manager'])
+        );
+    }
 
-        return $user->hasRole('super_admin')
-            || $vendor->isOwner($user)
-            || $user->hasPermissionTo('view_any_products');
+    public static function canDelete($record): bool
+    {
+        $vendor = filament()->getTenant();
+        $user   = auth()->user();
+        return $vendor && (
+            $user->isSuperAdmin() ||
+            $vendor->isOwner($user)
+        );
     }
 }
