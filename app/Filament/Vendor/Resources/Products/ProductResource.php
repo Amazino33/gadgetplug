@@ -13,7 +13,9 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Auth\Access\Response;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 
 class ProductResource extends Resource
 {
@@ -90,5 +92,31 @@ class ProductResource extends Resource
             $user->isSuperAdmin() ||
             $vendor->isOwner($user)
         );
+    }
+
+    // Filament v5 routes action visibility through getXxxAuthorizationResponse(),
+    // not canXxx(). These bridge back to the vendor-role logic above so that the
+    // Create / Edit / Delete buttons respect the same rules as page access.
+    public static function getCreateAuthorizationResponse(): Response
+    {
+        return static::canCreate() ? Response::allow() : Response::deny();
+    }
+
+    public static function getEditAuthorizationResponse(Model $record): Response
+    {
+        return static::canEdit($record) ? Response::allow() : Response::deny();
+    }
+
+    public static function getDeleteAuthorizationResponse(Model $record): Response
+    {
+        return static::canDelete($record) ? Response::allow() : Response::deny();
+    }
+
+    public static function getDeleteAnyAuthorizationResponse(): Response
+    {
+        $vendor = filament()->getTenant();
+        $user   = auth()->user();
+        $allowed = $vendor && ($user->isSuperAdmin() || $vendor->isOwner($user));
+        return $allowed ? Response::allow() : Response::deny();
     }
 }
