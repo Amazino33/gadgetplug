@@ -8,9 +8,6 @@ use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
 use Filament\Tables\Table;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\SelectColumn;
-use Filament\Tables\Filters\SelectFilter;
-use Illuminate\Database\Eloquent\Builder;
 
 class OrderItemsTable
 {
@@ -37,6 +34,10 @@ class OrderItemsTable
 
                 TextColumn::make('order.customer_name')
                     ->label('Customer')
+                    ->searchable(),
+
+                TextColumn::make('order.customer_phone')
+                    ->label('Phone')
                     ->searchable(),
 
                 TextColumn::make('order.shipping_address')
