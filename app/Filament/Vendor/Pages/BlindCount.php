@@ -45,6 +45,13 @@ class BlindCount extends Page
             ->exists();
     }
 
+    public function canReset(): bool
+    {
+        $user   = auth()->user();
+        $vendor = filament()->getTenant();
+        return $user->isSuperAdmin() || $user->hasVendorRole($vendor->id, ['owner', 'inventory_manager']);
+    }
+
     // ── Livewire state ────────────────────────────────────────────────────────
     public ?int    $sessionId       = null;
     public int     $currentPosition = 1;
@@ -310,6 +317,31 @@ class BlindCount extends Page
                     ->send();
             }
         }
+    }
+
+    public function resetSession(): void
+    {
+        if (! $this->canReset()) {
+            Notification::make()->title('Only owners and inventory managers can reset a count session.')->danger()->send();
+            return;
+        }
+
+        $session = $this->getSession();
+        if (! $session) return;
+
+        BlindCountEntry::where('blind_count_session_id', $session->id)->delete();
+
+        $session->update([
+            'status'           => 'a_counting',
+            'storekeeper_b_id' => null,
+            'a_submitted_at'   => null,
+            'b_submitted_at'   => null,
+        ]);
+
+        $this->currentPosition = 1;
+        $this->count           = 0;
+
+        Notification::make()->title('Session reset. Storekeeper A can start their count over.')->success()->send();
     }
 
     private function saveCurrentEntry(): void

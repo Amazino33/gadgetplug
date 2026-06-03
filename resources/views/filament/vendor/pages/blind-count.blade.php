@@ -8,6 +8,7 @@
     $total         = $this->getTotalProducts();
     $product       = $this->getCurrentProduct();
     $canCount      = $this->canCount();
+    $canReset      = $this->canReset();
     $isLastProduct = $total > 0 && $this->currentPosition >= $total;
     $isCounting    = $session && (
         ($session->status === 'a_counting' && $role === 'a') ||
@@ -103,6 +104,13 @@
                 style="width: {{ $total > 0 ? round(($countedSoFar / $total) * 100) : 0 }}%"></div>
         </div>
     </div>
+    @if($canReset)
+    <button wire:click="resetSession"
+        wire:confirm="This will delete all counts entered so far and reset the session to the beginning. Are you sure?"
+        class="w-full mt-2 border border-red-800 hover:bg-red-900/30 text-red-400 text-sm font-semibold py-2.5 rounded-xl transition-colors">
+        ↺ Clear All Counting
+    </button>
+    @endif
 </div>
 
 {{-- ── WAITING: A submitted, B hasn't joined yet ───────────────────────── --}}
@@ -124,6 +132,13 @@
         Join as Storekeeper B
     </button>
     @endif
+    @if($canReset)
+    <button wire:click="resetSession"
+        wire:confirm="This will delete all counts entered so far and reset the session to the beginning. Are you sure?"
+        class="w-full border border-red-800 hover:bg-red-900/30 text-red-400 text-sm font-semibold py-2.5 rounded-xl transition-colors">
+        ↺ Clear All Counting
+    </button>
+    @endif
 </div>
 
 {{-- ── WAITING: A submitted, waiting for B ─────────────────────────────── --}}
@@ -134,6 +149,13 @@
     </div>
     <h2 class="text-white font-montserrat font-bold text-lg">Your count is submitted</h2>
     <p class="text-[#5a7a5c] text-sm">Waiting for Storekeeper B to complete their independent verification.</p>
+    @if($canReset)
+    <button wire:click="resetSession"
+        wire:confirm="This will delete all counts entered so far and reset the session to the beginning. Are you sure?"
+        class="w-full border border-red-800 hover:bg-red-900/30 text-red-400 text-sm font-semibold py-2.5 rounded-xl transition-colors">
+        ↺ Clear All Counting
+    </button>
+    @endif
 </div>
 
 {{-- ── COMPLETED ─────────────────────────────────────────────────────────── --}}
