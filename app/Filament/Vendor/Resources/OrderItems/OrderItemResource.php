@@ -15,6 +15,8 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Auth\Access\Response;
+use Illuminate\Database\Eloquent\Model;
 
 class OrderItemResource extends Resource
 {
@@ -58,12 +60,49 @@ class OrderItemResource extends Resource
     public static function canAccess(): bool
     {
         $vendor = filament()->getTenant();
-        $user = auth()->user();
+        $user   = auth()->user();
 
-        if (!$vendor) return false;
+        if (! $vendor) return false;
 
         return $user->isSuperAdmin()
             || $vendor->isOwner($user)
             || $user->hasVendorRole($vendor->id, ['order_manager', 'member']);
+    }
+
+    private static function isAuthorized(): bool
+    {
+        $vendor = filament()->getTenant();
+        $user   = auth()->user();
+        return $vendor && (
+            $user->isSuperAdmin() ||
+            $vendor->isOwner($user) ||
+            $user->hasVendorRole($vendor->id, ['order_manager', 'member'])
+        );
+    }
+
+    public static function getViewAuthorizationResponse(Model $record): Response
+    {
+        return static::isAuthorized() ? Response::allow() : Response::deny();
+    }
+
+    public static function getEditAuthorizationResponse(Model $record): Response
+    {
+        return static::isAuthorized() ? Response::allow() : Response::deny();
+    }
+
+    public static function getDeleteAuthorizationResponse(Model $record): Response
+    {
+        $vendor = filament()->getTenant();
+        $user   = auth()->user();
+        $allowed = $vendor && ($user->isSuperAdmin() || $vendor->isOwner($user));
+        return $allowed ? Response::allow() : Response::deny();
+    }
+
+    public static function getDeleteAnyAuthorizationResponse(): Response
+    {
+        $vendor  = filament()->getTenant();
+        $user    = auth()->user();
+        $allowed = $vendor && ($user->isSuperAdmin() || $vendor->isOwner($user));
+        return $allowed ? Response::allow() : Response::deny();
     }
 }

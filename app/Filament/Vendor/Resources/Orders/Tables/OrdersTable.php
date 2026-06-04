@@ -86,11 +86,17 @@ class OrdersTable
             ])
             ->recordActions([
                 ViewAction::make(),
+                Action::make('whatsapp')
+                    ->label('WhatsApp')
+                    ->icon('heroicon-o-chat-bubble-oval-left')
+                    ->color('success')
+                    ->url(fn (Order $record) => 'https://wa.me/' . preg_replace('/\D/', '', $record->customer_phone))
+                    ->openUrlInNewTab(),
                 Action::make('updateStatus')
                     ->label('Update Status')
                     ->icon('heroicon-o-arrow-path')
                     ->color('warning')
-                    ->form([
+                    ->schema([
                         Select::make('status')
                             ->label('New Status')
                             ->options(fn(Order $record) => match($record->status) {

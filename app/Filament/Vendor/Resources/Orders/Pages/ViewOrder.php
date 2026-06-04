@@ -18,11 +18,24 @@ class ViewOrder extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('callCustomer')
+                ->label('Call')
+                ->icon('heroicon-o-phone')
+                ->color('info')
+                ->url(fn () => 'tel:' . $this->record->customer_phone),
+
+            Action::make('whatsappCustomer')
+                ->label('WhatsApp')
+                ->icon('heroicon-o-chat-bubble-oval-left')
+                ->color('success')
+                ->url(fn () => 'https://wa.me/' . preg_replace('/\D/', '', $this->record->customer_phone))
+                ->openUrlInNewTab(),
+
             Action::make('updateStatus')
                 ->label('Update Status')
                 ->icon('heroicon-o-arrow-path')
                 ->color('warning')
-                ->form([
+                ->schema([
                     Select::make('status')
                         ->label('New Status')
                         ->options(fn() => match($this->record->status) {
