@@ -60,7 +60,7 @@ class OrderItemsTable
                     ->label('WhatsApp')
                     ->icon('heroicon-o-chat-bubble-oval-left')
                     ->color('success')
-                    ->url(fn ($record) => 'https://wa.me/' . preg_replace('/\D/', '', $record->order->customer_phone))
+                    ->url(fn ($record) => 'https://api.whatsapp.com/send?phone=' . preg_replace('/\D/', '', $record->order->customer_phone))
                     ->openUrlInNewTab(),
                 EditAction::make(),
             ])

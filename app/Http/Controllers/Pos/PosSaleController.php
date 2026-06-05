@@ -3,14 +3,12 @@
 namespace App\Http\Controllers\Pos;
 
 use App\Actions\Inventory\AdjustStockAction;
-use App\Actions\Inventory\ReleaseReservationAction;
 use App\Http\Controllers\Controller;
 use App\Models\PosCustomer;
 use App\Models\PosReturn;
 use App\Models\PosSale;
 use App\Models\PosSaleItem;
 use App\Models\PosSalePayment;
-use App\Models\Product;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -177,22 +175,52 @@ class PosSaleController extends Controller
 
     public function processReturn(Request $request, PosSale $sale, AdjustStockAction $adjustStock): JsonResponse
     {
+        if ($sale->status === 'voided') {
+            return response()->json(['message' => 'Voided sales cannot be returned.'], 422);
+        }
+
         $request->validate([
-            'items'         => 'required|array|min:1',
+            'items'              => 'required|array|min:1',
             'items.*.product_id' => 'required|integer',
             'items.*.quantity'   => 'required|integer|min:1',
-            'refund_method' => 'required|in:cash,card,bank_transfer,store_credit',
-            'reason'        => 'nullable|string|max:255',
+            'refund_method'      => 'required|in:cash,card,bank_transfer,store_credit',
+            'reason'             => 'nullable|string|max:255',
         ]);
 
-        $return = DB::transaction(function () use ($request, $sale, $adjustStock) {
-            $returnItems   = [];
-            $refundAmount  = 0;
+        $sale->loadMissing('items');
+
+        // Sum quantities already returned for this sale, keyed by product_id
+        $alreadyReturned = PosReturn::where('original_sale_id', $sale->id)
+            ->get()
+            ->flatMap(fn ($r) => collect($r->return_items))
+            ->groupBy('product_id')
+            ->map(fn ($rows) => $rows->sum('quantity'));
+
+        // Validate every requested item before touching the DB
+        foreach ($request->items as $item) {
+            $saleItem = $sale->items->firstWhere('product_id', $item['product_id']);
+
+            if (! $saleItem) {
+                return response()->json([
+                    'message' => "Product ID {$item['product_id']} was not part of the original sale.",
+                ], 422);
+            }
+
+            $maxReturnable = $saleItem->quantity - ($alreadyReturned[$item['product_id']] ?? 0);
+
+            if ($item['quantity'] > $maxReturnable) {
+                return response()->json([
+                    'message' => "Cannot return {$item['quantity']} of \"{$saleItem->product_name}\" — only {$maxReturnable} returnable.",
+                ], 422);
+            }
+        }
+
+        $return = DB::transaction(function () use ($request, $sale, $adjustStock, $alreadyReturned) {
+            $returnItems  = [];
+            $refundAmount = 0;
 
             foreach ($request->items as $item) {
-                $saleItem = $sale->items->firstWhere('product_id', $item['product_id']);
-                if (! $saleItem) continue;
-
+                $saleItem      = $sale->items->firstWhere('product_id', $item['product_id']);
                 $itemTotal     = $saleItem->unit_price * $item['quantity'];
                 $refundAmount += $itemTotal;
 
@@ -205,16 +233,16 @@ class PosSaleController extends Controller
                 ];
 
                 $adjustStock->execute(
-                    productId: $item['product_id'],
+                    productId:       $item['product_id'],
                     quantityChanged: $item['quantity'],
                     transactionType: 'pos_return',
-                    userId: $request->user()->id,
-                    reference: $sale->reference,
-                    description: "Return — {$saleItem->product_name} x{$item['quantity']}",
+                    userId:          $request->user()->id,
+                    reference:       $sale->reference,
+                    description:     "Return — {$saleItem->product_name} x{$item['quantity']}",
                 );
             }
 
-            $return = PosReturn::create([
+            $posReturn = PosReturn::create([
                 'reference'        => 'RET-' . strtoupper(Str::random(8)),
                 'vendor_id'        => $sale->vendor_id,
                 'original_sale_id' => $sale->id,
@@ -226,11 +254,18 @@ class PosSaleController extends Controller
                 'reason'           => $request->reason,
             ]);
 
-            if ($sale->status !== 'refunded') {
-                $sale->update(['status' => 'refunded']);
-            }
+            // Check if ALL items from the original sale have now been fully returned
+            $totalReturned = $alreadyReturned->merge(
+                collect($returnItems)->groupBy('product_id')->map(fn ($rows) => $rows->sum('quantity'))
+            );
 
-            return $return;
+            $fullyReturned = $sale->items->every(
+                fn ($i) => ($totalReturned[$i->product_id] ?? 0) >= $i->quantity
+            );
+
+            $sale->update(['status' => $fullyReturned ? 'refunded' : 'partial_refund']);
+
+            return $posReturn;
         });
 
         return response()->json($return, 201);
@@ -242,6 +277,34 @@ class PosSaleController extends Controller
             ->where('reference', $reference)
             ->where('vendor_id', $request->query('vendor_id'))
             ->firstOrFail();
+
+        if ($sale->status === 'voided') {
+            return response()->json(['message' => 'This sale has been voided and cannot be returned.'], 422);
+        }
+
+        if ($sale->status === 'refunded') {
+            return response()->json(['message' => 'All items from this sale have already been returned.'], 422);
+        }
+
+        // Attach already-returned quantity to each item so the frontend can cap inputs
+        $alreadyReturned = PosReturn::where('original_sale_id', $sale->id)
+            ->get()
+            ->flatMap(fn ($r) => collect($r->return_items))
+            ->groupBy('product_id')
+            ->map(fn ($rows) => $rows->sum('quantity'));
+
+        $sale->items->each(function ($item) use ($alreadyReturned) {
+            $returned          = $alreadyReturned[$item->product_id] ?? 0;
+            $item->returnable  = $item->quantity - $returned;
+            $item->returned    = $returned;
+        });
+
+        // Filter out items that have nothing left to return
+        $sale->setRelation('items', $sale->items->filter(fn ($i) => $i->returnable > 0)->values());
+
+        if ($sale->items->isEmpty()) {
+            return response()->json(['message' => 'All items from this sale have already been returned.'], 422);
+        }
 
         return response()->json($sale);
     }

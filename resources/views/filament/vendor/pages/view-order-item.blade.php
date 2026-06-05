@@ -148,7 +148,7 @@
                             <x-heroicon-o-phone class="w-3.5 h-3.5"/>
                             Call
                         </a>
-                        <a href="https://wa.me/{{ preg_replace('/\D/', '', $order->customer_phone) }}"
+                        <a href="https://api.whatsapp.com/send?phone={{ preg_replace('/\D/', '', $order->customer_phone) }}"
                             target="_blank"
                             class="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors">
                             <x-heroicon-o-chat-bubble-oval-left class="w-3.5 h-3.5"/>

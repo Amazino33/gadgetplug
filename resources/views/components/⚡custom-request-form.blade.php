@@ -16,28 +16,27 @@ new class extends Component
     {
         $this->validate();
 
-        $user = auth()->user();
-        $name = $user ? $user->name : 'Guest Visitor';
+        $user  = auth()->user();
+        $name  = $user ? $user->name  : 'Guest Visitor';
         $email = $user ? $user->email : 'No email provided';
 
         ClientRequest::create([
-            'client_name' => $name,
+            'client_name'  => $name,
             'client_email' => $email,
             'request_text' => $this->clientRequest,
             'is_completed' => false,
         ]);
 
-        $token = config('services.telegram.token');
+        $token  = config('services.telegram.token');
         $chatId = config('services.telegram.chat_id');
-        
-        // Switched to HTML tags to prevent user-input crashes
-        $text = "💬 <b>New To-do Request</b>\n";
+
+        $text  = "💬 <b>New To-do Request</b>\n";
         $text .= "👤 <b>Client:</b> {$name}\n\n";
         $text .= "📝 <b>Task:</b>\n" . htmlspecialchars($this->clientRequest);
 
         $response = Http::post("https://api.telegram.org/bot{$token}/sendMessage", [
-            'chat_id' => $chatId,
-            'text' => $text,
+            'chat_id'    => $chatId,
+            'text'       => $text,
             'parse_mode' => 'HTML',
         ]);
 
@@ -45,16 +44,15 @@ new class extends Component
             $this->reset('clientRequest');
             $this->successMessage = 'Sent! We will check our inventory and get back to you.';
         } else {
-            // This will now print the EXACT error from Telegram on your screen
             $this->addError('clientRequest', 'Telegram Error: ' . $response->body());
         }
     }
 };
 ?>
 
-<div x-data="{ open: false }" style="position: fixed; bottom: 24px; right: 24px; z-index: 99999; font-family: sans-serif;">
+<div x-data="{ open: false }" class="fixed bottom-6 right-6 z-99999 font-sans">
 
-    <!-- Chat Window Panel -->
+    {{-- Chat window --}}
     <div
         x-show="open"
         x-transition:enter="transition ease-out duration-200"
@@ -63,57 +61,69 @@ new class extends Component
         x-transition:leave="transition ease-in duration-150"
         x-transition:leave-start="opacity-100 translate-y-0"
         x-transition:leave-end="opacity-0 translate-y-4"
-        style="display: none; background: white; width: 320px; border-radius: 16px; box-shadow: 0 25px 50px rgba(0,0,0,0.2); border: 1px solid #f0f0f0; margin-bottom: 16px; overflow: hidden;"
+        class="mb-4 w-80 rounded-2xl overflow-hidden shadow-2xl border border-gray-200 dark:border-[#2a3a2a] bg-white dark:bg-[#162016]"
+        style="display: none;"
     >
-        <!-- Header -->
-        <div style="background: #2563eb; padding: 16px; color: white; display: flex; justify-content: space-between; align-items: center;">
+        {{-- Header --}}
+        <div class="bg-blue-600 dark:bg-blue-700 px-4 py-3.5 flex items-center justify-between">
             <div>
-                <div style="font-weight: 700; font-size: 14px;">GadgetPlug Support</div>
-                <div style="font-size: 12px; color: #bfdbfe;">Usually replies instantly</div>
+                <p class="text-white font-bold text-sm">GadgetPlug Support</p>
+                <p class="text-blue-200 text-xs mt-0.5">Usually replies instantly</p>
             </div>
-            <button @click="open = false" style="background: none; border: none; color: white; cursor: pointer; padding: 4px;">
-                <svg style="width: 20px; height: 20px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            <button @click="open = false"
+                class="text-white/80 hover:text-white transition-colors p-1 rounded-lg hover:bg-white/10">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                 </svg>
             </button>
         </div>
 
-        <!-- Body -->
-        <div style="padding: 16px; background: #f9fafb;">
+        {{-- Body --}}
+        <div class="p-4 bg-gray-50 dark:bg-[#0d1a0d]">
             @if ($successMessage)
-                <div style="margin-bottom: 16px; padding: 12px; background: #dcfce7; border: 1px solid #4ade80; color: #166534; font-size: 14px; border-radius: 8px;">
-                    {{ $successMessage }}
+                <div class="flex items-start gap-2.5 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-xl px-4 py-3">
+                    <svg class="w-4 h-4 text-green-600 dark:text-green-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                    </svg>
+                    <p class="text-sm text-green-700 dark:text-green-400 font-medium">{{ $successMessage }}</p>
                 </div>
             @else
-                <p style="font-size: 12px; color: #6b7280; margin-bottom: 12px; text-align: center;">Send us a message below.</p>
+                <p class="text-xs text-gray-500 dark:text-[#7a9e7c] mb-3 text-center">Send us a message below.</p>
 
-                <form wire:submit="submitRequest">
-                    <div style="margin-bottom: 12px;">
+                <form wire:submit="submitRequest" class="space-y-3">
+                    <div>
                         <textarea
                             wire:model="clientRequest"
                             rows="3"
-                            style="width: 100%; font-size: 14px; border: 1px solid #d1d5db; border-radius: 8px; padding: 10px; resize: none; box-sizing: border-box; outline: none; font-family: sans-serif;"
-                            placeholder="I'm looking for..."
+                            placeholder="I'm looking for…"
+                            class="w-full text-sm rounded-xl px-3.5 py-2.5 resize-none outline-none font-sans
+                                   bg-white dark:bg-[#162016]
+                                   border border-gray-200 dark:border-[#2a3a2a]
+                                   text-gray-800 dark:text-[#e8f5e9]
+                                   placeholder:text-gray-400 dark:placeholder:text-[#4a6a4c]
+                                   focus:border-blue-500 dark:focus:border-blue-500
+                                   transition-colors"
                         ></textarea>
 
                         @error('clientRequest')
-                            <span style="color: #ef4444; font-size: 12px; margin-top: 4px; display: block;">{{ $message }}</span>
+                            <p class="text-red-500 dark:text-red-400 text-xs mt-1">{{ $message }}</p>
                         @enderror
                     </div>
 
                     <button
                         type="submit"
-                        style="width: 100%; background: #2563eb; color: white; font-weight: 700; padding: 10px 16px; border-radius: 8px; border: none; cursor: pointer; font-size: 14px; display: flex; justify-content: center; align-items: center;"
                         wire:loading.attr="disabled"
                         wire:target="submitRequest"
+                        class="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60
+                               text-white font-bold text-sm px-4 py-2.5 rounded-xl border-none cursor-pointer transition-colors"
                     >
                         <span wire:loading.remove wire:target="submitRequest">Send Message</span>
-                        <span wire:loading wire:target="submitRequest">
-                            <svg style="animation: spin 1s linear infinite; width: 16px; height: 16px; margin-right: 8px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle style="opacity: 0.25;" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path style="opacity: 0.75;" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        <span wire:loading wire:target="submitRequest" class="flex items-center gap-2">
+                            <svg class="w-4 h-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
                             </svg>
-                            Sending...
+                            Sending…
                         </span>
                     </button>
                 </form>
@@ -121,25 +131,19 @@ new class extends Component
         </div>
     </div>
 
-    <!-- Floating Toggle Button -->
+    {{-- Floating toggle button --}}
     <button
         @click="open = !open"
-        style="background: #2563eb; color: white; border-radius: 9999px; padding: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; margin-left: auto; transition: transform 0.2s;"
-        onmouseover="this.style.transform='scale(1.05)'"
-        onmouseout="this.style.transform='scale(1)'"
+        class="ml-auto flex items-center justify-center w-14 h-14 rounded-full
+               bg-blue-600 hover:bg-blue-700 active:scale-95
+               text-white shadow-xl border-none cursor-pointer transition-all duration-200"
     >
-        <svg x-show="!open" style="width: 24px; height: 24px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>
+        <svg x-show="!open" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
         </svg>
-        <svg x-show="open" style="display: none; width: 24px; height: 24px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        <svg x-show="open" style="display:none;" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
         </svg>
     </button>
 
-    <style>
-        @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
-    </style>
 </div>

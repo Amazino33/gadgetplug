@@ -1,15 +1,13 @@
 <?php
 
 use App\Http\Controllers\Payment\PaystackCallbackController;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Session;
-use App\Models\Order;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
 use Livewire\Volt\Volt;
 
 Volt::route('/', 'pages.product-catalog')->name('home');
+Volt::route('/track', 'pages.track-order')->name('track-order');
+Route::view('/privacy-policy', 'pages.privacy-policy')->name('privacy-policy');
 Volt::route('/product/{product:slug}', 'pages.product-detail')->name('product.show');
 Volt::route('/cart', 'pages.cart')->name('cart');
 Volt::route('/checkout', 'checkout')->name('checkout');

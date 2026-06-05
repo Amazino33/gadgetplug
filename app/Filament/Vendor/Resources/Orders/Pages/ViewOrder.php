@@ -28,7 +28,7 @@ class ViewOrder extends ViewRecord
                 ->label('WhatsApp')
                 ->icon('heroicon-o-chat-bubble-oval-left')
                 ->color('success')
-                ->url(fn () => 'https://wa.me/' . preg_replace('/\D/', '', $this->record->customer_phone))
+                ->url(fn () => 'https://api.whatsapp.com/send?phone=' . preg_replace('/\D/', '', $this->record->customer_phone))
                 ->openUrlInNewTab(),
 
             Action::make('updateStatus')
