@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Policies;
 
+use App\Models\Vendor;
 use Illuminate\Foundation\Auth\User as AuthUser;
 use Spatie\Permission\Models\Role;
 use Illuminate\Auth\Access\HandlesAuthorization;
@@ -11,35 +12,48 @@ use Illuminate\Auth\Access\HandlesAuthorization;
 class RolePolicy
 {
     use HandlesAuthorization;
-    
+
+    private function isVendorOwnerOrManager(AuthUser $user): bool
+    {
+        $vendor = filament()->hasTenancy() ? filament()->getTenant() : null;
+
+        if (! $vendor instanceof Vendor) {
+            return false;
+        }
+
+        return $user->isSuperAdmin()
+            || $vendor->isOwner($user)
+            || $user->hasVendorRole($vendor->id, ['inventory_manager']);
+    }
+
     public function viewAny(AuthUser $authUser): bool
     {
-        return $authUser->can('ViewAny:Role');
+        return $this->isVendorOwnerOrManager($authUser) || $authUser->can('ViewAny:Role');
     }
 
     public function view(AuthUser $authUser, Role $role): bool
     {
-        return $authUser->can('View:Role');
+        return $this->isVendorOwnerOrManager($authUser) || $authUser->can('View:Role');
     }
 
     public function create(AuthUser $authUser): bool
     {
-        return $authUser->can('Create:Role');
+        return $this->isVendorOwnerOrManager($authUser) || $authUser->can('Create:Role');
     }
 
     public function update(AuthUser $authUser, Role $role): bool
     {
-        return $authUser->can('Update:Role');
+        return $this->isVendorOwnerOrManager($authUser) || $authUser->can('Update:Role');
     }
 
     public function delete(AuthUser $authUser, Role $role): bool
     {
-        return $authUser->can('Delete:Role');
+        return $this->isVendorOwnerOrManager($authUser) || $authUser->can('Delete:Role');
     }
 
     public function deleteAny(AuthUser $authUser): bool
     {
-        return $authUser->can('DeleteAny:Role');
+        return $this->isVendorOwnerOrManager($authUser) || $authUser->can('DeleteAny:Role');
     }
 
     public function restore(AuthUser $authUser, Role $role): bool

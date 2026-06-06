@@ -7,7 +7,7 @@
                     <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Member</th>
                     <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Email</th>
                     <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Role</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Permissions</th>
+                    <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Shield Role</th>
                     <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Actions</th>
                 </tr>
             </thead>
@@ -39,8 +39,8 @@
                 @forelse($members as $member)
                     @php
                         setPermissionsTeamId(filament()->getTenant()->id);
-                        $memberPermissions = $member->getAllPermissions();
-                        $role = $member->pivot->role ?? 'member';
+                        $shieldRole = $member->roles->first();
+                        $storeRole  = $member->pivot->role ?? 'member';
                     @endphp
                     <tr class="hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
                         <td class="px-4 py-3 font-medium text-gray-900 dark:text-white">
@@ -51,19 +51,17 @@
                         </td>
                         <td class="px-4 py-3">
                             <x-filament::badge color="gray">
-                                {{ ucwords(str_replace('_', ' ', $role)) }}
+                                {{ ucwords(str_replace('_', ' ', $storeRole)) }}
                             </x-filament::badge>
                         </td>
                         <td class="px-4 py-3">
-                            <div class="flex flex-wrap gap-1">
-                                @forelse($memberPermissions as $permission)
-                                    <x-filament::badge color="info" size="sm">
-                                        {{ str_replace('_', ' ', $permission->name) }}
-                                    </x-filament::badge>
-                                @empty
-                                    <span class="text-xs text-gray-400 dark:text-gray-500">—</span>
-                                @endforelse
-                            </div>
+                            @if($shieldRole)
+                                <x-filament::badge color="primary">
+                                    {{ \Illuminate\Support\Str::headline($shieldRole->name) }}
+                                </x-filament::badge>
+                            @else
+                                <span class="text-xs text-gray-400 dark:text-gray-500">—</span>
+                            @endif
                         </td>
                         <td class="px-4 py-3">
                             <button

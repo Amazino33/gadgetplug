@@ -3,6 +3,7 @@
 namespace App\Providers\Filament;
 
 use App\Models\Vendor;
+use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -65,6 +66,10 @@ class VendorPanelProvider extends PanelProvider
                     ->icon('heroicon-o-computer-desktop')
                     ->group('Store')
                     ->sort(99),
+            ])
+            ->plugins([
+                FilamentShieldPlugin::make()
+                    ->navigationGroup('Settings'),
             ])
             ->databaseNotifications()
             ->databaseNotificationsPolling('30s')
