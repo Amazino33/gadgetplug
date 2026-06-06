@@ -62,4 +62,14 @@ class RoleResource extends ShieldRoleResource
 
         return parent::getEloquentQuery()->where('team_id', $vendorId);
     }
+
+    public static function getPages(): array
+    {
+        return [
+            'index'  => Pages\ListRoles::route('/'),
+            'create' => Pages\CreateRole::route('/create'),
+            'view'   => Pages\ViewRole::route('/{record}'),
+            'edit'   => Pages\EditRole::route('/{record}/edit'),
+        ];
+    }
 }
