@@ -21,16 +21,18 @@ class EnsureUserBelongsToVendor
             return $next($request);
         }
 
-        if ($user->hasRole('super_admin') || $vendor->isOwner($user)) {
+        // isSuperAdmin() does a raw DB check — hasRole() is team-scoped and
+        // would miss the global (team_id = NULL) super_admin role here.
+        if ($user->isSuperAdmin()) {
+            setPermissionsTeamId(null);
             return $next($request);
         }
 
-        if (!$vendor->users()->where('user_id', $user->id)->exists()) {
-            abort(403, 'You do not have access to this vendor.');
+        if ($vendor->isOwner($user) || $vendor->users()->where('user_id', $user->id)->exists()) {
+            setPermissionsTeamId($vendor->id);
+            return $next($request);
         }
 
-        setPermissionsTeamId($vendor->id);
-
-        return $next($request);
+        abort(403, 'You do not have access to this vendor.');
     }
 }

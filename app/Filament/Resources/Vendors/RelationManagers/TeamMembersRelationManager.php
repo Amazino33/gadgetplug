@@ -3,10 +3,10 @@
 namespace App\Filament\Resources\Vendors\RelationManagers;
 
 use App\Models\User;
+use Filament\Actions\Action;
+use Filament\Actions\DetachAction;
 use Filament\Forms\Components\Select;
 use Filament\Resources\RelationManagers\RelationManager;
-use Filament\Tables\Actions\Action;
-use Filament\Tables\Actions\DetachAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Spatie\Permission\Models\Role;

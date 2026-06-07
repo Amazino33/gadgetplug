@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Vendors\Tables;
 
+use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -63,6 +64,12 @@ class VendorsTable
                 TernaryFilter::make('is_verified')->label('Verified'),
             ])
             ->recordActions([
+                Action::make('open_panel')
+                    ->label('Open Panel')
+                    ->icon('heroicon-o-arrow-top-right-on-square')
+                    ->color('gray')
+                    ->url(fn ($record) => route('filament.vendor.home', ['tenant' => $record->slug]))
+                    ->openUrlInNewTab(),
                 EditAction::make(),
             ])
             ->toolbarActions([

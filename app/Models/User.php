@@ -113,11 +113,19 @@ class User extends Authenticatable implements HasTenants, FilamentUser
 
     public function getTenants(Panel $panel): Collection
     {
+        if ($this->isSuperAdmin()) {
+            return Vendor::all();
+        }
+
         return $this->vendors();
     }
 
     public function canAccessTenant(Model $tenant): bool
     {
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
         return $this->vendors()->contains($tenant);
     }
 
