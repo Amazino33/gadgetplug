@@ -14,51 +14,21 @@ class RoleResource extends ShieldRoleResource
         return false;
     }
 
-    private static function isVendorOwnerOrManager(): bool
-    {
-        $vendor = filament()->getTenant();
-        $user   = auth()->user();
-
-        return $vendor && (
-            $user->isSuperAdmin() ||
-            $vendor->isOwner($user) ||
-            $user->hasVendorRole($vendor->id, ['inventory_manager'])
-        );
-    }
-
-    public static function canAccess(): bool
-    {
-        return static::isVendorOwnerOrManager();
-    }
-
-    public static function canViewAny(): bool
-    {
-        return static::isVendorOwnerOrManager();
-    }
-
-    public static function canCreate(): bool
-    {
-        return static::isVendorOwnerOrManager();
-    }
-
-    public static function canEdit($record): bool
-    {
-        return static::isVendorOwnerOrManager();
-    }
-
-    public static function canDelete($record): bool
-    {
-        return static::isVendorOwnerOrManager();
-    }
-
-    public static function canDeleteAny(): bool
-    {
-        return static::isVendorOwnerOrManager();
-    }
+    public static function canAccess(): bool   { return auth()->user()->isSuperAdmin(); }
+    public static function canViewAny(): bool  { return auth()->user()->isSuperAdmin(); }
+    public static function canCreate(): bool   { return auth()->user()->isSuperAdmin(); }
+    public static function canEdit($record): bool   { return auth()->user()->isSuperAdmin(); }
+    public static function canDelete($record): bool { return auth()->user()->isSuperAdmin(); }
+    public static function canDeleteAny(): bool     { return auth()->user()->isSuperAdmin(); }
 
     public static function getEloquentQuery(): Builder
     {
         $vendorId = filament()->getTenant()?->id;
+
+        // Abort with empty result rather than leaking global (team_id = NULL) roles
+        if (! $vendorId) {
+            return parent::getEloquentQuery()->whereRaw('0 = 1');
+        }
 
         return parent::getEloquentQuery()->where('team_id', $vendorId);
     }
