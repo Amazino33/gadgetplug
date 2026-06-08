@@ -55,6 +55,13 @@ class PosSessionController extends Controller
 
     public function close(Request $request, PosSession $session): JsonResponse
     {
+        $user   = $request->user();
+        $vendor = \App\Models\Vendor::find($session->vendor_id);
+
+        if (! $vendor?->isOwner($user) && ! $user->hasVendorRole($session->vendor_id, ['store_admin', 'order_manager', 'inventory_manager'])) {
+            return response()->json(['message' => 'Insufficient permissions to close a session.'], 403);
+        }
+
         $request->validate(['cash_counted' => 'nullable|numeric|min:0']);
 
         $report = DB::transaction(function () use ($request, $session) {

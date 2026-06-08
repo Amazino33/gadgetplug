@@ -31,6 +31,12 @@ class VendorPermissionsSeeder extends Seeder
             'invite_team_members',
             'edit_team_members',
             'remove_team_members',
+
+            // POS
+            'access_pos',
+            'void_sale',
+            'process_return',
+            'close_pos_session',
         ];
 
         foreach ($permissions as $permission) {

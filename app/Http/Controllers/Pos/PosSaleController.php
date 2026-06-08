@@ -146,6 +146,13 @@ class PosSaleController extends Controller
 
     public function void(Request $request, PosSale $sale, AdjustStockAction $adjustStock): JsonResponse
     {
+        $user   = $request->user();
+        $vendor = \App\Models\Vendor::find($sale->vendor_id);
+
+        if (! $vendor?->isOwner($user) && ! $user->hasVendorRole($sale->vendor_id, ['store_admin', 'order_manager', 'inventory_manager'])) {
+            return response()->json(['message' => 'Insufficient permissions to void a sale.'], 403);
+        }
+
         if ($sale->status !== 'completed') {
             return response()->json(['message' => 'Only completed sales can be voided.'], 422);
         }
@@ -175,6 +182,13 @@ class PosSaleController extends Controller
 
     public function processReturn(Request $request, PosSale $sale, AdjustStockAction $adjustStock): JsonResponse
     {
+        $user   = $request->user();
+        $vendor = \App\Models\Vendor::find($sale->vendor_id);
+
+        if (! $vendor?->isOwner($user) && ! $user->hasVendorRole($sale->vendor_id, ['store_admin', 'order_manager', 'inventory_manager'])) {
+            return response()->json(['message' => 'Insufficient permissions to process a return.'], 403);
+        }
+
         if ($sale->status === 'voided') {
             return response()->json(['message' => 'Voided sales cannot be returned.'], 422);
         }

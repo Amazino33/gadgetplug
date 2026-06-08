@@ -65,7 +65,9 @@ class VendorPanelProvider extends PanelProvider
                     ->url(fn (): string => url('/pos/' . (filament()->getTenant()?->slug ?? '')))
                     ->icon('heroicon-o-computer-desktop')
                     ->group('Store')
-                    ->sort(99),
+                    ->sort(99)
+                    ->visible(fn () => auth()->user()?->isSuperAdmin()
+                        || auth()->user()?->hasPermissionTo('access_pos')),
             ])
             ->plugins([
                 FilamentShieldPlugin::make()
