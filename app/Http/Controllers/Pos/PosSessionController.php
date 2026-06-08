@@ -37,6 +37,11 @@ class PosSessionController extends Controller
             'status'        => 'open',
         ]);
 
+        activity()->causedBy($request->user())
+            ->withProperties(['terminal' => $session->terminal_id, 'opening_float' => $session->opening_float])
+            ->tap(fn ($a) => $a->vendor_id = $session->vendor_id)
+            ->log('Opened POS session');
+
         return response()->json($session, 201);
     }
 
@@ -117,10 +122,19 @@ class PosSessionController extends Controller
             return $report;
         });
 
+        activity()->causedBy($request->user())
+            ->withProperties([
+                'total_sales'  => $report->total_sales,
+                'cash_counted' => $report->cash_counted,
+                'variance'     => $report->cash_variance,
+            ])
+            ->tap(fn ($a) => $a->vendor_id = $session->vendor_id)
+            ->log('Closed POS session');
+
         return response()->json($report);
     }
 
-    public function zReport(Request $request, PosSession $session): JsonResponse
+    public function zReport(PosSession $session): JsonResponse
     {
         $report = $session->zReport;
 

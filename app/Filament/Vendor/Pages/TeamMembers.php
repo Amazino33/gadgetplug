@@ -172,6 +172,11 @@ class TeamMembers extends Page
                 $user->syncRoles([$roleId]);
             }
 
+            activity()->causedBy(auth()->user())
+                ->withProperties(['email' => $email])
+                ->tap(fn ($a) => $a->vendor_id = $vendor->id)
+                ->log("Added {$user->name} to the team");
+
             Notification::make()->title('Member added successfully')->success()->send();
         } else {
             $token = Str::random(32);
@@ -183,6 +188,11 @@ class TeamMembers extends Page
             ], now()->addDays(7));
 
             Mail::to($email)->send(new \App\Mail\VendorInviteMail($vendor, $token, $email));
+
+            activity()->causedBy(auth()->user())
+                ->withProperties(['email' => $email])
+                ->tap(fn ($a) => $a->vendor_id = $vendor->id)
+                ->log("Invited {$email} to the team");
 
             Notification::make()->title('Invite sent to ' . $email)->success()->send();
         }
@@ -202,6 +212,13 @@ class TeamMembers extends Page
         } else {
             $member->syncRoles([]);
         }
+
+        $roleName = $roleId ? \Spatie\Permission\Models\Role::find($roleId)?->name : 'none';
+        activity()->causedBy(auth()->user())
+            ->performedOn($member)
+            ->withProperties(['role' => $roleName])
+            ->tap(fn ($a) => $a->vendor_id = $vendor->id)
+            ->log("Assigned role \"{$roleName}\" to {$member->name}");
 
         Notification::make()->title('Role assigned to ' . $member->name)->success()->send();
         $this->dispatch('$refresh');
@@ -223,6 +240,12 @@ class TeamMembers extends Page
             $member->syncRoles([]);
             $member->syncPermissions([]);
             $vendor->users()->detach($userId);
+
+            activity()->causedBy($user)
+                ->withProperties(['removed_user' => $member->name])
+                ->tap(fn ($a) => $a->vendor_id = $vendor->id)
+                ->log("Removed {$member->name} from the team");
+
             Notification::make()->title('Member removed')->success()->send();
         }
 

@@ -171,6 +171,11 @@ class PosSaleController extends Controller
 
             $sale->update(['status' => 'voided']);
 
+            activity()->causedBy($request->user())
+                ->performedOn($sale)
+                ->tap(fn ($a) => $a->vendor_id = $sale->vendor_id)
+                ->log("Voided sale {$sale->reference}");
+
             if ($sale->customer_id) {
                 PosCustomer::where('id', $sale->customer_id)->decrement('total_spent', $sale->total);
                 PosCustomer::where('id', $sale->customer_id)->decrement('total_transactions');
@@ -278,6 +283,12 @@ class PosSaleController extends Controller
             );
 
             $sale->update(['status' => $fullyReturned ? 'refunded' : 'partial_refund']);
+
+            activity()->causedBy($request->user())
+                ->performedOn($sale)
+                ->withProperties(['refund_amount' => $refundAmount, 'reference' => $posReturn->reference])
+                ->tap(fn ($a) => $a->vendor_id = $sale->vendor_id)
+                ->log("Processed return {$posReturn->reference} for sale {$sale->reference}");
 
             return $posReturn;
         });
