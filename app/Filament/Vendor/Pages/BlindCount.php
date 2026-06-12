@@ -39,10 +39,7 @@ class BlindCount extends Page
         $user   = auth()->user();
         $vendor = filament()->getTenant();
         if ($vendor->isOwner($user)) return false;
-        return $user->memberVendors()
-            ->where('vendor_id', $vendor->id)
-            ->wherePivotIn('role', ['storekeeper'])
-            ->exists();
+        return $user->hasVendorRole($vendor->id, ['storekeeper']);
     }
 
     public function canReset(): bool

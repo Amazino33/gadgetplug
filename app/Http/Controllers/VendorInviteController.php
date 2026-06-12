@@ -57,7 +57,7 @@ class VendorInviteController extends Controller
 
         // Attach to vendor
         if (!$vendor->users()->where('user_id', $user->id)->exists()) {
-            $vendor->users()->attach($user->id, ['role' => 'member']);
+            $vendor->users()->attach($user->id);
         }
 
         // Assign permissions scoped to this vendor

@@ -35,10 +35,13 @@ class VendorSeeder extends Seeder
             'storekeeper@gadgetplug.com' => 'storekeeper',
         ];
 
+        setPermissionsTeamId($vendor->id);
+
         foreach ($teamRoles as $email => $role) {
             $user = User::where('email', $email)->first();
             if ($user && ! $vendor->users()->where('user_id', $user->id)->exists()) {
-                $vendor->users()->attach($user->id, ['role' => $role]);
+                $vendor->users()->attach($user->id);
+                $user->assignRole($role);
             }
         }
     }

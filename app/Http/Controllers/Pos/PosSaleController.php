@@ -347,9 +347,9 @@ class PosSaleController extends Controller
         $manager = User::whereNotNull('pos_pin')
             ->where(fn ($q) => $q
                 ->whereHas('ownedVendors', fn ($q) => $q->where('vendors.id', $request->vendor_id))
-                ->orWhereHas('memberVendors', fn ($q) => $q
-                    ->where('vendors.id', $request->vendor_id)
-                    ->wherePivotIn('role', ['owner', 'inventory_manager'])
+                ->orWhereHas('roles', fn ($q)=> $q
+                    ->where('name', 'inventory_manager')
+                    ->where('team_id', $request->vendor_id)
                 )
             )
             ->get()

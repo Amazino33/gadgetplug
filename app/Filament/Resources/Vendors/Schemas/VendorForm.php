@@ -24,6 +24,9 @@ class VendorForm
                 ->helperText('Use lowercase letters and dashes (e.g., supreme-gadgets)'),
             Toggle::make('is_verified')
                 ->default(true),
+            Toggle::make('owner_can_manage_roles')
+                ->label('Allow owner to manage roles')
+                ->helperText('Grants the vendor owner access to create and assign roles for their team.'),
         ]);
     }
 }

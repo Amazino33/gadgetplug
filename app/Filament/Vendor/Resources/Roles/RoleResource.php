@@ -7,19 +7,36 @@ use Illuminate\Database\Eloquent\Builder;
 
 class RoleResource extends ShieldRoleResource
 {
-    // We scope via team_id in getEloquentQuery(); Filament's relationship-based
-    // tenant scoping would look for a non-existent 'vendors' relation on Role.
     public static function isScopedToTenant(): bool
     {
         return false;
     }
 
-    public static function canAccess(): bool   { return auth()->user()->isSuperAdmin(); }
-    public static function canViewAny(): bool  { return auth()->user()->isSuperAdmin(); }
-    public static function canCreate(): bool   { return auth()->user()->isSuperAdmin(); }
-    public static function canEdit($record): bool   { return auth()->user()->isSuperAdmin(); }
-    public static function canDelete($record): bool { return auth()->user()->isSuperAdmin(); }
-    public static function canDeleteAny(): bool     { return auth()->user()->isSuperAdmin(); }
+    private static function canManage(): bool
+    {
+        $user = auth()->user();
+        $vendor = filament()->getTenant();
+
+        return $user->isSuperAdmin() || ($vendor?->isOwner($user) && $vendor->owner_can_manage_roles);
+    }
+    public static function canAccess(): bool   {
+        return static::canManage();
+    }
+    public static function canViewAny(): bool  {
+        return static::canManage();
+    }
+    public static function canCreate(): bool   {
+        return static::canManage();
+    }
+    public static function canEdit($record): bool   {
+        return static::canManage();
+    }
+    public static function canDelete($record): bool {
+        return static::canManage();
+    }
+    public static function canDeleteAny(): bool     {
+        return static::canManage();
+    }
 
     public static function getEloquentQuery(): Builder
     {

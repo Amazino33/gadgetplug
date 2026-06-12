@@ -15,7 +15,7 @@ class Vendor extends Model
     protected $fillable = [
         'user_id', 'name', 'slug', 'logo', 'is_verified',
         'description', 'whatsapp', 'bank_name', 'account_number', 'account_name',
-        'pos_vat_enabled', 'pos_vat_rate', 'pos_blind_count_participants',
+        'pos_vat_enabled', 'pos_vat_rate', 'pos_blind_count_participants', 'owner_can_manage_roles'
     ];
 
     public function getSlugOptions(): SlugOptions
@@ -42,7 +42,6 @@ class Vendor extends Model
     public function users()
     {
         return $this->belongsToMany(User::class, 'vendor_users')
-            ->withPivot('role')
             ->withTimestamps();
     }
 
@@ -59,14 +58,6 @@ class Vendor extends Model
     public function isOwner(User $user): bool
     {
         return $this->user_id === $user->id;
-    }
-
-    public function hasAnyRole(User $user, array $roles): bool
-    {
-        return $this->users()
-            ->where('user_id', $user->id)
-            ->wherePivotIn('role', $roles)
-            ->exists();
     }
 
     public function canAccess(User $user): bool

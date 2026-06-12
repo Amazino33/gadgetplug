@@ -99,7 +99,6 @@ class User extends Authenticatable implements HasTenants, FilamentUser
     public function memberVendors()
     {
         return $this->belongsToMany(Vendor::class, 'vendor_users')
-            ->withPivot('role')
             ->withTimestamps();
     }
 
@@ -129,20 +128,18 @@ class User extends Authenticatable implements HasTenants, FilamentUser
         return $this->vendors()->contains($tenant);
     }
 
-    // Check if this user has a specific role within a vendor (checks pivot + owner)
     public function hasVendorRole(int $vendorId, array|string $roles): bool
     {
         $roles = (array) $roles;
 
-        // Vendor owner has all roles implicitly
         if ($this->ownedVendors()->where('id', $vendorId)->exists()) {
             return true;
         }
 
-        return $this->memberVendors()
-            ->where('vendor_id', $vendorId)
-            ->wherePivotIn('role', $roles)
-            ->exists();
+        setPermissionsTeamId($vendorId);
+        $this->unsetRelation('roles');
+
+        return $this->hasAnyRole($roles);
     }
 
     public function orders()
@@ -162,16 +159,14 @@ class User extends Authenticatable implements HasTenants, FilamentUser
 
     public function canAccessPanel(Panel $panel): bool
     {
-        // 1. Admin Panel Access (Only for users with the super_admin role)
-        // if ($panel->getId() === 'admin') {
-        //     return $this->hasRole('super_admin');
-        // }
+        if ($panel->getId() === 'admin') {
+            return $this->isSuperAdmin();
+        }
 
-        // // 2. Vendor Panel Access (Admins and Vendors can access)
-        // if ($panel->getId() === 'vendor') {
-        //     return $this->hasAnyRole(['super_admin', 'vendor']);
-        // }
+        if ($panel->getId() === 'vendor') {
+            return $this->isSuperAdmin() || $this->vendors()->isNotEmpty();
+        }
 
-        return true;
+        return false;
     }
 }
