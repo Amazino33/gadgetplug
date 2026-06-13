@@ -66,8 +66,15 @@ class VendorPanelProvider extends PanelProvider
                     ->icon('heroicon-o-computer-desktop')
                     ->group('Store')
                     ->sort(99)
-                    ->visible(fn () => auth()->user()?->isSuperAdmin()
-                        || auth()->user()?->hasPermissionTo('access_pos')),
+                    ->visible(function () {
+                        $user = auth()->user();
+                        $vendor = filament()->getTenant();
+                        if (! $user || ! $vendor) return false;
+                        if ($user->isSuperAdmin()) return true;
+                        setPermissionsTeamId($vendor->id);
+                        $user->unsetRelation('roles');
+                        return $user->hasPermissionTo('access_pos');
+                    }),
             ])
             ->plugins([
                 FilamentShieldPlugin::make()
