@@ -155,4 +155,16 @@ class StoreProfile extends Page
             ->success()
             ->send();
     }
+
+    public static function canAccess(): bool
+    {
+        $user = auth()->user();
+        $vendor = filament()->getTenant();
+
+        return $vendor && (
+            $user->isSuperAdmin() ||
+            $vendor->isOwner($user) ||
+            $user->hasVendorRole($vendor->id, ['store_admin'])
+        );
+    }
 }

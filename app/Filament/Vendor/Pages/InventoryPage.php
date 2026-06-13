@@ -40,4 +40,16 @@ class InventoryPage extends Page
     {
         return 1;
     }
+
+    public static function canAccess(): bool
+    {
+        $user = auth()->user();
+        $vendor = filament()->getTenant();
+
+        return $vendor && (
+            $user->isSuperAdmin() ||
+            $vendor->isOwner($user) ||
+            $user->hasVendorRole($vendor->id, ['inventory_manager', 'storekeeper', 'store_admin'])
+        );
+    }
 }

@@ -196,4 +196,15 @@ class PayoutsPage extends Page implements HasTable
             ->success()
             ->send();
     }
+
+    public static function canAccess(): bool 
+    {
+        $user = auth()->user();
+        $vendor = filament()->getTenant();
+
+        return $vendor && (
+            $user->isSuperAdmin() ||
+            $vendor->isOwner($user)
+        );
+    }
 }
