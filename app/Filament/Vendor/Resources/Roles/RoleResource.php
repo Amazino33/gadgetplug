@@ -45,7 +45,7 @@ class RoleResource extends ShieldRoleResource
 
     public static function form(Schema $schema): Schema
     {
-        return $schema->components([
+        return $schema->columns(1)->components([
             TextInput::make('name')
                 ->label('Role Name')
                 ->required()
@@ -73,7 +73,7 @@ class RoleResource extends ShieldRoleResource
                 ->getOptionLabelFromRecordUsing(fn ($record) => Str::headline($record->name))
                 ->bulkToggleable()
                 ->columns(3),
-        ])->column(1);
+        ]);
     }
 
     public static function getEloquentQuery(): Builder
