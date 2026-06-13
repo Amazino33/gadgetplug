@@ -29,7 +29,7 @@ class ProcurementResource extends Resource
 
         $user   = auth()->user();
         $vendor = filament()->getTenant();
-        return $vendor && $user->hasVendorRole($vendor->id, ['owner', 'inventory_manager', 'storekeeper']);
+        return $vendor && $user->hasVendorPermission($vendor->id, 'view_any_products');
     }
 
     // Storekeepers can only create; owners/managers can also view all statuses
@@ -37,7 +37,7 @@ class ProcurementResource extends Resource
     {
         $user   = auth()->user();
         $vendor = filament()->getTenant();
-        return $vendor && $user->hasVendorRole($vendor->id, ['owner', 'inventory_manager', 'storekeeper']);
+        return $vendor && $user->hasVendorPermission($vendor->id, 'create_products');
     }
 
     public static function canEdit($record): bool   { return false; }

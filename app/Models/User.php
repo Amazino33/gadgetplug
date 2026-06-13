@@ -142,6 +142,18 @@ class User extends Authenticatable implements HasTenants, FilamentUser
         return $this->hasAnyRole($roles);
     }
 
+    public function hasVendorPermission(int $vendorId, string|array $permission): bool 
+    {
+        if ($this->ownedVendors()->where('id', $vendorId)->exists()) {
+            return true;
+        }
+
+        setPermissionsTeamId($vendorId);
+        $this->unsetRelation('roles');
+
+        return $this->hasAnyPermission((array) $permission);
+    }
+
     public function orders()
     {
         return $this->hasMany(Order::class);

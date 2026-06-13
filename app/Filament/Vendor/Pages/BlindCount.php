@@ -30,7 +30,7 @@ class BlindCount extends Page
     {
         $user   = auth()->user();
         $vendor = filament()->getTenant();
-        return $vendor && $user->hasVendorRole($vendor->id, ['owner', 'inventory_manager', 'storekeeper']);
+        return $vendor && $user->hasVendorPermission($vendor->id, 'view_any_products');
     }
 
     // Owners and inventory_managers observe; only storekeepers physically count
@@ -46,7 +46,7 @@ class BlindCount extends Page
     {
         $user   = auth()->user();
         $vendor = filament()->getTenant();
-        return $user->isSuperAdmin() || $user->hasVendorRole($vendor->id, ['owner', 'inventory_manager']);
+        return $user->isSuperAdmin() || $user->hasVendorPermission($vendor->id, 'edit_products');
     }
 
     // ── Livewire state ────────────────────────────────────────────────────────

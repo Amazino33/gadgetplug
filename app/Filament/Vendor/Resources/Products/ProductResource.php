@@ -60,7 +60,7 @@ class ProductResource extends Resource
         $user   = auth()->user();
         return $vendor && (
             $user->isSuperAdmin() ||
-            $user->hasVendorRole($vendor->id, ['owner', 'product_manager', 'member'])
+            $user->hasVendorPermission($vendor->id, 'view_any_products')
         );
     }
 
@@ -70,7 +70,7 @@ class ProductResource extends Resource
         $user   = auth()->user();
         return $vendor && (
             $user->isSuperAdmin() ||
-            $user->hasVendorRole($vendor->id, ['owner', 'product_manager'])
+            $user->hasVendorPermission($vendor->id, 'create_products')
         );
     }
 
@@ -80,7 +80,7 @@ class ProductResource extends Resource
         $user   = auth()->user();
         return $vendor && (
             $user->isSuperAdmin() ||
-            $user->hasVendorRole($vendor->id, ['owner', 'product_manager'])
+            $user->hasVendorPermission($vendor->id, 'edit_products')
         );
     }
 
@@ -90,7 +90,8 @@ class ProductResource extends Resource
         $user   = auth()->user();
         return $vendor && (
             $user->isSuperAdmin() ||
-            $vendor->isOwner($user)
+            $vendor->isOwner($user) ||
+            $user->hasVendorPermission($vendor->id, 'delete_products')
         );
     }
 

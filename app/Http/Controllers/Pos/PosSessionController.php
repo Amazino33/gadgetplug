@@ -63,7 +63,7 @@ class PosSessionController extends Controller
         $user   = $request->user();
         $vendor = \App\Models\Vendor::find($session->vendor_id);
 
-        if (! $vendor?->isOwner($user) && ! $user->hasVendorRole($session->vendor_id, ['store_admin', 'order_manager', 'inventory_manager'])) {
+        if (! $vendor?->isOwner($user) && ! $user->hasVendorPermission($session->vendor_id, 'close_pos_session')) {
             return response()->json(['message' => 'Insufficient permissions to close a session.'], 403);
         }
 

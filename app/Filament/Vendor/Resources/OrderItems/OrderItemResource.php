@@ -66,7 +66,7 @@ class OrderItemResource extends Resource
 
         return $user->isSuperAdmin()
             || $vendor->isOwner($user)
-            || $user->hasVendorRole($vendor->id, ['order_manager', 'member']);
+            || $user->hasVendorPermission($vendor->id, 'view_any_order_items');
     }
 
     private static function isAuthorized(): bool
@@ -76,7 +76,7 @@ class OrderItemResource extends Resource
         return $vendor && (
             $user->isSuperAdmin() ||
             $vendor->isOwner($user) ||
-            $user->hasVendorRole($vendor->id, ['order_manager', 'member'])
+            $user->hasVendorPermission($vendor->id, 'view_any_order_items')
         );
     }
 
@@ -87,7 +87,16 @@ class OrderItemResource extends Resource
 
     public static function getEditAuthorizationResponse(Model $record): Response
     {
-        return static::isAuthorized() ? Response::allow() : Response::deny();
+        $user = auth()->user();
+        $vendor = filament()->getTenant();
+
+        $allowed = $vendor && (
+            $user->isSuperAdmin() ||
+            $vendor->isOwner($user) ||
+            $user->hasVendorPermission($vendor->id, 'edit_order_items')
+        );
+
+        return $allowed ? Response::allow() : Response::deny();
     }
 
     public static function getDeleteAuthorizationResponse(Model $record): Response

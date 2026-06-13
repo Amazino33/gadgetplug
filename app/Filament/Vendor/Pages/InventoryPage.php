@@ -49,7 +49,7 @@ class InventoryPage extends Page
         return $vendor && (
             $user->isSuperAdmin() ||
             $vendor->isOwner($user) ||
-            $user->hasVendorRole($vendor->id, ['inventory_manager', 'storekeeper', 'store_admin'])
+            $user->hasVendorPermission($vendor->id, 'view_any_products')
         );
     }
 }

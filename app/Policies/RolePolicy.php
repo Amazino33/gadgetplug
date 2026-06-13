@@ -23,7 +23,7 @@ class RolePolicy
 
         return $user->isSuperAdmin()
             || $vendor->isOwner($user)
-            || $user->hasVendorRole($vendor->id, ['inventory_manager']);
+            || $user->hasVendorPermission($vendor->id, 'edit_vendor');
     }
 
     public function viewAny(AuthUser $authUser): bool

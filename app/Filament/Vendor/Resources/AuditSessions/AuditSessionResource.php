@@ -35,7 +35,7 @@ class AuditSessionResource extends Resource
     {
         $user   = auth()->user();
         $vendor = filament()->getTenant();
-        return $vendor && $user->hasVendorRole($vendor->id, ['owner', 'inventory_manager', 'storekeeper']);
+        return $vendor && $user->hasVendorPermission($vendor->id, 'view_any_products');
     }
 
     public static function table(Table $table): Table
@@ -230,7 +230,7 @@ class AuditSessionResource extends Resource
                     ])
                     ->visible(fn (AuditSession $record): bool =>
                         $record->status === 'discrepancy' &&
-                        auth()->user()->hasVendorRole($record->vendor_id, ['owner', 'inventory_manager'])
+                        auth()->user()->hasVendorPermission($record->vendor_id, 'edit_order_items')
                     )
                     ->action(function (AuditSession $record, array $data, AdjustStockAction $adjustStock): void {
                         $finalCount         = (int) $data['manager_override_count'];

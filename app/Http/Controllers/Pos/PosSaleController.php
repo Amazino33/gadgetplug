@@ -149,7 +149,7 @@ class PosSaleController extends Controller
         $user   = $request->user();
         $vendor = \App\Models\Vendor::find($sale->vendor_id);
 
-        if (! $vendor?->isOwner($user) && ! $user->hasVendorRole($sale->vendor_id, ['store_admin', 'order_manager', 'inventory_manager'])) {
+        if (! $vendor?->isOwner($user) && ! $user->hasVendorPermission($sale->vendor_id, 'void_sale')) {
             return response()->json(['message' => 'Insufficient permissions to void a sale.'], 403);
         }
 
@@ -190,7 +190,7 @@ class PosSaleController extends Controller
         $user   = $request->user();
         $vendor = \App\Models\Vendor::find($sale->vendor_id);
 
-        if (! $vendor?->isOwner($user) && ! $user->hasVendorRole($sale->vendor_id, ['store_admin', 'order_manager', 'inventory_manager'])) {
+        if (! $vendor?->isOwner($user) && ! $user->hasVendorPermission($sale->vendor_id, 'process_return')) {
             return response()->json(['message' => 'Insufficient permissions to process a return.'], 403);
         }
 

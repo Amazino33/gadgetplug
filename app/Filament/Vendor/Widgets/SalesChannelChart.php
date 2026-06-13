@@ -57,7 +57,7 @@ class SalesChannelChart extends ChartWidget
         return $vendor && (
             $user->isSuperAdmin() ||
             $vendor->isOwner($user) ||
-            $user->hasVendorRole($vendor->id, ['store_admin'])
+            $user->hasVendorPermission($vendor->id, 'edit_vendor')
         );
     }
 }

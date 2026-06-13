@@ -31,7 +31,7 @@ class SupplierResource extends Resource
 
         $user   = auth()->user();
         $vendor = filament()->getTenant();
-        return $vendor && $user->hasVendorRole($vendor->id, ['owner', 'inventory_manager', 'storekeeper']);
+        return $vendor && $user->hasVendorPermission($vendor->id, 'view_any_products');
     }
 
     public static function form(Schema $schema): Schema
