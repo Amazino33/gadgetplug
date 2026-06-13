@@ -30,7 +30,7 @@ class BlindCount extends Page
     {
         $user   = auth()->user();
         $vendor = filament()->getTenant();
-        return $vendor && $user->hasVendorPermission($vendor->id, 'view_any_products');
+        return $vendor && $user->hasVendorPermission($vendor->id, 'manage_inventory');
     }
 
     // Owners and inventory_managers observe; only storekeepers physically count
