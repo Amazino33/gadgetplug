@@ -13,6 +13,7 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
+use Spatie\Permission\Models\Role;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -40,6 +41,11 @@ class AppServiceProvider extends ServiceProvider
         // 2. Add this Super Admin bypass
         Gate::before(function ($user, $ability) {
             return $user->hasRole('super_admin') ? true : null;
+        });
+
+        Role::deleting(function (Role $role): void {
+            DB::table('model_has_roles')->where('role_id', $role->id)->delete();
+            DB::table('role_has_permissions')->where('role_id', $role->id)->delete();
         });
     }
 
