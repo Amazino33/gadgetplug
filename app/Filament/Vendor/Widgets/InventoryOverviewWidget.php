@@ -66,4 +66,16 @@ class InventoryOverviewWidget extends BaseWidget
                 ->color($outOfStock > 0 ? 'danger' : ($lowStock > 0 ? 'warning' : 'success')),
         ];
     }
+
+    public static function canView(): bool 
+    {
+        $user = auth()->user();
+        $vendor = filament()->getTenant();
+
+        return $vendor && (
+            $user->isSuperAdmin() ||
+            $vendor->isOwner($user) ||
+            $user->hasVendorRole($vendor->id, ['inventory_manager', 'storekeeper', 'store_admin'])
+        );
+    }
 }

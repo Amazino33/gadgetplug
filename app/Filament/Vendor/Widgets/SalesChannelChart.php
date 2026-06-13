@@ -48,4 +48,16 @@ class SalesChannelChart extends ChartWidget
             'labels' => ['Online App', 'Physical POS'],
         ];
     }
+
+    public static function canView(): bool 
+    {
+        $user = auth()->user();
+        $vendor = filament()->getTenant();
+
+        return $vendor && (
+            $user->isSuperAdmin() ||
+            $vendor->isOwner($user) ||
+            $user->hasVendorRole($vendor->id, ['store_admin'])
+        );
+    }
 }
