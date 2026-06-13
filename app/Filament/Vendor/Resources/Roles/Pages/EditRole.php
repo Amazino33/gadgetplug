@@ -13,13 +13,13 @@ class EditRole extends BaseEditRole
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        $this->permissions = collect($data['permissions'] ?? []);
         return Arr::only($data, ['name', 'guard_name']);
     }
 
     protected function afterSave(): void
     {
-        $this->record->syncPermissions($this->permissions->toArray());
+        $permissionIds = $this->data['permissions'] ?? [];
+        $this->record->syncPermissions(is_array($permissionIds) ? $permissionIds : []);
         app(PermissionRegistrar::class)->forgetCachedPermissions();
     }
 }
