@@ -14,7 +14,6 @@ class CreateRole extends BaseCreateRole
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        $this->permissions = collect($data['permissions'] ?? []);
         $teamId = filament()->getTenant()?->id;
         $result = Arr::only($data, ['name', 'guard_name']);
         if ($teamId) {
@@ -25,7 +24,8 @@ class CreateRole extends BaseCreateRole
 
     protected function afterCreate(): void 
     {
-        $this->record->syncPermissions($this->permissions->toArray());
+        $permissionIds = $this->data['permissions'] ?? [];
+        $this->record->syncPermissions(is_array($permissionIds) ? $permissionIds : []);
         app(PermissionRegistrar::class)->forgetCachedPermissions();
     }
 }
