@@ -58,6 +58,7 @@ class TeamMembersRelationManager extends RelationManager
                         setPermissionsTeamId($vendor->id);
                         $record->unsetRelation('roles');
                         $record->syncRoles($data['roles'] ?? []);
+                        $record->syncPermissions([]);
                     }),
 
                 DetachAction::make()

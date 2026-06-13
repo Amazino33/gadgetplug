@@ -144,6 +144,7 @@ class TeamMembers extends Page
             if ($roleId) {
                 setPermissionsTeamId($vendor->id);
                 $user->syncRoles([$roleId]);
+                $user->syncPermissions([]);
             }
 
             activity()->causedBy(auth()->user())
@@ -183,8 +184,10 @@ class TeamMembers extends Page
 
         if ($roleId) {
             $member->syncRoles([$roleId]);
+            $member->syncPermissions([]);
         } else {
             $member->syncRoles([]);
+            $member->syncPermissions([]);
         }
 
         $roleName = $roleId ? \Spatie\Permission\Models\Role::find($roleId)?->name : 'none';
