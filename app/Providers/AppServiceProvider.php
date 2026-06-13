@@ -46,6 +46,11 @@ class AppServiceProvider extends ServiceProvider
         Role::deleting(function (Role $role): void {
             DB::table('model_has_roles')->where('role_id', $role->id)->delete();
             DB::table('role_has_permissions')->where('role_id', $role->id)->delete();
+            DB::statement('SET FOREIGN_KEY_CHECKS=0');
+        });
+
+        Role::deleted(function (Role $role): void {
+            DB::statement('SET FOREIGN_KEY_CHECKS=1');
         });
     }
 
