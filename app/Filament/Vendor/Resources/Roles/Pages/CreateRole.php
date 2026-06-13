@@ -5,6 +5,8 @@ namespace App\Filament\Vendor\Resources\Roles\Pages;
 use App\Filament\Vendor\Resources\Roles\RoleResource;
 use BezhanSalleh\FilamentShield\Resources\Roles\Pages\CreateRole as BaseCreateRole;
 use BezhanSalleh\FilamentShield\Support\Utils;
+use Illuminate\Support\Arr;
+use Spatie\Permission\PermissionRegistrar;
 
 class CreateRole extends BaseCreateRole
 {
@@ -12,11 +14,18 @@ class CreateRole extends BaseCreateRole
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        // Shield only includes team_id when the team select field is visible
-        // (central-app mode). In the vendor panel the field is hidden, so we
-        // inject the current vendor's id here before delegating to the parent.
-        $data[Utils::getTenantModelForeignKey()] = filament()->getTenant()?->id;
+        $this->permissions = collect($data['permissions'] ?? []);
+        $teamId = filament()->getTenant()?->id;
+        $result = Arr::only($data, ['name', 'guard_name']);
+        if ($teamId) {
+            $result[Utils::getTenantModelForeignKey()] = $teamId;
+        }
+        return $result;
+    }
 
-        return parent::mutateFormDataBeforeCreate($data);
+    protected function afterCreate(): void 
+    {
+        $this->record->syncPermissions($this->permissions->toArray());
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
     }
 }
