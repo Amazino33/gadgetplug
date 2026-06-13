@@ -7,6 +7,7 @@ use BezhanSalleh\FilamentShield\Resources\Roles\Pages\CreateRole as BaseCreateRo
 use BezhanSalleh\FilamentShield\Support\Utils;
 use Illuminate\Support\Arr;
 use Spatie\Permission\PermissionRegistrar;
+use Spatie\Permission\Models\Permission;
 
 class CreateRole extends BaseCreateRole
 {
@@ -25,7 +26,8 @@ class CreateRole extends BaseCreateRole
     protected function afterCreate(): void 
     {
         $permissionIds = $this->data['permissions'] ?? [];
-        $this->record->syncPermissions(is_array($permissionIds) ? $permissionIds : []);
+        $permissions = Permission::whereIn('id', $permissionIds)->get();
+        $this->record->syncPermissions($permissions);
         app(PermissionRegistrar::class)->forgetCachedPermissions();
     }
 }

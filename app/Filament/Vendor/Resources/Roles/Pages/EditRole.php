@@ -6,6 +6,7 @@ use App\Filament\Vendor\Resources\Roles\RoleResource;
 use BezhanSalleh\FilamentShield\Resources\Roles\Pages\EditRole as BaseEditRole;
 use Illuminate\Support\Arr;
 use Spatie\Permission\PermissionRegistrar;
+use Spatie\Permission\Models\Permission;
 
 class EditRole extends BaseEditRole
 {
@@ -19,7 +20,8 @@ class EditRole extends BaseEditRole
     protected function afterSave(): void
     {
         $permissionIds = $this->data['permissions'] ?? [];
-        $this->record->syncPermissions(is_array($permissionIds) ? $permissionIds : []);
+        $permissions = Permission::whereIn('id', $permissionIds)->get();
+        $this->record->syncPermissions($permissions);
         app(PermissionRegistrar::class)->forgetCachedPermissions();
     }
 }
