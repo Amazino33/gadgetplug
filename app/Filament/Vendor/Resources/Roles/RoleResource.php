@@ -73,7 +73,7 @@ class RoleResource extends ShieldRoleResource
                 ->getOptionLabelFromRecordUsing(fn ($record) => Str::headline($record->name))
                 ->bulkToggleable()
                 ->columns(3),
-        ]);
+        ])->column(1);
     }
 
     public static function getEloquentQuery(): Builder
