@@ -62,7 +62,7 @@ class RoleResource extends ShieldRoleResource
                 ->relationship(
                     'permissions',
                     'name',
-                    fn ($q) => $q->whereIn('name', [
+                    fn ($query) => $query->whereIn('name', [
                         'view_products', 'view_any_products', 'create_products', 'edit_products', 'delete_products',
                         'view_order_items', 'view_any_order_items', 'edit_order_items',
                         'view_vendor', 'edit_vendor',
