@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Supplier extends Model
 {
-    protected $fillable = ['vendor_id', 'name', 'phone', 'email', 'address', 'notes'];
+    protected $fillable = ['vendor_id', 'name', 'phone', 'email', 'address', 'notes', 'location', 'rating', 'avg_delivery_days',];
 
     public function vendor(): BelongsTo
     {

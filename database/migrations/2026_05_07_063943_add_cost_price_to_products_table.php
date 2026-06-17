@@ -9,7 +9,6 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('products', function (Blueprint $table) {
-            // We put it right after 'price' so the database stays organized
             $table->decimal('cost_price', 12, 2)->default(0)->after('price');
         });
     }

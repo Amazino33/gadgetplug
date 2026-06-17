@@ -27,7 +27,7 @@ class Procurement extends Model
     }
     protected $fillable = [
         'reference', 'vendor_id', 'supplier_id', 'waybill_image',
-        'total_cost', 'amount_paid', 'payment_status', 'status',
+        'total_cost', 'amount_paid', 'payment_status', 'payment_method', 'status',
         'void_reason', 'notes', 'created_by', 'approved_by', 'approved_at',
     ];
 

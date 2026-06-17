@@ -3,7 +3,7 @@
 namespace App\Filament\Vendor\Resources\Procurements\Pages;
 
 use App\Filament\Vendor\Resources\Procurements\ProcurementResource;
-use Filament\Actions\CreateAction;
+use Filament\Actions\Action;
 use Filament\Resources\Pages\ListRecords;
 
 class ListProcurements extends ListRecords
@@ -13,9 +13,11 @@ class ListProcurements extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            CreateAction::make()
+            Action::make('new_procurement')
                 ->label('+ New Procurement')
-                ->icon('heroicon-o-plus'),
+                ->icon('heroicon-o-plus')
+                ->url(route('procurement.create'))
+                ->color('warning'),
         ];
     }
 }

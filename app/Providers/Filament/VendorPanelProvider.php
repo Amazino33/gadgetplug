@@ -62,7 +62,7 @@ class VendorPanelProvider extends PanelProvider
             ->tenant(Vendor::class, slugAttribute: 'slug', ownershipRelationship: 'vendors')
             ->navigationItems([
                 NavigationItem::make('POS Terminal')
-                    ->url(fn (): string => url('/pos/' . (filament()->getTenant()?->slug ?? '')))
+                    ->url(fn(): string => url('/pos/' . (filament()->getTenant()?->slug ?? '')))
                     ->icon('heroicon-o-computer-desktop')
                     ->group('Store')
                     ->sort(99)
@@ -75,6 +75,21 @@ class VendorPanelProvider extends PanelProvider
                         $user->unsetRelation('roles');
                         return $user->hasPermissionTo('access_pos');
                     }),
+                NavigationItem::make('New Procurement')
+                    ->url(fn(): string => route('procurement.create'))
+                    ->icon('heroicon-o-plus-circle')
+                    ->group('Procurement')
+                    ->sort(10)
+                    ->visible(function () {
+                        $user = auth()->user();
+                        $vendor = filament()->getTenant();
+                        if (! $user || ! $vendor) return false;
+                        if ($user->isSuperAdmin()) return true;
+                        setPermissionsTeamId($vendor->id);
+                        $user->unsetRelation('roles');
+                        return $user->hasPermissionTo('manage_inventory');
+                    }),
+
             ])
             ->plugins([
                 FilamentShieldPlugin::make()
@@ -84,11 +99,11 @@ class VendorPanelProvider extends PanelProvider
             ->databaseNotificationsPolling('30s')
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
-                fn () => Blade::render("@include('partials.meta-pixel')"),
+                fn() => Blade::render("@include('partials.meta-pixel')"),
             )
             ->renderHook(
                 PanelsRenderHook::BODY_END,
-                fn () => Blade::render('<x-barcode-scanner />'),
+                fn() => Blade::render('<x-barcode-scanner />'),
             );
     }
 }

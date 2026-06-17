@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+
+<html lang="en" style=""><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Financials - Procurement</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&amp;family=Montserrat:wght@600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "surface-tint": "#016e00",
+                        "surface-container-highest": "#e1e3e4",
+                        "tertiary-fixed-dim": "#97da00",
+                        "surface": "#f8f9fa",
+                        "primary-fixed-dim": "#6cdf59",
+                        "surface-container-low": "#f3f4f5",
+                        "secondary-container": "#fd761a",
+                        "on-secondary-fixed": "#341100",
+                        "on-primary-fixed-variant": "#015300",
+                        "on-surface": "#191c1d",
+                        "error-container": "#ffdad6",
+                        "on-tertiary-fixed": "#121f00",
+                        "surface-bright": "#f8f9fa",
+                        "outline-variant": "#becab5",
+                        "tertiary": "#466800",
+                        "error": "#ba1a1a",
+                        "surface-dim": "#d9dadb",
+                        "on-tertiary-container": "#030600",
+                        "on-secondary-container": "#5c2400",
+                        "outline": "#6f7b68",
+                        "on-primary-fixed": "#002200",
+                        "on-error": "#ffffff",
+                        "on-primary-container": "#f8ffef",
+                        "tertiary-container": "#598300",
+                        "surface-variant": "#e1e3e4",
+                        "inverse-surface": "#2e3132",
+                        "surface-container-high": "#e7e8e9",
+                        "surface-container": "#edeeef",
+                        "on-surface-variant": "#3f4a3a",
+                        "surface-container-lowest": "#ffffff",
+                        "on-background": "#191c1d",
+                        "on-error-container": "#93000a",
+                        "primary-fixed": "#88fc72",
+                        "on-tertiary-fixed-variant": "#344e00",
+                        "on-secondary-fixed-variant": "#783200",
+                        "inverse-primary": "#6cdf59",
+                        "primary": "#016c00",
+                        "tertiary-fixed": "#acf900",
+                        "secondary-fixed": "#ffdbca",
+                        "primary-container": "#018800",
+                        "on-tertiary": "#ffffff",
+                        "inverse-on-surface": "#f0f1f2",
+                        "secondary": "#9d4300",
+                        "background": "#f8f9fa",
+                        "secondary-fixed-dim": "#ffb690",
+                        "on-secondary": "#ffffff",
+                        "on-primary": "#ffffff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "lg": "24px",
+                        "xl": "32px",
+                        "gutter": "20px",
+                        "xs": "4px",
+                        "sm": "8px",
+                        "md": "16px",
+                        "container-max": "1280px",
+                        "base": "4px"
+                    },
+                    "fontFamily": {
+                        "title-md": ["Montserrat"],
+                        "label-bold": ["Inter"],
+                        "body-md": ["Inter"],
+                        "numeric-data": ["Montserrat"],
+                        "body-sm": ["Inter"],
+                        "headline-lg": ["Montserrat"],
+                        "display-lg": ["Montserrat"],
+                        "headline-lg-mobile": ["Montserrat"]
+                    },
+                    "fontSize": {
+                        "title-md": ["18px", { "lineHeight": "24px", "fontWeight": "600" }],
+                        "label-bold": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "numeric-data": ["16px", { "lineHeight": "24px", "fontWeight": "600" }],
+                        "body-sm": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "fontWeight": "700" }],
+                        "display-lg": ["48px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "fontWeight": "700" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .custom-shadow-card {
+            box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.04);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background flex h-screen overflow-hidden antialiased">
+<!-- Shared Component: NavigationDrawer -->
+<aside class="hidden md:flex flex-col h-full w-72 rounded-r-xl bg-surface shadow-xl p-md z-40 shrink-0">
+<div class="flex items-center gap-sm mb-xl px-sm shrink-0">
+<div class="w-10 h-10 rounded-full bg-primary-container flex items-center justify-center text-on-primary-container font-title-md text-title-md">
+                S
+            </div>
+<div class="flex flex-col">
+<span class="font-title-md text-title-md text-primary">GadgetPlug</span>
+<span class="font-label-bold text-label-bold text-on-surface-variant">Admin Account</span>
+</div>
+</div>
+<nav class="flex flex-col gap-xs flex-1 overflow-y-auto pb-sm">
+<div class="px-md py-xs mt-xs font-label-bold text-label-bold text-on-surface-variant uppercase tracking-wider">Main Navigation</div>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors duration-150 font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+                Dashboard
+            </a>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors duration-150 font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined" data-icon="group">group</span>
+                Team Members
+            </a>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors duration-150 font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined" data-icon="shopping_cart">shopping_cart</span>
+                Order Items
+            </a>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors duration-150 font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined" data-icon="inventory_2">inventory_2</span>
+                Products
+            </a>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors duration-150 font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined" data-icon="warehouse">warehouse</span>
+                Inventory
+            </a>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors duration-150 font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined" data-icon="store">store</span>
+                Store Profile
+            </a>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors duration-150 font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined" data-icon="payments">payments</span>
+                Payouts
+            </a>
+<div class="px-md py-xs mt-sm font-label-bold text-label-bold text-on-surface-variant uppercase tracking-wider">Inventory</div>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors duration-150 font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined" data-icon="fact_check">fact_check</span>
+                Blind Count
+            </a>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors duration-150 font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined" data-icon="assignment">assignment</span>
+                Audit Sessions
+            </a>
+<div class="px-md py-xs mt-sm font-label-bold text-label-bold text-on-surface-variant uppercase tracking-wider">Procurement</div>
+<a class="flex items-center gap-md px-md py-sm rounded-lg bg-primary-container text-on-primary-container font-bold transition-colors duration-150 font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined" data-icon="factory">factory</span>
+                Suppliers
+            </a>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors duration-150 font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined" data-icon="shopping_bag">shopping_bag</span>
+                Procurements
+            </a>
+<div class="px-md py-xs mt-sm font-label-bold text-label-bold text-on-surface-variant uppercase tracking-wider">Store</div>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors duration-150 font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined" data-icon="point_of_sale">point_of_sale</span>
+                POS Terminal
+            </a>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors duration-150 font-body-md text-body-md mt-auto pt-sm" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+                Settings
+            </a>
+<a class="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container transition-colors duration-150 font-body-md text-body-md" href="#">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+                Logout
+            </a>
+</nav>
+</aside>
+<!-- Main Workspace -->
+<main class="flex-1 flex flex-col h-full overflow-y-auto">
+<!-- Header & Breadcrumbs -->
+<header class="bg-surface-container-lowest px-lg py-md border-b border-surface-container flex flex-col gap-sm sticky top-0 z-30 shadow-sm custom-shadow-card">
+<div class="flex items-center gap-sm font-label-bold text-label-bold text-on-surface-variant uppercase tracking-wider">
+<span class="">Supplier</span>
+<span class="material-symbols-outlined text-[16px]">chevron_right</span>
+<span class="">Items</span>
+<span class="material-symbols-outlined text-[16px]">chevron_right</span>
+<span class="text-primary font-bold">Financials</span>
+<span class="material-symbols-outlined text-[16px]">chevron_right</span>
+<span class="">Confirm</span>
+</div>
+<h1 class="font-headline-lg text-headline-lg text-on-surface">Financial Details</h1>
+</header>
+<!-- Content Grid -->
+<div class="p-lg mx-auto w-full max-w-container-max grid grid-cols-1 lg:grid-cols-12 gap-lg flex-1 items-start">
+<!-- Left Column: Forms & OCR (70%) -->
+<div class="lg:col-span-8 flex flex-col gap-lg">
+<!-- Financial Details Form Card -->
+<section class="bg-surface-container-lowest rounded-xl p-lg custom-shadow-card border border-outline-variant/30 flex flex-col gap-lg">
+<h2 class="font-title-md text-title-md text-on-surface border-b border-surface-container pb-sm">Payment Information</h2>
+<!-- Payment Method Selection -->
+<div class="flex flex-col gap-sm">
+<label class="font-label-bold text-label-bold text-on-surface-variant">Payment Method</label>
+<div class="grid grid-cols-3 gap-md">
+<label class="flex flex-col items-center justify-center p-md border border-outline-variant rounded-lg cursor-pointer hover:bg-surface-container-low transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary-container/10 has-[:checked]:text-primary">
+<input checked="" class="sr-only" name="payment_method" type="radio" value="transfer"/>
+<span class="material-symbols-outlined mb-xs">account_balance</span>
+<span class="font-body-sm text-body-sm font-bold">Bank Transfer</span>
+</label>
+<label class="flex flex-col items-center justify-center p-md border border-outline-variant rounded-lg cursor-pointer hover:bg-surface-container-low transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary-container/10 has-[:checked]:text-primary text-on-surface-variant">
+<input class="sr-only" name="payment_method" type="radio" value="cash"/>
+<span class="material-symbols-outlined mb-xs">payments</span>
+<span class="font-body-sm text-body-sm font-bold">Cash</span>
+</label>
+<label class="flex flex-col items-center justify-center p-md border border-outline-variant rounded-lg cursor-pointer hover:bg-surface-container-low transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary-container/10 has-[:checked]:text-primary text-on-surface-variant">
+<input class="sr-only" name="payment_method" type="radio" value="credit"/>
+<span class="material-symbols-outlined mb-xs">credit_card</span>
+<span class="font-body-sm text-body-sm font-bold">Credit</span>
+</label>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 gap-md">
+<!-- Amount Paid -->
+<div class="flex flex-col gap-xs">
+<label class="font-label-bold text-label-bold text-on-surface-variant" for="amount_paid">Amount Paid (₦)</label>
+<div class="relative">
+<span class="absolute inset-y-0 left-0 flex items-center pl-sm font-numeric-data text-numeric-data text-on-surface-variant">₦</span>
+<input class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg pl-xl pr-sm py-sm font-numeric-data text-numeric-data text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all" id="amount_paid" type="text" value="1,800,000"/>
+</div>
+</div>
+<!-- Reference Number -->
+<div class="flex flex-col gap-xs">
+<label class="font-label-bold text-label-bold text-on-surface-variant" for="reference_note">Reference Number / Note</label>
+<input class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-sm py-sm font-body-md text-body-md text-on-surface focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all" id="reference_note" placeholder="e.g. TRF-2023-09-01" type="text"/>
+</div>
+</div>
+</section>
+<!-- OCR Invoice Preview Card -->
+<section class="bg-surface-container-lowest rounded-xl p-lg custom-shadow-card border border-outline-variant/30 flex gap-lg">
+<div class="w-1/3 bg-surface-container rounded-lg flex items-center justify-center overflow-hidden border border-outline-variant relative">
+<img alt="Scanned Invoice" class="object-cover w-full h-full opacity-80 mix-blend-multiply" data-alt="A clean, brightly lit, top-down photograph of a modern, professional business invoice resting on a minimalist white desk. The invoice contains crisp black typography on white paper, detailing a list of electronic items and totals. The lighting is soft and even, typical of a high-end corporate or SaaS platform setting. Subtle green accents on the desk hint at a tech-forward retail environment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDL64y1-jqE2QJEQg1H5EaKSUsvCH8qThgpCMGw-QkSIxPbCUKm00If41wqvy0q-V9eUWyA22GusZBHmQ7LfRha0xIyP9j0VFxC90O_P3bV7wnYNkKcsTO3VgKxgZvwiGqEDOuDMqe805NXvDPlRnYYYcpti1VFUkkAR2553_hRApB1xGJH4G4lz9fB3X-3d9noesTM0rI2eMbIl18EY91BFWSRcuofsF0nuqOtgQqO4NHptivgaPqvzMRMIuFTXZXDWz3Q6w0qcx4"/>
+<div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent"></div>
+</div>
+<div class="flex-1 flex flex-col justify-center gap-sm">
+<div class="flex items-center justify-between">
+<h3 class="font-title-md text-title-md text-on-surface">Attached Invoice</h3>
+<span class="inline-flex items-center gap-xs px-sm py-xs bg-tertiary-container/20 text-tertiary font-label-bold text-label-bold rounded-full">
+<span class="material-symbols-outlined text-[14px]">check_circle</span>
+                                High Confidence OCR
+                            </span>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant">We've automatically extracted the total amount from your uploaded invoice document. Please verify the amount paid matches.</p>
+<button class="self-start font-label-bold text-label-bold text-primary flex items-center gap-xs hover:underline mt-sm">
+<span class="material-symbols-outlined text-[16px]">visibility</span>
+                            View Full Document
+                        </button>
+</div>
+</section>
+</div>
+<!-- Right Column: Order Summary (30%) -->
+<aside class="lg:col-span-4 sticky top-xl flex flex-col gap-lg">
+<div class="bg-surface-container-lowest rounded-xl custom-shadow-card border border-outline-variant/30 overflow-hidden flex flex-col">
+<div class="bg-surface-container-low px-lg py-md border-b border-outline-variant/30">
+<h2 class="font-title-md text-title-md text-on-surface">Order Summary</h2>
+</div>
+<div class="p-lg flex flex-col gap-md">
+<!-- Items List -->
+<div class="flex flex-col gap-sm border-b border-surface-container pb-md">
+<div class="flex justify-between items-start">
+<div class="flex flex-col">
+<span class="font-body-sm text-body-sm font-bold text-on-surface">iPhone 15 Pro Max</span>
+<span class="font-label-bold text-label-bold text-on-surface-variant">Qty: 10</span>
+</div>
+<span class="font-numeric-data text-numeric-data text-on-surface">₦1,200,000</span>
+</div>
+<div class="flex justify-between items-start">
+<div class="flex flex-col">
+<span class="font-body-sm text-body-sm font-bold text-on-surface">Samsung S24 Ultra</span>
+<span class="font-label-bold text-label-bold text-on-surface-variant">Qty: 5</span>
+</div>
+<span class="font-numeric-data text-numeric-data text-on-surface">₦600,000</span>
+</div>
+</div>
+<!-- Totals -->
+<div class="flex flex-col gap-xs pt-sm">
+<div class="flex justify-between items-center font-body-sm text-body-sm text-on-surface-variant">
+<span class="">Subtotal</span>
+<span class="font-numeric-data text-numeric-data">₦1,800,000</span>
+</div>
+<div class="flex justify-between items-center font-body-sm text-body-sm text-on-surface-variant">
+<span class="">Tax (0%)</span>
+<span class="font-numeric-data text-numeric-data">₦0</span>
+</div>
+</div>
+</div>
+<!-- Grand Total -->
+<div class="bg-surface-container px-lg py-md flex justify-between items-center">
+<span class="font-title-md text-title-md text-on-surface">Total Order Value</span>
+<span class="font-headline-lg-mobile text-headline-lg-mobile font-numeric-data text-primary">₦1,800,000</span>
+</div>
+</div>
+<!-- Actions -->
+<div class="flex gap-md pt-sm">
+<button class="flex-1 px-lg py-sm rounded-lg border border-outline-variant bg-surface-container-lowest text-primary font-title-md text-title-md hover:bg-surface-container-low transition-colors">
+                        Back
+                    </button>
+<button class="flex-[2] px-lg py-sm rounded-lg bg-secondary-container text-on-secondary-container font-title-md text-title-md hover:opacity-90 transition-opacity shadow-sm flex items-center justify-center gap-sm">
+                        Review &amp; Confirm
+                        <span class="material-symbols-outlined text-[20px]">arrow_forward</span>
+</button>
+</div>
+</aside>
+</div>
+</main>
+</body></html>

@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en" style=""><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Procurement Items - Gadget Hub</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&amp;family=Montserrat:wght@600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary-container": "#5c2400",
+                        "on-primary-fixed": "#002200",
+                        "on-secondary-fixed": "#341100",
+                        "on-background": "#191c1d",
+                        "primary-container": "#018800",
+                        "surface-container": "#edeeef",
+                        "surface": "#f8f9fa",
+                        "surface-bright": "#f8f9fa",
+                        "secondary-container": "#fd761a",
+                        "error": "#ba1a1a",
+                        "on-surface-variant": "#3f4a3a",
+                        "surface-dim": "#d9dadb",
+                        "secondary-fixed": "#ffdbca",
+                        "on-error": "#ffffff",
+                        "inverse-on-surface": "#f0f1f2",
+                        "surface-container-highest": "#e1e3e4",
+                        "on-tertiary-fixed": "#121f00",
+                        "on-primary-fixed-variant": "#015300",
+                        "outline": "#6f7b68",
+                        "surface-container-lowest": "#ffffff",
+                        "primary-fixed-dim": "#6cdf59",
+                        "on-tertiary": "#ffffff",
+                        "on-surface": "#191c1d",
+                        "on-secondary": "#ffffff",
+                        "on-primary": "#ffffff",
+                        "surface-tint": "#016e00",
+                        "primary-fixed": "#88fc72",
+                        "secondary-fixed-dim": "#ffb690",
+                        "on-tertiary-fixed-variant": "#344e00",
+                        "inverse-surface": "#2e3132",
+                        "secondary": "#9d4300",
+                        "outline-variant": "#becab5",
+                        "surface-container-high": "#e7e8e9",
+                        "tertiary-container": "#598300",
+                        "inverse-primary": "#6cdf59",
+                        "surface-variant": "#e1e3e4",
+                        "primary": "#016c00",
+                        "surface-container-low": "#f3f4f5",
+                        "error-container": "#ffdad6",
+                        "background": "#f8f9fa",
+                        "tertiary": "#466800",
+                        "on-error-container": "#93000a",
+                        "tertiary-fixed": "#acf900",
+                        "on-secondary-fixed-variant": "#783200",
+                        "on-primary-container": "#f8ffef",
+                        "tertiary-fixed-dim": "#97da00",
+                        "on-tertiary-container": "#030600"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "md": "16px",
+                        "container-max": "1280px",
+                        "xl": "32px",
+                        "lg": "24px",
+                        "gutter": "20px",
+                        "xs": "4px",
+                        "sm": "8px",
+                        "base": "4px"
+                    },
+                    "fontFamily": {
+                        "title-md": ["Montserrat"],
+                        "headline-lg-mobile": ["Montserrat"],
+                        "headline-lg": ["Montserrat"],
+                        "display-lg": ["Montserrat"],
+                        "body-sm": ["Inter"],
+                        "numeric-data": ["Montserrat"],
+                        "label-bold": ["Inter"],
+                        "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "title-md": ["18px", { "lineHeight": "24px", "fontWeight": "600" }],
+                        "headline-lg-mobile": ["24px", { "lineHeight": "32px", "fontWeight": "700" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "fontWeight": "700" }],
+                        "display-lg": ["48px", { "lineHeight": "1.2", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "body-sm": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "numeric-data": ["16px", { "lineHeight": "24px", "fontWeight": "600" }],
+                        "label-bold": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }],
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8f9fa; }
+        h1, h2, h3, h4, h5, h6, .font-title-md, .font-headline-lg, .font-display-lg, .font-numeric-data { font-family: 'Montserrat', sans-serif; }
+        
+        /* Ambient Shadows based on Style Guidance */
+        .shadow-level-1 { box-shadow: 0px 4px 20px rgba(0, 0, 0, 0.04); }
+        .shadow-level-2 { box-shadow: 0px 10px 30px rgba(0, 0, 0, 0.08); }
+        
+        /* Custom Inputs */
+        .input-premium {
+            background-color: #ffffff;
+            border: 1px solid #E5E7EB;
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            color: #191c1d;
+            transition: all 0.2s ease-in-out;
+        }
+        .input-premium:focus {
+            outline: none;
+            border-color: #068B03; /* Primary Green */
+            box-shadow: 0 0 0 3px rgba(6, 139, 3, 0.2);
+        }
+        .input-premium::placeholder { color: #9CA3AF; }
+
+        /* Buttons */
+        .btn-primary {
+            background-color: #F97316; /* Action Orange */
+            color: #ffffff;
+            border-radius: 8px;
+            padding: 10px 24px;
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 600;
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+        .btn-primary:hover { background-color: #ea580c; }
+        
+        .btn-secondary {
+            background-color: #ffffff;
+            color: #068B03; /* Primary Green */
+            border: 1px solid #E5E7EB;
+            border-radius: 8px;
+            padding: 10px 24px;
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .btn-secondary:hover { background-color: #f3f4f6; border-color: #d1d5db; }
+
+        .btn-neon {
+            background-color: #B1FF00; /* Neon Tech */
+            color: #121f00; /* Dark text for contrast */
+            border-radius: 8px;
+            padding: 8px 16px;
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.2s;
+            border: 1px solid rgba(177, 255, 0, 0.5);
+            box-shadow: 0 0 10px rgba(177, 255, 0, 0.3);
+        }
+        .btn-neon:hover {
+            box-shadow: 0 0 15px rgba(177, 255, 0, 0.6);
+            transform: translateY(-1px);
+        }
+
+        .btn-ghost-danger {
+            background-color: transparent;
+            color: #ba1a1a;
+            padding: 8px;
+            border-radius: 8px;
+            transition: background-color 0.2s;
+        }
+        .btn-ghost-danger:hover { background-color: #ffdad6; }
+        
+        .card-hover:hover {
+            box-shadow: 0px 6px 24px rgba(0, 0, 0, 0.06);
+            transform: translateY(-1px);
+            transition: all 0.2s ease;
+        }
+
+        /* Stepper Styles */
+        .stepper-line { flex: 1; height: 2px; background-color: #E5E7EB; margin: 0 12px; }
+        .stepper-line.active { background-color: #068B03; }
+        .step-circle {
+            width: 32px; height: 32px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-family: 'Montserrat', sans-serif; font-weight: 600; font-size: 14px;
+        }
+        .step-circle.completed { background-color: #018800; color: white; }
+        .step-circle.active { background-color: #018800; color: white; box-shadow: 0 0 0 4px rgba(1, 136, 0, 0.2); }
+        .step-circle.pending { background-color: #E5E7EB; color: #6B7280; }
+        
+        /* Layout utility */
+        .main-content { margin-left: 256px; } /* 64px width from SideNavBar config -> 16rem -> 256px */
+        
+        /* Custom Scrollbar for Sidebar */
+        .sidebar-scroll::-webkit-scrollbar { width: 4px; }
+        .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
+        .sidebar-scroll::-webkit-scrollbar-thumb { background: #E5E7EB; border-radius: 4px; }
+        .sidebar-scroll::-webkit-scrollbar-thumb:hover { background: #D1D5DB; }
+    </style>
+</head>
+<body class="bg-background text-on-background min-h-screen flex antialiased">
+<!-- SideNavBar -->
+<nav class="fixed left-0 top-0 h-full w-64 z-50 bg-surface-container-lowest border-r border-outline-variant shadow-md flex flex-col py-lg px-md hidden md:flex">
+<!-- Header -->
+<div class="mb-xl flex items-center gap-sm">
+<div class="w-10 h-10 rounded bg-primary-container text-on-primary-container flex items-center justify-center font-bold text-lg">
+                G
+            </div>
+<div>
+<h1 class="font-headline-lg text-title-md font-bold text-primary">GadgetPlug </h1>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Retail SaaS</p>
+</div>
+</div>
+<!-- Navigation Links -->
+<div class="flex-1 overflow-y-auto space-y-xs pb-md sidebar-scroll pr-1 -mr-1">
+<div class="px-md pt-sm pb-xs text-[10px] font-bold text-outline uppercase tracking-wider">Main Navigation</div>
+<a class="flex items-center gap-sm px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined" style="font-size: 20px;">dashboard</span>
+<span class="font-label-bold text-label-bold">Dashboard</span>
+</a>
+<a class="flex items-center gap-sm px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined" style="font-size: 20px;">group</span>
+<span class="font-label-bold text-label-bold">Team Members</span>
+</a>
+<a class="flex items-center gap-sm px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined" style="font-size: 20px;">receipt_long</span>
+<span class="font-label-bold text-label-bold">Order Items</span>
+</a>
+<a class="flex items-center gap-sm px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined" style="font-size: 20px;">category</span>
+<span class="font-label-bold text-label-bold">Products</span>
+</a>
+<a class="flex items-center gap-sm px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined" style="font-size: 20px;">inventory_2</span>
+<span class="font-label-bold text-label-bold">Inventory</span>
+</a>
+<a class="flex items-center gap-sm px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined" style="font-size: 20px;">store</span>
+<span class="font-label-bold text-label-bold">Store Profile</span>
+</a>
+<a class="flex items-center gap-sm px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined" style="font-size: 20px;">payments</span>
+<span class="font-label-bold text-label-bold">Payouts</span>
+</a>
+<div class="px-md pt-md pb-xs text-[10px] font-bold text-outline uppercase tracking-wider">Inventory</div>
+<a class="flex items-center gap-sm px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined" style="font-size: 20px;">visibility_off</span>
+<span class="font-label-bold text-label-bold">Blind Count</span>
+</a>
+<a class="flex items-center gap-sm px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined" style="font-size: 20px;">fact_check</span>
+<span class="font-label-bold text-label-bold">Audit Sessions</span>
+</a>
+<div class="px-md pt-md pb-xs text-[10px] font-bold text-outline uppercase tracking-wider">Procurement</div>
+<a class="flex items-center gap-sm px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined" style="font-size: 20px;">local_shipping</span>
+<span class="font-label-bold text-label-bold">Suppliers</span>
+</a>
+<a class="flex items-center gap-sm px-md py-sm bg-secondary-container text-on-secondary-container font-bold rounded-lg scale-98 transition-transform duration-150 shadow-sm" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1; font-size: 20px;">shopping_cart</span>
+<span class="font-label-bold text-label-bold">Procurements</span>
+</a>
+<div class="px-md pt-md pb-xs text-[10px] font-bold text-outline uppercase tracking-wider">Store</div>
+<a class="flex items-center gap-sm px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined" style="font-size: 20px;">point_of_sale</span>
+<span class="font-label-bold text-label-bold">POS Terminal</span>
+</a>
+</div>
+<!-- CTA & Footer -->
+<div class="mt-auto pt-md space-y-md">
+<button class="w-full btn-primary flex justify-center items-center gap-xs">
+<span class="material-symbols-outlined" style="font-size: 18px;">add</span>
+                Add New Stock
+            </button>
+<div class="space-y-xs pt-md border-t border-outline-variant">
+<a class="flex items-center gap-sm px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors" href="#">
+<span class="material-symbols-outlined" style="font-size: 20px;">help</span>
+<span class="font-label-bold text-label-bold">Help Center</span>
+</a>
+<a class="flex items-center gap-sm px-md py-sm rounded-lg text-error hover:bg-error-container transition-colors" href="#">
+<span class="material-symbols-outlined" style="font-size: 20px;">logout</span>
+<span class="font-label-bold text-label-bold">Logout</span>
+</a>
+</div>
+</div>
+</nav>
+<!-- Main Content Area -->
+<div class="flex-1 flex flex-col min-w-0 main-content">
+<!-- TopAppBar -->
+<header class="w-full h-16 sticky top-0 z-40 bg-surface border-b border-outline-variant shadow-sm flex items-center justify-between px-lg">
+<div class="flex items-center gap-md">
+<h2 class="font-title-md text-title-md text-on-surface hidden md:block">Procurement Dashboard</h2>
+<!-- Mobile Menu Button -->
+<button class="md:hidden text-on-surface p-sm hover:bg-surface-container-high rounded-full">
+<span class="material-symbols-outlined">menu</span>
+</button>
+</div>
+<!-- Global Search (Hidden on smaller screens, placeholder for large) -->
+<div class="hidden lg:flex flex-1 max-w-md mx-lg">
+<div class="relative w-full">
+<span class="material-symbols-outlined absolute left-3 top-2 text-outline" style="font-size: 20px;">search</span>
+<input class="input-premium w-full pl-10 bg-surface-container-low border-none focus:bg-surface focus:border-primary" placeholder="Search orders, suppliers..." type="text"/>
+</div>
+</div>
+<!-- Top Nav Links (Hidden md as per rules if using SideNav, but JSON provides them. Since SideNav is active and this is a deep state, we'll keep TopAppBar minimal on web as per hybrid rules, but respect JSON structure) -->
+<div class="flex items-center gap-md">
+<div class="hidden lg:flex space-x-md mr-md border-r border-outline-variant pr-md">
+<a class="font-label-bold text-label-bold text-on-surface-variant hover:text-primary transition-colors" href="#">Inventory</a>
+<a class="font-label-bold text-label-bold text-primary border-b-2 border-primary pb-1" href="#">Orders</a>
+<a class="font-label-bold text-label-bold text-on-surface-variant hover:text-primary transition-colors" href="#">Suppliers</a>
+</div>
+<div class="flex items-center gap-sm text-on-surface-variant">
+<button class="p-2 hover:bg-surface-container-high rounded-full transition-colors active:opacity-80">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="p-2 hover:bg-surface-container-high rounded-full transition-colors active:opacity-80">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<div class="w-8 h-8 rounded-full bg-surface-container-highest overflow-hidden ml-sm border border-outline-variant cursor-pointer">
+<!-- Placeholder for Profile Image -->
+<div class="w-full h-full bg-primary-container text-primary flex items-center justify-center font-bold text-sm">
+                            JD
+                        </div>
+</div>
+</div>
+</div>
+</header>
+<!-- Canvas / Content -->
+<main class="flex-1 overflow-y-auto p-md md:p-lg lg:p-xl flex flex-col gap-lg bg-surface">
+<!-- Context Header & Stepper -->
+<div class="w-full max-w-container-max mx-auto bg-surface-container-lowest rounded-xl p-lg shadow-level-1 border border-outline-variant">
+<div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-md mb-md">
+<div>
+<h2 class="font-headline-lg text-headline-lg text-on-surface">Purchase Order #PO-2023-089</h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-1">Supplier: TechSource Distributors Ltd.</p>
+</div>
+<div class="text-right">
+<p class="font-label-bold text-label-bold text-outline uppercase tracking-wider mb-1">Total Estimated Value</p>
+<p class="font-numeric-data text-headline-lg-mobile text-primary">₦ 4,250,000</p>
+</div>
+</div>
+<!-- 4-Step Horizontal Stepper -->
+<div class="flex items-center justify-between w-full mt-lg px-2">
+<!-- Step 1 -->
+<div class="flex flex-col items-center relative z-10 w-24">
+<div class="step-circle completed">
+<span class="material-symbols-outlined" style="font-size: 16px;">check</span>
+</div>
+<span class="font-label-bold text-label-bold mt-2 text-on-surface">Supplier</span>
+</div>
+<div class="stepper-line active"></div>
+<!-- Step 2 (Active) -->
+<div class="flex flex-col items-center relative z-10 w-24">
+<div class="step-circle active">2</div>
+<span class="font-label-bold text-label-bold mt-2 text-primary font-bold">Items</span>
+</div>
+<div class="stepper-line"></div>
+<!-- Step 3 -->
+<div class="flex flex-col items-center relative z-10 w-24 opacity-60">
+<div class="step-circle pending">3</div>
+<span class="font-label-bold text-label-bold mt-2 text-on-surface-variant">Financials</span>
+</div>
+<div class="stepper-line"></div>
+<!-- Step 4 -->
+<div class="flex flex-col items-center relative z-10 w-24 opacity-60">
+<div class="step-circle pending">4</div>
+<span class="font-label-bold text-label-bold mt-2 text-on-surface-variant">Confirm</span>
+</div>
+</div>
+</div>
+<!-- Items Section Header -->
+<div class="w-full max-w-container-max mx-auto flex justify-between items-center mt-sm">
+<div class="flex items-center gap-sm">
+<h3 class="font-title-md text-title-md text-on-surface">Items Added</h3>
+<span class="bg-surface-container-high text-on-surface px-2 py-1 rounded-full font-numeric-data text-body-sm font-bold">3</span>
+</div>
+<div class="flex gap-sm">
+<button class="btn-secondary flex items-center gap-xs h-10">
+<span class="material-symbols-outlined" style="font-size: 18px;">add_circle</span>
+                        Add Item manually
+                    </button>
+<button class="btn-neon flex items-center gap-xs h-10">
+<span class="material-symbols-outlined" style="font-size: 18px;">barcode_scanner</span>
+                        Scan Next
+                    </button>
+</div>
+</div>
+<!-- Procurement Items List -->
+<div class="w-full max-w-container-max mx-auto space-y-md">
+<!-- Item Card 1 -->
+<div class="bg-surface-container-lowest rounded-xl p-md border border-outline-variant shadow-level-1 card-hover flex flex-col lg:flex-row gap-md lg:items-center relative">
+<!-- Delete Action -->
+<div class="absolute top-md right-md lg:static lg:ml-auto order-first lg:order-last">
+<button class="btn-ghost-danger">
+<span class="material-symbols-outlined">delete</span>
+</button>
+</div>
+<!-- Product Info -->
+<div class="flex-1 min-w-[200px]">
+<label class="font-label-bold text-label-bold text-outline block mb-1">Product</label>
+<div class="flex items-center gap-sm">
+<div class="w-10 h-10 bg-surface-container-high rounded flex items-center justify-center text-outline">
+<span class="material-symbols-outlined" style="font-size: 20px;">smartphone</span>
+</div>
+<div>
+<p class="font-title-md text-[16px] leading-tight text-on-surface">iPhone 15 Pro Max</p>
+<p class="font-body-sm text-xs text-on-surface-variant">256GB - Natural Titanium</p>
+</div>
+</div>
+</div>
+<!-- Inputs Grid -->
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-sm lg:gap-md flex-[2]">
+<!-- IMEI/Serial -->
+<div class="col-span-2 lg:col-span-1">
+<label class="font-label-bold text-label-bold text-outline block mb-1">IMEI / Serial</label>
+<div class="relative">
+<input class="input-premium w-full pr-8" placeholder="Scan or type..." type="text" value="358941209841029"/>
+<span class="material-symbols-outlined absolute right-2 top-2 text-outline cursor-pointer hover:text-primary" style="font-size: 16px;">qr_code_scanner</span>
+</div>
+</div>
+<!-- Quantity -->
+<div>
+<label class="font-label-bold text-label-bold text-outline block mb-1">Qty</label>
+<div class="flex items-center border border-outline-variant rounded-lg overflow-hidden bg-surface-container-lowest h-[38px]">
+<button class="px-2 text-outline hover:bg-surface-container-high transition-colors h-full flex items-center"><span class="material-symbols-outlined" style="font-size: 16px;">remove</span></button>
+<input class="w-12 text-center font-numeric-data text-body-md border-none focus:ring-0 p-0 h-full bg-transparent" type="text" value="5"/>
+<button class="px-2 text-outline hover:bg-surface-container-high transition-colors h-full flex items-center"><span class="material-symbols-outlined" style="font-size: 16px;">add</span></button>
+</div>
+</div>
+<!-- Unit Cost -->
+<div>
+<label class="font-label-bold text-label-bold text-outline block mb-1">Unit Cost</label>
+<div class="relative">
+<span class="absolute left-2 top-2 font-numeric-data text-on-surface-variant" style="font-size: 14px;">₦</span>
+<input class="input-premium w-full pl-6 font-numeric-data" placeholder="1,150,000" type="text" value="1,150,000"/>
+</div>
+</div>
+<!-- Selling Price -->
+<div>
+<label class="font-label-bold text-label-bold text-outline block mb-1">Selling Price</label>
+<div class="relative">
+<span class="absolute left-2 top-2 font-numeric-data text-on-surface-variant" style="font-size: 14px;">₦</span>
+<input class="input-premium w-full pl-6 font-numeric-data text-primary" type="text" value="1,350,000"/>
+</div>
+</div>
+</div>
+</div>
+<!-- Item Card 2 -->
+<div class="bg-surface-container-lowest rounded-xl p-md border border-outline-variant shadow-level-1 card-hover flex flex-col lg:flex-row gap-md lg:items-center relative">
+<div class="absolute top-md right-md lg:static lg:ml-auto order-first lg:order-last">
+<button class="btn-ghost-danger">
+<span class="material-symbols-outlined">delete</span>
+</button>
+</div>
+<div class="flex-1 min-w-[200px]">
+<label class="font-label-bold text-label-bold text-outline block mb-1">Product</label>
+<div class="flex items-center gap-sm">
+<div class="w-10 h-10 bg-surface-container-high rounded flex items-center justify-center text-outline">
+<span class="material-symbols-outlined" style="font-size: 20px;">laptop_mac</span>
+</div>
+<div>
+<p class="font-title-md text-[16px] leading-tight text-on-surface">MacBook Pro M3</p>
+<p class="font-body-sm text-xs text-on-surface-variant">14-inch, 18GB RAM, 512GB</p>
+</div>
+</div>
+</div>
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-sm lg:gap-md flex-[2]">
+<div class="col-span-2 lg:col-span-1">
+<label class="font-label-bold text-label-bold text-outline block mb-1">IMEI / Serial</label>
+<div class="relative">
+<input class="input-premium w-full pr-8" placeholder="Scan or type..." type="text" value="C02H8903Q6L4"/>
+<span class="material-symbols-outlined absolute right-2 top-2 text-outline cursor-pointer hover:text-primary" style="font-size: 16px;">qr_code_scanner</span>
+</div>
+</div>
+<div>
+<label class="font-label-bold text-label-bold text-outline block mb-1">Qty</label>
+<div class="flex items-center border border-outline-variant rounded-lg overflow-hidden bg-surface-container-lowest h-[38px]">
+<button class="px-2 text-outline hover:bg-surface-container-high transition-colors h-full flex items-center"><span class="material-symbols-outlined" style="font-size: 16px;">remove</span></button>
+<input class="w-12 text-center font-numeric-data text-body-md border-none focus:ring-0 p-0 h-full bg-transparent" type="text" value="2"/>
+<button class="px-2 text-outline hover:bg-surface-container-high transition-colors h-full flex items-center"><span class="material-symbols-outlined" style="font-size: 16px;">add</span></button>
+</div>
+</div>
+<div>
+<label class="font-label-bold text-label-bold text-outline block mb-1">Unit Cost</label>
+<div class="relative">
+<span class="absolute left-2 top-2 font-numeric-data text-on-surface-variant" style="font-size: 14px;">₦</span>
+<input class="input-premium w-full pl-6 font-numeric-data" type="text" value="1,850,000"/>
+</div>
+</div>
+<div>
+<label class="font-label-bold text-label-bold text-outline block mb-1">Selling Price</label>
+<div class="relative">
+<span class="absolute left-2 top-2 font-numeric-data text-on-surface-variant" style="font-size: 14px;">₦</span>
+<input class="input-premium w-full pl-6 font-numeric-data text-primary" type="text" value="2,100,000"/>
+</div>
+</div>
+</div>
+</div>
+<!-- Empty State / Add Row Placeholder -->
+<div class="bg-surface-container-lowest rounded-xl p-md border border-dashed border-outline-variant flex items-center justify-center h-24 hover:bg-surface-container-low transition-colors cursor-pointer group">
+<div class="flex items-center gap-sm text-outline group-hover:text-primary transition-colors">
+<span class="material-symbols-outlined">add_box</span>
+<span class="font-label-bold text-label-bold">Click to add new item row</span>
+</div>
+</div>
+</div>
+<!-- Bottom Action Bar -->
+<div class="w-full max-w-container-max mx-auto mt-auto pt-lg pb-md border-t border-outline-variant flex justify-between items-center sticky bottom-0 bg-surface z-10 py-md">
+<button class="btn-secondary text-on-surface-variant border-outline-variant flex items-center gap-xs">
+<span class="material-symbols-outlined" style="font-size: 18px;">arrow_back</span>
+                    Back
+                </button>
+<div class="flex items-center gap-md">
+<div class="hidden md:block text-right mr-md">
+<p class="font-label-bold text-label-bold text-outline">Subtotal (7 Items)</p>
+<p class="font-numeric-data text-title-md text-on-surface">₦ 9,450,000</p>
+</div>
+<button class="btn-primary flex items-center gap-xs" style="background-color: rgb(6, 139, 3); border: 1px solid rgb(6, 139, 3);">
+                        Next: Financials
+                        <span class="material-symbols-outlined" style="font-size: 18px;">arrow_forward</span>
+</button>
+</div>
+</div>
+</main>
+</div>
+</body></html>
