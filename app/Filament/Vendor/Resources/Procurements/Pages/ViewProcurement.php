@@ -97,7 +97,7 @@ class ViewProcurement extends ViewRecord
                     ->modalDescription(fn () => 
                         "Approving {$this->record->reference} will restock {$this->record->items()->count()} products and update their cost/selling price."
                     )
-                    ->visible(fn () => $this->record->isPending() && $user->hasVendorPermission($vendor->id, 'approve_procurement') && $this->record->created_by !== auth()->id())
+                    ->visible(fn () => $this->record->isPending() && $user->hasVendorPermission($vendor->id, 'approve_procurement') && ($this->record->created_by !== auth()->id() || !$vendor->hasOtherApprovers($this->record->created_by)))
                     ->action(function (ApproveProcurementAction $approveAction) {
                         try {
                             $approveAction->execute($this->record);

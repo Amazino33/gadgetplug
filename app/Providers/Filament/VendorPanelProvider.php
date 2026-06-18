@@ -75,20 +75,6 @@ class VendorPanelProvider extends PanelProvider
                         $user->unsetRelation('roles');
                         return $user->hasPermissionTo('access_pos');
                     }),
-                NavigationItem::make('New Procurement')
-                    ->url(fn(): string => route('procurement.create'))
-                    ->icon('heroicon-o-plus-circle')
-                    ->group('Procurement')
-                    ->sort(10)
-                    ->visible(function () {
-                        $user = auth()->user();
-                        $vendor = filament()->getTenant();
-                        if (! $user || ! $vendor) return false;
-                        if ($user->isSuperAdmin()) return true;
-                        setPermissionsTeamId($vendor->id);
-                        $user->unsetRelation('roles');
-                        return $user->hasPermissionTo('manage_inventory');
-                    }),
 
             ])
             ->plugins([

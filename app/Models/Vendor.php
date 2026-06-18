@@ -86,4 +86,11 @@ class Vendor extends Model
 
         return $owned->merge($member)->unique('id');
     }
+
+    public function hasOtherApprovers(int $excludeUserId): bool
+    {
+        $allUsers = collect([$this->user])->merge($this->users);
+        return $allUsers->where('id', '!=', $excludeUserId)
+                 ->contains(fn (User $user) => $user->hasVendorPermission($this->id, 'approve_procurement'));
+    }
 }

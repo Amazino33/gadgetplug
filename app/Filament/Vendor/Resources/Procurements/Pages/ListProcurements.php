@@ -14,7 +14,7 @@ class ListProcurements extends ListRecords
     {
         return [
             Action::make('new_procurement')
-                ->label('+ New Procurement')
+                ->label('New Procurement')
                 ->icon('heroicon-o-plus')
                 ->url(route('procurement.create'))
                 ->color('warning'),

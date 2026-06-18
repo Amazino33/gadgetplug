@@ -37,7 +37,7 @@
                     class="pl-9 pr-4 py-2.5 border border-[#becab5] rounded-lg bg-white text-sm focus:border-[#016c00] focus:ring-2 focus:ring-[#016c00]/20 outline-none w-64"
                     oninput="filterSuppliers(this.value)">
             </div>
-            <a href="#" class="flex items-center gap-2 px-4 py-2.5 border border-[#becab5] rounded-lg text-[#016c00] text-sm font-semibold hover:bg-[#f3f4f5] transition-colors whitespace-nowrap">
+            <a href="/plug/{{ $vendor->slug }}/suppliers" class="flex items-center gap-2 px-4 py-2.5 border border-[#becab5] rounded-lg text-[#016c00] text-sm font-semibold hover:bg-[#f3f4f5] transition-colors whitespace-nowrap">
                 <span class="material-symbols-outlined text-sm">add</span> New Supplier
             </a>
         </div>
