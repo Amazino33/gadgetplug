@@ -39,7 +39,8 @@ class VendorPermissionsSeeder extends Seeder
             'close_pos_session',
 
             // Inventory
-            'manage_inventory'
+            'manage_inventory',
+            'approve_procurement',
         ];
 
         foreach ($permissions as $permission) {

@@ -198,7 +198,7 @@ class CreateProcurement extends CreateRecord
 
             // ── Step 4: Confirm ────────────────────────────────────────────────
             Step::make('Confirm')
-                ->description('Submit for admin approval')
+                ->description('Submit for approval')
                 ->icon('heroicon-o-check-badge')
                 ->schema([
                     Placeholder::make('confirmation_notice')
@@ -208,7 +208,7 @@ class CreateProcurement extends CreateRecord
                                 <p class="font-semibold text-amber-800 dark:text-amber-300 text-sm mb-1">⚠️ Ready to Submit?</p>
                                 <p class="text-amber-700 dark:text-amber-400 text-sm">
                                     This will create a <strong>Pending</strong> procurement record.
-                                    Inventory levels will <strong>not</strong> change until an admin approves this record.
+                                    Inventory levels will <strong>not</strong> change until approved.
                                 </p>
                                 <p class="text-amber-700 dark:text-amber-400 text-sm mt-2">
                                     Once submitted, this record cannot be edited. If a mistake is made, it must be voided and a new one created.
@@ -236,7 +236,7 @@ class CreateProcurement extends CreateRecord
 
     protected function getCreatedNotificationTitle(): ?string
     {
-        return 'Procurement submitted — awaiting admin approval.';
+        return 'Procurement submitted — awaiting approval.';
     }
 
     protected function getRedirectUrl(): string

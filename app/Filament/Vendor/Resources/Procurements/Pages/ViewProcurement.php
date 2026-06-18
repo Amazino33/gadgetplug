@@ -2,13 +2,18 @@
 
 namespace App\Filament\Vendor\Resources\Procurements\Pages;
 
+use App\Actions\Procurement\ApproveProcurementAction;
 use App\Filament\Vendor\Resources\Procurements\ProcurementResource;
 use App\Models\Procurement;
+use Filament\Actions\Action;
 use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Textarea;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Illuminate\Support\HtmlString;
+use Override;
 
 class ViewProcurement extends ViewRecord
 {
@@ -73,6 +78,56 @@ class ViewProcurement extends ViewRecord
                     ->content(new HtmlString($this->buildItemsTable($record))),
             ]),
         ]);
+    }
+
+    #[Override]
+    protected function getHeaderActions(): array
+    {
+        $user = auth()->user();
+        $vendor = filament()->getTenant();
+        return
+            [
+                Action::make('approve')
+                    ->label('Approve & Update Stock')
+                    ->icon('heroicon-o-check-circle')
+                    ->color('success')
+                    ->size('lg')
+                    ->requiresConfirmation()
+                    ->modalHeading('Approve Procurement')
+                    ->modalDescription(fn () => 
+                        "Approving {$this->record->reference} will restock {$this->record->items()->count()} products and update their cost/selling price."
+                    )
+                    ->visible(fn () => $this->record->isPending() && $user->hasVendorPermission($vendor->id, 'approve_procurement') && $this->record->created_by !== auth()->id())
+                    ->action(function (ApproveProcurementAction $approveAction) {
+                        try {
+                            $approveAction->execute($this->record);
+                            Notification::make()->title('Procurement Approved, Inventory Updated.')->success()->send();
+                            $this->refreshFormData(['status', 'approved_by', 'approved_at']);
+                        } catch (\Throwable $e) {
+                            Notification::make()->title('Error: ' . $e->getMessage())->danger()->send();
+                        }
+                    }),
+
+                Action::make('void')
+                    ->label('Void')
+                    ->icon('heroicon-o-x-circle')
+                    ->color('danger')
+                    ->size('lg')
+                    ->requiresConfirmation()
+                    ->modalHeading('Void this Procurement')
+                    ->form([
+                        Textarea::make('void_reason')->label('Void Reason')
+                            ->required()->minLength(10)
+                            ->placeholder('Explain why this record is being voided...')
+                    ])
+                    ->visible(fn () => $this->record->isPending() && $user->hasVendorPermission($vendor->id, 'manage_inventory'))
+                    ->action(function (array $data) {
+                        $this->record->update(['status' => 'voided', 'void_reason' => $data['void_reason']]);
+                        Notification::make()->title('Procurement Voided')
+                            ->warning()->send();
+                        $this->refreshFormData(['status', 'void_reason']);
+                    }),
+            ];
     }
 
     private function buildItemsTable(Procurement $record): string

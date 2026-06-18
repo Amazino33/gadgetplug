@@ -2,13 +2,9 @@
 
 namespace App\Filament\Resources\Procurements\Pages;
 
-use App\Actions\Procurement\ApproveProcurementAction;
 use App\Filament\Resources\Procurements\ProcurementResource;
 use App\Models\Procurement;
-use Filament\Actions\Action;
 use Filament\Forms\Components\Placeholder;
-use Filament\Forms\Components\Textarea;
-use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
@@ -18,47 +14,6 @@ use Illuminate\Support\HtmlString;
 class ViewProcurement extends ViewRecord
 {
     protected static string $resource = ProcurementResource::class;
-
-    protected function getHeaderActions(): array
-    {
-        return [
-            Action::make('approve')
-                ->label('Approve & Update Stock')
-                ->icon('heroicon-o-check-circle')
-                ->color('success')
-                ->size('lg')
-                ->requiresConfirmation()
-                ->modalHeading('Approve Procurement')
-                ->modalDescription(fn () => "Approving {$this->record->reference} will restock {$this->record->items()->count()} product(s) and update their cost/selling prices.")
-                ->visible(fn () => $this->record->isPending())
-                ->action(function (ApproveProcurementAction $action) {
-                    try {
-                        $action->execute($this->record);
-                        Notification::make()->title('Procurement approved. Inventory updated.')->success()->send();
-                        $this->refreshFormData(['status', 'approved_by', 'approved_at']);
-                    } catch (\Throwable $e) {
-                        Notification::make()->title('Error: ' . $e->getMessage())->danger()->send();
-                    }
-                }),
-
-            Action::make('void')
-                ->label('Void')
-                ->icon('heroicon-o-x-circle')
-                ->color('danger')
-                ->requiresConfirmation()
-                ->modalHeading('Void this Procurement')
-                ->form([
-                    Textarea::make('void_reason')->label('Void Reason')->required()->minLength(10)
-                        ->placeholder('Explain why this record is being voided…'),
-                ])
-                ->visible(fn () => $this->record->isPending())
-                ->action(function (array $data) {
-                    $this->record->update(['status' => 'voided', 'void_reason' => $data['void_reason']]);
-                    Notification::make()->title('Procurement voided.')->warning()->send();
-                    $this->refreshFormData(['status', 'void_reason']);
-                }),
-        ];
-    }
 
     public function infolist(Schema $schema): Schema
     {
