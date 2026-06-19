@@ -43,16 +43,58 @@
         </div>
     </div>
 
-    {{-- Supplier Grid --}}
-    <form method="POST" action="{{ route('procurement.storeSupplier') }}">
+    <form method="POST" action="{{ route('procurement.storeSupplier') }}" enctype="multipart/form-data">
         @csrf
+
+        {{-- Receipt Upload --}}
+        <div class="bg-white rounded-xl p-6 shadow-[0px_4px_20px_rgba(0,0,0,0.04)] border border-[#becab5]/30 mb-6">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 rounded-lg bg-[#016c00]/10 flex items-center justify-center">
+                    <span class="material-symbols-outlined text-[#016c00]">receipt_long</span>
+                </div>
+                <div>
+                    <h3 class="font-semibold text-[#191c1d]" style="font-family:'Montserrat',sans-serif;">Receipt / Waybill Photo</h3>
+                    <p class="text-xs text-[#6f7b68]">Snap or upload the purchase receipt for reference.</p>
+                </div>
+            </div>
+
+            <label id="receiptDropzone"
+                class="relative flex flex-col items-center justify-center w-full h-44 border-2 border-dashed rounded-xl cursor-pointer hover:border-[#016c00] hover:bg-[#f3f4f5] transition-all group
+                    {{ ($receiptImage ?? false) ? 'border-[#016c00] bg-[#f3f4f5]' : 'border-[#becab5]' }}">
+                <div id="receiptPlaceholder" class="flex flex-col items-center gap-2 text-[#6f7b68] group-hover:text-[#016c00] transition-colors"
+                    @if($receiptImage ?? false) style="display:none" @endif>
+                    <span class="material-symbols-outlined text-4xl">photo_camera</span>
+                    <span class="text-sm font-semibold">Tap to snap or upload receipt</span>
+                    <span class="text-xs">JPG, PNG — max 5 MB</span>
+                </div>
+                <img id="receiptPreview"
+                    src="{{ ($receiptImage ?? false) ? asset('storage/' . $receiptImage) : '' }}"
+                    alt="Receipt preview"
+                    class="absolute inset-0 w-full h-full object-contain rounded-xl p-2"
+                    style="{{ ($receiptImage ?? false) ? '' : 'display:none' }}" />
+                <input type="file" name="receipt_image" id="receiptInput" accept="image/*" capture="environment"
+                    class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    onchange="previewReceipt(this)" />
+            </label>
+            @error('receipt_image')
+                <p class="text-red-600 text-sm mt-2">{{ $message }}</p>
+            @enderror
+            <button type="button" id="receiptClear" onclick="clearReceipt()"
+                style="{{ ($receiptImage ?? false) ? 'display:flex' : 'display:none' }}"
+                class="mt-3 flex items-center gap-1 text-red-500 text-xs font-semibold hover:text-red-700 transition-colors">
+                <span class="material-symbols-outlined text-sm">close</span> Remove photo
+            </button>
+        </div>
+
+        {{-- Supplier Grid --}}
         @error('supplier_id')
             <p class="text-red-600 text-sm mb-4">{{ $message }}</p>
         @enderror
 
         <div id="supplierGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             @forelse($suppliers as $supplier)
-            <div class="supplier-card bg-white rounded-xl p-6 border border-[#becab5]/50 shadow-[0px_4px_20px_rgba(0,0,0,0.04)] hover:shadow-[0px_10px_30px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-300 flex flex-col gap-4"
+            <div class="supplier-card rounded-xl p-6 shadow-[0px_4px_20px_rgba(0,0,0,0.04)] hover:shadow-[0px_10px_30px_rgba(0,0,0,0.08)] hover:-translate-y-0.5 transition-all duration-300 flex flex-col gap-4
+                {{ ($selectedSupplier ?? null) == $supplier->id ? 'bg-green-50 border-2 border-[#016c00]' : 'bg-white border border-[#becab5]/50' }}"
                 data-name="{{ strtolower($supplier->name) }}">
                 <div class="flex items-start justify-between">
                     <div class="flex gap-4">
@@ -115,6 +157,37 @@
             cards.forEach(card => {
                 card.style.display = card.dataset.name.includes(query.toLowerCase()) ? '' : 'none';
             });
+        }
+
+        function previewReceipt(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            if (file.size > 5 * 1024 * 1024) {
+                alert('Image must be under 5 MB.');
+                input.value = '';
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                document.getElementById('receiptPreview').src = e.target.result;
+                document.getElementById('receiptPreview').style.display = '';
+                document.getElementById('receiptPlaceholder').style.display = 'none';
+                document.getElementById('receiptClear').style.display = 'flex';
+                document.getElementById('receiptDropzone').classList.add('border-[#016c00]', 'bg-[#f3f4f5]');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function clearReceipt() {
+            const input = document.getElementById('receiptInput');
+            input.value = '';
+            document.getElementById('receiptPreview').style.display = 'none';
+            document.getElementById('receiptPreview').src = '';
+            document.getElementById('receiptPlaceholder').style.display = '';
+            document.getElementById('receiptClear').style.display = 'none';
+            document.getElementById('receiptDropzone').classList.remove('border-[#016c00]', 'bg-[#f3f4f5]');
         }
     </script>
 </x-layouts.procurement>

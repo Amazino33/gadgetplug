@@ -25,16 +25,25 @@ class ProcurementWizardController extends Controller
             ->orderByDesc('rating')
             ->get();
 
-        return view('procurement.create', compact('vendor', 'suppliers'));
+        $selectedSupplier = session('procurement.supplier_id');
+        $receiptImage = session('procurement.receipt_image');
+
+        return view('procurement.create', compact('vendor', 'suppliers', 'selectedSupplier', 'receiptImage'));
     }
 
     public function storeSupplier(Request $request)
     {
         $request->validate([
-            'supplier_id' => 'required|exists:suppliers,id',
+            'supplier_id'   => 'required|exists:suppliers,id',
+            'receipt_image'  => 'nullable|image|max:5120',
         ]);
 
         session(['procurement.supplier_id' => $request->supplier_id]);
+
+        if ($request->hasFile('receipt_image')) {
+            $path = $request->file('receipt_image')->store('receipts', 'public');
+            session(['procurement.receipt_image' => $path]);
+        }
 
         return redirect()->route('procurement.items');
     }
@@ -55,9 +64,13 @@ class ProcurementWizardController extends Controller
 
         $supplier = Supplier::findOrFail(session('procurement.supplier_id'));
         $products = Product::where('vendor_id', $vendor->id)->orderBy('name')->get();
+        $productsJson = $products->map(fn($p) => [
+            'id' => $p->id, 'name' => $p->name,
+            'price' => $p->price ?? 0, 'cost_price' => $p->cost_price ?? 0,
+        ])->values();
         $items    = session('procurement.items', []);
 
-        return view('procurement.items', compact('vendor', 'supplier', 'products', 'items'));
+        return view('procurement.items', compact('vendor', 'supplier', 'products', 'productsJson', 'items'));
     }
 
     public function storeItems(Request $request)
@@ -90,13 +103,14 @@ class ProcurementWizardController extends Controller
             abort(403, 'No vendor associated with your account. Please log in as a vendor user.');
         }
 
-        $supplier = Supplier::findOrFail(session('procurement.supplier_id'));
-        $items    = session('procurement.items', []);
-        $products = Product::whereIn('id', array_column($items, 'product_id'))->get()->keyBy('id');
+        $supplier   = Supplier::findOrFail(session('procurement.supplier_id'));
+        $items      = session('procurement.items', []);
+        $products   = Product::whereIn('id', array_column($items, 'product_id'))->get()->keyBy('id');
+        $financials = session('procurement.financials', []);
 
         $subtotal = collect($items)->sum(fn($i) => $i['quantity'] * $i['unit_cost']);
 
-        return view('procurement.financials', compact('vendor', 'supplier', 'items', 'products', 'subtotal'));
+        return view('procurement.financials', compact('vendor', 'supplier', 'items', 'products', 'subtotal', 'financials'));
     }
 
     public function storeFinancials(Request $request)
@@ -158,6 +172,7 @@ class ProcurementWizardController extends Controller
                 'payment_method' => $financials['payment_method'],
                 'notes'          => $financials['reference_number'] ?? null,
                 'status'         => 'pending',
+                'waybill_image'  => session('procurement.receipt_image'),
             ]);
 
 
@@ -173,7 +188,7 @@ class ProcurementWizardController extends Controller
             }
         });
 
-        session()->forget(['procurement.supplier_id', 'procurement.items', 'procurement.financials']);
+        session()->forget(['procurement.supplier_id', 'procurement.items', 'procurement.financials', 'procurement.receipt_image']);
 
         return redirect()->route('procurement.create')
             ->with('success', 'Procurement submitted successfully and is pending approval.');

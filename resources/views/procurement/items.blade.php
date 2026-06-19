@@ -89,13 +89,14 @@
 
     {{-- Product data for JS --}}
     <script>
-        const products = @json($products->map(fn($p) => ['id' => $p->id, 'name' => $p->name, 'price' => $p->price ?? 0]));
+        const products = @json($productsJson);
+        const savedItems = @json(session('procurement.items', []));
         let itemIndex = 0;
 
-        function addItem() {
+        function addItem(prefill = null) {
             const list = document.getElementById('itemsList');
             const idx = itemIndex++;
-            const options = products.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+            const options = products.map(p => `<option value="${p.id}" ${prefill && prefill.product_id == p.id ? 'selected' : ''}>${p.name}</option>`).join('');
 
             const html = `
             <div class="item-row bg-white rounded-xl p-4 border border-[#becab5]/50 shadow-[0px_4px_20px_rgba(0,0,0,0.04)] flex flex-col lg:flex-row gap-4 lg:items-end relative" id="row_${idx}">
@@ -117,6 +118,7 @@
                     <label class="text-[10px] font-bold text-[#6f7b68] uppercase tracking-wider block mb-1">IMEI / Serial</label>
                     <div class="relative">
                         <input type="text" name="items[${idx}][barcode]" placeholder="Scan or type..."
+                            value="${prefill?.barcode || ''}"
                             class="w-full px-3 py-2 pr-8 border border-[#becab5] rounded-lg text-sm focus:border-[#016c00] focus:ring-2 focus:ring-[#016c00]/20 outline-none">
                         <span class="material-symbols-outlined absolute right-2 top-2 text-[#6f7b68] text-[16px] cursor-pointer hover:text-[#016c00]">qr_code_scanner</span>
                     </div>
@@ -128,7 +130,7 @@
                         <button type="button" onclick="changeQty(${idx}, -1)" class="px-2 text-[#6f7b68] hover:bg-[#e7e8e9] h-full transition-colors">
                             <span class="material-symbols-outlined text-[16px]">remove</span>
                         </button>
-                        <input type="number" name="items[${idx}][quantity]" value="1" min="1"
+                        <input type="number" name="items[${idx}][quantity]" value="${prefill?.quantity || 1}" min="1"
                             id="qty_${idx}" onchange="recalculate()"
                             class="w-12 text-center border-none focus:ring-0 text-sm font-bold bg-transparent p-0 h-full">
                         <button type="button" onclick="changeQty(${idx}, 1)" class="px-2 text-[#6f7b68] hover:bg-[#e7e8e9] h-full transition-colors">
@@ -142,6 +144,7 @@
                     <div class="relative">
                         <span class="absolute left-2 top-2 text-[#6f7b68] text-sm font-bold">₦</span>
                         <input type="number" name="items[${idx}][unit_cost]" placeholder="0.00" min="0" step="0.01"
+                            value="${prefill?.unit_cost || ''}"
                             id="cost_${idx}" onchange="recalculate()"
                             class="w-full pl-6 pr-3 py-2 border border-[#becab5] rounded-lg text-sm font-bold focus:border-[#016c00] focus:ring-2 focus:ring-[#016c00]/20 outline-none">
                     </div>
@@ -152,6 +155,7 @@
                     <div class="relative">
                         <span class="absolute left-2 top-2 text-[#6f7b68] text-sm font-bold">₦</span>
                         <input type="number" name="items[${idx}][selling_price]" placeholder="0.00" min="0" step="0.01"
+                            value="${prefill?.selling_price || ''}"
                             id="price_${idx}"
                             class="w-full pl-6 pr-3 py-2 border border-[#becab5] rounded-lg text-sm font-bold text-[#016c00] focus:border-[#016c00] focus:ring-2 focus:ring-[#016c00]/20 outline-none">
                     </div>
@@ -200,7 +204,12 @@
             document.getElementById('itemCount').textContent = document.querySelectorAll('.item-row').length;
         }
 
-        // Add one row on load
-        addItem();
+        // Restore saved items or add one empty row
+        if (savedItems.length > 0) {
+            savedItems.forEach(item => addItem(item));
+            recalculate();
+        } else {
+            addItem();
+        }
     </script>
 </x-layouts.procurement>
