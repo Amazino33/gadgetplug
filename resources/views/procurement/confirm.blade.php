@@ -2,17 +2,22 @@
 
     {{-- Stepper --}}
     <div class="bg-white rounded-xl p-6 shadow-[0px_4px_20px_rgba(0,0,0,0.04)] border border-[#becab5]/30 mb-6">
-        <div class="flex items-center gap-2 text-xs font-bold text-[#6f7b68] uppercase tracking-wider mb-5">
-            <span>Supplier</span>
-            <span class="material-symbols-outlined text-[16px]">chevron_right</span>
-            <span>Items</span>
-            <span class="material-symbols-outlined text-[16px]">chevron_right</span>
-            <span>Financials</span>
-            <span class="material-symbols-outlined text-[16px]">chevron_right</span>
-            <span class="text-[#016c00]">Confirm</span>
+        <h1 class="text-2xl font-bold text-[#191c1d] mb-1" style="font-family:'Montserrat',sans-serif;">Review & Confirm</h1>
+        <p class="text-sm text-[#6f7b68] mb-4">Please review your procurement before submitting for approval.</p>
+        <div class="flex items-center justify-between relative">
+            <div class="absolute left-4 right-4 top-4 h-0.5 bg-[#e1e3e4] -z-10"></div>
+            <div class="absolute left-4 top-4 h-0.5 bg-[#016c00] -z-10" style="width:75%"></div>
+            @foreach([['1','Supplier','completed'],['2','Items','completed'],['3','Financials','completed'],['4','Confirm','active']] as [$num,$label,$state])
+            <div class="flex flex-col items-center gap-2 bg-white px-2">
+                <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold
+                    {{ $state === 'completed' ? 'bg-[#016c00] text-white' : ($state === 'active' ? 'bg-[#016c00] text-white ring-4 ring-[#016c00]/20' : 'bg-[#e7e8e9] text-[#6f7b68]') }}"
+                    style="font-family:'Montserrat',sans-serif;">
+                    {{ $state === 'completed' ? '✓' : $num }}
+                </div>
+                <span class="text-xs font-semibold {{ $state === 'active' ? 'text-[#016c00]' : 'text-[#6f7b68]' }}">{{ $label }}</span>
+            </div>
+            @endforeach
         </div>
-        <h1 class="text-2xl font-bold text-[#191c1d]" style="font-family:'Montserrat',sans-serif;">Review & Confirm</h1>
-        <p class="text-sm text-[#6f7b68] mt-1">Please review your procurement before submitting for approval.</p>
     </div>
 
     {{-- Warning Notice --}}
@@ -20,7 +25,7 @@
         <span class="material-symbols-outlined text-orange-500 shrink-0">info</span>
         <div>
             <p class="text-sm font-semibold text-orange-800">Pending Approval</p>
-            <p class="text-xs text-orange-700 mt-0.5">This procurement will be submitted as <strong>pending</strong> and must be approved by an administrator before stock is updated.</p>
+            <p class="text-xs text-orange-700 mt-0.5">This procurement will be submitted as <strong>pending</strong> and must be approved before stock is updated.</p>
         </div>
     </div>
 
@@ -47,8 +52,8 @@
 
             {{-- Items Table --}}
             <div class="bg-white rounded-xl border border-[#becab5]/30 shadow-[0px_4px_20px_rgba(0,0,0,0.04)] overflow-hidden">
-                <div class="px-5 py-4 border-b border-[#e1e3e4] bg-[#f3f4f5]">
-                    <h2 class="text-xs font-bold text-[#6f7b68] uppercase tracking-wider">Items ({{ count($items) }})</h2>
+                <div class="px-5 py-4 border-b border-[#e1e3e4]">
+                    <h2 class="text-base font-semibold text-[#191c1d]" style="font-family:'Montserrat',sans-serif;">Items ({{ count($items) }})</h2>
                 </div>
                 <div class="divide-y divide-[#e1e3e4]">
                     @foreach($items as $item)
@@ -92,8 +97,8 @@
         {{-- Right: Payment Summary --}}
         <div class="lg:col-span-4">
             <div class="bg-white rounded-xl border border-[#becab5]/30 shadow-[0px_4px_20px_rgba(0,0,0,0.04)] overflow-hidden mb-4">
-                <div class="bg-[#f3f4f5] px-5 py-4 border-b border-[#e1e3e4]">
-                    <h2 class="text-sm font-semibold text-[#191c1d]" style="font-family:'Montserrat',sans-serif;">Payment Summary</h2>
+                <div class="px-5 py-4 border-b border-[#e1e3e4]">
+                    <h2 class="text-base font-semibold text-[#191c1d]" style="font-family:'Montserrat',sans-serif;">Payment Summary</h2>
                 </div>
                 <div class="p-5 space-y-3">
                     <div class="flex justify-between text-sm">
@@ -123,21 +128,23 @@
                 </div>
             </div>
 
-            <div class="flex gap-3">
-                <a href="{{ route('procurement.financials') }}"
-                    class="flex-1 text-center px-4 py-2.5 border border-[#becab5] rounded-lg text-[#016c00] text-sm font-semibold hover:bg-[#f3f4f5] transition-colors">
-                    Back
-                </a>
-                <form method="POST" action="{{ route('procurement.submit') }}" class="flex-[2]">
-                    @csrf
-                    <button type="submit"
-                        class="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#016c00] text-white text-sm font-bold rounded-lg hover:bg-green-800 transition-colors"
-                        style="font-family:'Montserrat',sans-serif;">
-                        <span class="material-symbols-outlined text-sm">check_circle</span>
-                        Submit Procurement
-                    </button>
-                </form>
-            </div>
         </div>
+    </div>
+
+    {{-- Bottom Bar --}}
+    <div class="sticky bottom-0 bg-white border-t border-[#e1e3e4] flex justify-between items-center px-6 py-4 -mx-6 shadow-[0px_-4px_20px_rgba(0,0,0,0.04)] mt-6">
+        <a href="{{ route('procurement.financials') }}"
+            class="flex items-center gap-2 px-6 py-2.5 border border-[#becab5] rounded-lg text-[#6f7b68] text-sm font-semibold hover:bg-[#f3f4f5] transition-colors">
+            <span class="material-symbols-outlined text-sm">arrow_back</span> Back
+        </a>
+        <form method="POST" action="{{ route('procurement.submit') }}">
+            @csrf
+            <button type="submit"
+                class="flex items-center gap-2 px-6 py-2.5 bg-[#016c00] text-white text-sm font-bold rounded-lg hover:bg-green-800 transition-colors"
+                style="font-family:'Montserrat',sans-serif;">
+                <span class="material-symbols-outlined text-sm">check_circle</span>
+                Submit Procurement
+            </button>
+        </form>
     </div>
 </x-layouts.procurement>
