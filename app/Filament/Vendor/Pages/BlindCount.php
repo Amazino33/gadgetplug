@@ -21,8 +21,8 @@ class BlindCount extends Page
 {
     protected static null|string|BackedEnum $navigationIcon  = 'heroicon-o-eye-slash';
     protected static string|null|UnitEnum   $navigationGroup = 'Inventory';
-    protected static ?string $navigationLabel = 'Blind Count';
-    protected static ?string $title           = 'Blind Stock Count';
+    protected static ?string $navigationLabel = 'Inventory Count';
+    protected static ?string $title           = 'Inventory Count';
     protected static ?int    $navigationSort  = 3;
     protected string  $view = 'filament.vendor.pages.blind-count';
 
@@ -140,7 +140,7 @@ class BlindCount extends Page
     public function startSession(): void
     {
         if (! $this->canCount()) {
-            Notification::make()->title('Only storekeepers can start a blind count session.')->warning()->send();
+            Notification::make()->title('Only storekeepers can start an inventory count session.')->warning()->send();
             return;
         }
 
@@ -194,7 +194,7 @@ class BlindCount extends Page
     public function joinAsB(): void
     {
         if (! $this->canCount()) {
-            Notification::make()->title('Only storekeepers can participate in blind counts.')->warning()->send();
+            Notification::make()->title('Only storekeepers can participate in inventory counts.')->warning()->send();
             return;
         }
 
@@ -408,7 +408,7 @@ class BlindCount extends Page
                         quantityChanged: $difference,
                         transactionType: 'audit_correction',
                         userId:          $session->storekeeper_a_id,
-                        reference:       "Blind Count #{$session->id}",
+                        reference:       "Inventory Count #{$session->id}",
                         description:     "Single-person count. System had {$product->stock_quantity}, found {$count}."
                     );
                 }
@@ -455,7 +455,7 @@ class BlindCount extends Page
                             quantityChanged: $difference,
                             transactionType: 'audit_correction',
                             userId:          $session->storekeeper_b_id,
-                            reference:       "Blind Count #{$session->id}",
+                            reference:       "Inventory Count #{$session->id}",
                             description:     "Verified count. System had {$product->stock_quantity}, found {$countB}."
                         );
                     }
@@ -482,7 +482,7 @@ class BlindCount extends Page
 
                 if ($managers->isNotEmpty()) {
                     Notification::make()
-                        ->title("{$discrepancies} discrepanc" . ($discrepancies === 1 ? 'y' : 'ies') . " found in blind count")
+                        ->title("{$discrepancies} discrepanc" . ($discrepancies === 1 ? 'y' : 'ies') . " found in inventory count")
                         ->body('Review the Audit Sessions page to resolve them.')
                         ->danger()
                         ->sendToDatabase($managers);

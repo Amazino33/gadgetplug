@@ -49,7 +49,7 @@ class ProcessAuditCountAction
                         transactionType: 'audit_correction',
                         userId: $storeKeeperBId,
                         reference: "Audit #{$audit->id}",
-                        description: "Blind count verified. System expected {$currentSystemStock}, actually found {$audit->count_b}."
+                        description: "Inventory count verified. System expected {$currentSystemStock}, actually found {$audit->count_b}."
                     );
                 }
             } else {

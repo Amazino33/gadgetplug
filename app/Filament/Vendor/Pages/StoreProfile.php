@@ -79,7 +79,7 @@ class StoreProfile extends Page
                             ->live(),
 
                         Select::make('pos_blind_count_participants')
-                            ->label('Blind Count Participants')
+                            ->label('Inventory Count Participants')
                             ->options([
                                 1 => '1 person — single counter (faster)',
                                 2 => '2 people — dual verification (more accurate)',

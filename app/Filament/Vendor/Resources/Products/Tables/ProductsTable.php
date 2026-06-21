@@ -94,7 +94,7 @@ class ProductsTable
                 EditAction::make(),
 
                 Action::make('start_audit')
-                    ->label('Start Blind Count')
+                    ->label('Start Inventory Count')
                     ->icon('heroicon-o-clipboard-document-check')
                     ->color('warning')
                     ->requiresConfirmation()

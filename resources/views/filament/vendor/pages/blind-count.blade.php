@@ -26,7 +26,7 @@
         <div class="w-14 h-14 bg-[#1a3a1a] rounded-full flex items-center justify-center mx-auto mb-3">
             <x-heroicon-o-eye-slash class="w-7 h-7 text-[#4caf50]"/>
         </div>
-        <h2 class="text-white font-montserrat font-bold text-xl">Start Blind Count</h2>
+        <h2 class="text-white font-montserrat font-bold text-xl">Start Inventory Count</h2>
         <p class="text-[#5a7a5c] text-sm mt-1">Products will be served randomly. Count what you physically see.</p>
     </div>
 
@@ -75,8 +75,8 @@
     <div class="w-14 h-14 bg-[#1a3a1a] rounded-full flex items-center justify-center mx-auto">
         <x-heroicon-o-eye class="w-7 h-7 text-[#5a7a5c]"/>
     </div>
-    <h2 class="text-white font-montserrat font-bold text-lg">No Active Blind Count</h2>
-    <p class="text-[#5a7a5c] text-sm">Blind count sessions are started by storekeepers. Assign the <span class="text-[#4caf50] font-semibold">Storekeeper</span> role to a team member from the Team Members page.</p>
+    <h2 class="text-white font-montserrat font-bold text-lg">No Active Inventory Count</h2>
+    <p class="text-[#5a7a5c] text-sm">Inventory count sessions are started by storekeepers. Assign the <span class="text-[#4caf50] font-semibold">Storekeeper</span> role to a team member from the Team Members page.</p>
 </div>
 @endif
 
@@ -165,7 +165,7 @@
         <x-heroicon-o-check-badge class="w-7 h-7 text-[#4caf50]"/>
     </div>
     <h2 class="text-white font-montserrat font-bold text-lg">Session Complete</h2>
-    <p class="text-[#5a7a5c] text-sm">The blind count has been processed. Check Audit Sessions for any discrepancies that need manager review.</p>
+    <p class="text-[#5a7a5c] text-sm">The inventory count has been processed. Check Audit Sessions for any discrepancies that need manager review.</p>
     <a href="{{ \App\Filament\Vendor\Resources\AuditSessions\AuditSessionResource::getUrl('index', tenant: filament()->getTenant()) }}"
         class="inline-block mt-2 text-[#4caf50] text-sm font-semibold hover:underline">
         View Audit Sessions →
