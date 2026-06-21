@@ -59,10 +59,6 @@ class ProductForm
                                     ->prefix('₦')
                                     ->gt('cost_price'),
 
-                                TextInput::make('stock_quantity')
-                                    ->numeric()
-                                    ->required()
-                                    ->default(0),
 
                                 Textarea::make('description')
                                     ->rows(4)
