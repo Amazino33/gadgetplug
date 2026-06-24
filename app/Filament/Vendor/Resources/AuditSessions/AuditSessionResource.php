@@ -263,7 +263,7 @@ class AuditSessionResource extends Resource
             ->toolbarActions([
                 BulkActionGroup::make([
                     DeleteBulkAction::make()
-                        ->visible(fn () => filament()->getTenant()?->isOwner(auth()->user())),
+                        ->visible(fn () => auth()->user()->isSuperAdmin() || filament()->getTenant()?->isOwner(auth()->user())),
                 ]),
             ]);
     }
