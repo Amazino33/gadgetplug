@@ -262,7 +262,8 @@ class AuditSessionResource extends Resource
             ->defaultSort('created_at', 'desc')
             ->toolbarActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make(),
+                    DeleteBulkAction::make()
+                        ->visible(fn () => auth()->user()->isSuperAdmin() || filament()->getTenant()?->isOwner(auth()->user())),
                 ]),
             ]);
     }
