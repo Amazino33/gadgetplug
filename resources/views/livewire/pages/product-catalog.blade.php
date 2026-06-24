@@ -61,7 +61,7 @@ new class extends Component {
     {
         $query = Product::published()
             ->with(['vendor', 'category', 'media'])
-            ->whereRaw('(stock_quantity - reserved_stock) > 0')
+            ->whereRaw('CAST(stock_quantity AS SIGNED) - CAST(reserved_stock AS SIGNED) > 0')
             ->when($this->selectedCategory, fn($q) => $q->where('category_id', $this->selectedCategory))
             ->when($this->search, fn($q) => $q->where(function ($sq) {
                 $sq->where('name', 'like', "%{$this->search}%")

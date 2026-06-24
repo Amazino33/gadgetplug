@@ -46,7 +46,7 @@ class ProductsTable
                     ->label('Available')
                     ->numeric()
                     ->sortable(query: fn ($query, $direction) =>
-                        $query->orderByRaw("(stock_quantity - reserved_stock) {$direction}")
+                        $query->orderByRaw("CAST(stock_quantity AS SIGNED) - CAST(reserved_stock AS SIGNED) {$direction}")
                     )
                     ->badge()
                     ->color(fn (int $state): string => match (true) {

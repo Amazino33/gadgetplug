@@ -79,11 +79,11 @@ class InventoryTableWidget extends BaseWidget
                 Tables\Columns\TextColumn::make('available_stock')
                     ->label('Available to Sell')
                     ->sortable(query: fn ($query, $direction) =>
-                        $query->orderByRaw("(stock_quantity - reserved_stock) {$direction}")
+                        $query->orderByRaw("CAST(stock_quantity AS SIGNED) - CAST(reserved_stock AS SIGNED) {$direction}")
                     )
                     ->badge()
                     ->color(fn (int $state): string => match (true) {
-                        $state === 0 => 'danger',
+                        $state <= 0  => 'danger',
                         $state < 5   => 'warning',
                         default      => 'success',
                     })
@@ -149,10 +149,10 @@ class InventoryTableWidget extends BaseWidget
                         'healthy' => 'Healthy',
                     ])
                     ->query(fn (\Illuminate\Database\Eloquent\Builder $q, array $data) => match ($data['value'] ?? null) {
-                        'out'     => $q->whereRaw('(stock_quantity - reserved_stock) <= 0'),
-                        'low'     => $q->whereRaw('(stock_quantity - reserved_stock) > 0')
-                                       ->whereRaw('(stock_quantity - reserved_stock) < 5'),
-                        'healthy' => $q->whereRaw('(stock_quantity - reserved_stock) >= 5'),
+                        'out'     => $q->whereRaw('CAST(stock_quantity AS SIGNED) - CAST(reserved_stock AS SIGNED) <= 0'),
+                        'low'     => $q->whereRaw('CAST(stock_quantity AS SIGNED) - CAST(reserved_stock AS SIGNED) > 0')
+                                       ->whereRaw('CAST(stock_quantity AS SIGNED) - CAST(reserved_stock AS SIGNED) < 5'),
+                        'healthy' => $q->whereRaw('CAST(stock_quantity AS SIGNED) - CAST(reserved_stock AS SIGNED) >= 5'),
                         default   => $q,
                     }),
             ])

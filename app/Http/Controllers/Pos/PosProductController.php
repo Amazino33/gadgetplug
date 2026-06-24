@@ -16,7 +16,7 @@ class PosProductController extends Controller
 
         $products = Product::published()
             ->where('vendor_id', $request->vendor_id)
-            ->whereRaw('(stock_quantity - reserved_stock) > 0')
+            ->whereRaw('CAST(stock_quantity AS SIGNED) - CAST(reserved_stock AS SIGNED) > 0')
             ->with('media')
             ->select(['id', 'name', 'sku', 'barcode', 'price', 'stock_quantity', 'reserved_stock', 'vendor_id'])
             ->get()
