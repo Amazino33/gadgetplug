@@ -157,7 +157,7 @@ class AuditSessionResource extends Resource
                     }),
 
             ])
-            ->actions([
+            ->recordActions([
 
                 // ── Storekeeper B submits their count ────────────────────────────
                 Action::make('verify_count')
