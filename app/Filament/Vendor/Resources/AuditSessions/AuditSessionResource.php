@@ -14,6 +14,8 @@ use Filament\Tables\Table;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Actions\Action;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteBulkAction;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Exception;
@@ -257,7 +259,13 @@ class AuditSessionResource extends Resource
                     ->successNotificationTitle('Discrepancy resolved.'),
 
             ])
-            ->defaultSort('created_at', 'desc');
+            ->defaultSort('created_at', 'desc')
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make()
+                        ->visible(fn () => filament()->getTenant()?->isOwner(auth()->user())),
+                ]),
+            ]);
     }
 
     public static function getPages(): array
