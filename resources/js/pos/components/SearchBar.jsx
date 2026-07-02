@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, forwardRef, useImperativeHandle } from '
 import { db } from '../lib/db';
 import api from '../lib/api';
 
-const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect }, ref) {
+const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect, autoFocus = true }, ref) {
     const [query, setQuery]     = useState('');
     const [results, setResults] = useState([]);
     const [open, setOpen]       = useState(false);
@@ -69,8 +69,8 @@ const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect }, ref) {
 
     return (
         <div className="relative flex-1">
-            <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5">
-                <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5">
+                <svg className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                         d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
@@ -83,30 +83,30 @@ const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect }, ref) {
                     onFocus={() => query && setOpen(true)}
                     onBlur={() => setTimeout(() => setOpen(false), 150)}
                     placeholder="Scan barcode or search product…  [F3]"
-                    autoFocus
-                    className="flex-1 bg-transparent text-sm outline-none placeholder-gray-400"
+                    autoFocus={autoFocus}
+                    className="flex-1 bg-transparent text-sm outline-none placeholder-gray-400 dark:placeholder-gray-500 text-gray-800 dark:text-gray-100"
                 />
             </div>
 
             {open && results.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 max-h-72 overflow-y-auto">
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg z-50 max-h-72 overflow-y-auto">
                     {results.map((p) => (
                         <button
                             key={p.id}
                             onMouseDown={() => pick(p)}
-                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-left border-b border-gray-50 last:border-0"
+                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 text-left border-b border-gray-50 dark:border-gray-800 last:border-0"
                         >
                             {p.image
                                 ? <img src={p.image} className="w-10 h-10 rounded-lg object-cover shrink-0" />
-                                : <div className="w-10 h-10 rounded-lg bg-gray-100 shrink-0" />
+                                : <div className="w-10 h-10 rounded-lg bg-gray-100 dark:bg-gray-800 shrink-0" />
                             }
                             <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-gray-800 truncate">{p.name}</p>
-                                <p className="text-xs text-gray-400">{p.sku ?? p.barcode ?? '—'}</p>
+                                <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate">{p.name}</p>
+                                <p className="text-xs text-gray-400 dark:text-gray-500">{p.sku ?? p.barcode ?? '—'}</p>
                             </div>
                             <div className="text-right shrink-0">
-                                <p className="text-sm font-semibold text-gray-800">₦{Number(p.price).toLocaleString()}</p>
-                                <p className={`text-xs ${p.available_stock < 5 ? 'text-orange-500' : 'text-gray-400'}`}>
+                                <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">₦{Number(p.price).toLocaleString()}</p>
+                                <p className={`text-xs ${p.available_stock < 5 ? 'text-orange-500' : 'text-gray-400 dark:text-gray-500'}`}>
                                     {p.available_stock} left
                                 </p>
                             </div>

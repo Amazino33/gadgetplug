@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import api from '../lib/api';
 import { db } from '../lib/db';
 
-const DOTS = 6;
+const DOTS = 4;
 const CONFIG = window.POS_CONFIG ?? {};
 
 export default function Login({ onLogin }) {
@@ -71,13 +71,13 @@ export default function Login({ onLogin }) {
     const keys = ['1','2','3','4','5','6','7','8','9','','0','⌫'];
 
     return (
-        <div className="min-h-screen bg-[#F9FAFB] flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 sm:p-10">
+        <div className="min-h-screen bg-[#F9FAFB] dark:bg-gray-950 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-sm p-6 sm:p-10">
 
                 {/* Back to panel */}
                 {panelUrl && (
                     <a href={panelUrl}
-                        className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 mb-5 -mt-1">
+                        className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 mb-5 -mt-1">
                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                         </svg>
@@ -90,8 +90,8 @@ export default function Login({ onLogin }) {
                         GadgetPlug POS
                     </p>
                     {lockedVendorName
-                        ? <p className="text-gray-600 text-sm font-medium mt-1">{lockedVendorName}</p>
-                        : <p className="text-gray-400 text-sm mt-1">Enter your PIN to continue</p>
+                        ? <p className="text-gray-600 dark:text-gray-400 text-sm font-medium mt-1">{lockedVendorName}</p>
+                        : <p className="text-gray-400 dark:text-gray-500 text-sm mt-1">Enter your PIN to continue</p>
                     }
                 </div>
 
@@ -104,11 +104,11 @@ export default function Login({ onLogin }) {
                         value={vendorId}
                         onChange={(e) => setVendorId(e.target.value)}
                         onBlur={() => setTimeout(() => pinInputRef.current?.focus(), 100)}
-                        className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm text-center mb-5 focus:outline-none focus:border-[#068B03]"
+                        className="w-full border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500 rounded-lg px-4 py-2.5 text-sm text-center mb-5 focus:outline-none focus:border-[#068B03]"
                     />
                 )}
 
-                <p className="text-xs text-gray-400 text-center mb-3">
+                <p className="text-xs text-gray-400 dark:text-gray-500 text-center mb-3">
                     {lockedVendorId ? 'Tap below or type your PIN' : 'Enter your PIN'}
                 </p>
 
@@ -135,7 +135,7 @@ export default function Login({ onLogin }) {
                             className={`w-4 h-4 rounded-full border-2 transition-all ${
                                 i < pin.length
                                     ? 'bg-[#068B03] border-[#068B03] scale-110'
-                                    : 'border-gray-300'
+                                    : 'border-gray-300 dark:border-gray-600'
                             }`}
                         />
                     ))}
@@ -160,8 +160,8 @@ export default function Login({ onLogin }) {
                             className={`h-14 rounded-xl text-xl font-semibold transition-all
                                 ${k === '' ? 'invisible' : ''}
                                 ${k === '⌫'
-                                    ? 'bg-gray-100 text-gray-600 hover:bg-gray-200 active:scale-95'
-                                    : 'bg-[#F9FAFB] text-gray-800 hover:bg-gray-100 active:scale-95'
+                                    ? 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 active:scale-95'
+                                    : 'bg-[#F9FAFB] dark:bg-gray-800 text-gray-800 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 active:scale-95'
                                 }
                             `}
                         >

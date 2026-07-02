@@ -14,7 +14,7 @@ class PosAuthController extends Controller
     {
         $request->validate([
             'vendor_id' => 'required|integer',
-            'pin'       => 'required|string|min:4|max:6',
+            'pin'       => 'required|digits:4',
         ]);
 
         // Find users who belong to this vendor and have a POS PIN

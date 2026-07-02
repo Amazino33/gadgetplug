@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -22,6 +22,7 @@
             panelUrl:   @json($panelUrl),
         };
     </script>
+    <script>if (localStorage.getItem('darkMode') === 'true') document.documentElement.classList.add('dark');</script>
     @viteReactRefresh
     @vite(['resources/js/pos/main.jsx', 'resources/js/pwa.js'])
 </head>
