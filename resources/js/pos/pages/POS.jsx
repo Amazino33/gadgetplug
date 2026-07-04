@@ -18,10 +18,6 @@ import ReceiptModal from '../components/ReceiptModal';
 
 const CONFIG = window.POS_CONFIG ?? {};
 
-const vendorSettings = JSON.parse(localStorage.getItem('pos_vendor_settings') ?? '{}');
-const VAT_ENABLED = vendorSettings.vat_enabled ?? true;
-const VAT_RATE    = vendorSettings.vat_rate    ?? 7.5;
-
 // Small button used inside the mobile "More" sheet
 const SheetBtn = ({ label, onClick, disabled = false, color = 'gray' }) => {
     const colors = {
