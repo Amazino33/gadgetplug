@@ -16,6 +16,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Exception;
@@ -156,6 +157,26 @@ class AuditSessionResource extends Resource
                         default               => 'gray',
                     }),
 
+                // ── 9. Reason code ───────────────────────────────────────────────
+                TextColumn::make('reason_code')
+                    ->label('Reason')
+                    ->badge()
+                    ->color('warning')
+                    ->placeholder('—'),
+
+                // ── 10. Financial write-off value ────────────────────────────────
+                TextColumn::make('loss_value')
+                    ->label('Write-Off (₦)')
+                    ->alignRight()
+                    ->getStateUsing(fn (AuditSession $r): string =>
+                        $r->loss_value > 0
+                            ? '−₦' . number_format((float) $r->loss_value, 2)
+                            : '—'
+                    )
+                    ->color(fn (AuditSession $r): string =>
+                        $r->loss_value > 0 ? 'danger' : 'gray'
+                    ),
+
             ])
             ->recordActions([
 
@@ -229,6 +250,18 @@ class AuditSessionResource extends Resource
                             ->numeric()
                             ->required()
                             ->minValue(0),
+                        Select::make('reason_code')
+                            ->label('Reason for Discrepancy')
+                            ->options([
+                                'Damaged in Store'        => 'Damaged in Store',
+                                'Suspected Theft'         => 'Suspected Theft',
+                                'Waybill Shortage'        => 'Waybill Shortage',
+                                'Data Entry Error'        => 'Data Entry Error',
+                                'Supplier Short Delivery' => 'Supplier Short Delivery',
+                                'Other'                   => 'Other',
+                            ])
+                            ->required()
+                            ->searchable(),
                     ])
                     ->visible(fn (AuditSession $record): bool =>
                         $record->status === 'discrepancy' &&
@@ -236,8 +269,12 @@ class AuditSessionResource extends Resource
                     )
                     ->action(function (AuditSession $record, array $data, AdjustStockAction $adjustStock): void {
                         $finalCount         = (int) $data['manager_override_count'];
+                        $reasonCode         = $data['reason_code'];
                         $currentSystemStock = (int) $record->product->stock_quantity;
                         $difference         = $finalCount - $currentSystemStock;
+                        $lossValue          = $difference < 0
+                            ? abs($difference) * (float) ($record->product->cost_price ?? 0)
+                            : 0;
 
                         if ($difference !== 0) {
                             $adjustStock->execute(
@@ -246,7 +283,9 @@ class AuditSessionResource extends Resource
                                 transactionType: 'audit_correction',
                                 userId:          auth()->id(),
                                 reference:       "Audit Override #{$record->id}",
-                                description:     "Manager override forced stock to {$finalCount}."
+                                description:     "Manager override forced stock to {$finalCount}. Reason: {$reasonCode}.",
+                                auditSessionId:  $record->id,
+                                reasonCode:      $reasonCode,
                             );
                         }
 
@@ -254,6 +293,8 @@ class AuditSessionResource extends Resource
                             'manager_id'             => auth()->id(),
                             'manager_override_count' => $finalCount,
                             'status'                 => 'resolved_by_override',
+                            'reason_code'            => $reasonCode,
+                            'loss_value'             => $lossValue,
                         ]);
                     })
                     ->successNotificationTitle('Discrepancy resolved.'),

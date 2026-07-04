@@ -2,7 +2,6 @@
 
 namespace App\Actions\Inventory;
 
-use App\Models\Inventory;
 use App\Models\InventoryLedger;
 use App\Models\Product;
 use Illuminate\Support\Facades\DB;
@@ -20,8 +19,10 @@ class AdjustStockAction
         ?int $userId = null,
         ?string $reference = null,
         ?string $description = null,
+        ?int $auditSessionId = null,
+        ?string $reasonCode = null,
     ) {
-        return DB::transaction(function () use ($productId, $quantityChanged, $transactionType, $userId, $reference, $description) {
+        return DB::transaction(function () use ($productId, $quantityChanged, $transactionType, $userId, $reference, $description, $auditSessionId, $reasonCode) {
             // 1. PESSIMISTIC LOCK: Lock the product row until the transaction is done
             // If POS tries to sell this at the exact same millisecond, it will be forced to wait.
             $product = Product::where('id', $productId)->lockForUpdate()->firstOrFail();
@@ -37,13 +38,15 @@ class AdjustStockAction
 
             // 4. Record the immutable movement in the ledger
             $ledger = InventoryLedger::create([
-                'vendor_id' => $product->vendor_id,
-                'product_id' => $product->id,
-                'user_id' => $userId,
+                'vendor_id'        => $product->vendor_id,
+                'product_id'       => $product->id,
+                'user_id'          => $userId,
                 'transaction_type' => $transactionType,
-                'quantity_change' => $quantityChanged,
-                'reference' => $reference,
-                'description' => $description,
+                'quantity_change'  => $quantityChanged,
+                'reference'        => $reference,
+                'description'      => $description,
+                'audit_session_id' => $auditSessionId,
+                'reason_code'      => $reasonCode,
             ]);
 
             // 5. Trigger low stock alert if needed 

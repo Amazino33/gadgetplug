@@ -22,4 +22,9 @@ class InventoryLedger extends Model
     {
         return $this->belongsTo(User::class);
     }
+
+    public function auditSession()
+    {
+        return $this->belongsTo(AuditSession::class);
+    }
 }

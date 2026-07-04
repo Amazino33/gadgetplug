@@ -17,6 +17,12 @@ class AuditSession extends Model
         'manager_id',
         'manager_override_count',
         'status',
+        'reason_code',
+        'loss_value',
+    ];
+
+    protected $casts = [
+        'loss_value' => 'decimal:2',
     ];
 
     public function vendor(): BelongsTo
