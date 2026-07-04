@@ -40,10 +40,6 @@ const SheetBtn = ({ label, onClick, disabled = false, color = 'gray' }) => {
 };
 
 export default function POS({ user, vendorId, onLogout }) {
-    const vendorSettings = JSON.parse(localStorage.getItem('pos_vendor_settings') ?? '{}');
-    const VAT_ENABLED = vendorSettings.vat_enabled ?? true;
-    const VAT_RATE    = vendorSettings.vat_rate    ?? 7.5;
-
     const [cart, setCart]                 = useState([]);
     const [selectedIdx, setSelectedIdx]   = useState(null);
     const [customer, setCustomer]         = useState(null);
