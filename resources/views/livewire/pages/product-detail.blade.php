@@ -198,12 +198,7 @@ $emoji = $categoryEmojis[strtolower($product->category?->name ?? '')] ?? '📦';
                 <span class="font-montserrat font-black text-[32px] text-brand leading-none">
                     ₦{{ number_format($product->price) }}
                 </span>
-                @if ($product->stock_quantity > 0)
-                <span class="flex items-center gap-1 bg-[#e8f5e9] dark:bg-[#1a2a1a] text-brand text-[11px] font-bold font-montserrat px-2.5 py-1 rounded-full">
-                    <span class="w-1.5 h-1.5 rounded-full bg-brand inline-block animate-pulse"></span>
-                    Only {{ $product->stock_quantity }} Left — Order Now!
-                </span>
-                @else
+                @if ($product->stock_quantity <= 0)
                 <span class="flex items-center gap-1 bg-[#fce4ec] text-red-600 text-[11px] font-bold font-montserrat px-2.5 py-1 rounded-full">
                     <span class="w-1.5 h-1.5 rounded-full bg-red-500 inline-block"></span>
                     Out of Stock
@@ -229,7 +224,6 @@ $emoji = $categoryEmojis[strtolower($product->category?->name ?? '')] ?? '📦';
                         @disabled($quantity >= $product->stock_quantity)>
                         +
                     </button>
-                    <span class="ml-3 text-[11px] text-brand-muted">Max: {{ $product->stock_quantity }}</span>
                 </div>
             </div>
             @endif

@@ -220,6 +220,8 @@ class CreateProcurement extends CreateRecord
         ];
     }
 
+    protected static bool $canCreateAnother = false;
+
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         $data['created_by'] = auth()->id();

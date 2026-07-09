@@ -8,4 +8,6 @@ use Filament\Resources\Pages\CreateRecord;
 class CreateClientRequest extends CreateRecord
 {
     protected static string $resource = ClientRequestResource::class;
+
+    protected static bool $canCreateAnother = false;
 }
