@@ -233,3 +233,122 @@ test('one active session per vendor guard still holds', function () {
 
     expect($component->get('sessionId'))->not->toBeNull();
 });
+
+test('previous navigates back and preserves the entered count on both items', function () {
+    $data = setUpSoloVendor();
+    $this->actingAs($data['storekeeper']);
+    setFilamentTenant($data['vendor']);
+
+    $component = Livewire::test(BlindCount::class)->call('startSession');
+    $component->set('count', 5);
+    $component->call('next');
+    $component->set('count', 3);
+    $component->call('previous');
+
+    // Back on item 1 — its previously entered count must still be there
+    expect($component->get('count'))->toBe(5)
+        ->and($component->get('currentPosition'))->toBe(1);
+
+    $firstProduct = productAtPosition($data['vendor'], 1);
+    $secondProduct = productAtPosition($data['vendor'], 2);
+
+    expect(BlindCountEntry::where('blind_count_session_id', $component->get('sessionId'))
+        ->where('product_id', $firstProduct->id)->first()->count)->toBe(5)
+        ->and(BlindCountEntry::where('blind_count_session_id', $component->get('sessionId'))
+        ->where('product_id', $secondProduct->id)->first()->count)->toBe(3);
+});
+
+test('previous is a no-op on the first item', function () {
+    $data = setUpSoloVendor();
+    $this->actingAs($data['storekeeper']);
+    setFilamentTenant($data['vendor']);
+
+    $component = Livewire::test(BlindCount::class)->call('startSession');
+    $component->call('previous');
+
+    expect($component->get('currentPosition'))->toBe(1);
+});
+
+test('mark not found saves a zero count with a note and advances', function () {
+    $data = setUpSoloVendor();
+    $this->actingAs($data['storekeeper']);
+    setFilamentTenant($data['vendor']);
+
+    $component = Livewire::test(BlindCount::class)->call('startSession');
+    $component->call('markNotFound');
+
+    $firstProduct = productAtPosition($data['vendor'], 1);
+    $entry = BlindCountEntry::where('blind_count_session_id', $component->get('sessionId'))
+        ->where('product_id', $firstProduct->id)->first();
+
+    expect($entry->count)->toBe(0)
+        ->and($entry->note)->toBe('Not found')
+        ->and($component->get('currentPosition'))->toBe(2);
+});
+
+test('a note persists across navigation', function () {
+    $data = setUpSoloVendor();
+    $this->actingAs($data['storekeeper']);
+    setFilamentTenant($data['vendor']);
+
+    $component = Livewire::test(BlindCount::class)->call('startSession');
+    $component->set('count', 2);
+    $component->set('note', 'Box was damaged');
+    $component->call('next');
+    $component->call('previous');
+
+    expect($component->get('note'))->toBe('Box was damaged');
+
+    $firstProduct = productAtPosition($data['vendor'], 1);
+    $entry = BlindCountEntry::where('blind_count_session_id', $component->get('sessionId'))
+        ->where('product_id', $firstProduct->id)->first();
+
+    expect($entry->note)->toBe('Box was damaged');
+});
+
+test('undo last reverts the most recently saved entry to its prior value', function () {
+    $data = setUpSoloVendor();
+    $this->actingAs($data['storekeeper']);
+    setFilamentTenant($data['vendor']);
+
+    $component = Livewire::test(BlindCount::class)->call('startSession');
+    $component->set('count', 5);
+    $component->call('next'); // saves item 1 = 5 (previous value was uncounted/null)
+
+    $component->call('undoLast');
+
+    $firstProduct = productAtPosition($data['vendor'], 1);
+    $entry = BlindCountEntry::where('blind_count_session_id', $component->get('sessionId'))
+        ->where('product_id', $firstProduct->id)->first();
+
+    expect($entry->count)->toBeNull()
+        ->and($component->get('currentPosition'))->toBe(1)
+        ->and($component->get('count'))->toBe(0)
+        ->and($component->get('canUndo'))->toBeFalse();
+});
+
+test('jump to barcode navigates to the matching product in this session', function () {
+    $data = setUpSoloVendor();
+    $this->actingAs($data['storekeeper']);
+    setFilamentTenant($data['vendor']);
+
+    $component = Livewire::test(BlindCount::class)->call('startSession');
+
+    $secondProduct = productAtPosition($data['vendor'], 2);
+    $secondProduct->update(['barcode' => 'TESTBARCODE123']);
+
+    $component->call('jumpToBarcode', 'TESTBARCODE123');
+
+    expect($component->get('currentPosition'))->toBe(2);
+});
+
+test('jump to barcode with no match warns and does not move', function () {
+    $data = setUpSoloVendor();
+    $this->actingAs($data['storekeeper']);
+    setFilamentTenant($data['vendor']);
+
+    $component = Livewire::test(BlindCount::class)->call('startSession');
+    $component->call('jumpToBarcode', 'NO-SUCH-BARCODE');
+
+    expect($component->get('currentPosition'))->toBe(1);
+});

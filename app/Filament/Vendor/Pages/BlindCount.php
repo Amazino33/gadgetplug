@@ -53,11 +53,19 @@ class BlindCount extends Page
     public ?int    $sessionId       = null;
     public int     $currentPosition = 1;
     public int     $count           = 0;
+    public string  $note            = '';
     public bool    $showSearch      = false;
     public string  $searchQuery     = '';
     public string  $frequency       = 'daily';
     public bool    $byCategory      = false;
     public ?int    $customDays      = null;
+
+    // One-shot undo snapshot — captures the previous value of whichever entry
+    // was just overwritten by saveCurrentEntry(), so undoLast() can restore it.
+    public bool    $canUndo           = false;
+    public ?int    $undoPosition      = null;
+    public ?int    $undoPreviousCount = null;
+    public ?string $undoPreviousNote  = null;
 
     // ── Helpers ───────────────────────────────────────────────────────────────
     public function getSession(): ?BlindCountSession
@@ -140,6 +148,7 @@ class BlindCount extends Page
                 ->where('product_id', $productId)
                 ->first();
             $this->count = $entry?->count ?? 0;
+            $this->note  = $entry?->note ?? '';
         }
     }
 
@@ -178,6 +187,8 @@ class BlindCount extends Page
         $this->sessionId       = $session->id;
         $this->currentPosition = 1;
         $this->count           = 0;
+        $this->note            = '';
+        $this->canUndo         = false;
     }
 
     private function buildProductOrder(int $vendorId): array
@@ -247,6 +258,95 @@ class BlindCount extends Page
             $this->currentPosition++;
             $this->loadCountForPosition($this->currentPosition);
         }
+    }
+
+    public function previous(): void
+    {
+        if (! $this->isParticipant()) return;
+
+        $this->saveCurrentEntry();
+
+        if ($this->currentPosition > 1) {
+            $this->currentPosition--;
+            $this->loadCountForPosition($this->currentPosition);
+        }
+    }
+
+    // Quick "item isn't on the shelf" action — counts as 0 and advances like next().
+    public function markNotFound(): void
+    {
+        if (! $this->isParticipant()) return;
+
+        $this->count = 0;
+        $this->note  = 'Not found';
+        $this->next();
+    }
+
+    // Reverts whichever entry saveCurrentEntry() last overwrote back to its
+    // previous value. One-shot — not a multi-step undo stack.
+    public function undoLast(): void
+    {
+        if (! $this->isParticipant() || ! $this->canUndo || $this->undoPosition === null) return;
+
+        $session   = $this->getSession();
+        if (! $session) return;
+
+        $productId = $session->product_order[$this->undoPosition - 1] ?? null;
+        if (! $productId) return;
+
+        BlindCountEntry::updateOrCreate(
+            [
+                'blind_count_session_id' => $session->id,
+                'user_id'                => auth()->id(),
+                'product_id'             => $productId,
+            ],
+            [
+                'position'   => $this->undoPosition,
+                'count'      => $this->undoPreviousCount,
+                'note'       => $this->undoPreviousNote,
+                'counted_at' => $this->undoPreviousCount !== null ? now() : null,
+            ]
+        );
+
+        $this->currentPosition = $this->undoPosition;
+        $this->loadCountForPosition($this->undoPosition);
+
+        $this->canUndo           = false;
+        $this->undoPosition      = null;
+        $this->undoPreviousCount = null;
+        $this->undoPreviousNote  = null;
+
+        Notification::make()->title('Reverted to previous value.')->success()->send();
+    }
+
+    // Resolves a scanned/typed barcode to a product in this session and jumps to it.
+    public function jumpToBarcode(string $barcode): void
+    {
+        if (! $this->isParticipant()) return;
+
+        $session = $this->getSession();
+        if (! $session) return;
+
+        $barcode = trim($barcode);
+        if ($barcode === '') return;
+
+        $product = Product::where('vendor_id', $session->vendor_id)
+            ->where(fn ($q) => $q->where('barcode', $barcode)->orWhere('sku', $barcode))
+            ->first();
+
+        if (! $product) {
+            Notification::make()->title("No product found for \"{$barcode}\".")->warning()->send();
+            return;
+        }
+
+        $position = array_search($product->id, $session->product_order, true);
+
+        if ($position === false) {
+            Notification::make()->title("{$product->name} isn't part of this count session.")->warning()->send();
+            return;
+        }
+
+        $this->goToPosition($position + 1);
     }
 
     public function goToPosition(int $position): void
@@ -355,6 +455,8 @@ class BlindCount extends Page
 
         $this->currentPosition = 1;
         $this->count           = 0;
+        $this->note            = '';
+        $this->canUndo         = false;
 
         Notification::make()->title('Session reset. Storekeeper A can start their count over.')->success()->send();
     }
@@ -369,6 +471,22 @@ class BlindCount extends Page
         $productId = $session->product_order[$this->currentPosition - 1] ?? null;
         if (! $productId) return;
 
+        $note     = $this->note !== '' ? $this->note : null;
+        $existing = BlindCountEntry::where('blind_count_session_id', $session->id)
+            ->where('user_id', auth()->id())
+            ->where('product_id', $productId)
+            ->first();
+
+        // Nothing changed since it was last saved — skip the snapshot/toast noise
+        if ($existing && $existing->count === $this->count && $existing->note === $note) {
+            return;
+        }
+
+        $this->undoPosition      = $this->currentPosition;
+        $this->undoPreviousCount = $existing?->count;
+        $this->undoPreviousNote  = $existing?->note;
+        $this->canUndo           = true;
+
         BlindCountEntry::updateOrCreate(
             [
                 'blind_count_session_id' => $session->id,
@@ -378,9 +496,13 @@ class BlindCount extends Page
             [
                 'position'   => $this->currentPosition,
                 'count'      => $this->count,
+                'note'       => $note,
                 'counted_at' => now(),
             ]
         );
+
+        $product = Product::find($productId);
+        $this->dispatch('entry-saved', productName: $product?->name ?? 'Item', count: $this->count);
     }
 
     private function loadCountForPosition(int $position): void
@@ -396,6 +518,7 @@ class BlindCount extends Page
             ->where('product_id', $productId)
             ->first();
         $this->count = $entry?->count ?? 0;
+        $this->note  = $entry?->note ?? '';
     }
 
     // Solo counts get the same scrutiny as dual counts: any variance — over or

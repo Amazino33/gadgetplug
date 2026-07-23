@@ -13,6 +13,7 @@ class BlindCountEntry extends Model
         'product_id',
         'position',
         'count',
+        'note',
         'counted_at',
     ];
 
