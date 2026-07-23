@@ -92,6 +92,34 @@ test('the products list page defaults to table view and can switch to grid', fun
     expect($component->get('displayMode'))->toBe('grid');
 });
 
+test('the products table renders real rows in both table and grid mode without error', function () {
+    $data = setUpProductVendor();
+
+    Product::create([
+        'vendor_id'      => $data['vendor']->id,
+        'category_id'    => $data['category']->id,
+        'name'           => 'Table Render Widget',
+        'sku'            => 'TRW-001',
+        'brand'          => 'Acme',
+        'price'          => 4000,
+        'cost_price'     => 2500,
+        'stock_quantity' => 5,
+        'status'         => 'published',
+    ]);
+
+    $this->actingAs($data['owner']);
+    Filament::setCurrentPanel(Filament::getPanel('vendor'));
+    Filament::setTenant($data['vendor']);
+
+    Livewire::test(ListProducts::class)
+        ->assertOk()
+        ->assertSee('Table Render Widget')
+        ->assertSee('Test Category · Acme')
+        ->set('displayMode', 'grid')
+        ->assertOk()
+        ->assertSee('Table Render Widget');
+});
+
 test('the product view page shows pricing and stock data', function () {
     $data = setUpProductVendor();
 

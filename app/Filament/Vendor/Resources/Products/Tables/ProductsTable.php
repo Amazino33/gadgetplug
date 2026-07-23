@@ -6,9 +6,15 @@ use App\Models\AuditSession;
 use App\Models\Product;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
+use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\TextInput;
+use Filament\Support\Enums\FontWeight;
+use Filament\Support\Enums\TextSize;
+use Filament\Tables\Columns\ImageColumn;
+use Filament\Tables\Columns\Layout\Split;
+use Filament\Tables\Columns\Layout\Stack;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\ViewColumn;
 use Filament\Tables\Filters\SelectFilter;
@@ -16,6 +22,9 @@ use Filament\Tables\Table;
 
 class ProductsTable
 {
+    // Neutral gray box + photo glyph — used wherever a product has no image.
+    private const PLACEHOLDER_IMAGE = 'data:image/svg+xml,' . '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="%23e5e7eb"/><path d="M28 68l16-22 11 13 9-11 18 24" stroke="%239ca3af" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="37" cy="36" r="7" fill="%239ca3af"/></svg>';
+
     public static function configure(Table $table): Table
     {
         // Resolved once, directly, rather than via closures — contentGrid()'s
@@ -33,17 +42,45 @@ class ProductsTable
                     ->view('filament.vendor.products.grid-card')
                     ->visible($isGrid),
 
-                TextColumn::make('name')
-                    ->searchable()
-                    ->sortable()
-                    ->hidden($isGrid),
+                Split::make([
+                    ImageColumn::make('thumb')
+                        ->label('')
+                        ->getStateUsing(fn (Product $record): ?string =>
+                            $record->getFirstMediaUrl('product-images', 'thumb') ?: null
+                        )
+                        ->defaultImageUrl(self::PLACEHOLDER_IMAGE)
+                        ->size(44)
+                        ->grow(false),
+
+                    Stack::make([
+                        TextColumn::make('name')
+                            ->weight(FontWeight::SemiBold)
+                            ->searchable()
+                            ->sortable()
+                            ->wrap(),
+
+                        TextColumn::make('eyebrow')
+                            ->label('')
+                            ->getStateUsing(fn (Product $record): ?string =>
+                                trim(collect([$record->category?->name, $record->brand])->filter()->implode(' · ')) ?: null
+                            )
+                            ->color('gray')
+                            ->size(TextSize::ExtraSmall),
+                    ])->space(1),
+                ])->hidden($isGrid),
 
                 TextColumn::make('category.name')
                     ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true)
                     ->hidden($isGrid),
 
                 TextColumn::make('price')
+                    ->label('Price')
                     ->money('NGN')
+                    ->weight(FontWeight::Bold)
+                    ->description(fn (Product $record): ?string => $record->cost_price !== null
+                        ? 'Cost ₦' . number_format((float) $record->cost_price, 2)
+                        : null, position: 'above')
                     ->sortable()
                     ->hidden($isGrid),
 
@@ -51,6 +88,7 @@ class ProductsTable
                     ->label('On Shelf')
                     ->numeric()
                     ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true)
                     ->hidden($isGrid),
 
                 TextColumn::make('reserved_stock')
@@ -59,6 +97,7 @@ class ProductsTable
                     ->sortable()
                     ->badge()
                     ->color(fn (int $state): string => $state > 0 ? 'warning' : 'gray')
+                    ->toggleable(isToggledHiddenByDefault: true)
                     ->hidden($isGrid),
 
                 TextColumn::make('available_stock')
@@ -77,6 +116,7 @@ class ProductsTable
 
                 TextColumn::make('brand')
                     ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true)
                     ->hidden($isGrid),
 
                 TextColumn::make('status')
@@ -114,11 +154,19 @@ class ProductsTable
                     ]),
             ])
             ->recordActions([
-                EditAction::make(),
+                EditAction::make()
+                    ->iconButton()
+                    ->tooltip('Edit'),
+
+                DeleteAction::make()
+                    ->iconButton()
+                    ->tooltip('Delete'),
 
                 Action::make('start_audit')
                     ->label('Start Inventory Count')
                     ->icon('heroicon-o-clipboard-document-check')
+                    ->iconButton()
+                    ->tooltip('Start Inventory Count')
                     ->color('warning')
                     ->requiresConfirmation()
                     ->modalHeading('Initiate Inventory Audit')
