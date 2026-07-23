@@ -90,6 +90,13 @@ class BlindCount extends Page
         return count($this->getSession()?->product_order ?? []);
     }
 
+    // Only the two counters may write entries — an observer must never be able to
+    // record a count, even by calling a Livewire action directly.
+    private function isParticipant(): bool
+    {
+        return in_array($this->getRole(), ['a', 'b'], true);
+    }
+
     public function getCountedEntries(): \Illuminate\Database\Eloquent\Collection
     {
         if (! $this->sessionId) return collect();
@@ -219,16 +226,20 @@ class BlindCount extends Page
 
     public function increment(): void
     {
+        if (! $this->isParticipant()) return;
         $this->count++;
     }
 
     public function decrement(): void
     {
+        if (! $this->isParticipant()) return;
         $this->count = max(0, $this->count - 1);
     }
 
     public function next(): void
     {
+        if (! $this->isParticipant()) return;
+
         $this->saveCurrentEntry();
 
         $total = $this->getTotalProducts();
@@ -240,6 +251,8 @@ class BlindCount extends Page
 
     public function goToPosition(int $position): void
     {
+        if (! $this->isParticipant()) return;
+
         $this->saveCurrentEntry();
         $this->currentPosition = $position;
         $this->loadCountForPosition($position);
@@ -249,6 +262,8 @@ class BlindCount extends Page
 
     public function submitAll(): void
     {
+        if (! $this->isParticipant()) return;
+
         $this->saveCurrentEntry();
 
         $session = $this->getSession();
@@ -282,8 +297,11 @@ class BlindCount extends Page
                 ]);
 
                 try {
-                    $this->processComparisonSinglePerson($session->fresh());
-                    Notification::make()->title('Count complete. Stock levels updated.')->success()->send();
+                    $discrepancies = $this->processComparisonSinglePerson($session->fresh());
+                    $message = $discrepancies > 0
+                        ? "Count complete. {$discrepancies} discrepanc" . ($discrepancies === 1 ? 'y' : 'ies') . " flagged for manager review."
+                        : 'Count complete. All stock levels verified.';
+                    Notification::make()->title($message)->success()->send();
                 } catch (\Throwable $e) {
                     Log::error('BlindCount single-person comparison failed', ['session_id' => $session->id, 'error' => $e->getMessage()]);
                     Notification::make()
@@ -343,6 +361,8 @@ class BlindCount extends Page
 
     private function saveCurrentEntry(): void
     {
+        if (! $this->isParticipant()) return;
+
         $session   = $this->getSession();
         if (! $session) return;
 
@@ -378,17 +398,23 @@ class BlindCount extends Page
         $this->count = $entry?->count ?? 0;
     }
 
-    private function processComparisonSinglePerson(BlindCountSession $session): void
+    // Solo counts get the same scrutiny as dual counts: any variance — over or
+    // under — is left as a 'discrepancy' for manager review rather than being
+    // auto-applied to stock. Only an exact match auto-verifies.
+    private function processComparisonSinglePerson(BlindCountSession $session): int
     {
-        $entries     = BlindCountEntry::where('blind_count_session_id', $session->id)
+        $entries = BlindCountEntry::where('blind_count_session_id', $session->id)
             ->where('user_id', $session->storekeeper_a_id)
             ->get()->keyBy('product_id');
 
-        $adjustStock = app(AdjustStockAction::class);
+        $discrepancies = 0;
 
-        DB::transaction(function () use ($session, $entries, $adjustStock) {
+        DB::transaction(function () use ($session, $entries, &$discrepancies) {
             foreach ($session->product_order as $productId) {
-                $count = (int) ($entries[$productId]?->count ?? 0);
+                $count      = (int) ($entries[$productId]?->count ?? 0);
+                $product    = Product::find($productId);
+                $difference = $count - (int) $product->stock_quantity;
+                $matched    = $difference === 0;
 
                 AuditSession::create([
                     'vendor_id'        => $session->vendor_id,
@@ -397,23 +423,45 @@ class BlindCount extends Page
                     'storekeeper_b_id' => null,
                     'count_a'          => $count,
                     'count_b'          => null,
-                    'status'           => 'verified',
+                    'status'           => $matched ? 'verified' : 'discrepancy',
                 ]);
 
-                $product    = Product::find($productId);
-                $difference = $count - (int) $product->stock_quantity;
-                if ($difference !== 0) {
-                    $adjustStock->execute(
-                        productId:       $productId,
-                        quantityChanged: $difference,
-                        transactionType: 'audit_correction',
-                        userId:          $session->storekeeper_a_id,
-                        reference:       "Inventory Count #{$session->id}",
-                        description:     "Single-person count. System had {$product->stock_quantity}, found {$count}."
-                    );
+                if (! $matched) {
+                    $discrepancies++;
                 }
             }
         });
+
+        $this->notifyManagersOfDiscrepancies($session->vendor_id, $discrepancies);
+
+        return $discrepancies;
+    }
+
+    private function notifyManagersOfDiscrepancies(int $vendorId, int $discrepancies): void
+    {
+        if ($discrepancies <= 0) return;
+
+        try {
+            $managers = User::where(fn ($q) => $q
+                    ->whereHas('ownedVendors', fn ($q) => $q->where('id', $vendorId))
+                    ->orWhereHas('roles', fn ($q) => $q
+                        ->where('name', 'inventory_manager')
+                        ->where('team_id', $vendorId)
+                    )
+                )
+                ->where('id', '!=', auth()->id())
+                ->get();
+
+            if ($managers->isNotEmpty()) {
+                Notification::make()
+                    ->title("{$discrepancies} discrepanc" . ($discrepancies === 1 ? 'y' : 'ies') . " found in inventory count")
+                    ->body('Review the Audit Sessions page to resolve them.')
+                    ->danger()
+                    ->sendToDatabase($managers);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('BlindCount manager notification failed', ['error' => $e->getMessage()]);
+        }
     }
 
     private function processComparison(BlindCountSession $session): int
@@ -467,30 +515,7 @@ class BlindCount extends Page
 
         // Notify managers — runs outside the transaction so a notification failure
         // never rolls back the audit records that were just created
-        if ($discrepancies > 0) {
-            try {
-                $vendorId = $session->vendor_id;
-                $managers = User::where(function ($q) use ($vendorId) {
-                    $q->whereHas('ownedVendors', fn ($q) => $q->where('id', $vendorId))
-                      ->orWhereHas('memberVendors', fn ($q) => $q
-                          ->where('vendor_users.vendor_id', $vendorId)
-                          ->whereIn('vendor_users.role', ['owner', 'inventory_manager'])
-                      );
-                })
-                ->where('id', '!=', auth()->id())
-                ->get();
-
-                if ($managers->isNotEmpty()) {
-                    Notification::make()
-                        ->title("{$discrepancies} discrepanc" . ($discrepancies === 1 ? 'y' : 'ies') . " found in inventory count")
-                        ->body('Review the Audit Sessions page to resolve them.')
-                        ->danger()
-                        ->sendToDatabase($managers);
-                }
-            } catch (\Throwable $e) {
-                Log::warning('BlindCount manager notification failed', ['error' => $e->getMessage()]);
-            }
-        }
+        $this->notifyManagersOfDiscrepancies($session->vendor_id, $discrepancies);
 
         return $discrepancies;
     }

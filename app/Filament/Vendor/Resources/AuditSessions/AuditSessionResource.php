@@ -240,8 +240,9 @@ class AuditSessionResource extends Resource
                     ->color('danger')
                     ->requiresConfirmation()
                     ->modalHeading('Manager Override')
-                    ->modalDescription(fn (AuditSession $record): string =>
-                        "A counted {$record->count_a}. B counted {$record->count_b}. Enter the correct stock figure."
+                    ->modalDescription(fn (AuditSession $record): string => $record->storekeeper_b_id
+                        ? "A counted {$record->count_a}. B counted {$record->count_b}. Enter the correct stock figure."
+                        : "Solo count found {$record->count_a}. System expected {$record->product?->stock_quantity}. Enter the correct stock figure."
                     )
                     ->slideOver()
                     ->form([

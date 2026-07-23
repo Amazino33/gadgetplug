@@ -14,6 +14,7 @@
         ($session->status === 'a_counting' && $role === 'a') ||
         ($session->status === 'b_counting' && $role === 'b')
     );
+    $singlePerson  = (filament()->getTenant()->pos_blind_count_participants ?? 2) === 1;
 @endphp
 
 {{-- ── NO SESSION ───────────────────────────────────────────────────────── --}}
@@ -284,7 +285,10 @@
     {{-- Action Button --}}
     <div class="px-4 pb-5">
         @if($isLastProduct)
-        <button wire:click="submitAll" wire:confirm="This will lock your count and cannot be undone. Are you sure?"
+        <button wire:click="submitAll"
+            wire:confirm="{{ $singlePerson
+                ? 'This locks your count and reconciles it against live stock immediately — any mismatch (short or over) goes to a manager for review. This cannot be undone. Are you sure?'
+                : 'This will lock your count and cannot be undone. Are you sure?' }}"
             class="w-full bg-[#4caf50] hover:bg-[#43a047] text-white font-bold py-4 rounded-xl transition-colors font-montserrat text-base">
             Submit All Counts ✓
         </button>
