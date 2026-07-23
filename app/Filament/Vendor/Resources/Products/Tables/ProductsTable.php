@@ -18,35 +18,40 @@ class ProductsTable
 {
     public static function configure(Table $table): Table
     {
+        // Resolved once, directly, rather than via closures — contentGrid()'s
+        // closure evaluation does not reliably receive $livewire the way
+        // per-column hidden()/visible() closures do.
+        $isGrid = $table->getLivewire()->displayMode === 'grid';
+
         return $table
-            ->contentGrid(fn ($livewire): ?array => $livewire->displayMode === 'grid'
+            ->contentGrid($isGrid
                 ? ['default' => 1, 'sm' => 2, 'lg' => 3, 'xl' => 4]
                 : null
             )
             ->columns([
                 ViewColumn::make('card')
                     ->view('filament.vendor.products.grid-card')
-                    ->visible(fn ($livewire): bool => $livewire->displayMode === 'grid'),
+                    ->visible($isGrid),
 
                 TextColumn::make('name')
                     ->searchable()
                     ->sortable()
-                    ->hidden(fn ($livewire): bool => $livewire->displayMode === 'grid'),
+                    ->hidden($isGrid),
 
                 TextColumn::make('category.name')
                     ->sortable()
-                    ->hidden(fn ($livewire): bool => $livewire->displayMode === 'grid'),
+                    ->hidden($isGrid),
 
                 TextColumn::make('price')
                     ->money('NGN')
                     ->sortable()
-                    ->hidden(fn ($livewire): bool => $livewire->displayMode === 'grid'),
+                    ->hidden($isGrid),
 
                 TextColumn::make('stock_quantity')
                     ->label('On Shelf')
                     ->numeric()
                     ->sortable()
-                    ->hidden(fn ($livewire): bool => $livewire->displayMode === 'grid'),
+                    ->hidden($isGrid),
 
                 TextColumn::make('reserved_stock')
                     ->label('Reserved')
@@ -54,7 +59,7 @@ class ProductsTable
                     ->sortable()
                     ->badge()
                     ->color(fn (int $state): string => $state > 0 ? 'warning' : 'gray')
-                    ->hidden(fn ($livewire): bool => $livewire->displayMode === 'grid'),
+                    ->hidden($isGrid),
 
                 TextColumn::make('available_stock')
                     ->label('Available')
@@ -68,11 +73,11 @@ class ProductsTable
                         $state < 5   => 'warning',
                         default      => 'success',
                     })
-                    ->hidden(fn ($livewire): bool => $livewire->displayMode === 'grid'),
+                    ->hidden($isGrid),
 
                 TextColumn::make('brand')
                     ->searchable()
-                    ->hidden(fn ($livewire): bool => $livewire->displayMode === 'grid'),
+                    ->hidden($isGrid),
 
                 TextColumn::make('status')
                     ->badge()
@@ -90,7 +95,7 @@ class ProductsTable
                         default     => 'gray',
                     })
                     ->formatStateUsing(fn (string $state): string => ucfirst($state))
-                    ->hidden(fn ($livewire): bool => $livewire->displayMode === 'grid'),
+                    ->hidden($isGrid),
 
                 TextColumn::make('published_at')
                     ->label('Goes Live')
@@ -98,7 +103,7 @@ class ProductsTable
                     ->sortable()
                     ->placeholder('Immediately')
                     ->toggleable()
-                    ->hidden(fn ($livewire): bool => $livewire->displayMode === 'grid'),
+                    ->hidden($isGrid),
             ])
             ->filters([
                 SelectFilter::make('status')
