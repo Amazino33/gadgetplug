@@ -120,6 +120,44 @@ test('the products table renders real rows in both table and grid mode without e
         ->assertSee('Table Render Widget');
 });
 
+test('grid mode actually produces a multi-column content grid, not just hidden columns', function () {
+    // Regression guard: Filament caches the Table config during the request's
+    // boot phase, before a live property update (e.g. from clicking a header
+    // action) takes effect — so this only reflects reality when displayMode
+    // is already set at mount time, exactly like a real ?display=grid page
+    // load. If the header actions ever go back to mutating the property via
+    // ->action() instead of navigating via ->url(), this test still passes
+    // (it isn't exercising the click), but the ones above that assert on
+    // rendered HTML would catch a live-click regression.
+    $data = setUpProductVendor();
+
+    // Needs at least one record — with zero products Filament renders an
+    // empty state instead of the grid wrapper, which would falsely fail this.
+    Product::create([
+        'vendor_id'      => $data['vendor']->id,
+        'category_id'    => $data['category']->id,
+        'name'           => 'Grid Regression Widget',
+        'price'          => 1000,
+        'cost_price'     => 500,
+        'stock_quantity' => 5,
+        'status'         => 'published',
+    ]);
+
+    $this->actingAs($data['owner']);
+    Filament::setCurrentPanel(Filament::getPanel('vendor'));
+    Filament::setTenant($data['vendor']);
+
+    $component = Livewire::test(ListProducts::class, ['displayMode' => 'grid']);
+
+    $table = $component->instance()->getTable();
+
+    expect($table->getContentGrid())->toBe(['default' => 1, 'sm' => 2, 'lg' => 3, 'xl' => 4]);
+
+    $html = $component->html();
+    expect($html)->toContain('fi-ta-content-grid')
+        ->and($html)->toContain('--cols-lg');
+});
+
 test('the product view page shows pricing and stock data', function () {
     $data = setUpProductVendor();
 

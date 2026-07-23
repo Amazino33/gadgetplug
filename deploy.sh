@@ -6,8 +6,12 @@ set -e
 echo "==> Pulling latest changes from origin/main..."
 git pull origin main
 
-echo "==> Installing dependencies..."
+echo "==> Installing PHP dependencies..."
 composer install --no-dev --optimize-autoloader
+
+echo "==> Installing JS dependencies and building frontend assets..."
+npm install
+npm run build
 
 echo "==> Running migrations..."
 php artisan migrate --force
