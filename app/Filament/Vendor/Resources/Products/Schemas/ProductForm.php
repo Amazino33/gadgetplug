@@ -50,8 +50,8 @@ class ProductForm
                                 TextInput::make('cost_price')
                                     ->numeric()
                                     ->prefix('₦')
-                                    ->default(0)
-                                    ->required(),
+                                    ->placeholder('Leave blank if unknown')
+                                    ->helperText('Optional — shown as "—" in reports until set.'),
 
                                 TextInput::make('price')
                                     ->numeric()

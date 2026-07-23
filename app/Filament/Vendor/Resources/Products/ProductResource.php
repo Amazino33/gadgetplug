@@ -5,6 +5,7 @@ namespace App\Filament\Vendor\Resources\Products;
 use App\Filament\Vendor\Resources\Products\Pages\CreateProduct;
 use App\Filament\Vendor\Resources\Products\Pages\EditProduct;
 use App\Filament\Vendor\Resources\Products\Pages\ListProducts;
+use App\Filament\Vendor\Resources\Products\Pages\ViewProduct;
 use App\Filament\Vendor\Resources\Products\Schemas\ProductForm;
 use App\Filament\Vendor\Resources\Products\Tables\ProductsTable;
 use App\Models\Product;
@@ -45,6 +46,7 @@ class ProductResource extends Resource
         return [
             'index' => ListProducts::route('/'),
             'create' => CreateProduct::route('/create'),
+            'view' => ViewProduct::route('/{record}'),
             'edit' => EditProduct::route('/{record}/edit'),
         ];
     }
@@ -71,6 +73,16 @@ class ProductResource extends Resource
         return $vendor && (
             $user->isSuperAdmin() ||
             $user->hasVendorPermission($vendor->id, 'create_products')
+        );
+    }
+
+    public static function canView($record): bool
+    {
+        $vendor = filament()->getTenant();
+        $user   = auth()->user();
+        return $vendor && (
+            $user->isSuperAdmin() ||
+            $user->hasVendorPermission($vendor->id, 'view_products')
         );
     }
 
@@ -101,6 +113,11 @@ class ProductResource extends Resource
     public static function getCreateAuthorizationResponse(): Response
     {
         return static::canCreate() ? Response::allow() : Response::deny();
+    }
+
+    public static function getViewAuthorizationResponse(Model $record): Response
+    {
+        return static::canView($record) ? Response::allow() : Response::deny();
     }
 
     public static function getEditAuthorizationResponse(Model $record): Response

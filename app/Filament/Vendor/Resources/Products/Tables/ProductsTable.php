@@ -10,6 +10,7 @@ use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\TextInput;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ViewColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 
@@ -18,29 +19,42 @@ class ProductsTable
     public static function configure(Table $table): Table
     {
         return $table
+            ->contentGrid(fn ($livewire): ?array => $livewire->displayMode === 'grid'
+                ? ['default' => 1, 'sm' => 2, 'lg' => 3, 'xl' => 4]
+                : null
+            )
             ->columns([
+                ViewColumn::make('card')
+                    ->view('filament.vendor.products.grid-card')
+                    ->visible(fn ($livewire): bool => $livewire->displayMode === 'grid'),
+
                 TextColumn::make('name')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->hidden(fn ($livewire): bool => $livewire->displayMode === 'grid'),
 
                 TextColumn::make('category.name')
-                    ->sortable(),
+                    ->sortable()
+                    ->hidden(fn ($livewire): bool => $livewire->displayMode === 'grid'),
 
                 TextColumn::make('price')
                     ->money('NGN')
-                    ->sortable(),
+                    ->sortable()
+                    ->hidden(fn ($livewire): bool => $livewire->displayMode === 'grid'),
 
                 TextColumn::make('stock_quantity')
                     ->label('On Shelf')
                     ->numeric()
-                    ->sortable(),
+                    ->sortable()
+                    ->hidden(fn ($livewire): bool => $livewire->displayMode === 'grid'),
 
                 TextColumn::make('reserved_stock')
                     ->label('Reserved')
                     ->numeric()
                     ->sortable()
                     ->badge()
-                    ->color(fn (int $state): string => $state > 0 ? 'warning' : 'gray'),
+                    ->color(fn (int $state): string => $state > 0 ? 'warning' : 'gray')
+                    ->hidden(fn ($livewire): bool => $livewire->displayMode === 'grid'),
 
                 TextColumn::make('available_stock')
                     ->label('Available')
@@ -53,10 +67,12 @@ class ProductsTable
                         $state === 0 => 'danger',
                         $state < 5   => 'warning',
                         default      => 'success',
-                    }),
+                    })
+                    ->hidden(fn ($livewire): bool => $livewire->displayMode === 'grid'),
 
                 TextColumn::make('brand')
-                    ->searchable(),
+                    ->searchable()
+                    ->hidden(fn ($livewire): bool => $livewire->displayMode === 'grid'),
 
                 TextColumn::make('status')
                     ->badge()
@@ -73,14 +89,16 @@ class ProductsTable
                         'expired'   => 'danger',
                         default     => 'gray',
                     })
-                    ->formatStateUsing(fn (string $state): string => ucfirst($state)),
+                    ->formatStateUsing(fn (string $state): string => ucfirst($state))
+                    ->hidden(fn ($livewire): bool => $livewire->displayMode === 'grid'),
 
                 TextColumn::make('published_at')
                     ->label('Goes Live')
                     ->since()
                     ->sortable()
                     ->placeholder('Immediately')
-                    ->toggleable(),
+                    ->toggleable()
+                    ->hidden(fn ($livewire): bool => $livewire->displayMode === 'grid'),
             ])
             ->filters([
                 SelectFilter::make('status')

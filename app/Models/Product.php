@@ -51,6 +51,7 @@ class Product extends Model implements HasMedia
 
     protected $casts = [
         'price'           => 'decimal:2',
+        'cost_price'      => 'decimal:2',
         'specifications'  => 'array',
         'stock_quantity'  => 'integer',
         'reserved_stock'  => 'integer',
@@ -71,6 +72,29 @@ class Product extends Model implements HasMedia
     public function getAvailableStockAttribute(): int
     {
         return max(0, $this->stock_quantity - $this->reserved_stock);
+    }
+
+    // Profit/margin/markup are always derived from price + cost_price, never stored —
+    // null whenever cost_price hasn't been set, rather than faking a number.
+    public function getProfitAttribute(): ?float
+    {
+        if ($this->cost_price === null) return null;
+
+        return (float) $this->price - (float) $this->cost_price;
+    }
+
+    public function getMarginPercentAttribute(): ?float
+    {
+        if ($this->cost_price === null || (float) $this->price <= 0) return null;
+
+        return ($this->profit / (float) $this->price) * 100;
+    }
+
+    public function getMarkupPercentAttribute(): ?float
+    {
+        if ($this->cost_price === null || (float) $this->cost_price <= 0) return null;
+
+        return ($this->profit / (float) $this->cost_price) * 100;
     }
 
     public function vendor()
