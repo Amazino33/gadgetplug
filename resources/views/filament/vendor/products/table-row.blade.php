@@ -52,7 +52,7 @@
                 @endif
             </div>
             <div class="min-w-0">
-                <p class="truncate font-montserrat text-sm font-semibold text-gray-900 dark:text-white group-hover:underline">{{ $product->name }}</p>
+                <p title="{{ $product->name }}" class="truncate font-montserrat text-sm font-semibold text-gray-900 dark:text-white group-hover:underline">{{ $product->name }}</p>
                 <p class="truncate text-xs text-gray-500 dark:text-gray-400">{{ $eyebrow !== '' ? $eyebrow : '—' }}</p>
             </div>
         </a>

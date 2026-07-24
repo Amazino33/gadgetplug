@@ -49,7 +49,7 @@
         @else
             {{-- DESKTOP TABLE --}}
             <div class="hidden md:block overflow-hidden rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900">
-                <table class="w-full text-left">
+                <table class="w-full text-left [table-layout:fixed]">
                     <thead>
                         <tr class="border-b border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-gray-800">
                             <th class="w-10 py-3 px-4">
@@ -59,10 +59,10 @@
                                     wire:click="toggleSelectAllOnPage"
                                     class="rounded border-gray-300 text-primary-600 focus:ring-primary-500">
                             </th>
-                            <th class="py-3 px-4 text-xs font-semibold uppercase tracking-wider text-gray-500">Product</th>
-                            <th class="py-3 px-4 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Pricing</th>
-                            <th class="py-3 px-4 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">Stock</th>
-                            <th class="py-3 px-4 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
+                            <th class="w-[38%] py-3 px-4 text-xs font-semibold uppercase tracking-wider text-gray-500">Product</th>
+                            <th class="w-[18%] py-3 px-4 text-right text-xs font-semibold uppercase tracking-wider text-gray-500">Pricing</th>
+                            <th class="w-[17%] py-3 px-4 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">Stock</th>
+                            <th class="w-[13%] py-3 px-4 text-center text-xs font-semibold uppercase tracking-wider text-gray-500">Status</th>
                             <th class="w-24 py-3 px-4"></th>
                         </tr>
                     </thead>
