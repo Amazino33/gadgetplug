@@ -9,9 +9,9 @@ git pull origin main
 echo "==> Installing PHP dependencies..."
 composer install --no-dev --optimize-autoloader
 
-echo "==> Installing JS dependencies and building frontend assets..."
-npm install
-npm run build
+# Frontend assets are built locally and committed to public/build — this
+# server has no npm/node available, and that's fine: git pull already
+# brought the compiled CSS/JS. Don't try to build here.
 
 echo "==> Running migrations..."
 php artisan migrate --force
