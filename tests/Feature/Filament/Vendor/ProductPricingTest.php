@@ -120,19 +120,14 @@ test('the products table renders real rows in both table and grid mode without e
         ->assertSee('Table Render Widget');
 });
 
-test('grid mode actually produces a multi-column content grid, not just hidden columns', function () {
-    // Regression guard: Filament caches the Table config during the request's
-    // boot phase, before a live property update (e.g. from clicking a header
-    // action) takes effect — so this only reflects reality when displayMode
-    // is already set at mount time, exactly like a real ?display=grid page
-    // load. If the header actions ever go back to mutating the property via
-    // ->action() instead of navigating via ->url(), this test still passes
-    // (it isn't exercising the click), but the ones above that assert on
-    // rendered HTML would catch a live-click regression.
+test('grid mode renders a real multi-column CSS grid, and table mode does not', function () {
+    // The Products list is now a fully custom Blade view (not Filament's
+    // Table/contentGrid) specifically because that component's config gets
+    // cached during the request's boot phase, before a live property update
+    // takes effect — so a live click never saw the new mode in time. This
+    // guards against that regression reappearing.
     $data = setUpProductVendor();
 
-    // Needs at least one record — with zero products Filament renders an
-    // empty state instead of the grid wrapper, which would falsely fail this.
     Product::create([
         'vendor_id'      => $data['vendor']->id,
         'category_id'    => $data['category']->id,
@@ -147,15 +142,74 @@ test('grid mode actually produces a multi-column content grid, not just hidden c
     Filament::setCurrentPanel(Filament::getPanel('vendor'));
     Filament::setTenant($data['vendor']);
 
-    $component = Livewire::test(ListProducts::class, ['displayMode' => 'grid']);
+    $tableHtml = Livewire::test(ListProducts::class)->html();
+    expect($tableHtml)->not->toContain('sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4');
 
-    $table = $component->instance()->getTable();
+    $gridHtml = Livewire::test(ListProducts::class, ['displayMode' => 'grid'])->html();
+    expect($gridHtml)->toContain('sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4');
+});
 
-    expect($table->getContentGrid())->toBe(['default' => 1, 'sm' => 2, 'lg' => 3, 'xl' => 4]);
+test('search filters products by name or SKU', function () {
+    $data = setUpProductVendor();
 
-    $html = $component->html();
-    expect($html)->toContain('fi-ta-content-grid')
-        ->and($html)->toContain('--cols-lg');
+    Product::create([
+        'vendor_id' => $data['vendor']->id, 'category_id' => $data['category']->id,
+        'name' => 'Findable Widget', 'sku' => 'FW-1', 'price' => 100, 'status' => 'published',
+    ]);
+    Product::create([
+        'vendor_id' => $data['vendor']->id, 'category_id' => $data['category']->id,
+        'name' => 'Other Product', 'sku' => 'OP-2', 'price' => 200, 'status' => 'published',
+    ]);
+
+    $this->actingAs($data['owner']);
+    Filament::setCurrentPanel(Filament::getPanel('vendor'));
+    Filament::setTenant($data['vendor']);
+
+    Livewire::test(ListProducts::class)
+        ->set('search', 'Findable')
+        ->assertSee('Findable Widget')
+        ->assertDontSee('Other Product');
+});
+
+test('deleting a single product removes it', function () {
+    $data = setUpProductVendor();
+
+    $product = Product::create([
+        'vendor_id' => $data['vendor']->id, 'category_id' => $data['category']->id,
+        'name' => 'Doomed Widget', 'price' => 100, 'status' => 'published',
+    ]);
+
+    $this->actingAs($data['owner']);
+    Filament::setCurrentPanel(Filament::getPanel('vendor'));
+    Filament::setTenant($data['vendor']);
+
+    Livewire::test(ListProducts::class)->call('deleteProduct', $product->id);
+
+    expect(Product::find($product->id))->toBeNull();
+});
+
+test('bulk delete removes only the selected products', function () {
+    $data = setUpProductVendor();
+
+    $keep = Product::create([
+        'vendor_id' => $data['vendor']->id, 'category_id' => $data['category']->id,
+        'name' => 'Keep Widget', 'price' => 100, 'status' => 'published',
+    ]);
+    $delete = Product::create([
+        'vendor_id' => $data['vendor']->id, 'category_id' => $data['category']->id,
+        'name' => 'Delete Widget', 'price' => 100, 'status' => 'published',
+    ]);
+
+    $this->actingAs($data['owner']);
+    Filament::setCurrentPanel(Filament::getPanel('vendor'));
+    Filament::setTenant($data['vendor']);
+
+    Livewire::test(ListProducts::class)
+        ->set('selected', [$delete->id])
+        ->call('deleteSelected');
+
+    expect(Product::find($keep->id))->not->toBeNull()
+        ->and(Product::find($delete->id))->toBeNull();
 });
 
 test('the product view page shows pricing and stock data', function () {
