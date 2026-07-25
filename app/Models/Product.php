@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
@@ -66,12 +67,31 @@ class Product extends Model implements HasMedia
               ->where(fn($q) => $q->whereNull('unpublish_at')->orWhere('unpublish_at', '>', now()));
     }
 
+    // "Published" governs whether a product physically exists/is live at all;
+    // these two further gate which sales channel(s) it's actually exposed to.
+    public function scopeVisibleOnline(Builder $query): void
+    {
+        $query->published()->where('show_online', true);
+    }
+
+    public function scopeVisibleInPos(Builder $query): void
+    {
+        $query->published()->where('show_in_pos', true);
+    }
+
     /**
      * Units actually available to sell = physical stock minus those held for pending orders.
      */
     public function getAvailableStockAttribute(): int
     {
         return max(0, $this->stock_quantity - $this->reserved_stock);
+    }
+
+    // Single source of truth for the "low stock" boundary — every stock badge
+    // across the admin panel and POS reads this instead of a hardcoded number.
+    public function getIsLowStockAttribute(): bool
+    {
+        return $this->available_stock > 0 && $this->available_stock < $this->low_stock_threshold;
     }
 
     // Profit/margin/markup are always derived from price + cost_price, never stored —
@@ -105,6 +125,11 @@ class Product extends Model implements HasMedia
     public function category()
     {
         return $this->belongsTo(Category::class);
+    }
+
+    public function tags(): BelongsToMany
+    {
+        return $this->belongsToMany(Tag::class);
     }
 
     public function registerMediaCollections(): void

@@ -59,7 +59,7 @@ new class extends Component {
 
     public function with(): array
     {
-        $query = Product::published()
+        $query = Product::visibleOnline()
             ->with(['vendor', 'category', 'media'])
             ->whereRaw('CAST(stock_quantity AS SIGNED) - CAST(reserved_stock AS SIGNED) > 0')
             ->when($this->selectedCategory, fn($q) => $q->where('category_id', $this->selectedCategory))

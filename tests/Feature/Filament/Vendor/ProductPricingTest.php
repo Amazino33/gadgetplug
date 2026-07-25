@@ -238,3 +238,104 @@ test('the product view page shows pricing and stock data', function () {
         ->assertSee('₦3,850.00')
         ->assertSee('₦5,000.00');
 });
+
+test('is_low_stock respects each product\'s own threshold, not a hardcoded number', function () {
+    $data = setUpProductVendor();
+
+    $customThreshold = Product::create([
+        'vendor_id' => $data['vendor']->id, 'category_id' => $data['category']->id,
+        'name' => 'Custom Threshold Widget', 'price' => 100, 'status' => 'published',
+        'stock_quantity' => 8, 'reserved_stock' => 0, 'low_stock_threshold' => 10,
+    ]);
+    $defaultThreshold = Product::create([
+        'vendor_id' => $data['vendor']->id, 'category_id' => $data['category']->id,
+        'name' => 'Default Threshold Widget', 'price' => 100, 'status' => 'published',
+        'stock_quantity' => 8, 'reserved_stock' => 0,
+    ]);
+
+    // 8 available: below a threshold of 10, but not below the default of 5.
+    expect($customThreshold->is_low_stock)->toBeTrue()
+        ->and($defaultThreshold->is_low_stock)->toBeFalse();
+});
+
+test('is_low_stock is false when out of stock — that is its own distinct state', function () {
+    $data = setUpProductVendor();
+
+    $product = Product::create([
+        'vendor_id' => $data['vendor']->id, 'category_id' => $data['category']->id,
+        'name' => 'Empty Widget', 'price' => 100, 'status' => 'published',
+        'stock_quantity' => 0, 'reserved_stock' => 0,
+    ]);
+
+    expect($product->is_low_stock)->toBeFalse()
+        ->and($product->available_stock)->toBe(0);
+});
+
+test('visibleOnline excludes products hidden from the storefront', function () {
+    $data = setUpProductVendor();
+
+    $onlineProduct = Product::create([
+        'vendor_id' => $data['vendor']->id, 'category_id' => $data['category']->id,
+        'name' => 'Online Widget', 'price' => 100, 'status' => 'published', 'show_online' => true,
+    ]);
+    $hiddenProduct = Product::create([
+        'vendor_id' => $data['vendor']->id, 'category_id' => $data['category']->id,
+        'name' => 'Hidden Widget', 'price' => 100, 'status' => 'published', 'show_online' => false,
+    ]);
+
+    $visibleIds = Product::visibleOnline()->pluck('id');
+
+    expect($visibleIds)->toContain($onlineProduct->id)
+        ->not->toContain($hiddenProduct->id);
+});
+
+test('visibleInPos excludes products hidden from POS', function () {
+    $data = setUpProductVendor();
+
+    $posProduct = Product::create([
+        'vendor_id' => $data['vendor']->id, 'category_id' => $data['category']->id,
+        'name' => 'POS Widget', 'price' => 100, 'status' => 'published', 'show_in_pos' => true,
+    ]);
+    $onlineOnlyProduct = Product::create([
+        'vendor_id' => $data['vendor']->id, 'category_id' => $data['category']->id,
+        'name' => 'Online Only Widget', 'price' => 100, 'status' => 'published', 'show_in_pos' => false,
+    ]);
+
+    $visibleIds = Product::visibleInPos()->pluck('id');
+
+    expect($visibleIds)->toContain($posProduct->id)
+        ->not->toContain($onlineOnlyProduct->id);
+});
+
+test('a product can be tagged and tags are scoped per vendor', function () {
+    $data = setUpProductVendor();
+
+    $product = Product::create([
+        'vendor_id' => $data['vendor']->id, 'category_id' => $data['category']->id,
+        'name' => 'Tagged Widget', 'price' => 100, 'status' => 'published',
+    ]);
+
+    $tag = \App\Models\Tag::create(['vendor_id' => $data['vendor']->id, 'name' => 'Premium']);
+    $product->tags()->attach($tag);
+
+    expect($product->fresh()->tags->pluck('name')->all())->toBe(['Premium'])
+        ->and($tag->vendor_id)->toBe($data['vendor']->id);
+});
+
+test('the product edit form renders with the new pricing, inventory, channel, and tag fields', function () {
+    $data = setUpProductVendor();
+
+    $product = Product::create([
+        'vendor_id' => $data['vendor']->id, 'category_id' => $data['category']->id,
+        'name' => 'Editable Widget', 'price' => 5000, 'cost_price' => 3000,
+        'status' => 'published', 'low_stock_threshold' => 7,
+    ]);
+
+    $this->actingAs($data['owner']);
+    Filament::setCurrentPanel(Filament::getPanel('vendor'));
+    Filament::setTenant($data['vendor']);
+
+    Livewire::test(\App\Filament\Vendor\Resources\Products\Pages\EditProduct::class, ['record' => $product->getRouteKey()])
+        ->assertOk()
+        ->assertFormSet(['name' => 'Editable Widget', 'low_stock_threshold' => 7, 'show_online' => true, 'show_in_pos' => true]);
+});

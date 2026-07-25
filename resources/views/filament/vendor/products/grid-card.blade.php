@@ -5,9 +5,9 @@
     $available = $record->available_stock;
 
     $badge = match (true) {
-        $available === 0 => ['Out of stock', 'bg-red-500 text-white'],
-        $available < 5   => ["{$available} left", 'bg-amber-500 text-white'],
-        default           => ["{$available} in stock", 'bg-emerald-500 text-white'],
+        $available === 0        => ['Out of stock', 'bg-red-500 text-white'],
+        $record->is_low_stock    => ["{$available} left", 'bg-amber-500 text-white'],
+        default                  => ["{$available} in stock", 'bg-emerald-500 text-white'],
     };
 
     $eyebrow = trim(collect([$record->category?->name, $record->brand])->filter()->implode(' · '));

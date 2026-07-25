@@ -3,19 +3,19 @@
     $available = $product->available_stock;
 
     $stockDot = match (true) {
-        $available === 0 => 'bg-red-500',
-        $available < 5   => 'bg-amber-500',
-        default           => 'bg-emerald-500',
+        $available === 0        => 'bg-red-500',
+        $product->is_low_stock   => 'bg-amber-500',
+        default                  => 'bg-emerald-500',
     };
     $stockLabel = match (true) {
-        $available === 0 => 'Out of stock',
-        $available < 5   => "Low stock ({$available})",
-        default           => "{$available} available",
+        $available === 0        => 'Out of stock',
+        $product->is_low_stock   => "Low stock ({$available})",
+        default                  => "{$available} available",
     };
     $stockTextClass = match (true) {
-        $available === 0 => 'text-red-600 dark:text-red-400',
-        $available < 5   => 'text-amber-600 dark:text-amber-400',
-        default           => 'text-gray-700 dark:text-gray-300',
+        $available === 0        => 'text-red-600 dark:text-red-400',
+        $product->is_low_stock   => 'text-amber-600 dark:text-amber-400',
+        default                  => 'text-gray-700 dark:text-gray-300',
     };
 
     $status = ($product->status === 'published' && $product->unpublish_at?->isPast()) ? 'expired' : $product->status;

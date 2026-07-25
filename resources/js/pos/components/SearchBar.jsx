@@ -106,7 +106,7 @@ const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect, autoFocus 
                             </div>
                             <div className="text-right shrink-0">
                                 <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">₦{Number(p.price).toLocaleString()}</p>
-                                <p className={`text-xs ${p.available_stock < 5 ? 'text-orange-500' : 'text-gray-400 dark:text-gray-500'}`}>
+                                <p className={`text-xs ${p.is_low_stock ? 'text-orange-500' : 'text-gray-400 dark:text-gray-500'}`}>
                                     {p.available_stock} left
                                 </p>
                             </div>

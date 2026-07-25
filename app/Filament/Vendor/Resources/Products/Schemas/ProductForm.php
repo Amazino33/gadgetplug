@@ -2,16 +2,21 @@
 
 namespace App\Filament\Vendor\Resources\Products\Schemas;
 
-use Filament\Schemas\Schema;
-use Filament\Schemas\Components\Section;
-use Filament\Schemas\Components\Grid;
+use App\Models\Tag;
+use Filament\Actions\Action;
+use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\KeyValue;
+use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\KeyValue;
 use Filament\Forms\Components\Toggle;
-use Filament\Forms\Components\DateTimePicker;
-use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
+use Filament\Schemas\Components\Grid;
+use Filament\Schemas\Components\Group;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
+use Illuminate\Support\HtmlString;
 
 class ProductForm
 {
@@ -19,102 +24,200 @@ class ProductForm
     {
         return $schema
             ->components([
-
-                Section::make('Product Details')
+                Grid::make(['default' => 1, 'lg' => 3])
                     ->schema([
-                        Grid::make(2)
-                            ->schema([
-                                Select::make('category_id')
-                                    ->relationship('category', 'name')
-                                    ->required()
-                                    ->searchable()
-                                    ->preload(),
+                        Group::make([
+                            Section::make('Basic Information')
+                                ->schema([
+                                    Grid::make(2)
+                                        ->schema([
+                                            Select::make('category_id')
+                                                ->relationship('category', 'name')
+                                                ->required()
+                                                ->searchable()
+                                                ->preload(),
 
-                                TextInput::make('brand')
-                                    ->placeholder('e.g., Apple, Samsung'),
+                                            TextInput::make('brand')
+                                                ->placeholder('e.g., Apple, Samsung'),
 
-                                TextInput::make('name')
-                                    ->required()
-                                    ->columnSpanFull(),
+                                            TextInput::make('name')
+                                                ->required()
+                                                ->columnSpanFull(),
 
-                                TextInput::make('sku')
-                                    ->label('SKU')
-                                    ->placeholder('e.g., APL-IP15-128-BLK')
-                                    ->maxLength(100),
+                                            TextInput::make('sku')
+                                                ->label('SKU')
+                                                ->placeholder('e.g., APL-IP15-128-BLK')
+                                                ->maxLength(100),
 
-                                TextInput::make('barcode')
-                                    ->label('Barcode')
-                                    ->placeholder('e.g., 0123456789012')
-                                    ->maxLength(100),
+                                            // Camera scan reuses the barcode-scanner component already
+                                            // mounted globally on this panel (see VendorPanelProvider) —
+                                            // same one used by Inventory Count's scan button.
+                                            TextInput::make('barcode')
+                                                ->label('Barcode')
+                                                ->placeholder('e.g., 0123456789012')
+                                                ->maxLength(100)
+                                                ->extraFieldWrapperAttributes([
+                                                    'x-on:barcode-scanned.window' => "\$wire.set('data.barcode', \$event.detail.barcode)",
+                                                ])
+                                                ->suffixAction(
+                                                    Action::make('scanBarcode')
+                                                        ->icon('heroicon-o-qr-code')
+                                                        ->tooltip('Scan barcode with camera')
+                                                        ->action(fn () => null)
+                                                        ->extraAttributes([
+                                                            'x-on:click' => "window.dispatchEvent(new CustomEvent('open-barcode-scanner'))",
+                                                        ]),
+                                                ),
 
-                                TextInput::make('cost_price')
-                                    ->numeric()
-                                    ->prefix('₦')
-                                    ->placeholder('Leave blank if unknown')
-                                    ->helperText('Optional — shown as "—" in reports until set.'),
+                                            Textarea::make('description')
+                                                ->rows(4)
+                                                ->columnSpanFull(),
+                                        ]),
+                                ]),
 
-                                TextInput::make('price')
-                                    ->numeric()
-                                    ->required()
-                                    ->prefix('₦')
-                                    ->gt('cost_price'),
+                            Section::make('Media')
+                                ->schema([
+                                    SpatieMediaLibraryFileUpload::make('images')
+                                        ->collection('product-images')
+                                        ->multiple()
+                                        ->reorderable()
+                                        ->image()
+                                        ->imageEditor()
+                                        ->maxFiles(8)
+                                        ->panelLayout('grid')
+                                        ->columnSpanFull(),
+                                ]),
 
+                            Section::make('Specifications')
+                                ->schema([
+                                    KeyValue::make('specifications')
+                                        ->keyLabel('Spec Name (e.g., RAM)')
+                                        ->valueLabel('Value (e.g., 8GB)')
+                                        ->columnSpanFull(),
+                                ])
+                                ->collapsible(),
+                        ])->columnSpan(['lg' => 2]),
 
-                                Textarea::make('description')
-                                    ->rows(4)
-                                    ->columnSpanFull(),
-                            ]),
+                        Group::make([
+                            Section::make('Pricing')
+                                ->schema([
+                                    TextInput::make('cost_price')
+                                        ->numeric()
+                                        ->prefix('₦')
+                                        ->placeholder('Leave blank if unknown')
+                                        ->helperText('Optional — shown as "—" in reports until set.')
+                                        ->live(),
+
+                                    TextInput::make('price')
+                                        ->numeric()
+                                        ->required()
+                                        ->prefix('₦')
+                                        ->gt('cost_price')
+                                        ->live(),
+
+                                    Placeholder::make('margin_preview')
+                                        ->label('')
+                                        ->content(function ($get): HtmlString {
+                                            $price = (float) ($get('price') ?? 0);
+
+                                            if ($price <= 0) {
+                                                return new HtmlString(
+                                                    '<p class="text-xs text-gray-400 dark:text-gray-500">Enter a selling price to see profit.</p>'
+                                                );
+                                            }
+
+                                            $cost = $get('cost_price');
+                                            $cost = ($cost !== null && $cost !== '') ? (float) $cost : null;
+
+                                            if ($cost === null) {
+                                                return new HtmlString(
+                                                    '<p class="text-xs text-gray-400 dark:text-gray-500">Add a cost price to see profit and margin.</p>'
+                                                );
+                                            }
+
+                                            $profit = $price - $cost;
+                                            $margin = ($profit / $price) * 100;
+                                            $markup = $cost > 0 ? ($profit / $cost) * 100 : 0;
+                                            $profitColor = $profit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400';
+
+                                            return new HtmlString(
+                                                '<div class="rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-gray-800 p-3 space-y-1.5">'
+                                                    . '<div class="flex justify-between text-sm"><span class="text-gray-500 dark:text-gray-400">Profit</span><span class="font-bold ' . $profitColor . '">₦' . number_format($profit, 2) . '</span></div>'
+                                                    . '<div class="flex justify-between text-sm"><span class="text-gray-500 dark:text-gray-400">Margin / Markup</span><span class="font-semibold text-gray-900 dark:text-white">' . number_format($margin, 1) . '% / ' . number_format($markup, 1) . '%</span></div>'
+                                                . '</div>'
+                                            );
+                                        }),
+                                ]),
+
+                            Section::make('Inventory')
+                                ->schema([
+                                    TextInput::make('low_stock_threshold')
+                                        ->label('Low Stock Alert Threshold')
+                                        ->helperText('Flagged as "low stock" once available units fall below this.')
+                                        ->numeric()
+                                        ->default(5)
+                                        ->minValue(0)
+                                        ->required(),
+                                ]),
+
+                            Section::make('Sales Channels')
+                                ->schema([
+                                    Toggle::make('show_online')
+                                        ->label('Online Store')
+                                        ->helperText('Show on the public storefront')
+                                        ->default(true),
+
+                                    Toggle::make('show_in_pos')
+                                        ->label('Offline Store (POS)')
+                                        ->helperText('Available for in-person POS sales')
+                                        ->default(true),
+                                ]),
+
+                            Section::make('Tags')
+                                ->schema([
+                                    Select::make('tags')
+                                        ->relationship('tags', 'name')
+                                        ->multiple()
+                                        ->searchable()
+                                        ->preload()
+                                        ->label('')
+                                        ->placeholder('Add tags…')
+                                        ->createOptionForm([
+                                            TextInput::make('name')->required(),
+                                        ])
+                                        ->createOptionUsing(function (array $data): int {
+                                            return Tag::create([
+                                                'vendor_id' => filament()->getTenant()->id,
+                                                'name'      => $data['name'],
+                                            ])->getKey();
+                                        }),
+                                ]),
+
+                            Section::make('Visibility')
+                                ->schema([
+                                    Select::make('status')
+                                        ->options([
+                                            'draft'     => 'Draft',
+                                            'published' => 'Published',
+                                            'archived'  => 'Archived',
+                                        ])
+                                        ->default('draft')
+                                        ->required()
+                                        ->live(),
+
+                                    DateTimePicker::make('published_at')
+                                        ->label('Publish Date')
+                                        ->placeholder('Publish immediately')
+                                        ->hidden(fn ($get) => $get('status') !== 'published'),
+
+                                    DateTimePicker::make('unpublish_at')
+                                        ->label('Unpublish Date')
+                                        ->placeholder('Never (stays live)')
+                                        ->after('published_at')
+                                        ->hidden(fn ($get) => $get('status') !== 'published'),
+                                ]),
+                        ])->columnSpan(['lg' => 1]),
                     ]),
-
-                Section::make('Product Images')
-                    ->schema([
-                        SpatieMediaLibraryFileUpload::make('images')
-                            ->collection('product-images')
-                            ->multiple()
-                            ->reorderable()
-                            ->image()
-                            ->imageEditor()
-                            ->maxFiles(8)
-                            ->panelLayout('grid')
-                            ->columnSpanFull(),
-                    ]),
-
-                Section::make('Visibility')
-                    ->schema([
-                        Grid::make(2)
-                            ->schema([
-                                Select::make('status')
-                                    ->options([
-                                        'draft'     => 'Draft',
-                                        'published' => 'Published',
-                                        'archived'  => 'Archived',
-                                    ])
-                                    ->default('draft')
-                                    ->required()
-                                    ->live(),
-
-                                DateTimePicker::make('published_at')
-                                    ->label('Publish Date')
-                                    ->placeholder('Publish immediately')
-                                    ->hidden(fn ($get) => $get('status') !== 'published'),
-
-                                DateTimePicker::make('unpublish_at')
-                                    ->label('Unpublish Date')
-                                    ->placeholder('Never (stays live)')
-                                    ->after('published_at')
-                                    ->hidden(fn ($get) => $get('status') !== 'published'),
-                            ]),
-                    ]),
-
-                Section::make('Specifications')
-                    ->schema([
-                        KeyValue::make('specifications')
-                            ->keyLabel('Spec Name (e.g., RAM)')
-                            ->valueLabel('Value (e.g., 8GB)')
-                            ->columnSpanFull(),
-                    ])
-                    ->collapsible(),
-
             ]);
     }
 }

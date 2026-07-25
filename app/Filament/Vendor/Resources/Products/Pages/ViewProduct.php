@@ -130,7 +130,7 @@ class ViewProduct extends ViewRecord
             ['Reserved', $record->reserved_stock, $record->reserved_stock > 0 ? 'text-yellow-600 dark:text-yellow-400' : 'text-gray-950 dark:text-white'],
             ['Available', $record->available_stock, match (true) {
                 $record->available_stock === 0 => 'text-red-600 dark:text-red-400',
-                $record->available_stock < 5   => 'text-yellow-600 dark:text-yellow-400',
+                $record->is_low_stock           => 'text-yellow-600 dark:text-yellow-400',
                 default                         => 'text-green-600 dark:text-green-400',
             }],
         ];

@@ -6,6 +6,7 @@ import { db } from '../lib/db';
 import api from '../lib/api';
 import Cart from '../components/Cart';
 import SearchBar from '../components/SearchBar';
+import BarcodeScanner from '../components/BarcodeScanner';
 import ActionGrid from '../components/ActionGrid';
 import PaymentModal from '../components/PaymentModal';
 import CustomerModal from '../components/CustomerModal';
@@ -258,14 +259,16 @@ export default function POS({ user, vendorId, onLogout }) {
                             </button>
                         </div>
                     </div>
-                    <div className="px-4 pb-3">
+                    <div className="px-4 pb-3 flex items-center gap-2">
                         <SearchBar vendorId={vendorId} onSelect={addProduct} autoFocus={false} />
+                        <BarcodeScanner vendorId={vendorId} onProductFound={addProduct} />
                     </div>
                 </div>
 
                 {/* ── Desktop header ──────────────────────────────── */}
                 <div className="hidden md:flex items-center gap-2 px-4 py-3 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 shrink-0">
                     <SearchBar ref={searchRef} vendorId={vendorId} onSelect={addProduct} />
+                    <BarcodeScanner vendorId={vendorId} onProductFound={addProduct} />
                     <span className={`text-xs px-2 py-1 rounded-full font-medium shrink-0 ${isOnline ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
                         {isOnline ? '●' : '●'}
                     </span>

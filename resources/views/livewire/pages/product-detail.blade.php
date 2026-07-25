@@ -13,7 +13,7 @@ new class extends Component {
 
     public function mount(Product $product): void
     {
-        if (! Product::published()->where('id', $product->id)->exists()) {
+        if (! Product::visibleOnline()->where('id', $product->id)->exists()) {
             abort(404);
         }
 
