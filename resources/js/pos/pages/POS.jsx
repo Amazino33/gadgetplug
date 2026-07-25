@@ -223,7 +223,7 @@ export default function POS({ user, vendorId, onLogout }) {
     }, [cart, selectedIdx, total, modal, lastSale, showMobileMore]);
 
     return (
-        <div className="flex flex-col md:flex-row h-screen bg-[#F9FAFB] dark:bg-gray-950 overflow-hidden select-none"
+        <div className="flex flex-col md:flex-row h-dvh bg-[#F9FAFB] dark:bg-gray-950 overflow-hidden select-none"
              style={{ fontFamily: 'Inter, sans-serif' }}>
 
             {/* ── Left/Top: Cart area ───────────────────────────────── */}
