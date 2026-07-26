@@ -79,6 +79,20 @@ class OrderInfolist
                         ->copyable(),
                 ]),
 
+            Section::make('Logistics')
+                ->columns(2)
+                ->schema([
+                    TextEntry::make('logisticsCompany.name')
+                        ->label('Company')
+                        ->placeholder('Not assigned yet')
+                        ->weight('bold'),
+
+                    TextEntry::make('deliveryPerson.name')
+                        ->label('Rider')
+                        ->placeholder('Not assigned yet')
+                        ->weight('bold'),
+                ]),
+
             Section::make('Items Ordered')
                 ->schema([
                     RepeatableEntry::make('items')

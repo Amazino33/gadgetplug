@@ -50,6 +50,21 @@ class Vendor extends Model
         return $this->hasMany(Product::class);
     }
 
+    public function logisticsCompanies()
+    {
+        return $this->hasMany(LogisticsCompany::class);
+    }
+
+    public function deliveryPersons()
+    {
+        return $this->hasMany(DeliveryPerson::class);
+    }
+
+    public function messageTemplates()
+    {
+        return $this->hasMany(MessageTemplate::class);
+    }
+
     public function payouts()
     {
         return $this->hasMany(VendorPayout::class);

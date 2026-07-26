@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Models\Activity;
 use Spatie\Activitylog\Traits\LogsActivity;
@@ -13,26 +15,51 @@ class Order extends Model
 
     protected $guarded = [];
 
+    // Transient, in-memory only — never persisted. Lets a Filament action opt an
+    // update out of OrderObserver's automatic customer notification (the "notify
+    // silently / skip" toggle) without affecting any other caller of ->update().
+    public bool $skipCustomerNotification = false;
+
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['status', 'payment_status'])
+            ->logOnly(['status', 'payment_status', 'logistics_company_id', 'delivery_person_id'])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs();
     }
 
     public function tapActivity(Activity $activity, string $eventName): void
     {
-        $activity->vendor_id = $this->vendor_id;
+        // Order has no direct vendor_id column — resolve it via its items instead
+        // (this previously read $this->vendor_id, which never existed and always logged null).
+        // Query fresh rather than through the `items` relation property: on Order::create(),
+        // items don't exist yet, and caching that empty collection on $this would poison any
+        // later activity logged on the same in-memory instance within the same request.
+        $activity->vendor_id = $this->items()->value('vendor_id');
     }
 
-    public function items()
+    public function items(): HasMany
     {
         return $this->hasMany(OrderItem::class);
     }
 
-    public function user()
+    public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function logisticsCompany(): BelongsTo
+    {
+        return $this->belongsTo(LogisticsCompany::class);
+    }
+
+    public function deliveryPerson(): BelongsTo
+    {
+        return $this->belongsTo(DeliveryPerson::class);
+    }
+
+    public function deliveryMessages(): HasMany
+    {
+        return $this->hasMany(DeliveryMessage::class);
     }
 }

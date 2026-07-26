@@ -45,4 +45,29 @@ return [
         'chat_id' => env('TELEGRAM_CHAT_ID'),
     ],
 
+    'anthropic' => [
+        'key' => env('ANTHROPIC_API_KEY'),
+    ],
+
+    'replicate' => [
+        'token' => env('REPLICATE_API_TOKEN'),
+    ],
+
+    'messaging' => [
+        // Blank = auto-select based on which provider below has real credentials.
+        'whatsapp_driver' => env('MESSAGING_WHATSAPP_DRIVER'),
+        'sms_driver'      => env('MESSAGING_SMS_DRIVER'),
+    ],
+
+    'termii' => [
+        'api_key'   => env('TERMII_API_KEY'),
+        'sender_id' => env('TERMII_SENDER_ID'),
+    ],
+
+    'whatsapp_cloud' => [
+        'token'           => env('WHATSAPP_CLOUD_TOKEN'),
+        'phone_number_id' => env('WHATSAPP_CLOUD_PHONE_NUMBER_ID'),
+        'api_version'     => env('WHATSAPP_CLOUD_API_VERSION', 'v21.0'),
+    ],
+
 ];

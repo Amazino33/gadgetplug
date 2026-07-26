@@ -32,5 +32,8 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <!-- Force the inert drivers regardless of real keys in a developer's local .env -->
+        <env name="MESSAGING_WHATSAPP_DRIVER" value="log_null"/>
+        <env name="MESSAGING_SMS_DRIVER" value="log_null"/>
     </php>
 </phpunit>

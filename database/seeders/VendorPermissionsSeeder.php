@@ -41,6 +41,9 @@ class VendorPermissionsSeeder extends Seeder
             // Inventory
             'manage_inventory',
             'approve_procurement',
+
+            // Logistics & Delivery Messaging
+            'manage_logistics',
         ];
 
         foreach ($permissions as $permission) {

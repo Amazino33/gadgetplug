@@ -4,6 +4,7 @@ namespace App\Filament\Vendor\Resources\Orders;
 
 use App\Filament\Vendor\Resources\Orders\Pages\ListOrders;
 use App\Filament\Vendor\Resources\Orders\Pages\ViewOrder;
+use App\Filament\Vendor\Resources\Orders\RelationManagers\DeliveryMessagesRelationManager;
 use App\Filament\Vendor\Resources\Orders\Schemas\OrderInfolist;
 use App\Filament\Vendor\Resources\Orders\Tables\OrdersTable;
 use App\Models\Order;
@@ -12,7 +13,9 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Auth\Access\Response;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 
 class OrderResource extends Resource
 {
@@ -47,6 +50,13 @@ class OrderResource extends Resource
             ->latest();
     }
 
+    public static function getRelations(): array
+    {
+        return [
+            DeliveryMessagesRelationManager::class,
+        ];
+    }
+
     public static function getPages(): array
     {
         return [
@@ -58,5 +68,27 @@ class OrderResource extends Resource
     public static function canCreate(): bool
     {
         return false;
+    }
+
+    public static function canAccess(): bool
+    {
+        return static::isAuthorized();
+    }
+
+    private static function isAuthorized(): bool
+    {
+        $vendor = filament()->getTenant();
+        $user   = auth()->user();
+
+        return $vendor && (
+            $user->isSuperAdmin() ||
+            $vendor->isOwner($user) ||
+            $user->hasVendorPermission($vendor->id, 'view_any_order_items')
+        );
+    }
+
+    public static function getViewAuthorizationResponse(Model $record): Response
+    {
+        return static::isAuthorized() ? Response::allow() : Response::deny();
     }
 }
