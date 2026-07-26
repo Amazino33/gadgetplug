@@ -47,7 +47,7 @@ class MessageTemplateSeeder extends Seeder
                 'key'            => 'rider_assignment',
                 'recipient_type' => 'rider',
                 'channel'        => 'whatsapp',
-                'body'           => 'Hi {{rider_name}}, you have a new delivery: order {{order_number}} for {{customer_name}}, to be delivered to {{delivery_address}}. Order total: {{total}}.',
+                'body'           => "New delivery for {{rider_name}}:\n\nOrder: {{order_number}}\nCustomer: {{customer_name}}\nPhone: {{customer_phone}}\nDeliver to: {{delivery_address}}\nTotal: {{total}}",
             ],
         ];
     }

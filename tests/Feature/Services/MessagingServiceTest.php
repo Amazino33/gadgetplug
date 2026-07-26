@@ -101,6 +101,7 @@ test('contextForOrder builds placeholder values from an order and its assigned r
     $context = TemplateRenderer::contextForOrder($data['order']);
 
     expect($context['customer_name'])->toBe('Jane Customer')
+        ->and($context['customer_phone'])->toBe('08040000000')
         ->and($context['order_number'])->toBe($data['order']->reference)
         ->and($context['rider_name'])->toBe('John Rider')
         ->and($context['rider_phone'])->toBe('08020000000')

@@ -27,6 +27,7 @@ class TemplateRenderer
     {
         return [
             'customer_name'    => $order->customer_name,
+            'customer_phone'   => $order->customer_phone,
             'order_number'     => $order->reference,
             'rider_name'       => $order->deliveryPerson?->name ?? '',
             'rider_phone'      => $order->deliveryPerson?->phone ?? '',

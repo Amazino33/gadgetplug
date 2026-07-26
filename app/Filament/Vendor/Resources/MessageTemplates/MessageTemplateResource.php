@@ -59,7 +59,7 @@ class MessageTemplateResource extends Resource
                     ->required()
                     ->rows(4)
                     ->columnSpanFull()
-                    ->helperText('Placeholders: {{customer_name}}, {{order_number}}, {{rider_name}}, {{rider_phone}}, {{company_name}}, {{status}}, {{total}}, {{delivery_address}}'),
+                    ->helperText('Placeholders: {{customer_name}}, {{customer_phone}}, {{order_number}}, {{rider_name}}, {{rider_phone}}, {{company_name}}, {{status}}, {{total}}, {{delivery_address}}'),
             ])->columns(3),
         ]);
     }
