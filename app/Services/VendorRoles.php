@@ -19,12 +19,13 @@ class VendorRoles
             'view_order_items', 'view_any_order_items', 'edit_order_items',
             'view_vendor', 'edit_vendor',
             'view_team_members', 'invite_team_members', 'edit_team_members', 'remove_team_members',
-            'access_pos', 'void_sale', 'process_return', 'close_pos_session', 
+            'access_pos', 'void_sale', 'process_return', 'close_pos_session',
             'manage_inventory', 'approve_procurement',
+            'create_procurement', 'submit_procurement', 'record_procurement_logistics',
         ],
         'product_manager' => [
             'view_products', 'view_any_products', 'create_products', 'edit_products', 'delete_products',
-            'view_order_items', 'view_any_order_items', 
+            'view_order_items', 'view_any_order_items',
             'manage_inventory',
         ],
         'order_manager' => [
@@ -39,12 +40,17 @@ class VendorRoles
             'view_team_members', 'invite_team_members', 'edit_team_members',
             'access_pos', 'void_sale', 'process_return', 'close_pos_session',
             'manage_inventory', 'approve_procurement',
+            'create_procurement', 'submit_procurement', 'record_procurement_logistics',
         ],
         'storekeeper' => [
             'view_products', 'view_any_products',
             'view_order_items', 'view_any_order_items',
             'access_pos',
             'manage_inventory',
+            // Storekeeper handles procurement creation/submission but never
+            // reconciles logistics — that's a separate capability by design
+            // (two-person workflow), deliberately not granted here.
+            'create_procurement', 'submit_procurement',
         ],
         'member' => [
             'view_products', 'view_any_products',
@@ -59,9 +65,9 @@ class VendorRoles
         foreach (self::ROLES as $roleName => $permissionNames) {
             // Idempotent — skip if this vendor already has the role
             $role = Role::firstOrCreate([
-                'name'       => $roleName,
+                'name' => $roleName,
                 'guard_name' => 'web',
-                'team_id'    => $vendor->id,
+                'team_id' => $vendor->id,
             ]);
 
             $permissions = Permission::whereIn('name', $permissionNames)
