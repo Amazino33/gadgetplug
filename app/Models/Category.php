@@ -12,12 +12,6 @@ class Category extends Model
 
     protected $guarded = [];
 
-    // Fraction (e.g. 0.60 = 60%) applied by the procurement pricing engine.
-    // Null means "use config('pricing.fallback_markup')".
-    protected $casts = [
-        'markup' => 'decimal:4',
-    ];
-
     public function getSlugOptions(): SlugOptions
     {
         return SlugOptions::create()

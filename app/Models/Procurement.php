@@ -25,20 +25,16 @@ class Procurement extends Model
     {
         $activity->vendor_id = $this->vendor_id;
     }
-
     protected $fillable = [
         'reference', 'vendor_id', 'supplier_id', 'waybill_image',
         'total_cost', 'amount_paid', 'payment_status', 'payment_method', 'status',
         'void_reason', 'notes', 'created_by', 'approved_by', 'approved_at',
-        'logistics_cost', 'logistics_recorded_by', 'reconciled_at',
     ];
 
     protected $casts = [
-        'total_cost' => 'decimal:2',
-        'amount_paid' => 'decimal:2',
-        'approved_at' => 'datetime',
-        'logistics_cost' => 'decimal:2',
-        'reconciled_at' => 'datetime',
+        'total_cost'   => 'decimal:2',
+        'amount_paid'  => 'decimal:2',
+        'approved_at'  => 'datetime',
     ];
 
     protected static function booted(): void
@@ -46,7 +42,7 @@ class Procurement extends Model
         // Generate reference after insert: GP-PROC-00001
         static::created(function (self $procurement) {
             $procurement->updateQuietly([
-                'reference' => 'GP-PROC-'.str_pad($procurement->id, 5, '0', STR_PAD_LEFT),
+                'reference' => 'GP-PROC-' . str_pad($procurement->id, 5, '0', STR_PAD_LEFT),
             ]);
         });
     }
@@ -76,51 +72,20 @@ class Procurement extends Model
         return $this->belongsTo(User::class, 'approved_by');
     }
 
-    public function logisticsRecorder(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'logistics_recorded_by');
-    }
-
     public function recalculate(): void
     {
-        $total = $this->items()->selectRaw('SUM(quantity * unit_cost) as total')->value('total') ?? 0;
-        $paid = (float) $this->amount_paid;
+        $total  = $this->items()->selectRaw('SUM(quantity * unit_cost) as total')->value('total') ?? 0;
+        $paid   = (float) $this->amount_paid;
         $status = match (true) {
             $paid >= $total && $total > 0 => 'full',
-            $paid > 0 => 'part_payment',
-            default => 'credit',
+            $paid > 0                     => 'part_payment',
+            default                       => 'credit',
         };
 
         $this->updateQuietly(['total_cost' => $total, 'payment_status' => $status]);
     }
 
-    public function isPending(): bool
-    {
-        return $this->status === 'pending';
-    }
-
-    public function isApproved(): bool
-    {
-        return $this->status === 'approved';
-    }
-
-    public function isVoided(): bool
-    {
-        return $this->status === 'voided';
-    }
-
-    public function isDraft(): bool
-    {
-        return $this->status === 'draft';
-    }
-
-    public function isAwaitingLogistics(): bool
-    {
-        return $this->status === 'awaiting_logistics';
-    }
-
-    public function isReconciled(): bool
-    {
-        return $this->status === 'reconciled';
-    }
+    public function isPending(): bool  { return $this->status === 'pending'; }
+    public function isApproved(): bool { return $this->status === 'approved'; }
+    public function isVoided(): bool   { return $this->status === 'voided'; }
 }

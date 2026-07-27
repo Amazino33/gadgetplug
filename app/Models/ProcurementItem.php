@@ -10,14 +10,11 @@ class ProcurementItem extends Model
     protected $fillable = [
         'procurement_id', 'product_id', 'barcode',
         'quantity', 'unit_cost', 'selling_price',
-        'landed_unit_cost', 'suggested_price',
     ];
 
     protected $casts = [
-        'unit_cost' => 'decimal:2',
+        'unit_cost'     => 'decimal:2',
         'selling_price' => 'decimal:2',
-        'landed_unit_cost' => 'decimal:2',
-        'suggested_price' => 'decimal:2',
     ];
 
     public function procurement(): BelongsTo
@@ -40,17 +37,13 @@ class ProcurementItem extends Model
     public function costVariancePct(): ?float
     {
         $historical = (float) ($this->product?->cost_price ?? 0);
-        if ($historical <= 0) {
-            return null;
-        }
-
+        if ($historical <= 0) return null;
         return (($this->unit_cost - $historical) / $historical) * 100;
     }
 
     public function hasCostVariance(): bool
     {
         $pct = $this->costVariancePct();
-
         return $pct !== null && abs($pct) > 10;
     }
 }

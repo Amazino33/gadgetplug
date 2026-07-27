@@ -44,13 +44,6 @@ class VendorPermissionsSeeder extends Seeder
 
             // Logistics & Delivery Messaging
             'manage_logistics',
-
-            // Procurement Auto-Pricing Workflow — distinct from manage_logistics
-            // above, which is outbound rider/delivery logistics. These are
-            // inbound trip logistics (freight cost on a supplier procurement).
-            'create_procurement',
-            'submit_procurement',
-            'record_procurement_logistics',
         ];
 
         foreach ($permissions as $permission) {
