@@ -3,9 +3,9 @@
 namespace App\Filament\Vendor\Resources\Products\Pages;
 
 use App\Filament\Vendor\Resources\Products\ProductResource;
+use App\Filament\Vendor\Resources\Products\Schemas\ProductForm;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;
-use Override;
 
 class EditProduct extends EditRecord
 {
@@ -26,5 +26,10 @@ class EditProduct extends EditRecord
             ->toArray();
 
         return $data;
+    }
+
+    protected function mutateFormDataBeforeSave(array $data): array
+    {
+        return ProductForm::stripTransientAiFields($data);
     }
 }

@@ -81,23 +81,26 @@ class ProcurementResource extends Resource
                 TextColumn::make('payment_status')
                     ->label('Payment')
                     ->badge()
-                    ->color(fn (string $state) => match ($state) {
+                    ->color(fn (?string $state) => match ($state) {
                         'full'         => 'success',
                         'part_payment' => 'warning',
                         'credit'       => 'danger',
+                        default        => 'gray',
                     })
-                    ->formatStateUsing(fn (string $state) => match ($state) {
+                    ->formatStateUsing(fn (?string $state) => match ($state) {
                         'full'         => 'Fully Paid',
                         'part_payment' => 'Part-Payment',
                         'credit'       => 'Credit',
+                        default        => $state ?? '—',
                     }),
 
                 TextColumn::make('status')
                     ->badge()
-                    ->color(fn (string $state) => match ($state) {
+                    ->color(fn (?string $state) => match ($state) {
                         'pending'  => 'warning',
                         'approved' => 'success',
                         'voided'   => 'danger',
+                        default    => 'gray',
                     }),
 
                 TextColumn::make('creator.name')
