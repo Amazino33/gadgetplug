@@ -5,20 +5,19 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\HasMany;
-use Spatie\MediaLibrary\HasMedia;
-use Spatie\MediaLibrary\InteractsWithMedia;
-use Spatie\Image\Enums\Fit;
-use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Models\Activity;
 use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Image\Enums\Fit;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Spatie\Sluggable\HasSlug;
 use Spatie\Sluggable\SlugOptions;
 
 class Product extends Model implements HasMedia
 {
-    use InteractsWithMedia, HasSlug, LogsActivity;
+    use HasSlug, InteractsWithMedia, LogsActivity;
 
     public function getActivitylogOptions(): LogOptions
     {
@@ -51,20 +50,21 @@ class Product extends Model implements HasMedia
     }
 
     protected $casts = [
-        'price'           => 'decimal:2',
-        'cost_price'      => 'decimal:2',
-        'specifications'  => 'array',
-        'stock_quantity'  => 'integer',
-        'reserved_stock'  => 'integer',
-        'published_at'    => 'datetime',
-        'unpublish_at'    => 'datetime',
+        'price' => 'decimal:2',
+        'cost_price' => 'decimal:2',
+        'price_overridden' => 'boolean',
+        'specifications' => 'array',
+        'stock_quantity' => 'integer',
+        'reserved_stock' => 'integer',
+        'published_at' => 'datetime',
+        'unpublish_at' => 'datetime',
     ];
 
     public function scopePublished(Builder $query): void
     {
         $query->where('status', 'published')
-              ->where(fn($q) => $q->whereNull('published_at')->orWhere('published_at', '<=', now()))
-              ->where(fn($q) => $q->whereNull('unpublish_at')->orWhere('unpublish_at', '>', now()));
+            ->where(fn ($q) => $q->whereNull('published_at')->orWhere('published_at', '<=', now()))
+            ->where(fn ($q) => $q->whereNull('unpublish_at')->orWhere('unpublish_at', '>', now()));
     }
 
     // "Published" governs whether a product physically exists/is live at all;
@@ -98,21 +98,27 @@ class Product extends Model implements HasMedia
     // null whenever cost_price hasn't been set, rather than faking a number.
     public function getProfitAttribute(): ?float
     {
-        if ($this->cost_price === null) return null;
+        if ($this->cost_price === null) {
+            return null;
+        }
 
         return (float) $this->price - (float) $this->cost_price;
     }
 
     public function getMarginPercentAttribute(): ?float
     {
-        if ($this->cost_price === null || (float) $this->price <= 0) return null;
+        if ($this->cost_price === null || (float) $this->price <= 0) {
+            return null;
+        }
 
         return ($this->profit / (float) $this->price) * 100;
     }
 
     public function getMarkupPercentAttribute(): ?float
     {
-        if ($this->cost_price === null || (float) $this->cost_price <= 0) return null;
+        if ($this->cost_price === null || (float) $this->cost_price <= 0) {
+            return null;
+        }
 
         return ($this->profit / (float) $this->cost_price) * 100;
     }
@@ -139,7 +145,7 @@ class Product extends Model implements HasMedia
             ->withResponsiveImages();    // auto-generates srcset sizes (optional but nice)
     }
 
-    public function registerMediaConversions(Media $media = null): void
+    public function registerMediaConversions(?Media $media = null): void
     {
         $this->addMediaConversion('thumb')
             ->fit(Fit::Crop, 300, 300)
