@@ -3,8 +3,10 @@
 namespace App\Filament\Vendor\Resources\Products\Schemas;
 
 use App\Models\Tag;
+use App\Services\ImageProcessing\ProductImagePipeline;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\KeyValue;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
@@ -12,14 +14,35 @@ use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Notifications\Notification;
+use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Illuminate\Support\HtmlString;
+use Illuminate\Support\Str;
+use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
 class ProductForm
 {
+    // Transient, UI-only state used by the "Enhance with AI" flow — never
+    // persisted to the Product model. Stripped before save via
+    // stripTransientAiFields() (see CreateProduct/EditProduct pages).
+    public const AI_TRANSIENT_FIELDS = [
+        'ai_enhanced_file_key',
+        'ai_suggested_filename',
+        'ai_suggested_alt_text',
+        'ai_suggested_title',
+    ];
+
+    public static function stripTransientAiFields(array $data): array
+    {
+        return array_diff_key($data, array_flip(self::AI_TRANSIENT_FIELDS));
+    }
+
     public static function configure(Schema $schema): Schema
     {
         return $schema
@@ -85,7 +108,105 @@ class ProductForm
                                         ->imageEditor()
                                         ->maxFiles(8)
                                         ->panelLayout('grid')
-                                        ->columnSpanFull(),
+                                        ->columnSpanFull()
+                                        // Only the one photo targeted by "Enhance with AI" (tracked by
+                                        // ai_enhanced_file_key) gets the suggested filename/alt/title —
+                                        // every other file falls back to the component's normal defaults.
+                                        ->getUploadedFileNameForStorageUsing(function (TemporaryUploadedFile $file, Get $get): string {
+                                            if ($file->getFilename() === $get('ai_enhanced_file_key') && filled($get('ai_suggested_filename'))) {
+                                                return Str::slug($get('ai_suggested_filename')).'.'.$file->getClientOriginalExtension();
+                                            }
+
+                                            return Str::ulid().'.'.$file->getClientOriginalExtension();
+                                        })
+                                        ->customProperties(function (TemporaryUploadedFile $file, Get $get): array {
+                                            if ($file->getFilename() !== $get('ai_enhanced_file_key')) {
+                                                return [];
+                                            }
+
+                                            return array_filter([
+                                                'alt' => $get('ai_suggested_alt_text'),
+                                                'title' => $get('ai_suggested_title'),
+                                            ]);
+                                        }),
+
+                                    Hidden::make('ai_enhanced_file_key'),
+                                    Hidden::make('ai_suggested_filename'),
+                                    Hidden::make('ai_suggested_alt_text'),
+                                    Hidden::make('ai_suggested_title'),
+
+                                    Actions::make([
+                                        Action::make('enhanceWithAi')
+                                            ->label('Enhance with AI')
+                                            ->icon('heroicon-o-sparkles')
+                                            ->color('primary')
+                                            ->action(function (Get $get, Set $set) {
+                                                $target = collect($get('images') ?? [])
+                                                    ->first(fn ($file) => $file instanceof TemporaryUploadedFile);
+
+                                                if (! $target) {
+                                                    Notification::make()
+                                                        ->title('Upload a photo first, then click Enhance with AI.')
+                                                        ->warning()
+                                                        ->send();
+
+                                                    return;
+                                                }
+
+                                                $result = app(ProductImagePipeline::class)
+                                                    ->process($target->get(), $target->getMimeType());
+
+                                                if ($result->hasOptimizedImage()) {
+                                                    // Local disk only — Livewire's temp-upload storage on this
+                                                    // app is never S3 (see config/filesystems.php), so writing
+                                                    // straight to the real path is safe and avoids re-deriving
+                                                    // the Storage disk/relative-path internals.
+                                                    file_put_contents($target->getRealPath(), $result->optimizedImages['fallback']);
+                                                    $set('ai_enhanced_file_key', $target->getFilename());
+                                                }
+
+                                                if ($result->hasAnalysis()) {
+                                                    $analysis = $result->analysis;
+
+                                                    $set('ai_suggested_filename', $analysis->filename);
+                                                    $set('ai_suggested_alt_text', $analysis->altText);
+                                                    $set('ai_suggested_title', $analysis->title);
+
+                                                    if (blank($get('description'))) {
+                                                        $set('description', $analysis->description);
+                                                    }
+
+                                                    $vendorId = filament()->getTenant()->id;
+                                                    $suggestedTagIds = collect($analysis->keywords)
+                                                        ->filter()
+                                                        ->map(fn (string $keyword) => Tag::firstOrCreate(
+                                                            ['vendor_id' => $vendorId, 'name' => $keyword],
+                                                        )->getKey());
+
+                                                    $set(
+                                                        'tags',
+                                                        collect($get('tags') ?? [])->merge($suggestedTagIds)->unique()->values()->all(),
+                                                    );
+                                                }
+
+                                                if ($result->backgroundRemovalFailed || $result->analysisFailed) {
+                                                    Notification::make()
+                                                        ->title('Enhanced with a few hiccups')
+                                                        ->body(match (true) {
+                                                            $result->backgroundRemovalFailed && $result->analysisFailed => 'Background removal and AI suggestions both failed — the original photo was kept.',
+                                                            $result->backgroundRemovalFailed => 'Background removal failed — the original photo was kept, but AI suggestions were still generated.',
+                                                            default => 'AI metadata suggestions failed, but the photo was still cleaned up.',
+                                                        })
+                                                        ->warning()
+                                                        ->send();
+                                                } else {
+                                                    Notification::make()
+                                                        ->title('Photo enhanced — review the suggested description, tags, and image below before saving.')
+                                                        ->success()
+                                                        ->send();
+                                                }
+                                            }),
+                                    ]),
                                 ]),
 
                             Section::make('Specifications')
@@ -142,9 +263,9 @@ class ProductForm
 
                                             return new HtmlString(
                                                 '<div class="rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-gray-800 p-3 space-y-1.5">'
-                                                    . '<div class="flex justify-between text-sm"><span class="text-gray-500 dark:text-gray-400">Profit</span><span class="font-bold ' . $profitColor . '">₦' . number_format($profit, 2) . '</span></div>'
-                                                    . '<div class="flex justify-between text-sm"><span class="text-gray-500 dark:text-gray-400">Margin / Markup</span><span class="font-semibold text-gray-900 dark:text-white">' . number_format($margin, 1) . '% / ' . number_format($markup, 1) . '%</span></div>'
-                                                . '</div>'
+                                                    .'<div class="flex justify-between text-sm"><span class="text-gray-500 dark:text-gray-400">Profit</span><span class="font-bold '.$profitColor.'">₦'.number_format($profit, 2).'</span></div>'
+                                                    .'<div class="flex justify-between text-sm"><span class="text-gray-500 dark:text-gray-400">Margin / Markup</span><span class="font-semibold text-gray-900 dark:text-white">'.number_format($margin, 1).'% / '.number_format($markup, 1).'%</span></div>'
+                                                .'</div>'
                                             );
                                         }),
                                 ]),
@@ -188,7 +309,7 @@ class ProductForm
                                         ->createOptionUsing(function (array $data): int {
                                             return Tag::create([
                                                 'vendor_id' => filament()->getTenant()->id,
-                                                'name'      => $data['name'],
+                                                'name' => $data['name'],
                                             ])->getKey();
                                         }),
                                 ]),
@@ -197,9 +318,9 @@ class ProductForm
                                 ->schema([
                                     Select::make('status')
                                         ->options([
-                                            'draft'     => 'Draft',
+                                            'draft' => 'Draft',
                                             'published' => 'Published',
-                                            'archived'  => 'Archived',
+                                            'archived' => 'Archived',
                                         ])
                                         ->default('draft')
                                         ->required()

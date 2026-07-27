@@ -3,11 +3,17 @@
 namespace App\Filament\Vendor\Resources\Products\Pages;
 
 use App\Filament\Vendor\Resources\Products\ProductResource;
+use App\Filament\Vendor\Resources\Products\Schemas\ProductForm;
 use Filament\Resources\Pages\CreateRecord;
 
 class CreateProduct extends CreateRecord
 {
     protected static string $resource = ProductResource::class;
+
+    protected function mutateFormDataBeforeCreate(array $data): array
+    {
+        return ProductForm::stripTransientAiFields($data);
+    }
 
     protected function getFormActions(): array
     {
