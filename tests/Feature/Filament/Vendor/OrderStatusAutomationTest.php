@@ -19,34 +19,34 @@ function setUpAutomationOrderVendor(string $initialStatus = 'paid'): array
 {
     config(['services.messaging.whatsapp_driver' => 'log_null', 'services.messaging.sms_driver' => 'log_null']);
 
-    $owner    = User::factory()->create();
-    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Automation Test Store']);
+    $owner = User::factory()->create();
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Automation Test Store']);
     $category = Category::create(['name' => 'Automation Category']);
-    $product  = Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'name'           => 'Automation Product',
-        'price'          => 6000,
+    $product = Product::create([
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'Automation Product',
+        'price' => 6000,
         'stock_quantity' => 10,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
     $order = Order::create([
-        'reference'        => 'ORD-AUTO-' . uniqid(),
-        'customer_name'    => 'Jane Customer',
-        'customer_email'   => 'jane@example.com',
-        'customer_phone'   => '08040000000',
+        'reference' => 'ORD-AUTO-'.uniqid(),
+        'customer_name' => 'Jane Customer',
+        'customer_email' => 'jane@example.com',
+        'customer_phone' => '08040000000',
         'shipping_address' => '1 Test Street, Lagos',
-        'total_amount'     => 6000,
-        'status'           => $initialStatus,
-        'payment_method'   => 'paystack',
+        'total_amount' => 6000,
+        'status' => $initialStatus,
+        'payment_method' => 'paystack',
     ]);
 
     OrderItem::create([
-        'order_id'   => $order->id,
+        'order_id' => $order->id,
         'product_id' => $product->id,
-        'vendor_id'  => $vendor->id,
-        'quantity'   => 1,
+        'vendor_id' => $vendor->id,
+        'quantity' => 1,
         'unit_price' => 6000,
     ]);
 
@@ -64,11 +64,11 @@ function actAsAutomationVendor(array $data): void
 test('advancing status to shipped auto-sends the customer_dispatched template', function () {
     $data = setUpAutomationOrderVendor('paid');
     MessageTemplate::create([
-        'vendor_id'      => $data['vendor']->id,
-        'key'            => 'customer_dispatched',
+        'vendor_id' => $data['vendor']->id,
+        'key' => 'customer_dispatched',
         'recipient_type' => 'customer',
-        'channel'        => 'whatsapp',
-        'body'           => 'Hi {{customer_name}}, order {{order_number}} is dispatched.',
+        'channel' => 'whatsapp',
+        'body' => 'Hi {{customer_name}}, order {{order_number}} is dispatched.',
     ]);
 
     actAsAutomationVendor($data);
@@ -83,8 +83,8 @@ test('advancing status to shipped auto-sends the customer_dispatched template', 
 
     expect($message)->not->toBeNull()
         ->and($message->channel)->toBe('whatsapp')
-        ->and($message->to_number)->toBe('08040000000')
-        ->and($message->body)->toBe('Hi Jane Customer, order ' . $data['order']->reference . ' is dispatched.')
+        ->and($message->to_number)->toBe('2348040000000')
+        ->and($message->body)->toBe('Hi Jane Customer, order '.$data['order']->reference.' is dispatched.')
         ->and($message->status)->toBe('sent')
         ->and($message->sent_by)->toBeNull();
 });
@@ -92,11 +92,11 @@ test('advancing status to shipped auto-sends the customer_dispatched template', 
 test('advancing status to delivered auto-sends the customer_delivered template', function () {
     $data = setUpAutomationOrderVendor('shipped');
     MessageTemplate::create([
-        'vendor_id'      => $data['vendor']->id,
-        'key'            => 'customer_delivered',
+        'vendor_id' => $data['vendor']->id,
+        'key' => 'customer_delivered',
         'recipient_type' => 'customer',
-        'channel'        => 'sms',
-        'body'           => 'Hi {{customer_name}}, order {{order_number}} delivered. Thanks!',
+        'channel' => 'sms',
+        'body' => 'Hi {{customer_name}}, order {{order_number}} delivered. Thanks!',
     ]);
 
     actAsAutomationVendor($data);
@@ -111,17 +111,17 @@ test('advancing status to delivered auto-sends the customer_delivered template',
 
     expect($message)->not->toBeNull()
         ->and($message->channel)->toBe('sms')
-        ->and($message->body)->toBe('Hi Jane Customer, order ' . $data['order']->reference . ' delivered. Thanks!');
+        ->and($message->body)->toBe('Hi Jane Customer, order '.$data['order']->reference.' delivered. Thanks!');
 });
 
 test('the notify toggle set to false suppresses the customer message but still updates status', function () {
     $data = setUpAutomationOrderVendor('paid');
     MessageTemplate::create([
-        'vendor_id'      => $data['vendor']->id,
-        'key'            => 'customer_dispatched',
+        'vendor_id' => $data['vendor']->id,
+        'key' => 'customer_dispatched',
         'recipient_type' => 'customer',
-        'channel'        => 'whatsapp',
-        'body'           => 'Hi {{customer_name}}, dispatched.',
+        'channel' => 'whatsapp',
+        'body' => 'Hi {{customer_name}}, dispatched.',
     ]);
 
     actAsAutomationVendor($data);
@@ -153,12 +153,12 @@ test('no message is sent when there is no active matching template for the vendo
 test('an inactive template is never used for automatic customer notification', function () {
     $data = setUpAutomationOrderVendor('paid');
     MessageTemplate::create([
-        'vendor_id'      => $data['vendor']->id,
-        'key'            => 'customer_dispatched',
+        'vendor_id' => $data['vendor']->id,
+        'key' => 'customer_dispatched',
         'recipient_type' => 'customer',
-        'channel'        => 'whatsapp',
-        'body'           => 'Hi {{customer_name}}, dispatched.',
-        'is_active'      => false,
+        'channel' => 'whatsapp',
+        'body' => 'Hi {{customer_name}}, dispatched.',
+        'is_active' => false,
     ]);
 
     actAsAutomationVendor($data);
@@ -187,34 +187,34 @@ test('cancelling an order never sends a customer message regardless of the notif
 });
 
 test('the original new-order vendor notification still fires on transition into paid', function () {
-    $owner    = User::factory()->create();
-    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Notify Regression Store']);
+    $owner = User::factory()->create();
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Notify Regression Store']);
     $category = Category::create(['name' => 'Notify Regression Category']);
-    $product  = Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'name'           => 'Notify Regression Product',
-        'price'          => 3000,
+    $product = Product::create([
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'Notify Regression Product',
+        'price' => 3000,
         'stock_quantity' => 10,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
     $order = Order::create([
-        'reference'        => 'ORD-NOTIFY-' . uniqid(),
-        'customer_name'    => 'Jane Customer',
-        'customer_email'   => 'jane@example.com',
-        'customer_phone'   => '08040000000',
+        'reference' => 'ORD-NOTIFY-'.uniqid(),
+        'customer_name' => 'Jane Customer',
+        'customer_email' => 'jane@example.com',
+        'customer_phone' => '08040000000',
         'shipping_address' => '1 Test Street',
-        'total_amount'     => 3000,
-        'status'           => 'pending',
-        'payment_method'   => 'paystack',
+        'total_amount' => 3000,
+        'status' => 'pending',
+        'payment_method' => 'paystack',
     ]);
 
     OrderItem::create([
-        'order_id'   => $order->id,
+        'order_id' => $order->id,
         'product_id' => $product->id,
-        'vendor_id'  => $vendor->id,
-        'quantity'   => 1,
+        'vendor_id' => $vendor->id,
+        'quantity' => 1,
         'unit_price' => 3000,
     ]);
 

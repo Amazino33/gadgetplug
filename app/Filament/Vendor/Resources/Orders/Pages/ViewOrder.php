@@ -9,6 +9,7 @@ use App\Models\DeliveryMessage;
 use App\Models\MessageTemplate;
 use App\Models\Order;
 use App\Services\Messaging\MessagingService;
+use App\Services\Messaging\PhoneNumber;
 use App\Services\Messaging\TemplateRenderer;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
@@ -29,13 +30,13 @@ class ViewOrder extends ViewRecord
                 ->label('Call')
                 ->icon('heroicon-o-phone')
                 ->color('info')
-                ->url(fn () => 'tel:' . $this->record->customer_phone),
+                ->url(fn () => 'tel:'.$this->record->customer_phone),
 
             Action::make('whatsappCustomer')
                 ->label('WhatsApp')
                 ->icon('heroicon-o-chat-bubble-oval-left')
                 ->color('success')
-                ->url(fn () => 'https://api.whatsapp.com/send?phone=' . preg_replace('/\D/', '', $this->record->customer_phone))
+                ->url(fn () => 'https://api.whatsapp.com/send?phone='.PhoneNumber::toNigerianInternational($this->record->customer_phone))
                 ->openUrlInNewTab(),
 
             Action::make('updateStatus')
@@ -45,9 +46,9 @@ class ViewOrder extends ViewRecord
                 ->schema([
                     Select::make('status')
                         ->label('New Status')
-                        ->options(fn() => match($this->record->status) {
+                        ->options(fn () => match ($this->record->status) {
                             'pending', 'confirmed', 'paid' => [
-                                'shipped'   => 'Hand to Logistics / Rider',
+                                'shipped' => 'Hand to Logistics / Rider',
                                 'cancelled' => 'Cancel Order',
                             ],
                             'shipped' => [
@@ -66,8 +67,8 @@ class ViewOrder extends ViewRecord
                 ])
                 ->action(function (array $data): void {
                     $newStatus = $data['status'];
-                    $order     = $this->record;
-                    $userId    = auth()->id();
+                    $order = $this->record;
+                    $userId = auth()->id();
 
                     $order->skipCustomerNotification = ! ($data['notify_customer'] ?? true);
 
@@ -77,14 +78,14 @@ class ViewOrder extends ViewRecord
                         foreach ($order->items as $item) {
                             try {
                                 app(DispatchStockAction::class)->execute(
-                                    productId:   $item->product_id,
-                                    quantity:    $item->quantity,
-                                    userId:      $userId,
-                                    reference:   $order->reference,
+                                    productId: $item->product_id,
+                                    quantity: $item->quantity,
+                                    userId: $userId,
+                                    reference: $order->reference,
                                     description: 'Physical deduction — order handed to rider.',
                                 );
                             } catch (\Exception $e) {
-                                Log::error("Dispatch stock failed for order {$order->id}: " . $e->getMessage());
+                                Log::error("Dispatch stock failed for order {$order->id}: ".$e->getMessage());
                             }
                         }
                     }
@@ -95,14 +96,14 @@ class ViewOrder extends ViewRecord
                         foreach ($order->items as $item) {
                             try {
                                 app(ReleaseReservationAction::class)->execute(
-                                    productId:   $item->product_id,
-                                    quantity:    $item->quantity,
-                                    userId:      $userId,
-                                    reference:   $order->reference,
+                                    productId: $item->product_id,
+                                    quantity: $item->quantity,
+                                    userId: $userId,
+                                    reference: $order->reference,
                                     description: 'Reservation released — order cancelled.',
                                 );
                             } catch (\Exception $e) {
-                                Log::error("Release reservation failed for order {$order->id}: " . $e->getMessage());
+                                Log::error("Release reservation failed for order {$order->id}: ".$e->getMessage());
                             }
                         }
                     }
@@ -111,16 +112,16 @@ class ViewOrder extends ViewRecord
                     $this->refreshFormData(['status']);
 
                     Notification::make()
-                        ->title(match($newStatus) {
-                            'shipped'   => 'Order handed to rider — stock deducted',
+                        ->title(match ($newStatus) {
+                            'shipped' => 'Order handed to rider — stock deducted',
                             'delivered' => 'Order marked as delivered',
                             'cancelled' => 'Order cancelled — stock released',
-                            default     => 'Status updated',
+                            default => 'Status updated',
                         })
                         ->success()
                         ->send();
                 })
-                ->visible(fn() => !in_array($this->record->status, ['delivered', 'cancelled', 'paid_but_failed_stock'])),
+                ->visible(fn () => ! in_array($this->record->status, ['delivered', 'cancelled', 'paid_but_failed_stock'])),
 
             Action::make('assignLogistics')
                 ->label('Assign & Notify Rider')
@@ -171,15 +172,15 @@ class ViewOrder extends ViewRecord
                 ])
                 ->fillForm(fn () => [
                     'logistics_company_id' => $this->record->logistics_company_id,
-                    'delivery_person_id'   => $this->record->delivery_person_id,
-                    'notify_rider'         => true,
+                    'delivery_person_id' => $this->record->delivery_person_id,
+                    'notify_rider' => true,
                 ])
                 ->action(function (array $data): void {
                     $order = $this->record;
 
                     $order->update([
                         'logistics_company_id' => $data['logistics_company_id'],
-                        'delivery_person_id'   => $data['delivery_person_id'],
+                        'delivery_person_id' => $data['delivery_person_id'],
                     ]);
 
                     $this->refreshFormData(['logisticsCompany.name', 'deliveryPerson.name']);
@@ -205,7 +206,7 @@ class ViewOrder extends ViewRecord
                         ->label('Send to')
                         ->options(fn () => array_filter([
                             'customer' => 'Customer',
-                            'rider'    => $this->record->delivery_person_id ? 'Rider' : null,
+                            'rider' => $this->record->delivery_person_id ? 'Rider' : null,
                         ]))
                         ->default('customer')
                         ->live()
@@ -248,7 +249,7 @@ class ViewOrder extends ViewRecord
                 ])
                 ->action(function (array $data): void {
                     $order = $this->record;
-                    $to    = $data['recipient_type'] === 'customer'
+                    $to = $data['recipient_type'] === 'customer'
                         ? $order->customer_phone
                         : $order->deliveryPerson?->phone;
 
@@ -262,14 +263,14 @@ class ViewOrder extends ViewRecord
                     }
 
                     $message = DeliveryMessage::create([
-                        'vendor_id'      => filament()->getTenant()->id,
-                        'order_id'       => $order->id,
+                        'vendor_id' => filament()->getTenant()->id,
+                        'order_id' => $order->id,
                         'recipient_type' => $data['recipient_type'],
-                        'channel'        => $data['channel'],
-                        'to_number'      => $to,
-                        'body'           => $data['body'],
-                        'status'         => 'queued',
-                        'sent_by'        => auth()->id(),
+                        'channel' => $data['channel'],
+                        'to_number' => $to,
+                        'body' => $data['body'],
+                        'status' => 'queued',
+                        'sent_by' => auth()->id(),
                     ]);
 
                     $this->sendAndNotify($message);
@@ -306,14 +307,14 @@ class ViewOrder extends ViewRecord
         }
 
         $message = DeliveryMessage::create([
-            'vendor_id'      => filament()->getTenant()->id,
-            'order_id'       => $order->id,
+            'vendor_id' => filament()->getTenant()->id,
+            'order_id' => $order->id,
             'recipient_type' => 'rider',
-            'channel'        => $template->channel,
-            'to_number'      => $to,
-            'body'           => app(TemplateRenderer::class)->render($template->body, TemplateRenderer::contextForOrder($order)),
-            'status'         => 'queued',
-            'sent_by'        => auth()->id(),
+            'channel' => $template->channel,
+            'to_number' => $to,
+            'body' => app(TemplateRenderer::class)->render($template->body, TemplateRenderer::contextForOrder($order)),
+            'status' => 'queued',
+            'sent_by' => auth()->id(),
         ]);
 
         $this->sendAndNotify($message);

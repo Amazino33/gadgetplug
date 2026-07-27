@@ -23,22 +23,28 @@ class MessagingService
     {
         $driver = $this->resolveDriver($message->channel);
 
+        $normalized = PhoneNumber::toNigerianInternational($message->to_number);
+        if ($normalized !== $message->to_number) {
+            $message->to_number = $normalized;
+        }
+
         try {
             $result = $driver->send($message);
         } catch (Throwable $e) {
             Log::warning('Delivery message send failed.', [
                 'delivery_message_id' => $message->id,
-                'channel'             => $message->channel,
-                'exception'           => $e->getMessage(),
+                'channel' => $message->channel,
+                'exception' => $e->getMessage(),
             ]);
 
             $result = DriverSendResult::failed(['error' => $e->getMessage()]);
         }
 
         $message->update([
-            'status'            => $result->status,
+            'to_number' => $message->to_number,
+            'status' => $result->status,
             'provider_response' => $result->providerResponse,
-            'sent_at'           => in_array($result->status, ['sent', 'link_generated'], true) ? now() : null,
+            'sent_at' => in_array($result->status, ['sent', 'link_generated'], true) ? now() : null,
         ]);
 
         return $message->fresh();
@@ -70,11 +76,11 @@ class MessagingService
     private function makeDriver(string $key): MessagingDriver
     {
         return match ($key) {
-            'termii'         => app(TermiiSmsDriver::class),
+            'termii' => app(TermiiSmsDriver::class),
             'whatsapp_cloud' => app(WhatsAppCloudApiDriver::class),
-            'wa_link'        => app(WaLinkDriver::class),
-            'log_null'       => app(LogNullDriver::class),
-            default          => throw new InvalidArgumentException("Unknown messaging driver [{$key}]."),
+            'wa_link' => app(WaLinkDriver::class),
+            'log_null' => app(LogNullDriver::class),
+            default => throw new InvalidArgumentException("Unknown messaging driver [{$key}]."),
         };
     }
 }
