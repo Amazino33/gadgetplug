@@ -86,10 +86,9 @@ class ProductForm
                                                     Action::make('scanBarcode')
                                                         ->icon('heroicon-o-qr-code')
                                                         ->tooltip('Scan barcode with camera')
-                                                        ->action(fn () => null)
-                                                        ->extraAttributes([
-                                                            'x-on:click' => "window.dispatchEvent(new CustomEvent('open-barcode-scanner'))",
-                                                        ]),
+                                                        ->alpineClickHandler(
+                                                            "window.dispatchEvent(new CustomEvent('open-barcode-scanner'))"
+                                                        ),
                                                 ),
 
                                             Textarea::make('description')
