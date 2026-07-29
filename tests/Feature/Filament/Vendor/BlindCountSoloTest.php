@@ -151,7 +151,7 @@ test('manager override resolves a solo discrepancy correctly, including overages
     $this->actingAs($manager);
     setFilamentTenant($data['vendor']);
 
-    Livewire::test(\App\Filament\Vendor\Resources\AuditSessions\AuditSessionResource\Pages\ManageAuditSessions::class)
+    Livewire::test(\App\Filament\Vendor\Resources\AuditSessions\Pages\ManageAuditSessions::class)
         ->callTableAction('manager_override', $audit, data: [
             'manager_override_count' => 15,
             'reason_code' => 'Data Entry Error',
@@ -340,6 +340,78 @@ test('jump to barcode navigates to the matching product in this session', functi
     $component->call('jumpToBarcode', 'TESTBARCODE123');
 
     expect($component->get('currentPosition'))->toBe(2);
+});
+
+// The counting screen runs full-screen with no panel nav, so exitCount() is the
+// only way out. It must not lose the number currently on screen: that entry is
+// otherwise only persisted by next()/previous().
+test('exiting the count saves the entry currently on screen', function () {
+    $data = setUpSoloVendor();
+    $this->actingAs($data['storekeeper']);
+    setFilamentTenant($data['vendor']);
+
+    $component = Livewire::test(BlindCount::class)->call('startSession');
+    $component->set('count', 8);
+    $component->call('exitCount');
+
+    $firstProduct = productAtPosition($data['vendor'], 1);
+    $entry = BlindCountEntry::where('blind_count_session_id', $component->get('sessionId'))
+        ->where('product_id', $firstProduct->id)
+        ->first();
+
+    expect($entry)->not->toBeNull()
+        ->and($entry->count)->toBe(8);
+
+    $component->assertRedirect();
+});
+
+test('re-entering after an exit resumes at the next uncounted item, keeping the saved one', function () {
+    $data = setUpSoloVendor();
+    $this->actingAs($data['storekeeper']);
+    setFilamentTenant($data['vendor']);
+
+    $sessionId = Livewire::test(BlindCount::class)
+        ->call('startSession')
+        ->set('count', 6)
+        ->call('exitCount')
+        ->get('sessionId');
+
+    // A fresh mount is what happens when the storekeeper navigates back in.
+    // currentPositionFor() resumes at last-counted + 1, so item 1 is not redone.
+    $resumed = Livewire::test(BlindCount::class);
+
+    expect($resumed->get('sessionId'))->toBe($sessionId)
+        ->and($resumed->get('currentPosition'))->toBe(2);
+
+    $firstProduct = productAtPosition($data['vendor'], 1);
+
+    expect(BlindCountEntry::where('blind_count_session_id', $sessionId)
+        ->where('product_id', $firstProduct->id)
+        ->first()->count)->toBe(6);
+});
+
+test('exiting as a non-participant does not write a count entry', function () {
+    $data = setUpSoloVendor();
+
+    $this->actingAs($data['storekeeper']);
+    setFilamentTenant($data['vendor']);
+    $sessionId = Livewire::test(BlindCount::class)->call('startSession')->get('sessionId');
+
+    $observer = User::factory()->create();
+    setPermissionsTeamId($data['vendor']->id);
+    $observer->assignRole('member');
+
+    $this->actingAs($observer);
+    setFilamentTenant($data['vendor']);
+
+    // Instantiated directly for the same reason as the observer test above.
+    $page = new BlindCount();
+    $page->mount();
+    $page->count = 99;
+    $page->exitCount();
+
+    expect(BlindCountEntry::where('blind_count_session_id', $sessionId)->where('user_id', $observer->id)->exists())
+        ->toBeFalse();
 });
 
 test('jump to barcode with no match warns and does not move', function () {

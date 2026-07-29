@@ -353,6 +353,20 @@ class BlindCount extends Page
         $this->goToPosition($position + 1);
     }
 
+    // The counting screen runs full-screen with the panel chrome hidden, so there
+    // is no nav to leave by — exiting has to be an explicit action. Save first:
+    // the in-progress entry is only persisted by next()/previous(), so without
+    // this the number on screen would be silently lost on the way out. The
+    // session itself stays open; BlindCountInProgressWidget leads back to it.
+    public function exitCount(): void
+    {
+        if ($this->isParticipant()) {
+            $this->saveCurrentEntry();
+        }
+
+        $this->redirect(filament()->getPanel('vendor')->getUrl(filament()->getTenant()));
+    }
+
     public function goToPosition(int $position): void
     {
         if (! $this->isParticipant()) return;
