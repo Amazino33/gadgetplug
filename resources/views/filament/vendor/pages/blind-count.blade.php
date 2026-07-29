@@ -31,27 +31,13 @@
         <p class="text-[#5a7a5c] text-sm mt-1">Products will be served randomly. Count what you physically see.</p>
     </div>
 
+    @php
+        $nextDue    = $this->nextCountDue();
+        $blocked    = $this->isBlockedByCadence();
+        $authorized = $nextDue !== null && $this->hasRecountAuthorization();
+    @endphp
+
     <div class="space-y-4">
-        <div>
-            <label class="text-[#7a9e7c] text-xs font-semibold uppercase tracking-wider mb-1.5 block">Frequency</label>
-            <select wire:model="frequency"
-                class="w-full bg-[#162016] border border-[#2a3a2a] text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#4caf50]">
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
-                <option value="custom">Custom</option>
-            </select>
-        </div>
-
-        @if($frequency === 'custom')
-        <div>
-            <label class="text-[#7a9e7c] text-xs font-semibold uppercase tracking-wider mb-1.5 block">Every N Days</label>
-            <input type="number" wire:model="customDays" min="1"
-                class="w-full bg-[#162016] border border-[#2a3a2a] text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-[#4caf50]"
-                placeholder="e.g. 3">
-        </div>
-        @endif
-
         <div class="flex items-center justify-between bg-[#162016] border border-[#2a3a2a] rounded-xl px-4 py-3">
             <div>
                 <p class="text-white text-sm font-medium">Count by Category</p>
@@ -62,11 +48,32 @@
                 <span class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 {{ $byCategory ? 'translate-x-5' : 'translate-x-0' }}"></span>
             </button>
         </div>
+
+        {{-- Cadence is a vendor setting, not a choice made here — see StoreProfile.
+             Showing the due date turns a dead-end refusal into something the
+             storekeeper can act on. --}}
+        @if($blocked)
+        <div class="bg-[#2a1a0d] border border-[#5a3a1a] rounded-xl px-4 py-3 space-y-1">
+            <p class="text-amber-300 text-sm font-semibold">Next count not due yet</p>
+            <p class="text-[#c9a06a] text-xs">
+                You counted recently. Your next count is due
+                <span class="font-semibold text-amber-200">{{ $nextDue->format('j M Y, g:ia') }}</span>
+                ({{ $nextDue->diffForHumans() }}).
+            </p>
+            <p class="text-[#8a7a5c] text-xs pt-1">Ask a manager to authorise an earlier count.</p>
+        </div>
+        @elseif($authorized)
+        <div class="bg-[#0d1a2a] border border-[#1a3a5a] rounded-xl px-4 py-3">
+            <p class="text-sky-300 text-sm font-semibold">Early count authorised</p>
+            <p class="text-[#6a9ac9] text-xs mt-0.5">A manager has cleared you to count ahead of schedule. Starting now uses up that authorisation.</p>
+        </div>
+        @endif
     </div>
 
     <button wire:click="startSession"
-        class="w-full bg-[#4caf50] hover:bg-[#43a047] text-white font-bold py-3.5 rounded-xl transition-colors font-montserrat">
-        Begin Count Session
+        @disabled($blocked)
+        class="w-full bg-[#4caf50] hover:bg-[#43a047] disabled:bg-[#2a3a2a] disabled:text-[#5a7a5c] disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-xl transition-colors font-montserrat">
+        {{ $blocked ? 'Count Not Due Yet' : 'Begin Count Session' }}
     </button>
 </div>
 
@@ -78,6 +85,40 @@
     </div>
     <h2 class="text-white font-montserrat font-bold text-lg">No Active Inventory Count</h2>
     <p class="text-[#5a7a5c] text-sm">You can view counts here, but not record one. To let a team member count, give their role the <span class="text-[#4caf50] font-semibold">Perform Inventory Count</span> permission under Settings &rarr; Roles.</p>
+</div>
+@endif
+
+{{-- Manager's re-count authorisation. Lives on the manager's own login on
+     purpose: the cadence is worthless if the person it restricts can lift it. --}}
+@php $blockedCounters = $this->getBlockedCounters(); @endphp
+@if($blockedCounters->isNotEmpty())
+<div class="mt-4 bg-[#0d1a0d] rounded-2xl border border-[#1a3a1a] p-5 space-y-3">
+    <div>
+        <h3 class="text-white font-montserrat font-bold text-sm">Counters waiting on the schedule</h3>
+        <p class="text-[#5a7a5c] text-xs mt-0.5">Authorising lets one person start a single early count. It is used up as soon as they begin, and recorded against your name.</p>
+    </div>
+
+    <div class="space-y-2">
+        @foreach($blockedCounters as $entry)
+        <div class="flex items-center justify-between gap-3 bg-[#162016] border border-[#2a3a2a] rounded-xl px-4 py-3">
+            <div class="min-w-0">
+                <p class="text-white text-sm font-medium truncate">{{ $entry->user->name }}</p>
+                <p class="text-[#5a7a5c] text-xs">Next count due {{ $entry->due->format('j M, g:ia') }}</p>
+            </div>
+            @if($entry->authorized)
+            <span class="shrink-0 text-sky-300 text-xs font-semibold">Authorised ✓</span>
+            @elseif($entry->user->id === auth()->id())
+            <span class="shrink-0 text-[#5a7a5c] text-xs">You</span>
+            @else
+            <button wire:click="authorizeRecount({{ $entry->user->id }})"
+                wire:confirm="Let {{ $entry->user->name }} run one early count? This will be recorded against your name."
+                class="shrink-0 border border-[#4caf50] hover:bg-[#4caf50]/15 text-[#4caf50] text-xs font-semibold px-3 py-2 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-[#4caf50]">
+                Authorise
+            </button>
+            @endif
+        </div>
+        @endforeach
+    </div>
 </div>
 @endif
 

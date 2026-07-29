@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Carbon\Carbon;
+use Carbon\CarbonInterface;
+use Carbon\CarbonInterval;
 
 class BlindCountSession extends Model
 {
@@ -60,23 +62,59 @@ class BlindCountSession extends Model
         return $lastCounted ? $lastCounted + 1 : 1;
     }
 
-    // Checks if the user is blocked from starting a new session based on frequency
-    public static function isBlockedFor(int $userId, int $vendorId, string $frequency, ?int $customDays): bool
+    // The cadence lives on the vendor, set by an owner/manager. It is deliberately
+    // NOT chosen by the counter: a period restriction the restricted person picks
+    // for themselves is not a control, and the old per-session dropdown meant
+    // anyone wanting to recount simply selected the shortest window.
+    // Null means the cadence is switched off — counts may run at any time.
+    public static function cadencePeriodFor(Vendor $vendor): ?CarbonInterval
     {
-        $cutoff = match ($frequency) {
-            'daily'   => now()->subDay(),
-            'weekly'  => now()->subWeek(),
-            'monthly' => now()->subMonth(),
-            'custom'  => now()->subDays($customDays ?? 1),
+        return match ($vendor->pos_blind_count_frequency ?? 'daily') {
+            'none'    => null,
+            'weekly'  => CarbonInterval::week(),
+            'monthly' => CarbonInterval::month(),
+            'custom'  => CarbonInterval::days(max(1, (int) ($vendor->pos_blind_count_custom_days ?? 1))),
+            default   => CarbonInterval::day(),
         };
+    }
 
-        return static::where('vendor_id', $vendorId)
+    // The user's most recent completed count at this vendor, whichever side they
+    // counted on. Null when they have never completed one.
+    public static function lastCompletedFor(int $userId, Vendor $vendor): ?self
+    {
+        return static::where('vendor_id', $vendor->id)
             ->where('status', 'completed')
-            ->where(function ($q) use ($userId) {
-                $q->where('storekeeper_a_id', $userId)
-                  ->orWhere('storekeeper_b_id', $userId);
-            })
-            ->where('b_submitted_at', '>=', $cutoff)
-            ->exists();
+            ->where(fn ($q) => $q
+                ->where('storekeeper_a_id', $userId)
+                ->orWhere('storekeeper_b_id', $userId))
+            ->orderByDesc('b_submitted_at')
+            ->first();
+    }
+
+    // When this user may next start a count. Null means "right now" — either the
+    // cadence is off, or they have no recent completed count.
+    // Dates are cast immutable app-wide, so this returns the CarbonInterface
+    // contract rather than the concrete Carbon class.
+    public static function nextCountDueFor(int $userId, Vendor $vendor): ?CarbonInterface
+    {
+        $period = static::cadencePeriodFor($vendor);
+        if ($period === null) return null;
+
+        $last = static::lastCompletedFor($userId, $vendor);
+        if (! $last?->b_submitted_at) return null;
+
+        $due = $last->b_submitted_at->copy()->add($period);
+
+        return $due->isFuture() ? $due : null;
+    }
+
+    // Blocked when the cadence has not elapsed AND no manager has authorised an
+    // early re-count. The authorisation is only consumed once a session actually
+    // starts, so merely viewing the page does not burn it.
+    public static function isBlockedFor(int $userId, Vendor $vendor): bool
+    {
+        if (static::nextCountDueFor($userId, $vendor) === null) return false;
+
+        return BlindCountAuthorization::unusedFor($userId, $vendor->id) === null;
     }
 }

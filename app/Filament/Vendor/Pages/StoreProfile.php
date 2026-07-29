@@ -41,6 +41,8 @@ class StoreProfile extends Page
             'pos_vat_enabled'              => $vendor->pos_vat_enabled ?? true,
             'pos_vat_rate'                 => $vendor->pos_vat_rate ?? 7.5,
             'pos_blind_count_participants' => $vendor->pos_blind_count_participants ?? 2,
+            'pos_blind_count_frequency'    => $vendor->pos_blind_count_frequency ?? 'daily',
+            'pos_blind_count_custom_days'  => $vendor->pos_blind_count_custom_days ?? 3,
         ]);
     }
 
@@ -87,6 +89,29 @@ class StoreProfile extends Page
                             ->default(2)
                             ->helperText('With 2 people, a second storekeeper independently verifies the first count before stock is updated.')
                             ->required(),
+
+                        Select::make('pos_blind_count_frequency')
+                            ->label('Inventory Count Frequency')
+                            ->options([
+                                'none'    => 'No restriction — count any time',
+                                'daily'   => 'Once a day',
+                                'weekly'  => 'Once a week',
+                                'monthly' => 'Once a month',
+                                'custom'  => 'Custom number of days',
+                            ])
+                            ->default('daily')
+                            ->helperText('How often the same person may count. This is set here, by you — not by the counter — so a storekeeper cannot shorten their own waiting period. A manager can still authorise an early re-count.')
+                            ->required()
+                            ->live(),
+
+                        TextInput::make('pos_blind_count_custom_days')
+                            ->label('Days Between Counts')
+                            ->numeric()
+                            ->minValue(1)
+                            ->maxValue(365)
+                            ->default(3)
+                            ->required()
+                            ->visible(fn ($get) => $get('pos_blind_count_frequency') === 'custom'),
 
                         TextInput::make('pos_vat_rate')
                             ->label('VAT Rate (%)')
@@ -138,6 +163,10 @@ class StoreProfile extends Page
             'pos_vat_enabled'              => $data['pos_vat_enabled'] ?? false,
             'pos_vat_rate'                 => $data['pos_vat_enabled'] ? ($data['pos_vat_rate'] ?? 7.5) : 0,
             'pos_blind_count_participants' => (int) ($data['pos_blind_count_participants'] ?? 2),
+            'pos_blind_count_frequency'    => $data['pos_blind_count_frequency'] ?? 'daily',
+            'pos_blind_count_custom_days'  => ($data['pos_blind_count_frequency'] ?? 'daily') === 'custom'
+                ? (int) ($data['pos_blind_count_custom_days'] ?? 3)
+                : null,
         ];
 
         // If name changed, let the sluggable trait regenerate a unique slug

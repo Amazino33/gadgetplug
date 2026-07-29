@@ -68,7 +68,7 @@ class RoleResource extends ShieldRoleResource
                         'view_vendor', 'edit_vendor',
                         'view_team_members', 'invite_team_members', 'edit_team_members', 'remove_team_members',
                         'access_pos', 'void_sale', 'process_return', 'close_pos_session',
-                        'manage_inventory', 'perform_inventory_count',
+                        'manage_inventory', 'perform_inventory_count', 'authorize_recount',
                         'view_inventory_reports', 'view_audit_sessions',
                         'approve_procurement', 'manage_procurement',
                         'manage_logistics',

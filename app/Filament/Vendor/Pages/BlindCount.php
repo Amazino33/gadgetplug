@@ -6,6 +6,7 @@ namespace App\Filament\Vendor\Pages;
 
 use App\Actions\Inventory\AdjustStockAction;
 use App\Models\AuditSession;
+use App\Models\BlindCountAuthorization;
 use App\Models\BlindCountEntry;
 use App\Models\BlindCountSession;
 use App\Models\Product;
@@ -53,6 +54,19 @@ class BlindCount extends Page
         return $user->isSuperAdmin() || $user->hasVendorPermission($vendor->id, 'edit_products');
     }
 
+    // Who may let someone count again before the vendor's cadence has elapsed.
+    // Deliberately a separate permission from perform_inventory_count: a counter
+    // must never be able to authorise their own re-count, which is the whole
+    // point of having a cadence at all.
+    public function canAuthorizeRecount(): bool
+    {
+        $user   = auth()->user();
+        $vendor = filament()->getTenant();
+        return $user->isSuperAdmin()
+            || $vendor->isOwner($user)
+            || $user->hasVendorPermission($vendor->id, 'authorize_recount');
+    }
+
     // ── Livewire state ────────────────────────────────────────────────────────
     public ?int    $sessionId       = null;
     public int     $currentPosition = 1;
@@ -60,9 +74,7 @@ class BlindCount extends Page
     public string  $note            = '';
     public bool    $showSearch      = false;
     public string  $searchQuery     = '';
-    public string  $frequency       = 'daily';
     public bool    $byCategory      = false;
-    public ?int    $customDays      = null;
 
     // One-shot undo snapshot — captures the previous value of whichever entry
     // was just overwritten by saveCurrentEntry(), so undoLast() can restore it.
@@ -166,8 +178,12 @@ class BlindCount extends Page
 
         $vendor = filament()->getTenant();
 
-        if (BlindCountSession::isBlockedFor(auth()->id(), $vendor->id, $this->frequency, $this->customDays)) {
-            Notification::make()->title('You have already completed a count within this period.')->warning()->send();
+        if (BlindCountSession::isBlockedFor(auth()->id(), $vendor)) {
+            Notification::make()
+                ->title('Next count not due yet')
+                ->body($this->blockedMessage())
+                ->warning()
+                ->send();
             return;
         }
 
@@ -178,12 +194,15 @@ class BlindCount extends Page
             return;
         }
 
+        // Only burn the manager's authorisation once a session really starts
+        $this->consumeAuthorization($vendor);
+
         $session = BlindCountSession::create([
             'vendor_id'        => $vendor->id,
             'storekeeper_a_id' => auth()->id(),
             'status'           => 'a_counting',
-            'frequency'        => $this->frequency,
-            'custom_days'      => $this->frequency === 'custom' ? $this->customDays : null,
+            'frequency'        => $vendor->pos_blind_count_frequency ?? 'daily',
+            'custom_days'      => $vendor->pos_blind_count_custom_days,
             'by_category'      => $this->byCategory,
             'product_order'    => $productIds,
         ]);
@@ -193,6 +212,94 @@ class BlindCount extends Page
         $this->count           = 0;
         $this->note            = '';
         $this->canUndo         = false;
+    }
+
+    // ── Cadence / re-count authorisation ──────────────────────────────────────
+
+    public function nextCountDue(): ?\Carbon\CarbonInterface
+    {
+        return BlindCountSession::nextCountDueFor(auth()->id(), filament()->getTenant());
+    }
+
+    public function isBlockedByCadence(): bool
+    {
+        return BlindCountSession::isBlockedFor(auth()->id(), filament()->getTenant());
+    }
+
+    public function hasRecountAuthorization(): bool
+    {
+        return BlindCountAuthorization::unusedFor(auth()->id(), filament()->getTenant()->id) !== null;
+    }
+
+    private function blockedMessage(): string
+    {
+        $due = $this->nextCountDue();
+
+        return $due
+            ? "You counted recently. Your next count is due {$due->format('j M Y, g:ia')}. A manager can authorise an earlier count."
+            : 'A manager can authorise an earlier count.';
+    }
+
+    private function consumeAuthorization(\App\Models\Vendor $vendor): void
+    {
+        BlindCountAuthorization::unusedFor(auth()->id(), $vendor->id)?->update(['used_at' => now()]);
+    }
+
+    // Counters currently held back by the cadence, for the manager's view
+    public function getBlockedCounters(): \Illuminate\Support\Collection
+    {
+        if (! $this->canAuthorizeRecount()) return collect();
+
+        $vendor = filament()->getTenant();
+
+        return $vendor->users
+            ->filter(fn (User $u) => BlindCountSession::nextCountDueFor($u->id, $vendor) !== null)
+            ->map(fn (User $u) => (object) [
+                'user'       => $u,
+                'due'        => BlindCountSession::nextCountDueFor($u->id, $vendor),
+                'authorized' => BlindCountAuthorization::unusedFor($u->id, $vendor->id) !== null,
+            ])
+            ->values();
+    }
+
+    public function authorizeRecount(int $userId): void
+    {
+        if (! $this->canAuthorizeRecount()) {
+            Notification::make()->title('You are not allowed to authorise a re-count.')->danger()->send();
+            return;
+        }
+
+        $vendor = filament()->getTenant();
+
+        // A counter authorising themselves would defeat the cadence entirely
+        if ($userId === auth()->id()) {
+            Notification::make()->title('You cannot authorise your own re-count.')->danger()->send();
+            return;
+        }
+
+        if (! $vendor->users->contains('id', $userId)) {
+            Notification::make()->title('That user is not part of this store.')->danger()->send();
+            return;
+        }
+
+        if (BlindCountAuthorization::unusedFor($userId, $vendor->id)) {
+            Notification::make()->title('That counter is already authorised.')->warning()->send();
+            return;
+        }
+
+        BlindCountAuthorization::create([
+            'vendor_id'     => $vendor->id,
+            'user_id'       => $userId,
+            'granted_by_id' => auth()->id(),
+        ]);
+
+        $user = User::find($userId);
+
+        Notification::make()
+            ->title("{$user->name} can now start an early count.")
+            ->body('The authorisation is used up as soon as they begin.')
+            ->success()
+            ->send();
     }
 
     private function buildProductOrder(int $vendorId): array
@@ -230,10 +337,16 @@ class BlindCount extends Page
 
         $vendor = filament()->getTenant();
 
-        if (BlindCountSession::isBlockedFor(auth()->id(), $vendor->id, $session->frequency, $session->custom_days)) {
-            Notification::make()->title('You have already completed a count within this period.')->warning()->send();
+        if (BlindCountSession::isBlockedFor(auth()->id(), $vendor)) {
+            Notification::make()
+                ->title('Next count not due yet')
+                ->body($this->blockedMessage())
+                ->warning()
+                ->send();
             return;
         }
+
+        $this->consumeAuthorization($vendor);
 
         $session->update(['storekeeper_b_id' => auth()->id()]);
         $this->restorePosition($session->fresh());
