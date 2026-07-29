@@ -14,7 +14,13 @@ return new class extends Migration
             $table->unsignedInteger('reserved_stock')->default(0)->after('stock_quantity');
         });
 
-        // 2. Extend ledger transaction_type enum to include reservation events
+        // 2. Extend ledger transaction_type enum to include reservation events.
+        // MODIFY COLUMN is MySQL-only syntax; SQLite (the test-suite driver) has
+        // no equivalent and does not enforce ENUM, so there is nothing to widen.
+        if (DB::getDriverName() !== 'mysql') {
+            return;
+        }
+
         DB::statement("ALTER TABLE inventory_ledgers MODIFY COLUMN transaction_type
             ENUM('online_sale','pos_sale','restock','audit_correction','refund','reserved','dispatched','reservation_released')
             NOT NULL");
@@ -25,6 +31,10 @@ return new class extends Migration
         Schema::table('products', function (Blueprint $table) {
             $table->dropColumn('reserved_stock');
         });
+
+        if (DB::getDriverName() !== 'mysql') {
+            return;
+        }
 
         DB::statement("ALTER TABLE inventory_ledgers MODIFY COLUMN transaction_type
             ENUM('online_sale','pos_sale','restock','audit_correction','refund')

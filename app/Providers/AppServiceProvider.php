@@ -46,11 +46,18 @@ class AppServiceProvider extends ServiceProvider
         Role::deleting(function (Role $role): void {
             DB::table('model_has_roles')->where('role_id', $role->id)->delete();
             DB::table('role_has_permissions')->where('role_id', $role->id)->delete();
-            DB::statement('SET FOREIGN_KEY_CHECKS=0');
+
+            // SET FOREIGN_KEY_CHECKS is MySQL-only syntax and is a hard error on
+            // SQLite, which the test suite runs on.
+            if (DB::getDriverName() === 'mysql') {
+                DB::statement('SET FOREIGN_KEY_CHECKS=0');
+            }
         });
 
         Role::deleted(function (Role $role): void {
-            DB::statement('SET FOREIGN_KEY_CHECKS=1');
+            if (DB::getDriverName() === 'mysql') {
+                DB::statement('SET FOREIGN_KEY_CHECKS=1');
+            }
         });
     }
 

@@ -9,8 +9,12 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // Expand the enum to include 'split'
-        DB::statement("ALTER TABLE pos_sales MODIFY COLUMN payment_method ENUM('cash','card','bank_transfer','split') NOT NULL");
+        // Expand the enum to include 'split'. MODIFY COLUMN is MySQL-only syntax;
+        // SQLite (the test-suite driver) has no equivalent and does not enforce
+        // ENUM, so there is nothing to widen.
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE pos_sales MODIFY COLUMN payment_method ENUM('cash','card','bank_transfer','split') NOT NULL");
+        }
 
         Schema::create('pos_sale_payments', function (Blueprint $table) {
             $table->id();
@@ -27,6 +31,9 @@ return new class extends Migration
     public function down(): void
     {
         Schema::dropIfExists('pos_sale_payments');
-        DB::statement("ALTER TABLE pos_sales MODIFY COLUMN payment_method ENUM('cash','card','bank_transfer') NOT NULL");
+
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE pos_sales MODIFY COLUMN payment_method ENUM('cash','card','bank_transfer') NOT NULL");
+        }
     }
 };

@@ -7,10 +7,14 @@ use Illuminate\Support\Facades\DB;
 
 return new class extends Migration
 {
-    Public function up(): void
+    public function up(): void
     {
-        $hasOldIndex = ! empty(DB::select("SHOW INDEX FROM roles WHERE key_name = 'roles_name_guard_name_unique'"));
-        $hasNewIndex = ! empty(DB::select("SHOW INDEX FROM roles WHERE key_name = 'roles_team_id_name_guard_name_unique'"));
+        // Schema::getIndexes() rather than "SHOW INDEX", which is MySQL-only
+        // syntax and a hard error on SQLite (the test-suite driver).
+        $indexes = collect(Schema::getIndexes('roles'))->pluck('name');
+
+        $hasOldIndex = $indexes->contains('roles_name_guard_name_unique');
+        $hasNewIndex = $indexes->contains('roles_team_id_name_guard_name_unique');
 
         Schema::table('roles', function (Blueprint $table) use ($hasOldIndex, $hasNewIndex) {
             if ($hasOldIndex) {

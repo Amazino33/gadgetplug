@@ -12,6 +12,13 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // Every statement below is MySQL-specific DDL. SQLite (the test-suite
+        // driver) already permits NULL in a non-INTEGER composite primary key
+        // column, so the nullability this migration buys is there by default.
+        if (DB::getDriverName() !== 'mysql') {
+            return;
+        }
+
         DB::statement('SET FOREIGN_KEY_CHECKS=0');
 
         // model_has_roles
@@ -31,6 +38,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (DB::getDriverName() !== 'mysql') {
+            return;
+        }
+
         DB::statement('SET FOREIGN_KEY_CHECKS=0');
 
         DB::statement('ALTER TABLE model_has_roles DROP PRIMARY KEY');
