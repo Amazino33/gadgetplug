@@ -1,8 +1,14 @@
 <?php
 
+use Filament\Facades\Filament;
+use Filament\Notifications\Notification;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -15,5 +21,45 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->statefulApi();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        // A forbidden page inside a Filament panel sends the user back to that
+        // panel's dashboard with an explanation, instead of a dead-end 403 —
+        // easy to hit now that page access is permission-driven, since a stale
+        // link or bookmark may point somewhere the role no longer covers.
+        $exceptions->render(function (Throwable $e, Request $request): ?RedirectResponse {
+            $isForbidden = $e instanceof AuthorizationException
+                || ($e instanceof HttpExceptionInterface && $e->getStatusCode() === 403);
+
+            if (! $isForbidden) {
+                return null;
+            }
+
+            // Only real page loads. Livewire and JSON callers can't follow a 302
+            // and surface the failure themselves.
+            if (! $request->isMethod('GET') || $request->expectsJson() || $request->hasHeader('X-Livewire')) {
+                return null;
+            }
+
+            $panel = Filament::getCurrentPanel();
+
+            if (! $panel || ! $panel->auth()->check()) {
+                return null;
+            }
+
+            $home = rescue(fn () => $panel->getUrl(Filament::getTenant()), null, false);
+
+            // Nowhere to send them, or the dashboard itself is what was refused —
+            // let the 403 stand rather than bounce in a loop.
+            if (blank($home) || rtrim($request->url(), '/') === rtrim($home, '/')) {
+                return null;
+            }
+
+            Notification::make()
+                ->title('You do not have access to that page')
+                ->warning()
+                ->send();
+
+            // Built directly rather than via redirect(), whose helper resolves to
+            // Livewire's fluent redirector and doesn't return a RedirectResponse.
+            return new RedirectResponse($home);
+        });
     })->create();
