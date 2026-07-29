@@ -38,7 +38,7 @@ class AuditSessionResource extends Resource
     {
         $user   = auth()->user();
         $vendor = filament()->getTenant();
-        return $vendor && $user->hasVendorPermission($vendor->id, 'manage_inventory');
+        return $vendor && $user->hasVendorPermission($vendor->id, 'view_audit_sessions');
     }
 
     public static function table(Table $table): Table

@@ -19,8 +19,9 @@ class VendorRoles
             'view_order_items', 'view_any_order_items', 'edit_order_items',
             'view_vendor', 'edit_vendor',
             'view_team_members', 'invite_team_members', 'edit_team_members', 'remove_team_members',
-            'access_pos', 'void_sale', 'process_return', 'close_pos_session', 
-            'manage_inventory', 'approve_procurement',
+            'access_pos', 'void_sale', 'process_return', 'close_pos_session',
+            'manage_inventory', 'view_inventory_reports', 'view_audit_sessions',
+            'approve_procurement', 'manage_procurement',
         ],
         'product_manager' => [
             'view_products', 'view_any_products', 'create_products', 'edit_products', 'delete_products',
@@ -38,7 +39,8 @@ class VendorRoles
             'view_vendor',
             'view_team_members', 'invite_team_members', 'edit_team_members',
             'access_pos', 'void_sale', 'process_return', 'close_pos_session',
-            'manage_inventory', 'approve_procurement',
+            'manage_inventory', 'view_inventory_reports', 'view_audit_sessions',
+            'approve_procurement', 'manage_procurement',
         ],
         'storekeeper' => [
             'view_products', 'view_any_products',

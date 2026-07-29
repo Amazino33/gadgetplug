@@ -29,7 +29,8 @@ class TeamMembers extends Page
 
         return $vendor && (
             $user->isSuperAdmin() ||
-            $vendor->isOwner($user)
+            $vendor->isOwner($user) ||
+            $user->hasVendorPermission($vendor->id, 'view_team_members')
         );
     }
 

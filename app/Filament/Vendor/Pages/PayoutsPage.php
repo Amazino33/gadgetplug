@@ -204,7 +204,8 @@ class PayoutsPage extends Page implements HasTable
 
         return $vendor && (
             $user->isSuperAdmin() ||
-            $vendor->isOwner($user)
+            $vendor->isOwner($user) ||
+            $user->hasVendorPermission($vendor->id, 'view_payouts')
         );
     }
 }
