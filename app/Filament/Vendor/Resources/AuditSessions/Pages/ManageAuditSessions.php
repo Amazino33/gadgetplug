@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Filament\Vendor\Resources\AuditSessions\AuditSessionResource\Pages;
+namespace App\Filament\Vendor\Resources\AuditSessions\Pages;
 
 use App\Filament\Vendor\Resources\AuditSessions\AuditSessionResource;
 use App\Filament\Vendor\Widgets\BlindCountInProgressWidget;

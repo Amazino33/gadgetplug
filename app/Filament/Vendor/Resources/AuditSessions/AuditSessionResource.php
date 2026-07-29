@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Vendor\Resources\AuditSessions;
 
-use App\Filament\Vendor\Resources\AuditSessions\AuditSessionResource\Pages;
+use App\Filament\Vendor\Resources\AuditSessions\Pages;
 use App\Models\AuditSession;
 use App\Models\User;
 use App\Actions\Inventory\ProcessAuditCountAction;
