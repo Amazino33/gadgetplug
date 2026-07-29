@@ -9,6 +9,7 @@
     $product       = $this->getCurrentProduct();
     $canCount      = $this->canCount();
     $canReset      = $this->canReset();
+    $canCancel     = $this->canCancel();
     $isLastProduct = $total > 0 && $this->currentPosition >= $total;
     $isCounting    = $session && (
         ($session->status === 'a_counting' && $role === 'a') ||
@@ -153,6 +154,15 @@
         ↺ Clear All Counting
     </button>
     @endif
+    @if($canCancel)
+    {{-- Reset hands the session back to the same counter; cancel ends it so a
+         different person can start. That is the difference worth spelling out. --}}
+    <button wire:click="cancelSession"
+        wire:confirm="Cancel this count session? Every count entered so far is discarded and nothing is written to stock. Anyone eligible can then start a fresh count."
+        class="w-full border border-[#2a3a2a] hover:border-red-800 hover:bg-red-900/20 text-[#c96a6a] text-sm font-semibold py-2.5 rounded-xl transition-colors">
+        ✕ Cancel Session &amp; Free the Store
+    </button>
+    @endif
 </div>
 
 {{-- ── WAITING: A submitted, B hasn't joined yet ───────────────────────── --}}
@@ -181,6 +191,13 @@
         ↺ Clear All Counting
     </button>
     @endif
+    @if($canCancel)
+    <button wire:click="cancelSession"
+        wire:confirm="Cancel this count session? Every count entered so far is discarded and nothing is written to stock. Anyone eligible can then start a fresh count."
+        class="w-full border border-[#2a3a2a] hover:border-red-800 hover:bg-red-900/20 text-[#c96a6a] text-sm font-semibold py-2.5 rounded-xl transition-colors">
+        ✕ Cancel Session &amp; Free the Store
+    </button>
+    @endif
 </div>
 
 {{-- ── WAITING: A submitted, waiting for B ─────────────────────────────── --}}
@@ -196,6 +213,13 @@
         wire:confirm="This will delete all counts entered so far and reset the session to the beginning. Are you sure?"
         class="w-full border border-red-800 hover:bg-red-900/30 text-red-400 text-sm font-semibold py-2.5 rounded-xl transition-colors">
         ↺ Clear All Counting
+    </button>
+    @endif
+    @if($canCancel)
+    <button wire:click="cancelSession"
+        wire:confirm="Cancel this count session? Every count entered so far is discarded and nothing is written to stock. Anyone eligible can then start a fresh count."
+        class="w-full border border-[#2a3a2a] hover:border-red-800 hover:bg-red-900/20 text-[#c96a6a] text-sm font-semibold py-2.5 rounded-xl transition-colors">
+        ✕ Cancel Session &amp; Free the Store
     </button>
     @endif
 </div>
@@ -327,6 +351,18 @@
             class="w-9 h-9 shrink-0 flex items-center justify-center rounded-lg text-[#7a9e7c] hover:text-white hover:bg-[#162016] transition-colors focus:outline-none focus:ring-2 focus:ring-[#4caf50]">
             <x-heroicon-o-magnifying-glass class="w-5 h-5"/>
         </button>
+
+        @if($canCancel)
+        {{-- Distinct from Exit: exit saves and leaves the session open, this ends
+             it so somebody else can start. Behind a confirm — it discards counts. --}}
+        <button wire:click="cancelSession"
+            wire:confirm="Cancel this count session? Every count entered so far is discarded and nothing is written to stock. Anyone eligible can then start a fresh count."
+            aria-label="Cancel this count session"
+            title="Cancel session — discards all counts"
+            class="w-9 h-9 shrink-0 flex items-center justify-center rounded-lg text-[#8a5a5a] hover:text-red-400 hover:bg-red-900/20 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500">
+            <x-heroicon-o-trash class="w-5 h-5"/>
+        </button>
+        @endif
     </div>
 
     {{-- Row 2: the elastic middle. Stacked when tall, side-by-side when wide. --}}

@@ -565,6 +565,54 @@ class BlindCount extends Page
         }
     }
 
+    // resetSession() clears the counts but keeps the session bound to whoever
+    // started it, so it never frees the store for a different counter. Cancelling
+    // discards the session entirely, which is what you want when the wrong person
+    // opened it or a count was abandoned part-way.
+    public function canCancel(): bool
+    {
+        $session = $this->getSession();
+
+        // A completed session is an audit record — it must never be deletable
+        if (! $session || $session->status === 'completed') return false;
+
+        if ($this->canReset()) return true;
+
+        // A counter may abandon a session only while it is actually their turn,
+        // so nobody can wipe out a colleague's submitted count mid-verification.
+        return ($session->status === 'a_counting' && $this->getRole() === 'a')
+            || ($session->status === 'b_counting' && $this->getRole() === 'b');
+    }
+
+    public function cancelSession(): void
+    {
+        if (! $this->canCancel()) {
+            Notification::make()->title('You cannot cancel this count session.')->danger()->send();
+            return;
+        }
+
+        $session = $this->getSession();
+        if (! $session) return;
+
+        BlindCountEntry::where('blind_count_session_id', $session->id)->delete();
+        $session->delete();
+
+        // Back to a clean slate so the page re-renders on the start screen
+        $this->sessionId       = null;
+        $this->currentPosition = 1;
+        $this->count           = 0;
+        $this->note            = '';
+        $this->canUndo         = false;
+        $this->showSearch      = false;
+        $this->searchQuery     = '';
+
+        Notification::make()
+            ->title('Count session cancelled')
+            ->body('Nothing was saved to stock. Anyone eligible can now start a fresh count.')
+            ->success()
+            ->send();
+    }
+
     public function resetSession(): void
     {
         if (! $this->canReset()) {

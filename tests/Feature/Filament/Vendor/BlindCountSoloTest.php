@@ -414,6 +414,118 @@ test('exiting as a non-participant does not write a count entry', function () {
         ->toBeFalse();
 });
 
+// Cancelling exists because resetSession() keeps the session bound to whoever
+// started it — it never frees the store for a different counter.
+test('cancelling a session deletes it and frees the store for another counter', function () {
+    $data = setUpSoloVendor();
+    $this->actingAs($data['storekeeper']);
+    setFilamentTenant($data['vendor']);
+
+    $component = Livewire::test(BlindCount::class)->call('startSession');
+    $sessionId = $component->get('sessionId');
+    $component->set('count', 5)->call('next');
+
+    expect(BlindCountEntry::where('blind_count_session_id', $sessionId)->count())->toBeGreaterThan(0);
+
+    $component->call('cancelSession');
+
+    expect(\App\Models\BlindCountSession::find($sessionId))->toBeNull()
+        ->and(BlindCountEntry::where('blind_count_session_id', $sessionId)->count())->toBe(0)
+        ->and($component->get('sessionId'))->toBeNull();
+
+    // The store is free: a fresh session can be started straight away
+    Livewire::test(BlindCount::class)->call('startSession');
+
+    expect(\App\Models\BlindCountSession::whereIn('status', ['a_counting', 'b_counting'])->count())->toBe(1);
+});
+
+test('a completed session cannot be cancelled', function () {
+    $data = setUpSoloVendor();
+    $this->actingAs($data['storekeeper']);
+    setFilamentTenant($data['vendor']);
+
+    $component = countAllAndSubmit([10, 10]);
+    $sessionId = $component->get('sessionId');
+
+    expect(\App\Models\BlindCountSession::find($sessionId)->status)->toBe('completed');
+
+    $component->call('cancelSession');
+
+    // Still there — a completed count is an audit record, not disposable
+    expect(\App\Models\BlindCountSession::find($sessionId))->not->toBeNull()
+        ->and(AuditSession::where('vendor_id', $data['vendor']->id)->count())->toBe(2);
+});
+
+test('a non-participant cannot cancel someone else\'s session', function () {
+    $data = setUpSoloVendor();
+
+    $this->actingAs($data['storekeeper']);
+    setFilamentTenant($data['vendor']);
+    $sessionId = Livewire::test(BlindCount::class)->call('startSession')->get('sessionId');
+
+    $observer = User::factory()->create();
+    setPermissionsTeamId($data['vendor']->id);
+    $observer->assignRole('member');
+
+    $this->actingAs($observer);
+    setFilamentTenant($data['vendor']);
+    // Instantiated directly for the same reason as the observer test above.
+    $page = new BlindCount();
+    $page->mount();
+    $page->cancelSession();
+
+    expect(\App\Models\BlindCountSession::find($sessionId))->not->toBeNull();
+});
+
+// Counter A must not be able to destroy their own submitted count while B is
+// independently verifying it — that is exactly the work the dual count protects.
+test('counter A cannot cancel once B is verifying', function () {
+    $data = setUpSoloVendor();
+
+    $this->actingAs($data['storekeeper']);
+    setFilamentTenant($data['vendor']);
+    $component = Livewire::test(BlindCount::class)->call('startSession');
+    $sessionId = $component->get('sessionId');
+
+    $verifier = User::factory()->create();
+    setPermissionsTeamId($data['vendor']->id);
+    $verifier->assignRole('storekeeper');
+
+    // A has submitted; B is now counting
+    \App\Models\BlindCountSession::find($sessionId)->update([
+        'status'           => 'b_counting',
+        'storekeeper_b_id' => $verifier->id,
+        'a_submitted_at'   => now(),
+    ]);
+
+    $page = new BlindCount();
+    $page->mount();
+
+    expect($page->canCancel())->toBeFalse();
+
+    $page->cancelSession();
+
+    expect(\App\Models\BlindCountSession::find($sessionId))->not->toBeNull();
+});
+
+test('a manager can cancel a session they are not part of', function () {
+    $data = setUpSoloVendor();
+
+    $this->actingAs($data['storekeeper']);
+    setFilamentTenant($data['vendor']);
+    $sessionId = Livewire::test(BlindCount::class)->call('startSession')->get('sessionId');
+
+    $manager = User::factory()->create();
+    setPermissionsTeamId($data['vendor']->id);
+    $manager->assignRole('inventory_manager');
+
+    $this->actingAs($manager);
+    setFilamentTenant($data['vendor']);
+    Livewire::test(BlindCount::class)->call('cancelSession');
+
+    expect(\App\Models\BlindCountSession::find($sessionId))->toBeNull();
+});
+
 test('jump to barcode with no match warns and does not move', function () {
     $data = setUpSoloVendor();
     $this->actingAs($data['storekeeper']);
