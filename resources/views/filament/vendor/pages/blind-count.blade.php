@@ -77,7 +77,7 @@
         <x-heroicon-o-eye class="w-7 h-7 text-[#5a7a5c]"/>
     </div>
     <h2 class="text-white font-montserrat font-bold text-lg">No Active Inventory Count</h2>
-    <p class="text-[#5a7a5c] text-sm">Inventory count sessions are started by storekeepers. Assign the <span class="text-[#4caf50] font-semibold">Storekeeper</span> role to a team member from the Team Members page.</p>
+    <p class="text-[#5a7a5c] text-sm">You can view counts here, but not record one. To let a team member count, give their role the <span class="text-[#4caf50] font-semibold">Perform Inventory Count</span> permission under Settings &rarr; Roles.</p>
 </div>
 @endif
 

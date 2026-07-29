@@ -46,7 +46,7 @@ class VendorRoles
             'view_products', 'view_any_products',
             'view_order_items', 'view_any_order_items',
             'access_pos',
-            'manage_inventory',
+            'manage_inventory', 'perform_inventory_count',
         ],
         'member' => [
             'view_products', 'view_any_products',

@@ -33,13 +33,17 @@ class BlindCount extends Page
         return $vendor && $user->hasVendorPermission($vendor->id, 'manage_inventory');
     }
 
-    // Owners and inventory_managers observe; only storekeepers physically count
+    // Who physically records a count, as opposed to merely viewing the page
+    // (canAccess). Deliberately permission-driven rather than hardcoded to the
+    // 'storekeeper' role name, so any role can be made a counter from the Roles
+    // screen. The owner is still excluded on purpose: whoever reviews and
+    // resolves discrepancies shouldn't also be the one recording the counts.
     public function canCount(): bool
     {
         $user   = auth()->user();
         $vendor = filament()->getTenant();
         if ($vendor->isOwner($user)) return false;
-        return $user->hasVendorRole($vendor->id, ['storekeeper']);
+        return $user->hasVendorPermission($vendor->id, 'perform_inventory_count');
     }
 
     public function canReset(): bool

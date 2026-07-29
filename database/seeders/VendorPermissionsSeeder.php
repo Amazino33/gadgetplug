@@ -40,6 +40,7 @@ class VendorPermissionsSeeder extends Seeder
 
             // Inventory
             'manage_inventory',
+            'perform_inventory_count',
             'view_inventory_reports',
             'view_audit_sessions',
             'approve_procurement',
