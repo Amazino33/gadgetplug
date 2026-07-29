@@ -13,6 +13,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use App\Models\Vendor;
+use Illuminate\Support\Facades\DB;
 
 class VendorApplicationsTable
 {
@@ -75,23 +76,47 @@ class VendorApplicationsTable
                             ->placeholder('e.g. Welcome aboard! Your store is now live.'),
                     ])
                     ->action(function (VendorApplication $record, array $data): void {
-                        // Slug is auto-generated uniquely by spatie/laravel-sluggable
-                        $vendor = Vendor::create([
-                            'user_id'     => $record->user_id,
-                            'name'        => $record->store_name,
-                            'is_verified' => true,
-                        ]);
+                        // Locks the row and re-checks status inside the transaction so a
+                        // double-click (or a retried request) can't create a second vendor
+                        // for the same application — the ->visible() check below only hides
+                        // the button after the page re-renders, it isn't a server-side guard.
+                        $vendor = DB::transaction(function () use ($record, $data) {
+                            $locked = VendorApplication::whereKey($record->id)->lockForUpdate()->first();
 
-                        // Attach user as owner in vendor_users
-                        $vendor->users()->syncWithoutDetaching([
-                            $record->user_id => ['role' => 'owner'],
-                        ]);
+                            if ($locked->status !== 'pending') {
+                                return null;
+                            }
 
-                        // Mark application approved
-                        $record->update([
-                            'status'      => 'approved',
-                            'admin_notes' => $data['admin_notes'] ?? null,
-                        ]);
+                            // Slug is auto-generated uniquely by spatie/laravel-sluggable
+                            $vendor = Vendor::create([
+                                'user_id'     => $locked->user_id,
+                                'name'        => $locked->store_name,
+                                'is_verified' => true,
+                            ]);
+
+                            // Attach user as owner in vendor_users
+                            $vendor->users()->syncWithoutDetaching([
+                                $locked->user_id => ['role' => 'owner'],
+                            ]);
+
+                            // Mark application approved
+                            $locked->update([
+                                'status'      => 'approved',
+                                'admin_notes' => $data['admin_notes'] ?? null,
+                            ]);
+
+                            return $vendor;
+                        });
+
+                        if (! $vendor) {
+                            Notification::make()
+                                ->title('Already processed')
+                                ->body('This application was already approved or rejected.')
+                                ->warning()
+                                ->send();
+
+                            return;
+                        }
 
                         $panelUrl = route('filament.vendor.home', ['tenant' => $vendor->slug]);
 
