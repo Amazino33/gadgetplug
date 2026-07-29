@@ -10,22 +10,24 @@ use Filament\Facades\Filament;
 use Filament\Widgets\ChartWidget;
 use Filament\Widgets\Concerns\InteractsWithPageFilters;
 
-class SalesChannelChart extends ChartWidget
+// Replaces the hardcoded sparkline that used to sit under "Today's Revenue" —
+// that was a fixed array of made-up numbers, not data.
+class RevenueTrendChart extends ChartWidget
 {
     use InteractsWithPageFilters;
 
-    protected static ?int $sort = 3;
+    protected static ?int $sort = 2;
 
-    protected int|string|array $columnSpan = 1;
+    protected int|string|array $columnSpan = 'full';
 
     public function getHeading(): ?string
     {
-        return 'Where sales came from · '.ReportPeriod::fromFilters($this->pageFilters)->label;
+        return 'Revenue & profit · '.ReportPeriod::fromFilters($this->pageFilters)->label;
     }
 
     protected function getType(): string
     {
-        return 'doughnut';
+        return 'line';
     }
 
     protected function getData(): array
@@ -38,21 +40,29 @@ class SalesChannelChart extends ChartWidget
 
         $period = ReportPeriod::fromFilters($this->pageFilters);
 
-        // Previously this split channels by orders.payment_method, which could
-        // never work: POS sales are not rows in `orders` at all, so the POS
-        // slice was permanently zero and the chart rendered empty.
-        $breakdown = app(SalesReportService::class)
-            ->channelBreakdown($vendorId, $period->from, $period->to);
+        $series = app(SalesReportService::class)
+            ->dailySeries($vendorId, $period->from, $period->to);
 
         return [
             'datasets' => [
                 [
                     'label' => 'Revenue (₦)',
-                    'data' => array_values($breakdown),
-                    'backgroundColor' => ['#3b82f6', '#10b981'],
+                    'data' => $series['revenue'],
+                    'borderColor' => '#3b82f6',
+                    'backgroundColor' => 'rgba(59, 130, 246, 0.1)',
+                    'fill' => true,
+                    'tension' => 0.3,
+                ],
+                [
+                    'label' => 'Profit (₦)',
+                    'data' => $series['profit'],
+                    'borderColor' => '#10b981',
+                    'backgroundColor' => 'rgba(16, 185, 129, 0.1)',
+                    'fill' => true,
+                    'tension' => 0.3,
                 ],
             ],
-            'labels' => array_keys($breakdown),
+            'labels' => $series['labels'],
         ];
     }
 

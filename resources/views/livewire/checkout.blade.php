@@ -118,6 +118,9 @@ new class extends Component {
                 'vendor_id'  => $item['product']->vendor_id,
                 'quantity'   => $item['quantity'],
                 'unit_price' => $item['product']->price,
+                // Cost as of this moment — a later restock must not rewrite
+                // what this sale earned.
+                'unit_cost'  => $item['product']->cost_price,
             ]);
         }
 

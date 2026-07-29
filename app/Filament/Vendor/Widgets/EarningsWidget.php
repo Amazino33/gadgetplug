@@ -3,10 +3,16 @@
 namespace App\Filament\Vendor\Widgets;
 
 use App\Models\OrderItem;
+use App\Services\Reporting\SalesReportService;
+use Carbon\CarbonImmutable;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Support\Facades\DB;
 
+// All-time figures, deliberately NOT filtered by the dashboard's date range —
+// StoreMetricsOverview above already answers "how did the selected period go".
+// This one answers "how has the store done overall", which is why it doesn't
+// use InteractsWithPageFilters.
 class EarningsWidget extends StatsOverviewWidget
 {
     protected static ?int $sort = 4;
@@ -17,51 +23,45 @@ class EarningsWidget extends StatsOverviewWidget
     {
         $vendor = filament()->getTenant();
 
-        // Revenue only from paid/delivered orders
-        $base = OrderItem::where('vendor_id', $vendor->id)
-            ->whereHas('order', fn($q) => $q->whereIn('status', ['paid', 'delivered']));
+        if (! $vendor) {
+            return [];
+        }
 
-        $totalRevenue  = (clone $base)->sum(DB::raw('quantity * unit_price'));
+        // Same service as every other widget, so "all time" cannot mean
+        // something different here than the period figures do above. Previously
+        // this counted online orders only and ignored POS entirely.
+        $all = app(SalesReportService::class)->summary(
+            $vendor->id,
+            CarbonImmutable::create(2000, 1, 1),
+            CarbonImmutable::now()->addDay(),
+        );
 
-        $thisMonth     = (clone $base)
-            ->whereHas('order', fn($q) => $q->whereMonth('created_at', now()->month)->whereYear('created_at', now()->year))
+        // Money that is promised but not yet earned, so it is intentionally kept
+        // out of revenue above. Online-only by nature: a POS sale is settled at
+        // the counter, there is nothing left to clear.
+        $pendingRevenue = (float) OrderItem::where('vendor_id', $vendor->id)
+            ->whereHas('order', fn ($q) => $q->whereIn('status', ['confirmed', 'shipped']))
             ->sum(DB::raw('quantity * unit_price'));
-
-        $lastMonth     = (clone $base)
-            ->whereHas('order', fn($q) => $q->whereMonth('created_at', now()->subMonth()->month)->whereYear('created_at', now()->subMonth()->year))
-            ->sum(DB::raw('quantity * unit_price'));
-
-        $pendingRevenue = OrderItem::where('vendor_id', $vendor->id)
-            ->whereHas('order', fn($q) => $q->whereIn('status', ['confirmed', 'shipped']))
-            ->sum(DB::raw('quantity * unit_price'));
-
-        $ordersThisMonth = OrderItem::where('vendor_id', $vendor->id)
-            ->whereHas('order', fn($q) => $q->whereMonth('created_at', now()->month)->whereYear('created_at', now()->year))
-            ->distinct('order_id')
-            ->count('order_id');
-
-        $monthChange = $lastMonth > 0
-            ? round((($thisMonth - $lastMonth) / $lastMonth) * 100, 1)
-            : ($thisMonth > 0 ? 100 : 0);
 
         return [
-            Stat::make('Total Earnings', '₦' . number_format($totalRevenue))
-                ->description('All paid & delivered orders')
+            Stat::make('All-Time Revenue', '₦'.number_format($all['revenue'], 2))
+                ->description('Online and POS combined')
                 ->descriptionIcon('heroicon-m-banknotes')
                 ->color('success'),
 
-            Stat::make('This Month', '₦' . number_format($thisMonth))
-                ->description(($monthChange >= 0 ? '+' : '') . $monthChange . '% vs last month')
-                ->descriptionIcon($monthChange >= 0 ? 'heroicon-m-arrow-trending-up' : 'heroicon-m-arrow-trending-down')
-                ->color($monthChange >= 0 ? 'success' : 'danger'),
+            Stat::make('All-Time Profit', '₦'.number_format($all['profit'], 2))
+                ->description(number_format($all['margin'], 1).'% margin'
+                    .($all['cost_is_estimated'] ? ' · partly estimated' : ''))
+                ->descriptionIcon('heroicon-m-sparkles')
+                ->color($all['profit'] >= 0 ? 'success' : 'danger'),
 
-            Stat::make('Pending Clearance', '₦' . number_format($pendingRevenue))
-                ->description('Orders confirmed or in transit')
+            Stat::make('Pending Clearance', '₦'.number_format($pendingRevenue, 2))
+                ->description('Confirmed or in transit, not yet paid out')
                 ->descriptionIcon('heroicon-m-clock')
                 ->color('warning'),
 
-            Stat::make('Orders This Month', $ordersThisMonth)
-                ->description('Unique orders received')
+            Stat::make('Total Sales', number_format($all['orders']))
+                ->description($all['units'].' items sold all time')
                 ->descriptionIcon('heroicon-m-shopping-bag')
                 ->color('info'),
         ];
@@ -75,7 +75,7 @@ class EarningsWidget extends StatsOverviewWidget
         return $vendor && (
             $user->isSuperAdmin() ||
             $vendor->isOwner($user) ||
-            $user->hasVendorPermission($vendor->id, 'edit_vendor')
+            $user->hasVendorPermission($vendor->id, 'view_inventory_reports')
         );
     }
 }

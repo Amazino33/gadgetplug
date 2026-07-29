@@ -24,6 +24,7 @@ use App\Filament\Vendor\Widgets\StoreMetricsOverview;
 use App\Filament\Vendor\Widgets\SalesChannelChart;
 use App\Filament\Vendor\Widgets\InventoryOverviewWidget;
 use App\Filament\Vendor\Widgets\EarningsWidget;
+use App\Filament\Vendor\Widgets\RevenueTrendChart;
 
 class VendorPanelProvider extends PanelProvider
 {
@@ -40,6 +41,7 @@ class VendorPanelProvider extends PanelProvider
             ->discoverPages(in: app_path('Filament/Vendor/Pages'), for: 'App\Filament\Vendor\Pages')
             ->widgets([
                 StoreMetricsOverview::class,
+                RevenueTrendChart::class,
                 SalesChannelChart::class,
                 InventoryOverviewWidget::class,
                 EarningsWidget::class,

@@ -9,6 +9,7 @@ use App\Models\PosReturn;
 use App\Models\PosSale;
 use App\Models\PosSaleItem;
 use App\Models\PosSalePayment;
+use App\Models\Product;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -106,6 +107,12 @@ class PosSaleController extends Controller
                 }
             }
 
+            // Cost is read once up front rather than per line: profit reporting
+            // needs what each item cost AT THIS MOMENT, and a later restock must
+            // not retroactively change what this sale earned.
+            $costPrices = Product::whereIn('id', collect($request->items)->pluck('product_id'))
+                ->pluck('cost_price', 'id');
+
             foreach ($request->items as $item) {
                 $lineDiscount = (float) ($item['discount_amount'] ?? 0);
                 $lineTotal    = ($item['unit_price'] * $item['quantity']) - $lineDiscount;
@@ -116,6 +123,7 @@ class PosSaleController extends Controller
                     'product_name' => $item['product_name'],
                     'product_sku'  => $item['product_sku'] ?? null,
                     'unit_price'   => $item['unit_price'],
+                    'unit_cost'    => $costPrices[$item['product_id']] ?? null,
                     'quantity'     => $item['quantity'],
                     'discount_amount' => $lineDiscount,
                     'total'        => $lineTotal,

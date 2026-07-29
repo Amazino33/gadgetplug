@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\PosCustomer;
 use App\Models\PosSale;
 use App\Models\PosSaleItem;
+use App\Models\Product;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -67,6 +68,13 @@ class PosSyncController extends Controller
                         'completed_at'            => $payload['completed_at'],
                     ]);
 
+                    // Best available cost for a sale that happened offline: the
+                    // product's cost now. The true cost at the time of the
+                    // offline sale isn't recoverable, but recording today's is
+                    // closer than leaving it blank for an already-completed sale.
+                    $costPrices = Product::whereIn('id', collect($payload['items'])->pluck('product_id'))
+                        ->pluck('cost_price', 'id');
+
                     foreach ($payload['items'] as $item) {
                         PosSaleItem::create([
                             'pos_sale_id'     => $sale->id,
@@ -74,6 +82,7 @@ class PosSyncController extends Controller
                             'product_name'    => $item['product_name'],
                             'product_sku'     => $item['product_sku'] ?? null,
                             'unit_price'      => $item['unit_price'],
+                            'unit_cost'       => $costPrices[$item['product_id']] ?? null,
                             'quantity'        => $item['quantity'],
                             'discount_amount' => $item['discount_amount'] ?? 0,
                             'total'           => $item['total'],
