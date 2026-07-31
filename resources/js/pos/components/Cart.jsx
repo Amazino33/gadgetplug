@@ -88,6 +88,9 @@ function MobileCartRow({ item, idx, isSelected, onSelect, onRemove }) {
                     <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">{item.name}</p>
                     <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
                         {item.sku && `${item.sku} · `}{fmt(item.price)}
+                        {item.listPrice > item.price && (
+                            <span className="line-through ml-1.5 opacity-70">{fmt(item.listPrice)}</span>
+                        )}
                     </p>
                     {item.lineDiscount > 0 && (
                         <span className="inline-block mt-1 text-xs bg-orange-50 text-orange-600 font-semibold px-2 py-0.5 rounded-full">
@@ -104,7 +107,7 @@ function MobileCartRow({ item, idx, isSelected, onSelect, onRemove }) {
     );
 }
 
-export default function Cart({ items, selectedIdx, onSelect, onQtyChange, onRemove }) {
+export default function Cart({ items, selectedIdx, onSelect, onQtyChange, onRemove, onPriceEdit }) {
     if (items.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center h-full text-gray-300 dark:text-gray-700">
@@ -187,7 +190,22 @@ export default function Cart({ items, selectedIdx, onSelect, onQtyChange, onRemo
                                         >+</button>
                                     </div>
                                 </td>
-                                <td className="px-4 py-4 text-right text-sm text-gray-600 dark:text-gray-400">{fmt(item.price)}</td>
+                                <td className="px-4 py-4 text-right">
+                                    {item.can_negotiate ? (
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); onPriceEdit(idx); }}
+                                            title="Click to negotiate this price"
+                                            className="text-sm text-gray-600 dark:text-gray-400 underline decoration-dotted underline-offset-4 hover:text-[#068B03] dark:hover:text-green-400"
+                                        >
+                                            {fmt(item.price)}
+                                        </button>
+                                    ) : (
+                                        <span className="text-sm text-gray-600 dark:text-gray-400">{fmt(item.price)}</span>
+                                    )}
+                                    {item.listPrice > item.price && (
+                                        <p className="text-xs text-gray-400 dark:text-gray-500 line-through">{fmt(item.listPrice)}</p>
+                                    )}
+                                </td>
                                 <td className="px-4 py-4 text-right text-sm font-semibold text-gray-800 dark:text-gray-100">{fmt(lineTotal)}</td>
                                 <td className="px-4 py-4 text-center">
                                     <button

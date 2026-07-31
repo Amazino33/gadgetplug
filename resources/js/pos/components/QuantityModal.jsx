@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useKeyboard } from '../hooks/useKeyboard';
 
-export default function QuantityModal({ item, onConfirm, onClose }) {
+export default function QuantityModal({ item, onConfirm, onClose, onNegotiate }) {
     const [qty, setQty] = useState(String(item.qty));
     const inputRef = useRef(null);
 
@@ -28,6 +28,15 @@ export default function QuantityModal({ item, onConfirm, onClose }) {
                     className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-4xl font-bold text-gray-800 text-center focus:outline-none focus:border-[#068B03] mb-4"
                 />
                 <p className="text-xs text-gray-400 text-center mb-4">Set to 0 to remove the item</p>
+
+                {item.can_negotiate && onNegotiate && (
+                    <button
+                        onClick={onNegotiate}
+                        className="w-full mb-4 py-2.5 rounded-xl border border-[#068B03] text-sm font-semibold text-[#068B03] hover:bg-green-50"
+                    >
+                        Negotiate price
+                    </button>
+                )}
                 <div className="flex gap-3">
                     <button onClick={onClose}
                         className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-500">

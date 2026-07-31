@@ -16,7 +16,12 @@ class Vendor extends Model
         'user_id', 'name', 'slug', 'logo', 'is_verified',
         'description', 'whatsapp', 'bank_name', 'account_number', 'account_name',
         'pos_vat_enabled', 'pos_vat_rate', 'pos_blind_count_participants',
-        'pos_blind_count_frequency', 'pos_blind_count_custom_days', 'owner_can_manage_roles'
+        'pos_blind_count_frequency', 'pos_blind_count_custom_days', 'owner_can_manage_roles',
+        'pos_min_margin_percent',
+    ];
+
+    protected $casts = [
+        'pos_min_margin_percent' => 'decimal:2',
     ];
 
     public function getSlugOptions(): SlugOptions

@@ -13,6 +13,7 @@ import CustomerModal from '../components/CustomerModal';
 import DiscountModal from '../components/DiscountModal';
 import SuspendTray from '../components/SuspendTray';
 import QuantityModal from '../components/QuantityModal';
+import PriceModal from '../components/PriceModal';
 import ReturnModal from '../components/ReturnModal';
 import ZReportModal from '../components/ZReportModal';
 import ReceiptModal from '../components/ReceiptModal';
@@ -102,7 +103,10 @@ export default function POS({ user, vendorId, onLogout }) {
                 return updated;
             }
             setSelectedIdx(prev.length);
-            return [...prev, { ...product, qty: 1, lineDiscount: 0 }];
+            // listPrice keeps the catalogue price after `price` has been
+            // haggled down, so the modal and receipt can still show what the
+            // customer would otherwise have paid.
+            return [...prev, { ...product, listPrice: product.price, qty: 1, lineDiscount: 0 }];
         });
         setTimeout(() => searchRef.current?.focus(), 50);
     }, []);
@@ -110,6 +114,18 @@ export default function POS({ user, vendorId, onLogout }) {
     const updateQty = (idx, qty) => {
         if (qty < 1) { removeItem(idx); return; }
         setCart((prev) => { const u = [...prev]; u[idx] = { ...u[idx], qty }; return u; });
+    };
+
+    const updatePrice = (idx, price) => {
+        setCart((prev) => {
+            const u = [...prev];
+            const floor = u[idx].min_price ?? u[idx].listPrice ?? u[idx].price;
+            // Belt and braces — PriceModal already blocks this, and the server
+            // refuses it outright, but nothing here should be able to seat a
+            // below-floor price in the cart in the first place.
+            u[idx] = { ...u[idx], price: Math.max(price, floor) };
+            return u;
+        });
     };
 
     const removeItem = (idx) => {
@@ -317,6 +333,7 @@ export default function POS({ user, vendorId, onLogout }) {
                         onSelect={handleCartSelect}
                         onQtyChange={updateQty}
                         onRemove={removeItem}
+                        onPriceEdit={(idx) => { setSelectedIdx(idx); setModal('price'); }}
                     />
                 </div>
 
@@ -543,6 +560,14 @@ export default function POS({ user, vendorId, onLogout }) {
                 <QuantityModal
                     item={cart[selectedIdx]}
                     onConfirm={(qty) => { updateQty(selectedIdx, qty); setModal(null); }}
+                    onClose={() => setModal(null)}
+                    onNegotiate={() => setModal('price')}
+                />
+            )}
+            {modal === 'price' && selectedIdx !== null && (
+                <PriceModal
+                    item={cart[selectedIdx]}
+                    onConfirm={(price) => { updatePrice(selectedIdx, price); setModal(null); }}
                     onClose={() => setModal(null)}
                 />
             )}

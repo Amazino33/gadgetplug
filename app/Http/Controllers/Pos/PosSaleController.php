@@ -11,6 +11,8 @@ use App\Models\PosSaleItem;
 use App\Models\PosSalePayment;
 use App\Models\Product;
 use App\Models\User;
+use App\Models\Vendor;
+use App\Services\Pos\PosPriceFloor;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -19,7 +21,7 @@ use Illuminate\Support\Str;
 
 class PosSaleController extends Controller
 {
-    public function store(Request $request, AdjustStockAction $adjustStock): JsonResponse
+    public function store(Request $request, AdjustStockAction $adjustStock, PosPriceFloor $priceFloor): JsonResponse
     {
         $request->validate([
             'vendor_id'                  => 'required|integer',
@@ -46,13 +48,22 @@ class PosSaleController extends Controller
             'payments.*.reference'       => 'nullable|string|max:50',
         ]);
 
-        $sale = DB::transaction(function () use ($request, $adjustStock) {
+        $vendor = Vendor::findOrFail($request->vendor_id);
+
+        $sale = DB::transaction(function () use ($request, $adjustStock, $priceFloor, $vendor) {
             $subtotal = collect($request->items)->sum(function ($item) {
                 $lineTotal = $item['unit_price'] * $item['quantity'];
                 return $lineTotal - ($item['discount_amount'] ?? 0);
             });
 
             $cartDiscount = (float) ($request->discount_amount ?? 0);
+
+            // Prices arrive from the till, so they're a claim rather than a
+            // fact — nothing above this point stops a client posting any price
+            // it likes. Checked on the pre-VAT goods value: VAT is collected on
+            // the customer's behalf, not margin the store gets to give away.
+            $priceFloor->guard($vendor, $request->items, $subtotal - $cartDiscount);
+
             $vatRate      = (float) ($request->vat_rate ?? 7.5);
             $vatAmount    = round(($subtotal - $cartDiscount) * ($vatRate / 100), 2);
             $total        = $subtotal - $cartDiscount + $vatAmount;

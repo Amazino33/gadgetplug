@@ -41,6 +41,7 @@ class StoreProfile extends Page
             'pos_vat_enabled'              => $vendor->pos_vat_enabled ?? true,
             'pos_vat_rate'                 => $vendor->pos_vat_rate ?? 7.5,
             'pos_blind_count_participants' => $vendor->pos_blind_count_participants ?? 2,
+            'pos_min_margin_percent'       => $vendor->pos_min_margin_percent ?? 0,
             'pos_blind_count_frequency'    => $vendor->pos_blind_count_frequency ?? 'daily',
             'pos_blind_count_custom_days'  => $vendor->pos_blind_count_custom_days ?? 3,
         ]);
@@ -123,6 +124,17 @@ class StoreProfile extends Page
                             ->default(7.5)
                             ->visible(fn ($get) => $get('pos_vat_enabled'))
                             ->required(fn ($get) => $get('pos_vat_enabled')),
+
+                        TextInput::make('pos_min_margin_percent')
+                            ->label('Minimum Margin on Negotiated Sales (%)')
+                            ->helperText('How much margin you insist on keeping when a cashier negotiates a price at the till. 0% lets them go down to cost, but never below it.')
+                            ->numeric()
+                            ->minValue(0)
+                            ->maxValue(100)
+                            ->step(0.5)
+                            ->suffix('%')
+                            ->default(0)
+                            ->required(),
                     ]),
 
                 Section::make('Bank Details for Payouts')
@@ -163,6 +175,7 @@ class StoreProfile extends Page
             'pos_vat_enabled'              => $data['pos_vat_enabled'] ?? false,
             'pos_vat_rate'                 => $data['pos_vat_enabled'] ? ($data['pos_vat_rate'] ?? 7.5) : 0,
             'pos_blind_count_participants' => (int) ($data['pos_blind_count_participants'] ?? 2),
+            'pos_min_margin_percent'       => (float) ($data['pos_min_margin_percent'] ?? 0),
             'pos_blind_count_frequency'    => $data['pos_blind_count_frequency'] ?? 'daily',
             'pos_blind_count_custom_days'  => ($data['pos_blind_count_frequency'] ?? 'daily') === 'custom'
                 ? (int) ($data['pos_blind_count_custom_days'] ?? 3)

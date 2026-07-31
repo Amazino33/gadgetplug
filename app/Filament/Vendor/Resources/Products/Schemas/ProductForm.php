@@ -267,6 +267,14 @@ class ProductForm
                                                 .'</div>'
                                             );
                                         }),
+
+                                    Toggle::make('allow_pos_price_override')
+                                        ->label('Allow price negotiation at the till')
+                                        ->helperText(fn ($get) => blank($get('cost_price'))
+                                            ? 'Needs a cost price before this can take effect — without one there is no way to tell what selling at a loss would mean.'
+                                            : 'Cashiers can haggle on this product, but never below your minimum margin. Turn off to fix the price.')
+                                        ->default(true)
+                                        ->disabled(fn ($get) => blank($get('cost_price'))),
                                 ]),
 
                             Section::make('Inventory')

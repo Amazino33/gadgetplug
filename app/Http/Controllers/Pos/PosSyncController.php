@@ -8,10 +8,13 @@ use App\Models\PosCustomer;
 use App\Models\PosSale;
 use App\Models\PosSaleItem;
 use App\Models\Product;
+use App\Models\Vendor;
+use App\Services\Pos\PosPriceFloor;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class PosSyncController extends Controller
 {
@@ -19,7 +22,7 @@ class PosSyncController extends Controller
      * Accept a batch of offline sales collected in IndexedDB and persist them.
      * Each sale carries a client-generated `offline_id` so we can deduplicate.
      */
-    public function sync(Request $request, AdjustStockAction $adjustStock): JsonResponse
+    public function sync(Request $request, AdjustStockAction $adjustStock, PosPriceFloor $priceFloor): JsonResponse
     {
         $request->validate([
             'vendor_id'         => 'required|integer',
@@ -36,6 +39,7 @@ class PosSyncController extends Controller
         ]);
 
         $results = [];
+        $vendor  = Vendor::findOrFail($request->vendor_id);
 
         foreach ($request->sales as $payload) {
             // Skip if already synced (reference derived from offline_id)
@@ -47,6 +51,17 @@ class PosSyncController extends Controller
             }
 
             try {
+                // The till enforces the floor before completing an offline
+                // sale, so reaching here below it means the cached rules were
+                // bypassed or tampered with. Re-checked on the pre-VAT goods
+                // value, derived from the total so it holds whether or not the
+                // client bothered to send a subtotal.
+                $priceFloor->guard(
+                    $vendor,
+                    $payload['items'],
+                    (float) $payload['total'] - (float) ($payload['vat_amount'] ?? 0),
+                );
+
                 DB::transaction(function () use ($payload, $request, $adjustStock, $existingRef) {
                     $sale = PosSale::create([
                         'reference'               => $existingRef,
@@ -105,6 +120,15 @@ class PosSyncController extends Controller
                 });
 
                 $results[] = ['offline_id' => $payload['offline_id'], 'status' => 'synced', 'reference' => $existingRef];
+            } catch (ValidationException $e) {
+                // Reported separately from a crash: this sale was understood
+                // and refused, and the goods are already off the shelf, so it
+                // needs a human to reconcile rather than a blind retry.
+                $results[] = [
+                    'offline_id' => $payload['offline_id'],
+                    'status'     => 'rejected',
+                    'message'    => $e->validator->errors()->first(),
+                ];
             } catch (\Throwable $e) {
                 $results[] = ['offline_id' => $payload['offline_id'], 'status' => 'error', 'message' => $e->getMessage()];
             }

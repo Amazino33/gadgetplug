@@ -53,6 +53,7 @@ class Product extends Model implements HasMedia
     protected $casts = [
         'price'           => 'decimal:2',
         'cost_price'      => 'decimal:2',
+        'allow_pos_price_override' => 'boolean',
         'specifications'  => 'array',
         'stock_quantity'  => 'integer',
         'reserved_stock'  => 'integer',
