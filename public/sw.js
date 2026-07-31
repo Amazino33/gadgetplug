@@ -1,4 +1,9 @@
-const CACHE_VERSION = 'v1';
+// Bump this to force every installed till to throw away its cached copies on
+// the next load. v1 held the POS shell cache-first forever (see the /pos rule
+// below), so tills kept serving an old shell pointing at build assets that had
+// long since been replaced — a front-end deploy could never actually reach a
+// device that had already opened the POS once.
+const CACHE_VERSION = 'v2';
 const STATIC_CACHE  = `gp-static-${CACHE_VERSION}`;
 const IMAGE_CACHE   = `gp-images-${CACHE_VERSION}`;
 const PAGE_CACHE    = `gp-pages-${CACHE_VERSION}`;
@@ -69,9 +74,16 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // POS shell — Cache-first (it's a SPA; React Router handles sub-routes)
+    // POS shell — Network-first, falling back to cache.
+    //
+    // This document names the hashed build assets, so caching it first meant a
+    // till that had opened the POS once was pinned to that build for good: new
+    // JS shipped, the shell never asked for it, and the cashier kept running
+    // last month's code with no way to tell. Network-first keeps the till fully
+    // offline-capable — the cached shell is still served the moment a fetch
+    // fails — while letting a deploy actually land when there is a connection.
     if (url.pathname.startsWith('/pos')) {
-        event.respondWith(cacheFirst(request, STATIC_CACHE));
+        event.respondWith(networkFirst(request));
         return;
     }
 
