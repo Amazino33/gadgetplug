@@ -40,6 +40,11 @@ new class extends Component {
     }
 }; ?>
 
+{{-- Livewire requires a single root element. Without this wrapper the
+     component's root is the whole document, DOCTYPE and <html> read as two
+     roots, and the page 500s before rendering anything. Every other Volt page
+     here has the same wrapper. --}}
+<div>
 <x-layouts.storefront title="Track Your Order — GadgetPlug">
 <div class="min-h-[calc(100vh-120px)] bg-brand-bg dark:bg-[#0d1a0d]">
 <div class="max-w-[680px] mx-auto px-4 md:px-6 py-10 md:py-14">
@@ -249,3 +254,4 @@ new class extends Component {
 </div>
 </div>
 </x-layouts.storefront>
+</div>

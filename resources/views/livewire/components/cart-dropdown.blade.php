@@ -112,7 +112,7 @@ new class extends Component {
                     @if ($item['thumb'])
                         <img src="{{ $item['thumb'] }}" alt="{{ $item['name'] }}" class="w-full h-full object-cover">
                     @else
-                        <span class="text-lg">📦</span>
+                        <x-gp-icon name="package" class="w-5 h-5 text-[#8a9e8c]" />
                     @endif
                 </div>
 
@@ -158,7 +158,7 @@ new class extends Component {
 
         {{-- Empty state --}}
         <div class="px-6 py-10 text-center">
-            <div class="text-5xl mb-3">🛒</div>
+            <x-gp-icon name="cart" class="w-12 h-12 mx-auto mb-3 text-[#c8deca]" />
             <h4 class="font-montserrat font-bold text-[14px] text-brand-dark dark:text-[#e8f5e9] mb-1">Your cart is empty</h4>
             <p class="text-[12px] text-brand-muted mb-4 leading-relaxed">Add some gadgets and they'll appear here</p>
             <a href="{{ route('home') }}" @click="open = false"

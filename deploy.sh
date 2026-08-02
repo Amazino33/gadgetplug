@@ -16,9 +16,19 @@ composer install --no-dev --optimize-autoloader
 echo "==> Running migrations..."
 php artisan migrate --force
 
-echo "==> Clearing caches..."
-php artisan view:clear
+echo "==> Rebuilding caches..."
+# Clear first, then build. Previously this only cleared, which left the app
+# parsing every config file and recompiling every Blade template on each
+# request — a large part of the slow first-byte time on this shared host.
 php artisan config:clear
+php artisan view:clear
+php artisan config:cache
+php artisan view:cache
+
+# NOTE: `php artisan route:cache` is deliberately not here. routes/web.php
+# defines three routes as closures (/nuke-cache and the two /pos entries) and
+# closures cannot be serialised, so route caching fails outright until those
+# are moved into controllers. Worth doing — it is the next easy win on TTFB.
 
 echo "==> Deploy complete. Now at:"
 git log --oneline -1

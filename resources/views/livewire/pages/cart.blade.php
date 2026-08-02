@@ -133,7 +133,7 @@ new class extends Component {
                     @if ($item['thumb'])
                         <img src="{{ $item['thumb'] }}" alt="{{ $item['name'] }}" class="w-full h-full object-cover">
                     @else
-                        <span class="text-3xl">📦</span>
+                        <x-gp-icon name="package" class="w-8 h-8 text-[#8a9e8c]" />
                     @endif
                 </a>
 
@@ -262,7 +262,7 @@ new class extends Component {
 
     {{-- ─── EMPTY CART ──────────────────────────────────────────────────────── --}}
     <div class="bg-white dark:bg-[#1a2a1a] rounded-2xl border border-brand-border dark:border-[#2a3a2a] py-20 text-center">
-        <div class="text-7xl mb-5">🛒</div>
+        <x-gp-icon name="cart" class="w-16 h-16 mx-auto mb-5 text-[#c8deca]" />
         <h2 class="font-montserrat font-black text-[22px] text-brand-dark dark:text-[#e8f5e9] mb-2">Your cart is empty</h2>
         <p class="text-[14px] text-brand-muted mb-7 max-w-xs mx-auto">
             Looks like you haven't added anything yet. Browse our verified vendors and find your next gadget!

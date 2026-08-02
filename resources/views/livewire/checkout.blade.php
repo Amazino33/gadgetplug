@@ -294,7 +294,7 @@ new class extends Component {
                             'done'  => false,
                         ],
                         [
-                            'title' => $paidMethod === 'pay_on_delivery' ? 'Pay Cash to Rider' : 'Enjoy Your Gadget ✓',
+                            'title' => $paidMethod === 'pay_on_delivery' ? 'Pay Cash to Rider' : 'Enjoy Your Gadget',
                             'desc'  => $paidMethod === 'pay_on_delivery'
                                         ? 'Pay the exact amount in cash to the rider once you are satisfied with the item.'
                                         : 'Your payment is complete. Welcome to the GadgetPlug family!',
@@ -345,7 +345,7 @@ new class extends Component {
                             @if ($item['thumb'])
                             <img src="{{ $item['thumb'] }}" alt="{{ $item['name'] }}" class="w-full h-full object-cover">
                             @else
-                            <span class="text-xl">📦</span>
+                            <x-gp-icon name="package" class="w-5 h-5 text-[#8a9e8c]" />
                             @endif
                         </div>
                         <div class="flex-1 min-w-0">
@@ -488,7 +488,7 @@ new class extends Component {
                         class="w-full bg-brand-bg dark:bg-[#0d1a0d] border border-[#d0d9d2] dark:border-[#2a3a2a] rounded-xl px-3.5 py-2.5 text-[13px] text-[#111] dark:text-[#e8f5e9] outline-none focus:border-brand transition-colors placeholder-[#8a9e8c] resize-none"></textarea>
                     @error('address') <p class="text-red-500 text-[11px] mt-1">{{ $message }}</p> @enderror
                     <p class="text-[11px] text-brand-muted mt-1.5">
-                        💡 Our rider will bring the item to this address. You can inspect before paying.
+                        Our rider will bring the item to this address. You can inspect before paying.
                     </p>
                     </div>
 
@@ -559,9 +559,9 @@ new class extends Component {
 
                     <p class="text-[11px] text-brand-muted text-center">
                         @if ($paymentMethod === 'pay_on_delivery')
-                            🚴 Our rider will bring your order. Pay cash on arrival after inspection.
+                            Our rider will bring your order. Pay cash on arrival after inspection.
                         @else
-                            🔒 Your payment is secured by Paystack. We never store card details.
+                            Your payment is secured by Paystack. We never store card details.
                         @endif
                     </p>
                 </div>
@@ -585,7 +585,7 @@ new class extends Component {
                             @if ($item['thumb'])
                                 <img src="{{ $item['thumb'] }}" alt="{{ $item['product']->name }}" class="w-full h-full object-cover">
                             @else
-                                <span class="text-lg">📦</span>
+                                <x-gp-icon name="package" class="w-5 h-5 text-[#8a9e8c]" />
                             @endif
                         </div>
                         <div class="flex-1 min-w-0">

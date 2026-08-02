@@ -74,16 +74,7 @@ $allImages  = $product->getMedia('product-images');
 $firstImage = $allImages->first();
 $defaultUrl = $firstImage ? $firstImage->getUrl() : '';
 
-$categoryEmojis = [
-    'phones' => '📱', 'mobile' => '📱', 'smartphones' => '📱',
-    'laptops' => '💻', 'computers' => '💻',
-    'audio' => '🎧', 'headphones' => '🎧', 'speakers' => '🎧',
-    'wearables' => '⌚', 'watches' => '⌚',
-    'gaming' => '🎮', 'cameras' => '📷',
-    'accessories' => '🔌', 'smart home' => '🏠',
-    'refurbished' => '♻️',
-];
-$emoji = $categoryEmojis[strtolower($product->category?->name ?? '')] ?? '📦';
+$categoryIcon = \App\Support\CategoryIcon::for($product->category?->name);
 @endphp
 
 <div>
@@ -133,7 +124,7 @@ $emoji = $categoryEmojis[strtolower($product->category?->name ?? '')] ?? '📦';
                         class="w-full h-full object-cover transition-all duration-300">
                 @else
                     <div class="w-full h-full flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-[#f0f8f0] to-[#e8f5e9] dark:from-[#1a2a1a] dark:to-[#162016]">
-                        <span class="text-[100px] leading-none opacity-60">{{ $emoji }}</span>
+                        <x-gp-icon :name="$categoryIcon" class="w-24 h-24 text-brand opacity-40" />
                         <span class="text-[12px] text-brand-muted font-medium">No image available</span>
                     </div>
                 @endif

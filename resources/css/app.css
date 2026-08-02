@@ -143,3 +143,67 @@ select:focus[data-flux-control] {
     background: radial-gradient(circle, rgba(177,255,0,.1) 0%, transparent 70%);
     pointer-events: none;
 }
+
+/* ── Keyboard focus ───────────────────────────────────────────────────────────
+   Several controls set focus:outline-none with nothing in its place, which
+   leaves keyboard users with no way to tell where they are on the page. This
+   restores a visible ring for keyboard navigation only — :focus-visible keeps
+   it off for mouse clicks, which is why it was removed in the first place. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+summary:focus-visible,
+[tabindex]:focus-visible {
+    outline: 2px solid #068B03;
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+.dark a:focus-visible,
+.dark button:focus-visible,
+.dark input:focus-visible,
+.dark select:focus-visible,
+.dark textarea:focus-visible,
+.dark [tabindex]:focus-visible {
+    outline-color: #b1ff00;
+}
+
+/* Skip link — first tab stop, so a keyboard user can jump the header nav */
+.gp-skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    z-index: 300;
+}
+.gp-skip-link:focus {
+    left: 1rem;
+    top: 1rem;
+    padding: 0.75rem 1rem;
+    background: #068B03;
+    color: #fff;
+    border-radius: 0.5rem;
+    font-weight: 600;
+}
+
+/* ── Skeleton placeholder ─────────────────────────────────────────────────────
+   Shown while the product grid is being fetched so the page has visible
+   structure immediately instead of collapsing to blank space. */
+@keyframes gp-shimmer {
+    0%   { background-position: -400px 0; }
+    100% { background-position: 400px 0; }
+}
+.gp-skeleton {
+    background: #e8f0e9;
+    background-image: linear-gradient(90deg, #e8f0e9 0px, #f4f9f4 200px, #e8f0e9 400px);
+    background-size: 800px 100%;
+    animation: gp-shimmer 1.4s infinite linear;
+}
+.dark .gp-skeleton {
+    background: #1a2a1a;
+    background-image: linear-gradient(90deg, #1a2a1a 0px, #223222 200px, #1a2a1a 400px);
+}
+@media (prefers-reduced-motion: reduce) {
+    .gp-skeleton { animation: none; }
+}
