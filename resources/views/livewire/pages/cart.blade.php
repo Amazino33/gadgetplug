@@ -25,10 +25,19 @@ new class extends Component {
 
         $productIds = array_keys($cart);
         $products   = Product::with('media')->whereIn('id', $productIds)->get()->keyBy('id');
+        $changed    = false;
 
         foreach ($cart as $productId => $item) {
             $product = $products->get($productId);
             if (!$product) continue;
+
+            // Self-heal a stale zero-quantity line from before CartService
+            // stopped creating them — it should never reach checkout.
+            if ((int) $item['quantity'] <= 0) {
+                unset($cart[$productId]);
+                $changed = true;
+                continue;
+            }
 
             $qty              = $item['quantity'];
             $this->total     += $product->price * $qty;
@@ -44,6 +53,10 @@ new class extends Component {
                 'thumb'    => $product->getFirstMediaUrl('product-images', 'thumb'),
                 'slug'     => $product->slug,
             ];
+        }
+
+        if ($changed) {
+            Session::put('cart', $cart);
         }
     }
 

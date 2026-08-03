@@ -15,6 +15,7 @@ new class extends Component {
     public ?int $selectedCategory = null;
     public string $search = '';
     public string $sort = 'latest';
+    public ?string $cartError = null;
 
     public function mount(): void
     {
@@ -90,7 +91,13 @@ new class extends Component {
     {
         $product = Product::find($productId);
         if (!$product) return;
-        app(CartService::class)->add($product);
+
+        if (! app(CartService::class)->add($product)) {
+            $this->cartError = "Sorry, \"{$product->name}\" is out of stock.";
+            return;
+        }
+
+        $this->cartError = null;
         $this->dispatch('cart-updated');
     }
 
@@ -98,7 +105,13 @@ new class extends Component {
     {
         $product = Product::find($productId);
         if (!$product) return;
-        app(CartService::class)->add($product);
+
+        if (! app(CartService::class)->add($product)) {
+            $this->cartError = "Sorry, \"{$product->name}\" is out of stock.";
+            return;
+        }
+
+        $this->cartError = null;
         $this->dispatch('cart-updated');
         $this->redirectRoute('checkout');
     }
@@ -122,6 +135,13 @@ $cardBgs = [
 
 <div>
 <x-layouts.storefront>
+
+@if($cartError)
+    <div class="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-red-600 text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-lg"
+        x-data x-init="setTimeout(() => $wire.set('cartError', null), 4000)">
+        {{ $cartError }}
+    </div>
+@endif
 
 {{-- ─── HERO (home page only) ──────────────────────────────────────────────── --}}
 @if($selectedCategory === null && $search === '')

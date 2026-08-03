@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Models\Activity;
 use Spatie\Activitylog\Traits\LogsActivity;
@@ -69,5 +70,12 @@ class Order extends Model
         // added within the same second would otherwise tie and fall back to
         // insertion order instead of newest-first.
         return $this->hasMany(OrderNote::class)->latest('id');
+    }
+
+    // Overrides LogsActivity's default (unordered) activities() relation so the
+    // "Activity History" infolist section shows the most recent change first.
+    public function activities(): MorphMany
+    {
+        return $this->morphMany(Activity::class, 'subject')->latest('id');
     }
 }

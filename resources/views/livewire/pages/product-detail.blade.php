@@ -10,6 +10,7 @@ new class extends Component {
     public Product $product;
     public int $quantity = 1;
     public bool $wishlisted = false;
+    public ?string $cartError = null;
 
     public function mount(Product $product): void
     {
@@ -57,13 +58,23 @@ new class extends Component {
 
     public function addToCart(): void
     {
-        app(CartService::class)->add($this->product, $this->quantity);
+        if (! app(CartService::class)->add($this->product, $this->quantity)) {
+            $this->cartError = 'Sorry, this product is out of stock.';
+            return;
+        }
+
+        $this->cartError = null;
         $this->dispatch('cart-updated');
     }
 
     public function buyNow(): void
     {
-        app(CartService::class)->add($this->product, $this->quantity);
+        if (! app(CartService::class)->add($this->product, $this->quantity)) {
+            $this->cartError = 'Sorry, this product is out of stock.';
+            return;
+        }
+
+        $this->cartError = null;
         $this->dispatch('cart-updated');
         $this->redirectRoute('checkout');
     }
@@ -92,6 +103,13 @@ $categoryIcon = \App\Support\CategoryIcon::for($product->category?->name);
     :image="$ogImage"
     :url="$ogUrl"
 >
+
+@if($cartError)
+    <div class="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-red-600 text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-lg"
+        x-data x-init="setTimeout(() => $wire.set('cartError', null), 4000)">
+        {{ $cartError }}
+    </div>
+@endif
 
 <div class="px-4 md:px-6 py-6 pb-40 md:pb-6 bg-[#f8fcf8] dark:bg-[#0d1a0d] min-h-screen">
 

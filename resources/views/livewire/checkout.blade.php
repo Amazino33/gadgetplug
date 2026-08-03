@@ -63,10 +63,21 @@ new class extends Component {
 
         $productIds = array_keys($cart);
         $products   = Product::with('media')->whereIn('id', $productIds)->get()->keyBy('id');
+        $droppedZeroQty = false;
 
         foreach ($cart as $productId => $item) {
             $product = $products->get($productId);
             if (!$product) continue;
+
+            // A zero-quantity line should never exist (CartService::add() now
+            // refuses to create one), but a stale session predating that fix,
+            // or any other path into the cart array, must not be allowed to
+            // silently produce a ₦0 order with a phantom item on it either.
+            if ((int) $item['quantity'] <= 0) {
+                unset($cart[$productId]);
+                $droppedZeroQty = true;
+                continue;
+            }
 
             $this->total += $product->price * $item['quantity'];
             $this->cartItems[] = [
@@ -75,6 +86,16 @@ new class extends Component {
                 'subtotal' => $product->price * $item['quantity'],
                 'thumb'    => $product->getFirstMediaUrl('product-images', 'thumb'),
             ];
+        }
+
+        if ($droppedZeroQty) {
+            Session::put('cart', $cart);
+            session()->flash('error', 'One or more items in your cart were out of stock and have been removed.');
+        }
+
+        if (empty($this->cartItems)) {
+            $this->redirectRoute('cart');
+            return;
         }
 
         if (auth()->check()) {
@@ -96,6 +117,19 @@ new class extends Component {
             'address'       => 'required|string|min:10',
             'paymentMethod' => 'required|in:paystack,pay_on_delivery',
         ]);
+
+        // Final guard, right before anything is written — no order should
+        // ever be created with no real items or a zero total.
+        $this->cartItems = array_values(array_filter(
+            $this->cartItems,
+            fn (array $item) => (int) $item['quantity'] > 0,
+        ));
+
+        if (empty($this->cartItems) || $this->total <= 0) {
+            session()->flash('error', 'Your cart is empty or out of stock. Please review it before checking out.');
+            $this->redirectRoute('cart');
+            return;
+        }
 
         $reference = 'GP-' . strtoupper(Str::random(10));
 

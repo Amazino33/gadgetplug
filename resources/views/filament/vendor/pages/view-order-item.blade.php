@@ -251,6 +251,36 @@
                 @endif
             </div>
 
+            {{-- Activity History — who did what --}}
+            <div class="bg-white dark:bg-gray-900 rounded-xl p-5 shadow-sm border border-gray-100 dark:border-gray-800">
+                <p class="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                    <x-heroicon-o-user-circle class="w-4 h-4 text-blue-500"/>
+                    Activity History
+                </p>
+
+                @forelse($order->activities as $activity)
+                    @php
+                        $changes = $activity->changes();
+                        $attributes = $changes['attributes'] ?? [];
+
+                        $activityLabel = match(true) {
+                            array_key_exists('status', $attributes) => 'Status changed to ' . ucfirst(str_replace('_', ' ', $attributes['status'])),
+                            array_key_exists('logistics_company_id', $attributes), array_key_exists('delivery_person_id', $attributes) => 'Logistics assignment updated',
+                            default => ucfirst($activity->description),
+                        };
+                    @endphp
+                    <div class="flex items-start justify-between gap-3 py-2 border-b border-gray-50 dark:border-gray-800 last:border-0">
+                        <div class="min-w-0">
+                            <p class="text-sm font-medium text-gray-800 dark:text-gray-200">{{ $activityLabel }}</p>
+                            <p class="text-[11px] text-gray-400">{{ $activity->causer?->name ?? 'System' }}</p>
+                        </div>
+                        <p class="text-[11px] text-gray-400 whitespace-nowrap">{{ $activity->created_at->format('d M Y, g:ia') }}</p>
+                    </div>
+                @empty
+                    <p class="text-sm text-gray-400">No changes recorded yet.</p>
+                @endforelse
+            </div>
+
         </div>
     </div>
 

@@ -120,6 +120,47 @@ class OrderInfolist
                         ]),
                 ]),
 
+            Section::make('Activity History')
+                ->schema([
+                    RepeatableEntry::make('activities')
+                        ->label('')
+                        ->schema([
+                            TextEntry::make('description')
+                                ->label('')
+                                ->weight('bold')
+                                ->formatStateUsing(function ($record) {
+                                    $changes = $record->changes();
+                                    $attributes = $changes['attributes'] ?? [];
+
+                                    if (array_key_exists('status', $attributes)) {
+                                        return 'Status changed to ' . ucfirst(str_replace('_', ' ', $attributes['status']));
+                                    }
+
+                                    if (array_key_exists('logistics_company_id', $attributes) || array_key_exists('delivery_person_id', $attributes)) {
+                                        return 'Logistics assignment updated';
+                                    }
+
+                                    return ucfirst($record->description);
+                                }),
+
+                            TextEntry::make('causer.name')
+                                ->label('')
+                                ->placeholder('System')
+                                ->color('gray')
+                                ->size('sm'),
+
+                            TextEntry::make('created_at')
+                                ->label('')
+                                ->dateTime('d M Y, g:ia')
+                                ->color('gray')
+                                ->size('sm')
+                                ->alignEnd(),
+                        ])
+                        ->columns(3),
+                ])
+                ->collapsible()
+                ->collapsed(fn ($record) => $record->activities->isEmpty()),
+
             Section::make('Notes')
                 ->schema([
                     RepeatableEntry::make('notes')
