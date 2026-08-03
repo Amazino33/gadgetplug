@@ -27,7 +27,7 @@ final class ReportPeriod
         'custom' => 'Custom range',
     ];
 
-    public const DEFAULT_PRESET = 'this_month';
+    public const DEFAULT_PRESET = 'today';
 
     public function __construct(
         public readonly CarbonInterface $from,
