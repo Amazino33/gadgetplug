@@ -17,6 +17,8 @@ import PriceModal from '../components/PriceModal';
 import ReturnModal from '../components/ReturnModal';
 import ZReportModal from '../components/ZReportModal';
 import ReceiptModal from '../components/ReceiptModal';
+import StuckSalesModal from '../components/StuckSalesModal';
+import SalesHistoryModal from '../components/SalesHistoryModal';
 
 const CONFIG = window.POS_CONFIG ?? {};
 
@@ -57,6 +59,9 @@ export default function POS({ user, vendorId, onLogout }) {
     const [isOnline, setIsOnline]         = useState(navigator.onLine);
     const [modal, setModal]               = useState(null);
     const [lastSale, setLastSale]         = useState(null);
+    const [saleError, setSaleError]       = useState(null);
+    const [stuckSales, setStuckSales]     = useState([]);
+    const [isReprintView, setIsReprintView] = useState(false);
     const [showMobileMore, setShowMobileMore] = useState(false);
     const [isDark, setIsDark] = useState(() => localStorage.getItem('darkMode') === 'true');
 
@@ -69,7 +74,7 @@ export default function POS({ user, vendorId, onLogout }) {
 
     const searchRef = useRef(null);
 
-    useSync(vendorId);
+    const { syncNow } = useSync(vendorId, setStuckSales);
 
     useEffect(() => {
         const on  = () => setIsOnline(true);
@@ -195,7 +200,17 @@ export default function POS({ user, vendorId, onLogout }) {
             try {
                 const { data } = await api.post('/sales', payload);
                 savedSale = { ...payload, reference: data.reference };
-            } catch {
+            } catch (err) {
+                if (err.response) {
+                    // The server was reached and refused the sale (insufficient
+                    // stock, a price below floor, etc.) — this is NOT a
+                    // connectivity problem. Queuing it "for later" would just
+                    // fail identically forever while the till shows a fake
+                    // success receipt. Stop here so the cashier can fix it now.
+                    setSaleError(err.response.data?.message || 'This sale was rejected by the server.');
+                    return;
+                }
+                // No response at all reached us — genuine network failure, safe to queue.
                 await db.offlineSales.add({ ...payload, synced: 0 });
             }
         } else {
@@ -219,6 +234,7 @@ export default function POS({ user, vendorId, onLogout }) {
 
         clearCart();
         setModal(null);
+        setIsReprintView(false);
         setLastSale(receiptSale);
     };
 
@@ -234,9 +250,9 @@ export default function POS({ user, vendorId, onLogout }) {
         F9:     () => { if (!lastSale && !cartEmpty) setModal('suspend'); },
         F10:    () => { if (!lastSale && !cartEmpty) setModal('payment'); },
         F12:    () => { if (!lastSale && !cartEmpty) completeSale({ paymentMethod: 'cash', amountTendered: total }); },
-        Escape: () => { if (lastSale) setLastSale(null); else if (showMobileMore) setShowMobileMore(false); else setModal(null); },
+        Escape: () => { if (saleError) setSaleError(null); else if (lastSale) setLastSale(null); else if (showMobileMore) setShowMobileMore(false); else setModal(null); },
         Delete: () => { if (!lastSale && selectedIdx !== null) removeItem(selectedIdx); },
-    }, [cart, selectedIdx, total, modal, lastSale, showMobileMore]);
+    }, [cart, selectedIdx, total, modal, lastSale, showMobileMore, saleError]);
 
     return (
         <div className="flex flex-col md:flex-row h-dvh bg-[#F9FAFB] dark:bg-gray-950 overflow-hidden select-none"
@@ -252,6 +268,12 @@ export default function POS({ user, vendorId, onLogout }) {
                             <span className={`w-2.5 h-2.5 rounded-full ${isOnline ? 'bg-green-500' : 'bg-orange-400'}`} />
                             <span className="text-sm font-semibold text-gray-800 dark:text-gray-100">{isOnline ? 'Online' : 'Offline'}</span>
                             <span className="text-sm text-gray-400 dark:text-gray-500">· {user.name.split(' ')[0]}</span>
+                            {stuckSales.length > 0 && (
+                                <button onClick={() => setModal('stuckSales')}
+                                    className="ml-1 flex items-center gap-1 rounded-full bg-red-100 dark:bg-red-900/30 px-2 py-0.5 text-[11px] font-bold text-red-700 dark:text-red-400">
+                                    ⚠ {stuckSales.length}
+                                </button>
+                            )}
                         </div>
                         <div className="flex items-center gap-2">
                             <button
@@ -292,8 +314,18 @@ export default function POS({ user, vendorId, onLogout }) {
                     <span className={`text-xs px-2 py-1 rounded-full font-medium shrink-0 ${isOnline ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
                         {isOnline ? '●' : '●'}
                     </span>
+                    {stuckSales.length > 0 && (
+                        <button onClick={() => setModal('stuckSales')}
+                            className="flex items-center gap-1 rounded-full bg-red-100 dark:bg-red-900/30 px-2 py-1 text-xs font-bold text-red-700 dark:text-red-400 shrink-0">
+                            ⚠ {stuckSales.length} stuck
+                        </button>
+                    )}
                     <span className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-25">{user.name}</span>
                     <div className="ml-auto flex items-center gap-3">
+                        <button onClick={() => setModal('salesHistory')}
+                            className="text-xs text-gray-400 dark:text-gray-500 hover:text-[#068B03] transition-colors shrink-0">
+                            My Sales
+                        </button>
                         {CONFIG.panelUrl && (
                             <a href={CONFIG.panelUrl}
                                 className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500 hover:text-[#068B03] transition-colors">
@@ -486,6 +518,11 @@ export default function POS({ user, vendorId, onLogout }) {
                                 label="Z-Report"
                                 onClick={() => { setModal('zreport'); setShowMobileMore(false); }}
                             />
+                            <SheetBtn
+                                label="My Sales"
+                                onClick={() => { setModal('salesHistory'); setShowMobileMore(false); }}
+                                color="green"
+                            />
                         </div>
 
                         <div className="border-t border-gray-100 dark:border-gray-800 pt-3 space-y-0">
@@ -592,11 +629,50 @@ export default function POS({ user, vendorId, onLogout }) {
             {lastSale && (
                 <ReceiptModal
                     sale={lastSale}
+                    isReprint={isReprintView}
                     onNewSale={() => {
                         setLastSale(null);
+                        setIsReprintView(false);
                         setTimeout(() => searchRef.current?.focus(), 50);
                     }}
                 />
+            )}
+            {modal === 'salesHistory' && (
+                <SalesHistoryModal
+                    vendorId={vendorId}
+                    onClose={() => setModal(null)}
+                    onReprint={(sale) => {
+                        setModal(null);
+                        setIsReprintView(true);
+                        setLastSale(sale);
+                    }}
+                />
+            )}
+            {modal === 'stuckSales' && (
+                <StuckSalesModal
+                    sales={stuckSales}
+                    onClose={() => setModal(null)}
+                    onRetried={() => syncNow()}
+                />
+            )}
+            {saleError && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center">
+                        <div className="w-14 h-14 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mx-auto mb-3">
+                            <svg className="w-7 h-7 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v3.75m-9.303 3.376C1.83 17.933 2.914 20 4.673 20h14.654c1.76 0 2.842-2.067 1.976-3.874L13.976 4.126c-.881-1.833-3.07-1.833-3.952 0L2.697 16.126z" />
+                            </svg>
+                        </div>
+                        <p className="text-sm font-bold text-gray-800 dark:text-gray-100 mb-1">Sale not completed</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">{saleError}</p>
+                        <button
+                            onClick={() => setSaleError(null)}
+                            className="w-full py-3 rounded-xl bg-[#068B03] text-white text-sm font-bold hover:bg-[#057002]"
+                        >
+                            OK, let me fix it
+                        </button>
+                    </div>
+                </div>
             )}
         </div>
     );

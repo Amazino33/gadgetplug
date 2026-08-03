@@ -4,10 +4,19 @@ import api from '../lib/api';
 
 /**
  * Background sync: every 30s, push any unsynced IndexedDB sales to the server.
- * Silently ignores failures — they'll retry next cycle.
+ * A genuine network failure retries next cycle. A sale the server actually
+ * rejected (insufficient stock, price below floor, etc.) is NOT retried
+ * blindly forever — it's marked and reported via onStuckSalesChange so a
+ * human can see it and fix the underlying cause.
  */
-export function useSync(vendorId) {
+export function useSync(vendorId, onStuckSalesChange) {
     const timerRef = useRef(null);
+
+    const reportStuck = async () => {
+        if (!onStuckSalesChange) return;
+        const all = await db.offlineSales.where('synced').equals(0).toArray();
+        onStuckSalesChange(all.filter((s) => s.sync_status === 'rejected' || s.sync_status === 'error'));
+    };
 
     const sync = async () => {
         if (!navigator.onLine || !vendorId) return;
@@ -16,23 +25,36 @@ export function useSync(vendorId) {
             .where('synced').equals(0)
             .toArray();
 
-        if (unsyncedSales.length === 0) return;
+        const pendingSales = unsyncedSales.filter(
+            (s) => s.sync_status !== 'rejected' && s.sync_status !== 'error'
+        );
 
-        try {
-            const { data } = await api.post('/sync', {
-                vendor_id: vendorId,
-                sales: unsyncedSales,
-            });
+        if (pendingSales.length > 0) {
+            try {
+                const { data } = await api.post('/sync', {
+                    vendor_id: vendorId,
+                    sales: pendingSales,
+                });
 
-            for (const result of data.results) {
-                if (result.status === 'synced' || result.status === 'duplicate') {
-                    const record = unsyncedSales.find((s) => s.offline_id === result.offline_id);
-                    if (record) await db.offlineSales.update(record.id, { synced: 1 });
+                for (const result of data.results) {
+                    const record = pendingSales.find((s) => s.offline_id === result.offline_id);
+                    if (!record) continue;
+
+                    if (result.status === 'synced' || result.status === 'duplicate') {
+                        await db.offlineSales.update(record.id, { synced: 1 });
+                    } else if (result.status === 'rejected' || result.status === 'error') {
+                        await db.offlineSales.update(record.id, {
+                            sync_status: result.status,
+                            sync_error: result.message,
+                        });
+                    }
                 }
+            } catch {
+                // Network error — retry next cycle
             }
-        } catch {
-            // Network error — retry next cycle
         }
+
+        await reportStuck();
     };
 
     useEffect(() => {

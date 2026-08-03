@@ -18,6 +18,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class PosSaleController extends Controller
 {
@@ -50,7 +51,8 @@ class PosSaleController extends Controller
 
         $vendor = Vendor::findOrFail($request->vendor_id);
 
-        $sale = DB::transaction(function () use ($request, $adjustStock, $priceFloor, $vendor) {
+        try {
+            $sale = DB::transaction(function () use ($request, $adjustStock, $priceFloor, $vendor) {
             $subtotal = collect($request->items)->sum(function ($item) {
                 $lineTotal = $item['unit_price'] * $item['quantity'];
                 return $lineTotal - ($item['discount_amount'] ?? 0);
@@ -158,7 +160,21 @@ class PosSaleController extends Controller
             }
 
             return $sale;
-        });
+            });
+        } catch (ValidationException $e) {
+            throw $e;
+        } catch (\Throwable $e) {
+            // A business-rule failure (e.g. insufficient stock) inside the
+            // transaction previously surfaced as an opaque 500 with no message
+            // in production — the till's frontend then silently treated that
+            // identically to a network drop and queued the sale offline forever,
+            // never telling the cashier the goods were never actually deducted
+            // or recorded. Report it plainly instead so the till can react to it now.
+            return response()->json([
+                'message' => $e->getMessage(),
+                'code'    => 'sale_rejected',
+            ], 422);
+        }
 
         return response()->json($sale->load(['items', 'payments']), 201);
     }
@@ -351,6 +367,24 @@ class PosSaleController extends Controller
         }
 
         return response()->json($sale);
+    }
+
+    // A cashier's own sales — used for the till's "Sales History" screen and
+    // receipt reprints. Deliberately scoped to the authenticated cashier only,
+    // not every sale for the vendor — that's the owner/manager's Sales Report.
+    public function myHistory(Request $request): JsonResponse
+    {
+        $request->validate([
+            'vendor_id' => 'required|integer',
+        ]);
+
+        $sales = PosSale::with(['items', 'payments'])
+            ->where('vendor_id', $request->vendor_id)
+            ->where('cashier_id', $request->user()->id)
+            ->latest('completed_at')
+            ->paginate(20);
+
+        return response()->json($sales);
     }
 
     // Manager approves a discount by verifying their PIN

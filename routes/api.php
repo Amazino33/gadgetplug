@@ -29,6 +29,7 @@ Route::prefix('pos')->group(function () {
         Route::post('sales/{sale}/void',           [PosSaleController::class, 'void']);
         Route::post('sales/{sale}/return',         [PosSaleController::class, 'processReturn']);
         Route::get('sales/{reference}/by-ref',     [PosSaleController::class, 'findByReference']);
+        Route::get('sales/my-history',              [PosSaleController::class, 'myHistory']);
 
         // Discounts — manager PIN approval
         Route::post('discounts/approve', [PosSaleController::class, 'approveDiscount']);

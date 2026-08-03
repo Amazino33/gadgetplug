@@ -3,7 +3,7 @@ import { fmt } from '../lib/format';
 
 const CONFIG = window.POS_CONFIG ?? {};
 
-export default function ReceiptModal({ sale, onNewSale }) {
+export default function ReceiptModal({ sale, onNewSale, isReprint = false }) {
     const { items, total, payment_method, amount_tendered, change_given,
             subtotal, discount_amount, vat_amount, reference,
             customer, bank_transfer_reference, payments } = sale;
@@ -27,14 +27,21 @@ export default function ReceiptModal({ sale, onNewSale }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
 
-                {/* Success header */}
-                <div className="bg-[#068B03] px-6 py-6 text-center">
+                {/* Success / reprint header */}
+                <div className={`px-6 py-6 text-center ${isReprint ? 'bg-gray-700' : 'bg-[#068B03]'}`}>
                     <div className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-3">
-                        <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                        </svg>
+                        {isReprint ? (
+                            <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                    d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                            </svg>
+                        ) : (
+                            <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                            </svg>
+                        )}
                     </div>
-                    <p className="text-white text-lg font-bold">Sale Complete</p>
+                    <p className="text-white text-lg font-bold">{isReprint ? 'Receipt Reprint' : 'Sale Complete'}</p>
                     <p className="text-white/70 text-xs mt-1">{reference}</p>
                 </div>
 
@@ -179,7 +186,7 @@ export default function ReceiptModal({ sale, onNewSale }) {
                         onClick={onNewSale}
                         className="flex-1 py-3 rounded-xl bg-[#068B03] text-white text-sm font-bold hover:bg-[#057002] active:scale-95 transition-all"
                     >
-                        New Sale [Enter]
+                        {isReprint ? 'Close [Enter]' : 'New Sale [Enter]'}
                     </button>
                 </div>
             </div>

@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\PosCustomer;
 use App\Models\PosSale;
 use App\Models\PosSaleItem;
+use App\Models\PosSalePayment;
 use App\Models\Product;
 use App\Models\Vendor;
 use App\Services\Pos\PosPriceFloor;
@@ -30,12 +31,16 @@ class PosSyncController extends Controller
             'sales.*.offline_id'      => 'required|string',
             'sales.*.customer_id'     => 'nullable|integer',
             'sales.*.items'           => 'required|array|min:1',
-            'sales.*.payment_method'  => 'required|in:cash,card,bank_transfer',
+            'sales.*.payment_method'  => 'required|in:cash,card,bank_transfer,split',
             'sales.*.total'           => 'required|numeric|min:0',
             'sales.*.vat_amount'      => 'nullable|numeric|min:0',
             'sales.*.discount_amount' => 'nullable|numeric|min:0',
             'sales.*.amount_tendered' => 'nullable|numeric|min:0',
             'sales.*.completed_at'    => 'required|date',
+            'sales.*.payments'                  => 'required_if:sales.*.payment_method,split|array|min:2',
+            'sales.*.payments.*.method'         => 'required_if:sales.*.payment_method,split|in:cash,card,bank_transfer',
+            'sales.*.payments.*.amount'         => 'required_if:sales.*.payment_method,split|numeric|min:0.01',
+            'sales.*.payments.*.reference'      => 'nullable|string|max:50',
         ]);
 
         $results = [];
@@ -82,6 +87,17 @@ class PosSyncController extends Controller
                         'synced_at'               => now(),
                         'completed_at'            => $payload['completed_at'],
                     ]);
+
+                    if ($payload['payment_method'] === 'split') {
+                        foreach ($payload['payments'] as $p) {
+                            PosSalePayment::create([
+                                'pos_sale_id' => $sale->id,
+                                'method'      => $p['method'],
+                                'amount'      => $p['amount'],
+                                'reference'   => $p['reference'] ?? null,
+                            ]);
+                        }
+                    }
 
                     // Best available cost for a sale that happened offline: the
                     // product's cost now. The true cost at the time of the
