@@ -109,6 +109,35 @@ it('still completes a sale that stock genuinely covers', function () {
         ->and($context['product']->fresh()->stock_quantity)->toBe(8);
 });
 
+it('completes a plain cash sale when payments is explicitly sent as null, matching the real till payload', function () {
+    // The till always sends `payments: isSplit ? payments : null` — the key is
+    // present with a null value, not omitted. That distinction is exactly what
+    // broke every non-split sale: `required_if:payment_method,split|array|min:2`
+    // without `nullable` still ran `array`/`min` against the present null value.
+    $context = rejectionContext(['stock_quantity' => 10]);
+    Sanctum::actingAs($context['owner']);
+
+    $response = $this->postJson('/api/pos/sales', [
+        'vendor_id' => $context['vendor']->id,
+        'items'     => [[
+            'product_id'   => $context['product']->id,
+            'product_name' => 'Powerbank 20000mAh',
+            'unit_price'   => 8000,
+            'quantity'     => 1,
+        ]],
+        'payment_method'          => 'cash',
+        'amount_tendered'         => 8000,
+        'vat_rate'                => 0,
+        'discount_approved_by'    => null,
+        'bank_transfer_reference' => null,
+        'payments'                => null,
+    ]);
+
+    $response->assertSuccessful();
+
+    expect(PosSale::count())->toBe(1);
+});
+
 it('accepts a split-payment sale through the offline sync endpoint', function () {
     $context = rejectionContext(['stock_quantity' => 10]);
     Sanctum::actingAs($context['owner']);
@@ -143,4 +172,32 @@ it('accepts a split-payment sale through the offline sync endpoint', function ()
     expect($sale)->not->toBeNull()
         ->and($sale->payment_method)->toBe('split')
         ->and(PosSalePayment::where('pos_sale_id', $sale->id)->count())->toBe(2);
+});
+
+it('syncs a queued plain cash sale when payments is explicitly null in the offline payload', function () {
+    $context = rejectionContext(['stock_quantity' => 10]);
+    Sanctum::actingAs($context['owner']);
+
+    $response = $this->postJson('/api/pos/sync', [
+        'vendor_id' => $context['vendor']->id,
+        'sales'     => [[
+            'offline_id'     => 'cash-offline-1',
+            'items'          => [[
+                'product_id'   => $context['product']->id,
+                'product_name' => 'Powerbank 20000mAh',
+                'unit_price'   => 8000,
+                'quantity'     => 1,
+                'total'        => 8000,
+            ]],
+            'payment_method' => 'cash',
+            'total'          => 8000,
+            'completed_at'   => now()->toDateTimeString(),
+            'payments'       => null,
+        ]],
+    ]);
+
+    $response->assertSuccessful();
+
+    $result = collect($response->json('results'))->firstWhere('offline_id', 'cash-offline-1');
+    expect($result['status'])->toBe('synced');
 });

@@ -37,7 +37,10 @@ class PosSyncController extends Controller
             'sales.*.discount_amount' => 'nullable|numeric|min:0',
             'sales.*.amount_tendered' => 'nullable|numeric|min:0',
             'sales.*.completed_at'    => 'required|date',
-            'sales.*.payments'                  => 'required_if:sales.*.payment_method,split|array|min:2',
+            // 'nullable' matters here even with 'required_if' present — see the
+            // identical fix in PosSaleController::store() for why a present-but-
+            // null 'payments' otherwise fails 'array'/'min' on every plain sale.
+            'sales.*.payments'                  => 'nullable|required_if:sales.*.payment_method,split|array|min:2',
             'sales.*.payments.*.method'         => 'required_if:sales.*.payment_method,split|in:cash,card,bank_transfer',
             'sales.*.payments.*.amount'         => 'required_if:sales.*.payment_method,split|numeric|min:0.01',
             'sales.*.payments.*.reference'      => 'nullable|string|max:50',

@@ -43,7 +43,12 @@ class PosSaleController extends Controller
             'payment_method'             => 'required|in:cash,card,bank_transfer,split',
             'amount_tendered'            => 'nullable|numeric|min:0',
             'bank_transfer_reference'    => 'nullable|string|max:50',
-            'payments'                   => 'required_if:payment_method,split|array|min:2',
+            // 'nullable' is required here even though 'required_if' is present:
+            // every non-split sale sends `payments: null` explicitly (not
+            // omitted), and without 'nullable' Laravel still runs 'array'/'min'
+            // against that null value — rejecting EVERY plain cash/card/bank
+            // transfer sale with "the payments field must be an array."
+            'payments'                   => 'nullable|required_if:payment_method,split|array|min:2',
             'payments.*.method'          => 'required_if:payment_method,split|in:cash,card,bank_transfer',
             'payments.*.amount'          => 'required_if:payment_method,split|numeric|min:0.01',
             'payments.*.reference'       => 'nullable|string|max:50',
