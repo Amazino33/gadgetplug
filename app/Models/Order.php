@@ -62,4 +62,12 @@ class Order extends Model
     {
         return $this->hasMany(DeliveryMessage::class);
     }
+
+    public function notes(): HasMany
+    {
+        // ->latest('id') rather than plain ->latest() (created_at) — two notes
+        // added within the same second would otherwise tie and fall back to
+        // insertion order instead of newest-first.
+        return $this->hasMany(OrderNote::class)->latest('id');
+    }
 }

@@ -2,8 +2,6 @@
 
 namespace App\Filament\Vendor\Resources\Orders\Pages;
 
-use App\Actions\Inventory\DispatchStockAction;
-use App\Actions\Inventory\ReleaseReservationAction;
 use App\Filament\Vendor\Resources\Orders\OrderResource;
 use App\Models\DeliveryMessage;
 use App\Models\MessageTemplate;
@@ -17,7 +15,6 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
-use Illuminate\Support\Facades\Log;
 
 class ViewOrder extends ViewRecord
 {
@@ -68,46 +65,11 @@ class ViewOrder extends ViewRecord
                 ->action(function (array $data): void {
                     $newStatus = $data['status'];
                     $order = $this->record;
-                    $userId = auth()->id();
 
+                    // Physical stock deduction (on 'shipped') and reservation release (on
+                    // 'cancelled') now happen centrally in OrderObserver::updated(), so
+                    // they apply no matter which UI changed the status — not just here.
                     $order->skipCustomerNotification = ! ($data['notify_customer'] ?? true);
-
-                    if ($newStatus === 'shipped') {
-                        // Trigger physical deduction for every item in this order
-                        $order->load('items');
-                        foreach ($order->items as $item) {
-                            try {
-                                app(DispatchStockAction::class)->execute(
-                                    productId: $item->product_id,
-                                    quantity: $item->quantity,
-                                    userId: $userId,
-                                    reference: $order->reference,
-                                    description: 'Physical deduction — order handed to rider.',
-                                );
-                            } catch (\Exception $e) {
-                                Log::error("Dispatch stock failed for order {$order->id}: ".$e->getMessage());
-                            }
-                        }
-                    }
-
-                    if ($newStatus === 'cancelled') {
-                        // Release reserved stock so items go back on sale
-                        $order->load('items');
-                        foreach ($order->items as $item) {
-                            try {
-                                app(ReleaseReservationAction::class)->execute(
-                                    productId: $item->product_id,
-                                    quantity: $item->quantity,
-                                    userId: $userId,
-                                    reference: $order->reference,
-                                    description: 'Reservation released — order cancelled.',
-                                );
-                            } catch (\Exception $e) {
-                                Log::error("Release reservation failed for order {$order->id}: ".$e->getMessage());
-                            }
-                        }
-                    }
-
                     $order->update(['status' => $newStatus]);
                     $this->refreshFormData(['status']);
 

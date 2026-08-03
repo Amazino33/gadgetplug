@@ -73,6 +73,10 @@ class OrderInfolist
                         ->label('Email')
                         ->columnSpanFull(),
 
+                    TextEntry::make('local_government')
+                        ->label('Local Government Area')
+                        ->placeholder('—'),
+
                     TextEntry::make('shipping_address')
                         ->label('Delivery Address')
                         ->columnSpanFull()
@@ -115,6 +119,33 @@ class OrderInfolist
                                 ->getStateUsing(fn ($record) => $record->quantity * $record->unit_price),
                         ]),
                 ]),
+
+            Section::make('Notes')
+                ->schema([
+                    RepeatableEntry::make('notes')
+                        ->label('')
+                        ->schema([
+                            TextEntry::make('body')
+                                ->label('')
+                                ->columnSpanFull(),
+
+                            TextEntry::make('user.name')
+                                ->label('')
+                                ->placeholder('Automated')
+                                ->color('gray')
+                                ->size('sm'),
+
+                            TextEntry::make('created_at')
+                                ->label('')
+                                ->since()
+                                ->color('gray')
+                                ->size('sm')
+                                ->alignEnd(),
+                        ])
+                        ->columns(2),
+                ])
+                ->collapsible()
+                ->collapsed(fn ($record) => $record->notes->isEmpty()),
 
         ]);
     }

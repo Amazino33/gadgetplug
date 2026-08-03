@@ -106,6 +106,7 @@ new class extends Component {
             'customer_email'   => $this->email,
             'customer_phone'   => $this->phone,
             'shipping_address' => $this->lga . ', Akwa Ibom State — ' . $this->address,
+            'local_government' => $this->lga,
             'total_amount'     => $this->total,
             'status'           => 'pending',
             'payment_method'   => $this->paymentMethod,
