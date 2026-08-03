@@ -208,3 +208,70 @@ it('reports top products across both channels', function () {
         ->and($top->first()['units'])->toBe(5)
         ->and($top->first()['revenue'])->toEqualWithDelta(5000.0, 0.01);
 });
+
+it('breaks POS sales down by cashier, not just a store-wide total', function () {
+    $ctx = makeReportVendor('Cashier Breakdown Store');
+    $cashierB = User::factory()->create(['name' => 'Cashier B']);
+
+    makePosSale($ctx, unitPrice: 1000, unitCost: 600, qty: 2); // rung up by $ctx['owner']
+
+    $saleByB = PosSale::create([
+        'reference' => 'POS-'.Str::random(10),
+        'vendor_id' => $ctx['vendor']->id,
+        'cashier_id' => $cashierB->id,
+        'subtotal' => 3000,
+        'vat_amount' => 0,
+        'total' => 3000,
+        'payment_method' => 'cash',
+        'status' => 'completed',
+        'completed_at' => CarbonImmutable::now(),
+    ]);
+    PosSaleItem::create([
+        'pos_sale_id' => $saleByB->id,
+        'product_id' => $ctx['product']->id,
+        'product_name' => $ctx['product']->name,
+        'unit_price' => 1500,
+        'quantity' => 2,
+        'total' => 3000,
+    ]);
+
+    $breakdown = app(SalesReportService::class)->cashierBreakdown(
+        $ctx['vendor']->id,
+        CarbonImmutable::now()->subDay(),
+        CarbonImmutable::now()->addDay(),
+    )->keyBy('cashier_name');
+
+    expect($breakdown)->toHaveCount(2)
+        ->and($breakdown[$ctx['owner']->name]['revenue'])->toEqualWithDelta(2000.0, 0.01)
+        ->and($breakdown['Cashier B']['revenue'])->toEqualWithDelta(3000.0, 0.01)
+        ->and($breakdown['Cashier B']['orders'])->toBe(1);
+});
+
+it('excludes voided sales from the cashier breakdown', function () {
+    $ctx = makeReportVendor('Voided Cashier Store');
+    makePosSale($ctx, unitPrice: 1000, unitCost: 600, qty: 1)->update(['status' => 'voided']);
+
+    $breakdown = app(SalesReportService::class)->cashierBreakdown(
+        $ctx['vendor']->id,
+        CarbonImmutable::now()->subDay(),
+        CarbonImmutable::now()->addDay(),
+    );
+
+    expect($breakdown)->toBeEmpty();
+});
+
+it('reports online order counts by status, including ones not yet earning revenue', function () {
+    $ctx = makeReportVendor('Status Breakdown Store');
+    makeOnlineOrder($ctx, unitPrice: 1000, unitCost: 600, qty: 1, status: 'paid');
+    makeOnlineOrder($ctx, unitPrice: 1000, unitCost: 600, qty: 1, status: 'confirmed');
+    makeOnlineOrder($ctx, unitPrice: 1000, unitCost: 600, qty: 1, status: 'confirmed');
+    makeOnlineOrder($ctx, unitPrice: 1000, unitCost: 600, qty: 1, status: 'cancelled');
+
+    $breakdown = app(SalesReportService::class)->onlineOrderStatusBreakdown(
+        $ctx['vendor']->id,
+        CarbonImmutable::now()->subDay(),
+        CarbonImmutable::now()->addDay(),
+    );
+
+    expect($breakdown)->toBe(['paid' => 1, 'confirmed' => 2, 'cancelled' => 1]);
+});

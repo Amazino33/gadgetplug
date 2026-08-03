@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Reporting;
 
+use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\PosReturn;
 use App\Models\PosSale;
@@ -159,6 +160,54 @@ class SalesReportService
         }
 
         return ['labels' => $labels, 'revenue' => $revenueSeries, 'profit' => $profitSeries];
+    }
+
+    /**
+     * Every cashier's POS contribution for the period, so the owner can see
+     * all their staff's sales in one place rather than only a store-wide total.
+     * Online orders have no cashier — a customer places those directly.
+     *
+     * @return Collection<int, array{cashier_id: int, cashier_name: string, orders: int, revenue: float}>
+     */
+    public function cashierBreakdown(int $vendorId, CarbonInterface $from, CarbonInterface $to): Collection
+    {
+        return PosSale::query()
+            ->join('users', 'users.id', '=', 'pos_sales.cashier_id')
+            ->where('pos_sales.vendor_id', $vendorId)
+            ->where('pos_sales.status', '!=', 'voided')
+            ->whereBetween(DB::raw('COALESCE(pos_sales.completed_at, pos_sales.created_at)'), [$from, $to])
+            ->groupBy('pos_sales.cashier_id', 'users.name')
+            ->selectRaw('pos_sales.cashier_id as cashier_id, users.name as cashier_name')
+            ->selectRaw(self::POS_REVENUE_SQL.' as revenue')
+            ->selectRaw('COUNT(*) as orders')
+            ->orderByDesc('revenue')
+            ->get()
+            ->map(fn ($row) => [
+                'cashier_id' => (int) $row->cashier_id,
+                'cashier_name' => $row->cashier_name,
+                'orders' => (int) $row->orders,
+                'revenue' => (float) $row->revenue,
+            ]);
+    }
+
+    /**
+     * How many online orders exist in this period, by status — including the
+     * ones that don't count toward revenue yet ('pending'/'confirmed'/
+     * 'cancelled'). Revenue can legitimately read ₦0 for online while orders
+     * are still sitting unpaid/undelivered; this is what lets the owner see
+     * why, instead of wondering if orders are being missed entirely.
+     *
+     * @return array<string, int>
+     */
+    public function onlineOrderStatusBreakdown(int $vendorId, CarbonInterface $from, CarbonInterface $to): array
+    {
+        return Order::query()
+            ->whereHas('items', fn ($q) => $q->where('vendor_id', $vendorId))
+            ->whereBetween('created_at', [$from, $to])
+            ->groupBy('status')
+            ->selectRaw('status, COUNT(*) as count')
+            ->pluck('count', 'status')
+            ->all();
     }
 
     /**

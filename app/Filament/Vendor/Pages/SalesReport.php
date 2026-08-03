@@ -89,6 +89,8 @@ class SalesReport extends Page
             'previous' => $reports->summary($vendorId, $previous->from, $previous->to),
             'channels' => $reports->channelBreakdown($vendorId, $period->from, $period->to),
             'topProducts' => $reports->topProducts($vendorId, $period->from, $period->to, 10),
+            'cashiers' => $reports->cashierBreakdown($vendorId, $period->from, $period->to),
+            'onlineStatuses' => $reports->onlineOrderStatusBreakdown($vendorId, $period->from, $period->to),
         ];
     }
 

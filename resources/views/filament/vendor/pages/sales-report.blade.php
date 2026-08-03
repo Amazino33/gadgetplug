@@ -72,6 +72,54 @@
                 @endforeach
             </div>
         @endif
+
+        @php
+            // Revenue only counts 'paid'/'delivered' orders — everything else
+            // placed in this period is real activity that just hasn't earned
+            // yet. Shown here so ₦0 online revenue is explained, not mysterious.
+            $notYetEarned = collect($onlineStatuses)
+                ->except(['paid', 'delivered'])
+                ->filter(fn ($count) => $count > 0);
+        @endphp
+        @if ($notYetEarned->isNotEmpty())
+            <div class="mt-4 rounded-lg bg-gray-50 p-3 text-xs text-gray-500 dark:bg-white/5 dark:text-gray-400">
+                Also placed online this period, not yet counted as revenue:
+                {{ $notYetEarned->map(fn ($count, $status) => $count . ' ' . str_replace('_', ' ', $status))->implode(', ') }}.
+            </div>
+        @endif
+    </div>
+
+    {{-- Who sold it — every cashier's POS contribution --}}
+    <div class="fi-section mt-6 rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
+        <div class="p-6 pb-3">
+            <h3 class="text-base font-semibold text-gray-950 dark:text-white">Sales by team member</h3>
+            <p class="text-sm text-gray-500 dark:text-gray-400">POS sales only — an online order has no cashier.</p>
+        </div>
+
+        @if ($cashiers->isEmpty())
+            <p class="px-6 pb-6 text-sm text-gray-500 dark:text-gray-400">No POS sales in this period.</p>
+        @else
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="border-y border-gray-200 bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:border-white/10 dark:bg-white/5 dark:text-gray-400">
+                        <tr>
+                            <th class="px-6 py-3 text-left font-medium">Cashier</th>
+                            <th class="px-6 py-3 text-right font-medium">Sales</th>
+                            <th class="px-6 py-3 text-right font-medium">Revenue</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200 dark:divide-white/10">
+                        @foreach ($cashiers as $cashier)
+                            <tr>
+                                <td class="px-6 py-3 text-gray-950 dark:text-white">{{ $cashier['cashier_name'] }}</td>
+                                <td class="px-6 py-3 text-right text-gray-700 dark:text-gray-300">{{ number_format($cashier['orders']) }}</td>
+                                <td class="px-6 py-3 text-right font-medium text-gray-950 dark:text-white">₦{{ number_format($cashier['revenue'], 2) }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        @endif
     </div>
 
     {{-- Best sellers --}}
