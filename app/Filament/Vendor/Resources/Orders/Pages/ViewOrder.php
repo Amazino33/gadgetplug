@@ -7,7 +7,6 @@ use App\Models\DeliveryMessage;
 use App\Models\MessageTemplate;
 use App\Models\Order;
 use App\Services\Messaging\MessagingService;
-use App\Services\Messaging\PhoneNumber;
 use App\Services\Messaging\TemplateRenderer;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
@@ -28,13 +27,6 @@ class ViewOrder extends ViewRecord
                 ->icon('heroicon-o-phone')
                 ->color('info')
                 ->url(fn () => 'tel:'.$this->record->customer_phone),
-
-            Action::make('whatsappCustomer')
-                ->label('WhatsApp')
-                ->icon('heroicon-o-chat-bubble-oval-left')
-                ->color('success')
-                ->url(fn () => 'https://api.whatsapp.com/send?phone='.PhoneNumber::toNigerianInternational($this->record->customer_phone))
-                ->openUrlInNewTab(),
 
             Action::make('updateStatus')
                 ->label('Update Status')
@@ -161,8 +153,8 @@ class ViewOrder extends ViewRecord
 
             Action::make('sendMessage')
                 ->label('Send Message')
-                ->icon('heroicon-o-paper-airplane')
-                ->color('primary')
+                ->icon('heroicon-o-chat-bubble-oval-left')
+                ->color('success')
                 ->schema([
                     Select::make('recipient_type')
                         ->label('Send to')

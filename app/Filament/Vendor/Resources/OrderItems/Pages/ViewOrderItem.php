@@ -3,6 +3,7 @@
 namespace App\Filament\Vendor\Resources\OrderItems\Pages;
 
 use App\Filament\Vendor\Resources\OrderItems\OrderItemResource;
+use App\Filament\Vendor\Resources\Orders\OrderResource;
 use App\Models\OrderItem;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
@@ -40,12 +41,14 @@ class ViewOrderItem extends ViewRecord
                 ->color('info')
                 ->url(fn () => 'tel:' . $this->record->order->customer_phone),
 
-            Action::make('whatsappCustomer')
-                ->label('WhatsApp')
+            // Sends the vendor to the order page's Send Message action rather than
+            // opening a blank WhatsApp chat — that path renders the vendor's
+            // templates and logs the message against the order.
+            Action::make('messageCustomer')
+                ->label('Message')
                 ->icon('heroicon-o-chat-bubble-oval-left')
                 ->color('success')
-                ->url(fn () => 'https://api.whatsapp.com/send?phone=' . preg_replace('/\D/', '', $this->record->order->customer_phone))
-                ->openUrlInNewTab(),
+                ->url(fn () => OrderResource::getUrl('view', ['record' => $this->record->order_id], tenant: filament()->getTenant())),
 
             Action::make('updateStatus')
                 ->label('Update Status')

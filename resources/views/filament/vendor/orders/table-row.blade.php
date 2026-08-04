@@ -60,11 +60,18 @@
                 class="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600">
                 <x-heroicon-o-phone class="h-4 w-4"/>
             </a>
-            <a href="https://api.whatsapp.com/send?phone={{ preg_replace('/\D/', '', $order->customer_phone) }}" target="_blank"
-                title="WhatsApp" aria-label="WhatsApp {{ $order->customer_name }}"
+            <button type="button"
+                x-data
+                x-on:click="window.dispatchEvent(new CustomEvent('open-send-message', { detail: {
+                    id: {{ $order->id }},
+                    customer: @js($order->customer_name),
+                    phone: @js($order->customer_phone),
+                    templates: @js($this->messageTemplatesFor($order)),
+                } }))"
+                title="Send message" aria-label="Send a message to {{ $order->customer_name }}"
                 class="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-emerald-50 dark:hover:bg-emerald-900/20 hover:text-emerald-600">
                 <x-heroicon-o-chat-bubble-oval-left class="h-4 w-4"/>
-            </a>
+            </button>
             <button type="button"
                 x-data
                 x-on:click="window.dispatchEvent(new CustomEvent('open-update-status', { detail: { id: {{ $order->id }}, options: @js($statusOptions) } }))"

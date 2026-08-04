@@ -16,9 +16,45 @@
                 this.newStatus = '';
                 this.note = '';
                 this.open = true;
+            },
+
+            msgOpen: false,
+            msgOrderId: null,
+            msgCustomer: '',
+            msgPhone: '',
+            msgTemplates: [],
+            msgTemplateKey: '',
+            msgChannel: 'whatsapp',
+            msgBody: '',
+            msgSending: false,
+            openMessageModal(detail) {
+                this.msgOrderId = detail.id;
+                this.msgCustomer = detail.customer;
+                this.msgPhone = detail.phone;
+                this.msgTemplates = detail.templates;
+                this.msgTemplateKey = '';
+                this.msgChannel = 'whatsapp';
+                this.msgBody = '';
+                this.msgSending = false;
+                this.msgOpen = true;
+            },
+            applyTemplate() {
+                const chosen = this.msgTemplates.find(t => t.key === this.msgTemplateKey);
+                if (chosen) {
+                    this.msgBody = chosen.body;
+                    this.msgChannel = chosen.channel;
+                }
+            },
+            async sendMessage() {
+                if (! this.msgBody.trim() || this.msgSending) return;
+                this.msgSending = true;
+                await $wire.sendOrderMessage(this.msgOrderId, this.msgBody, this.msgChannel);
+                this.msgOpen = false;
+                this.msgSending = false;
             }
         }"
         x-on:open-update-status.window="openModal($event.detail.id, $event.detail.options)"
+        x-on:open-send-message.window="openMessageModal($event.detail)"
     >
         {{-- Toolbar --}}
         <div class="flex flex-col sm:flex-row sm:items-center gap-3 bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-xl p-4">
@@ -118,6 +154,63 @@
                         x-on:click="$wire.updateOrderStatus(orderId, newStatus || null, note || null); open = false"
                         class="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700">
                         Save
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        {{-- Shared Send Message modal — same templates and send path as the
+             order page's Send Message action, so a message raised from the list
+             is logged and delivered identically. --}}
+        <div x-show="msgOpen" x-cloak
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+            x-on:keydown.escape.window="msgOpen = false">
+            <div class="w-full max-w-lg rounded-xl bg-white dark:bg-gray-900 p-5 shadow-xl" x-on:click.outside="msgOpen = false">
+                <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Send Message</h3>
+                <p class="mb-4 mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                    To <span class="font-medium text-gray-700 dark:text-gray-200" x-text="msgCustomer"></span>
+                    <span x-text="msgPhone ? '· ' + msgPhone : ''"></span>
+                </p>
+
+                <template x-if="msgTemplates.length">
+                    <div class="mb-4">
+                        <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Template</label>
+                        <select x-model="msgTemplateKey" x-on:change="applyTemplate()"
+                            class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+                            <option value="">Write my own…</option>
+                            <template x-for="option in msgTemplates" :key="option.key">
+                                <option :value="option.key" x-text="option.label"></option>
+                            </template>
+                        </select>
+                    </div>
+                </template>
+
+                <div class="mb-4">
+                    <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Message</label>
+                    <textarea x-model="msgBody" rows="8"
+                        placeholder="Pick a template above, or type your message here."
+                        class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></textarea>
+                </div>
+
+                <div class="mb-4">
+                    <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Channel</label>
+                    <select x-model="msgChannel"
+                        class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+                        <option value="whatsapp">WhatsApp</option>
+                        <option value="sms">SMS</option>
+                    </select>
+                </div>
+
+                <div class="flex justify-end gap-2">
+                    <button type="button" x-on:click="msgOpen = false"
+                        class="rounded-lg px-3 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10">
+                        Cancel
+                    </button>
+                    <button type="button"
+                        x-on:click="sendMessage()"
+                        x-bind:disabled="! msgBody.trim() || msgSending"
+                        class="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-50">
+                        <span x-text="msgSending ? 'Sending…' : 'Send'"></span>
                     </button>
                 </div>
             </div>

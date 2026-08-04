@@ -148,11 +148,13 @@
                             <x-heroicon-o-phone class="w-3.5 h-3.5"/>
                             Call
                         </a>
-                        <a href="https://api.whatsapp.com/send?phone={{ preg_replace('/\D/', '', $order->customer_phone) }}"
-                            target="_blank"
+                        {{-- Points at the order page's Send Message action rather than
+                             opening a blank WhatsApp chat: that path uses the vendor's
+                             templates and logs the message against the order. --}}
+                        <a href="{{ \App\Filament\Vendor\Resources\Orders\OrderResource::getUrl('view', ['record' => $order], tenant: filament()->getTenant()) }}"
                             class="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors">
                             <x-heroicon-o-chat-bubble-oval-left class="w-3.5 h-3.5"/>
-                            WhatsApp
+                            Message
                         </a>
                         <button
                             x-on:click="navigator.clipboard.writeText('{{ addslashes($order->shipping_address) }}'); copied = true; setTimeout(() => copied = false, 2000)"

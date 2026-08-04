@@ -2,6 +2,7 @@
 
 namespace App\Filament\Vendor\Resources\OrderItems\Tables;
 
+use App\Filament\Vendor\Resources\Orders\OrderResource;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
@@ -93,12 +94,14 @@ class OrderItemsTable
             ])
             ->recordActions([
                 ViewAction::make(),
-                Action::make('whatsapp')
-                    ->label('WhatsApp')
+                // Goes to the order page's Send Message action instead of a blank
+                // WhatsApp chat, so the vendor's templates are used and the
+                // message is logged against the order.
+                Action::make('messageCustomer')
+                    ->label('Message')
                     ->icon('heroicon-o-chat-bubble-oval-left')
                     ->color('success')
-                    ->url(fn ($record) => 'https://api.whatsapp.com/send?phone=' . preg_replace('/\D/', '', $record->order->customer_phone))
-                    ->openUrlInNewTab(),
+                    ->url(fn ($record) => OrderResource::getUrl('view', ['record' => $record->order_id], tenant: filament()->getTenant())),
                 EditAction::make(),
             ])
             ->toolbarActions([

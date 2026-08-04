@@ -202,6 +202,7 @@ test('message template seeder creates the expected default templates for a vendo
         'customer_delivered',
         'customer_dispatched',
         'customer_out_for_delivery',
+        'customer_received',
         'rider_assignment',
     ]);
 });
@@ -212,7 +213,8 @@ test('message template seeder is idempotent and never duplicates existing keys',
     MessageTemplateSeeder::forVendor($data['vendor']);
     MessageTemplateSeeder::forVendor($data['vendor']);
 
-    expect(MessageTemplate::where('vendor_id', $data['vendor']->id)->count())->toBe(5);
+    expect(MessageTemplate::where('vendor_id', $data['vendor']->id)->count())
+        ->toBe(count(MessageTemplateSeeder::defaults()));
 });
 
 test('the seed defaults action is only visible when the vendor has no templates yet', function () {
