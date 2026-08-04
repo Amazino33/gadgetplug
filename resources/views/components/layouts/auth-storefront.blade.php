@@ -26,6 +26,7 @@
     @vite(['resources/css/app.css', 'resources/js/app.js', 'resources/js/pwa.js'])
     @livewireStyles
     @include('partials.meta-pixel')
+    @include('partials.ms-clarity')
 </head>
 <body class="min-h-screen bg-[#0d1f0d] font-inter text-[#111] antialiased flex flex-col items-center justify-center px-4 py-10">
 

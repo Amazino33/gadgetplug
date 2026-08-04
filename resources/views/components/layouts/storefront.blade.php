@@ -50,6 +50,7 @@
     @vite(['resources/css/app.css', 'resources/js/app.js', 'resources/js/pwa.js'])
     @livewireStyles
     @include('partials.meta-pixel')
+    @include('partials.ms-clarity')
 </head>
 <body
     x-data="{
