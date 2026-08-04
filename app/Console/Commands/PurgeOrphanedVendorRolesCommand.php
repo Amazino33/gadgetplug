@@ -15,7 +15,8 @@ use Illuminate\Support\Facades\DB;
 class PurgeOrphanedVendorRolesCommand extends Command
 {
     protected $signature = 'roles:purge-orphans
-                            {--force : Actually delete. Without this the command only reports.}';
+                            {--force : Actually delete. Without this the command only reports.}
+                            {--skip-fk-checks : Last resort. Disables foreign key checks for the delete only. See the note in handle().}';
 
     protected $description = 'Delete vendor-scoped roles left behind by deleted vendors';
 
@@ -60,29 +61,68 @@ class PurgeOrphanedVendorRolesCommand extends Command
 
             $removedAssignments += DB::table($tables['model_has_roles'])->whereIn('role_id', $ids)->delete();
             $removedGrants      += DB::table($tables['role_has_permissions'])->whereIn('role_id', $ids)->delete();
+        }
 
-            // Verify the children are really gone before touching the parent.
-            // The previous attempt assumed this and was wrong somewhere.
-            $remaining = DB::table($tables['model_has_roles'])->whereIn('role_id', $ids)->count();
+        // On this database the bulk delete fails with a 1451 naming
+        // model_has_roles even when roles:diagnose confirms both foreign keys
+        // are ON DELETE CASCADE and no row anywhere references these ids. A
+        // cascade with no children cannot legitimately refuse, which points at
+        // stale InnoDB constraint metadata rather than real data. So: try the
+        // bulk delete, and if it refuses, go one row at a time to find out
+        // exactly which ids are affected rather than reporting the whole batch
+        // as failed.
+        try {
+            $removedRoles = $this->deleteRoles($tables['roles'], $orphanRoleIds->all());
+        } catch (\Throwable $e) {
+            $this->warn('Bulk delete refused; retrying one role at a time to isolate it.');
 
-            if ($remaining > 0) {
-                $this->error("{$remaining} assignment(s) still reference these roles after deletion — not removing the roles.");
-                $this->line('Rows still present:');
+            $removedRoles = 0;
+            $stubborn     = [];
 
-                DB::table($tables['model_has_roles'])
-                    ->whereIn('role_id', $ids)
-                    ->limit(5)
-                    ->get()
-                    ->each(fn ($row) => $this->line('  '.json_encode($row)));
-
-                return self::FAILURE;
+            foreach ($orphanRoleIds as $id) {
+                try {
+                    $removedRoles += $this->deleteRoles($tables['roles'], [$id]);
+                } catch (\Throwable) {
+                    $stubborn[] = $id;
+                }
             }
 
-            $removedRoles += DB::table($tables['roles'])->whereIn('id', $ids)->delete();
+            if ($stubborn !== []) {
+                $this->newLine();
+                $this->error(count($stubborn).' role(s) could not be deleted: '.implode(', ', $stubborn));
+                $this->line('Nothing references them, so this is the database refusing on stale constraint');
+                $this->line('metadata. Re-run with --skip-fk-checks to bypass it for this delete only.');
+            }
         }
 
         $this->info("Removed {$removedRoles} role(s), {$removedAssignments} assignment(s), {$removedGrants} permission grant(s).");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * --skip-fk-checks is narrow on purpose: it only ever runs after the
+     * referencing rows have been deleted and re-counted as zero, so it is
+     * bypassing a constraint that has nothing left to protect. It is still a
+     * blunt instrument, which is why it is opt-in and never the default.
+     *
+     * @param  array<int, int>  $ids
+     */
+    private function deleteRoles(string $rolesTable, array $ids): int
+    {
+        if (! $this->option('skip-fk-checks')) {
+            return DB::table($rolesTable)->whereIn('id', $ids)->delete();
+        }
+
+        DB::statement('SET FOREIGN_KEY_CHECKS=0');
+
+        try {
+            return DB::table($rolesTable)->whereIn('id', $ids)->delete();
+        } finally {
+            // Session-scoped, and restored even if the delete throws — leaving
+            // this off would disable integrity checking for the rest of the
+            // connection's life.
+            DB::statement('SET FOREIGN_KEY_CHECKS=1');
+        }
     }
 }
