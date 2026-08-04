@@ -54,10 +54,12 @@ class CleanupDuplicateVendorsCommand extends Command
 
             $this->line("<options=bold>{$group->name}</> — {$group->total} copies (owner #{$group->user_id})");
 
-            $counts = [];
+            $breakdowns = [];
+            $counts     = [];
 
             foreach ($vendors as $vendor) {
-                $counts[$vendor->id] = $this->attachedRowCount($vendor, $tables);
+                $breakdowns[$vendor->id] = $this->attachedRows($vendor, $tables);
+                $counts[$vendor->id]     = array_sum($breakdowns[$vendor->id]);
             }
 
             // Keep whichever copy actually holds data. On a tie the oldest wins,
@@ -68,16 +70,17 @@ class CleanupDuplicateVendorsCommand extends Command
                 ->first();
 
             foreach ($vendors as $vendor) {
-                $count = $counts[$vendor->id];
+                $count  = $counts[$vendor->id];
+                $detail = $this->describe($breakdowns[$vendor->id]);
 
                 if ($vendor->id === $keepId) {
-                    $this->line("  <fg=green>keep</>   #{$vendor->id}  slug={$vendor->slug}  attached rows: {$count}");
+                    $this->line("  <fg=green>keep</>   #{$vendor->id}  slug={$vendor->slug}  rows: {$count}  {$detail}");
 
                     continue;
                 }
 
                 if ($count > 0) {
-                    $this->line("  <fg=yellow>skip</>   #{$vendor->id}  slug={$vendor->slug}  attached rows: {$count} — has data, left alone");
+                    $this->line("  <fg=yellow>skip</>   #{$vendor->id}  slug={$vendor->slug}  rows: {$count}  {$detail}");
 
                     continue;
                 }
@@ -146,15 +149,40 @@ class CleanupDuplicateVendorsCommand extends Command
         return $tables;
     }
 
-    /** @param  array<int, string>  $tables */
-    private function attachedRowCount(Vendor $vendor, array $tables): int
+    /**
+     * Row counts per table, so the report says what is actually holding a
+     * vendor down rather than only how much. A bare total cannot distinguish
+     * real trading history from rows something seeded automatically.
+     *
+     * @param  array<int, string>  $tables
+     * @return array<string, int>
+     */
+    private function attachedRows(Vendor $vendor, array $tables): array
     {
-        $total = 0;
+        $counts = [];
 
         foreach ($tables as $table) {
-            $total += DB::table($table)->where('vendor_id', $vendor->id)->count();
+            $count = DB::table($table)->where('vendor_id', $vendor->id)->count();
+
+            if ($count > 0) {
+                $counts[$table] = $count;
+            }
         }
 
-        return $total;
+        arsort($counts);
+
+        return $counts;
+    }
+
+    /** @param  array<string, int>  $counts */
+    private function describe(array $counts): string
+    {
+        if ($counts === []) {
+            return '';
+        }
+
+        return '('.collect($counts)
+            ->map(fn (int $count, string $table) => "{$table}={$count}")
+            ->implode(', ').')';
     }
 }
