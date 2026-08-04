@@ -6,7 +6,6 @@ use App\Models\Vendor;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
-use Spatie\Permission\Models\Role;
 
 // Removes vendor rows created by the double-clicked "Approve" button on the
 // vendor applications screen (fixed in VendorApplicationsTable, which now locks
@@ -118,28 +117,60 @@ class CleanupDuplicateVendorsCommand extends Command
             return self::SUCCESS;
         }
 
-        DB::transaction(function () use ($deletable) {
-            foreach ($deletable as $vendor) {
-                // Spatie scopes roles by team_id with no foreign key, so these
-                // would otherwise be orphaned rows pointing at a vendor that no
-                // longer exists.
-                $roleIds = Role::where('team_id', $vendor->id)->pluck('id');
+        $deleted    = 0;
+        $roleIssues = 0;
 
-                if ($roleIds->isNotEmpty()) {
-                    DB::table('role_has_permissions')->whereIn('role_id', $roleIds)->delete();
-                    DB::table('model_has_roles')->whereIn('role_id', $roleIds)->delete();
-                    Role::whereIn('id', $roleIds)->delete();
-                }
-
-                DB::table('model_has_roles')->where('team_id', $vendor->id)->delete();
-
+        foreach ($deletable as $vendor) {
+            // One transaction per vendor rather than one for the whole run: a
+            // problem with the ninth copy should not roll back the eight that
+            // were already dealt with cleanly.
+            DB::transaction(function () use ($vendor) {
                 $vendor->delete();
-            }
-        });
+            });
 
-        $this->info('Deleted '.count($deletable).' empty duplicate vendor(s).');
+            $deleted++;
+
+            // Tidying the Spatie roles is separate and deliberately allowed to
+            // fail. They have no foreign key to vendors, so they are orphaned
+            // rows rather than anything holding the vendor in place, and the
+            // seeder recreates them idempotently. Losing the whole cleanup to a
+            // constraint on the permission tables would be a poor trade.
+            try {
+                $this->purgeRoles($vendor->id);
+            } catch (\Throwable $e) {
+                $roleIssues++;
+                $this->warn("  vendor #{$vendor->id}: removed, but its roles could not be tidied — {$e->getMessage()}");
+            }
+        }
+
+        $this->info("Deleted {$deleted} empty duplicate vendor(s).");
+
+        if ($roleIssues > 0) {
+            $this->warn("{$roleIssues} vendor(s) left orphaned permission rows behind. Harmless, but 'php artisan vendor:seed-roles' will not clear them.");
+        }
 
         return self::SUCCESS;
+    }
+
+    // Table names come from the permission config rather than being written out
+    // here, so a project that renames them does not silently skip the cleanup.
+    private function purgeRoles(int $vendorId): void
+    {
+        $tables  = config('permission.table_names');
+        $teamKey = config('permission.column_names.team_foreign_key', 'team_id');
+
+        $roleIds = DB::table($tables['roles'])->where($teamKey, $vendorId)->pluck('id');
+
+        // Assignments first, then the pivot to permissions, then the roles —
+        // children before parents, without relying on the database's cascade
+        // behaviour being what we expect.
+        DB::table($tables['model_has_roles'])->where($teamKey, $vendorId)->delete();
+
+        if ($roleIds->isNotEmpty()) {
+            DB::table($tables['model_has_roles'])->whereIn('role_id', $roleIds)->delete();
+            DB::table($tables['role_has_permissions'])->whereIn('role_id', $roleIds)->delete();
+            DB::table($tables['roles'])->whereIn('id', $roleIds)->delete();
+        }
     }
 
     /** @return array<int, string> */

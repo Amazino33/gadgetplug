@@ -149,3 +149,39 @@ it('still refuses when an ignored table is not the only thing attached', functio
 
     expect(Vendor::count())->toBe(2);
 });
+
+it('removes duplicates that have seeded roles with users assigned to them', function () {
+    // Reproduces the live failure: role assignments in model_has_roles pointed
+    // at the vendor's roles, and tidying those blew up the whole run.
+    $owner   = User::factory()->create();
+    $staff   = User::factory()->create();
+    $vendors = duplicateVendors($owner, 3);
+
+    giveVendorAProduct($vendors[0]);
+
+    foreach ($vendors as $vendor) {
+        App\Services\VendorRoles::seedFor($vendor);
+
+        $role = Spatie\Permission\Models\Role::where('team_id', $vendor->id)
+            ->where('name', 'storekeeper')
+            ->first();
+
+        DB::table(config('permission.table_names.model_has_roles'))->insert([
+            'role_id'    => $role->id,
+            'model_type' => User::class,
+            'model_id'   => $staff->id,
+            'team_id'    => $vendor->id,
+        ]);
+    }
+
+    $this->artisan('vendors:cleanup-duplicates', [
+        '--force'  => true,
+        '--ignore' => ['message_templates'],
+    ])->assertSuccessful();
+
+    expect(Vendor::count())->toBe(1)
+        ->and(Vendor::first()->id)->toBe($vendors[0]->id);
+
+    // The removed vendors leave no role rows behind.
+    expect(Spatie\Permission\Models\Role::whereIn('team_id', [$vendors[1]->id, $vendors[2]->id])->count())->toBe(0);
+});
