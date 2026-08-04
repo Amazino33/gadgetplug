@@ -20,34 +20,40 @@ class MessageTemplateSeeder extends Seeder
     {
         return [
             [
+                'key'            => 'customer_received',
+                'recipient_type' => 'customer',
+                'channel'        => 'whatsapp',
+                'body'           => "Hello {{customer_name}} 👋\n\nThank you for shopping with GadgetPlug! We have received your order *{{order_number}}*.\n\n*Your items*\n{{order_items}}\n\n*Total:* {{total}}\n*Payment:* {{payment_method}}\n*Deliver to:* {{delivery_address}}\n\n{{rider_line}}\n\nWe truly appreciate your business 💚\n— GadgetPlug",
+            ],
+            [
                 'key'            => 'customer_confirmed',
                 'recipient_type' => 'customer',
                 'channel'        => 'whatsapp',
-                'body'           => 'Hi {{customer_name}}, your order {{order_number}} ({{total}}) has been confirmed. We will notify you again once it is on its way.',
+                'body'           => "Hello {{customer_name}} 👋\n\nGood news — your order *{{order_number}}* is confirmed.\n\n*Your items*\n{{order_items}}\n\n*Total:* {{total}}\n*Deliver to:* {{delivery_address}}\n\nWe will message you again as soon as it is on its way.\n\nThank you for choosing GadgetPlug 💚",
             ],
             [
                 'key'            => 'customer_dispatched',
                 'recipient_type' => 'customer',
                 'channel'        => 'whatsapp',
-                'body'           => 'Hi {{customer_name}}, your order {{order_number}} has been dispatched with {{company_name}}. Your rider {{rider_name}} ({{rider_phone}}) will be in touch.',
+                'body'           => "Hello {{customer_name}} 👋\n\nYour order *{{order_number}}* is on its way!\n\n*Your items*\n{{order_items}}\n\n*Total:* {{total}}\n*Payment:* {{payment_method}}\n*Deliver to:* {{delivery_address}}\n\n{{rider_line}}\nPlease keep your phone nearby.\n\nThank you for shopping with GadgetPlug 💚",
             ],
             [
                 'key'            => 'customer_out_for_delivery',
                 'recipient_type' => 'customer',
                 'channel'        => 'whatsapp',
-                'body'           => 'Hi {{customer_name}}, your order {{order_number}} is out for delivery to {{delivery_address}}. Please have someone available to receive it.',
+                'body'           => "Hello {{customer_name}} 👋\n\nYour order *{{order_number}}* is out for delivery today.\n\n*Your items*\n{{order_items}}\n\n*Total:* {{total}}\n*Deliver to:* {{delivery_address}}\n\n{{rider_line}}\nPlease have someone available to receive it.\n\nThank you for choosing GadgetPlug 💚",
             ],
             [
                 'key'            => 'customer_delivered',
                 'recipient_type' => 'customer',
                 'channel'        => 'whatsapp',
-                'body'           => 'Hi {{customer_name}}, your order {{order_number}} has been delivered. Thank you for shopping with us!',
+                'body'           => "Hello {{customer_name}} 👋\n\nYour order *{{order_number}}* has been delivered.\n\n*Your items*\n{{order_items}}\n\n*Total:* {{total}}\n\nWe hope you enjoy your purchase. Thank you for shopping with GadgetPlug — we truly appreciate you 💚\n\nWe look forward to serving you again!",
             ],
             [
                 'key'            => 'rider_assignment',
                 'recipient_type' => 'rider',
                 'channel'        => 'whatsapp',
-                'body'           => "New delivery for {{rider_name}}:\n\nOrder: {{order_number}}\nCustomer: {{customer_name}}\nPhone: {{customer_phone}}\nDeliver to: {{delivery_address}}\nTotal: {{total}}",
+                'body'           => "Hello {{rider_name}} 👋\n\nYou have a new delivery from GadgetPlug.\n\n*Order:* {{order_number}}\n*Customer:* {{customer_name}}\n*Phone:* {{customer_phone}}\n*Deliver to:* {{delivery_address}}\n\n*Items ({{item_count}})*\n{{order_items}}\n\n*Total:* {{total}}\n*Payment:* {{payment_method}}\n\nThank you 💚",
             ],
         ];
     }

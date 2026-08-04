@@ -5,6 +5,7 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Services\CartService;
+use App\Services\Messaging\PhoneNumber;
 use App\Actions\Inventory\ReserveStockAction;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Session;
@@ -112,7 +113,16 @@ new class extends Component {
         $this->validate([
             'name'          => 'required|string|max:255',
             'email'         => 'required|email|max:255',
-            'phone'         => 'required|string|max:20',
+            // Order updates are delivered to this number over WhatsApp, so a
+            // typo here means the customer silently hears nothing. Validate the
+            // shape at the door rather than discovering it at send time.
+            'phone'         => ['required', 'string', 'max:20', function ($attribute, $value, $fail) {
+                $normalized = PhoneNumber::toNigerianInternational($value);
+
+                if (strlen((string) $normalized) !== 13) {
+                    $fail('Enter a valid Nigerian WhatsApp number, for example 08012345678.');
+                }
+            }],
             'lga'           => 'required|in:Uyo,Mkpat Enin,Eket',
             'address'       => 'required|string|min:10',
             'paymentMethod' => 'required|in:paystack,pay_on_delivery',
@@ -473,9 +483,17 @@ new class extends Component {
                         @error('email') <p class="text-red-500 text-[11px] mt-1">{{ $message }}</p> @enderror
                     </div>
                     <div class="md:col-span-2">
-                        <label class="block text-[12px] font-semibold text-brand-dark dark:text-[#e8f5e9] mb-1.5">Phone Number *</label>
+                        <label class="block text-[12px] font-semibold text-brand-dark dark:text-[#e8f5e9] mb-1.5">
+                            WhatsApp Number *
+                        </label>
                         <input type="tel" wire:model="phone" placeholder="08012345678"
                             class="w-full bg-brand-bg dark:bg-[#0d1a0d] border border-[#d0d9d2] dark:border-[#2a3a2a] rounded-xl px-3.5 py-2.5 text-[13px] text-[#111] dark:text-[#e8f5e9] outline-none focus:border-brand transition-colors placeholder-[#8a9e8c]">
+                        <p class="flex items-center gap-1.5 text-[11px] text-brand-muted dark:text-[#6a8a6a] mt-1.5">
+                            <svg class="w-3.5 h-3.5 shrink-0" fill="#25D366" viewBox="0 0 24 24">
+                                <path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2.05 22l5.25-1.38a9.87 9.87 0 004.74 1.21h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0012.04 2zm5.8 14.13c-.25.69-1.46 1.32-2 1.36-.51.04-1.16.06-1.87-.12-.43-.11-.98-.29-1.69-.6-2.97-1.28-4.91-4.27-5.06-4.47-.15-.2-1.21-1.61-1.21-3.07 0-1.46.77-2.18 1.04-2.48.27-.3.59-.37.79-.37.2 0 .39 0 .57.01.18.01.43-.07.67.51.25.6.84 2.06.91 2.21.07.15.12.32.02.52-.1.2-.15.32-.3.5-.15.17-.31.39-.44.52-.15.15-.3.31-.13.61.17.3.76 1.25 1.63 2.03 1.12 1 2.06 1.31 2.36 1.46.3.15.47.12.65-.07.17-.2.75-.87.95-1.17.2-.3.4-.25.67-.15.27.1 1.72.81 2.01.96.3.15.5.22.57.35.07.12.07.72-.18 1.41z"/>
+                            </svg>
+                            Your order updates are sent here — please use a number with WhatsApp.
+                        </p>
                         @error('phone') <p class="text-red-500 text-[11px] mt-1">{{ $message }}</p> @enderror
                     </div>
                 </div>

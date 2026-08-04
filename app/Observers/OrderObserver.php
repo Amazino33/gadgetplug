@@ -14,12 +14,20 @@ use Illuminate\Support\Facades\Log;
 
 class OrderObserver
 {
-    // Order status values that have a matching customer-facing template. Only
-    // 'shipped' and 'delivered' are actually reachable via the status-change UI
-    // in this app (see ViewOrder's updateStatus action) — 'confirmed' is set by
-    // the Paystack webhook, not a vendor action, and 'out_for_delivery' isn't a
-    // status this app's orders table has, so neither is wired here.
+    // Order status values that have a matching customer-facing template.
+    //
+    // 'paid' and 'confirmed' both mean "money is settled, the order is real" and
+    // both send the order-received acknowledgement: Paystack lands on 'paid' via
+    // the callback, pay-on-delivery lands on 'confirmed' at checkout. Deliberately
+    // not fired on 'pending' — a Paystack order sits at 'pending' from the moment
+    // the form is submitted until payment actually clears, so acknowledging there
+    // would thank people for abandoned checkouts.
+    //
+    // 'out_for_delivery' isn't a status this app's orders table uses; its template
+    // exists for vendors who send that message by hand from the order page.
     private const CUSTOMER_STATUS_TEMPLATES = [
+        'paid'      => 'customer_received',
+        'confirmed' => 'customer_received',
         'shipped'   => 'customer_dispatched',
         'delivered' => 'customer_delivered',
     ];
