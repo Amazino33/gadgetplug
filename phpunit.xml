@@ -35,5 +35,15 @@
         <!-- Force the inert drivers regardless of real keys in a developer's local .env -->
         <env name="MESSAGING_WHATSAPP_DRIVER" value="log_null"/>
         <env name="MESSAGING_SMS_DRIVER" value="log_null"/>
+        <!-- Blank the provider credentials as well. Tests that null the *_DRIVER
+             config at runtime to exercise auto-selection would otherwise fall
+             through to whichever provider has real keys locally and, with no
+             Http::fake() in place, send live messages during a test run. -->
+        <env name="WAWP_INSTANCE_ID" value=""/>
+        <env name="WAWP_ACCESS_TOKEN" value=""/>
+        <env name="WHATSAPP_CLOUD_TOKEN" value=""/>
+        <env name="WHATSAPP_CLOUD_PHONE_NUMBER_ID" value=""/>
+        <env name="TERMII_API_KEY" value=""/>
+        <env name="TERMII_SENDER_ID" value=""/>
     </php>
 </phpunit>

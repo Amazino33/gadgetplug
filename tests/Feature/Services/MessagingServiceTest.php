@@ -152,6 +152,8 @@ test('whatsapp defaults to the wa link driver when no cloud api credentials are 
     config([
         'services.whatsapp_cloud.token' => null,
         'services.whatsapp_cloud.phone_number_id' => null,
+        'services.wawp.instance_id' => null,
+        'services.wawp.access_token' => null,
         'services.messaging.whatsapp_driver' => null,
     ]);
 
@@ -227,6 +229,145 @@ test('whatsapp uses the cloud api automatically when credentials are configured'
         && $request['to'] === '2348040000000'
         && $request['type'] === 'text'
         && $request['text']['body'] === 'Test message body');
+});
+
+// --- Wawp WhatsApp gateway --------------------------------------------
+
+function configureWawp(array $overrides = []): void
+{
+    config(array_merge([
+        'services.whatsapp_cloud.token' => null,
+        'services.whatsapp_cloud.phone_number_id' => null,
+        'services.wawp.instance_id' => 'TESTINSTANCE01',
+        'services.wawp.access_token' => 'test-access-token',
+        'services.messaging.whatsapp_driver' => null,
+    ], $overrides));
+}
+
+test('whatsapp uses wawp automatically when its credentials are configured and cloud api is not', function () {
+    configureWawp();
+
+    Http::fake([
+        'api.wawp.net/*' => Http::response([
+            'id' => ['_serialized' => 'true_2348040000000@c.us_ABC123'],
+            'body' => 'Test message body',
+            'to' => '2348040000000@c.us',
+            'ack' => 0,
+        ], 200),
+    ]);
+
+    $data = setUpMessagingVendor();
+    $message = makeDeliveryMessage($data['vendor'], $data['order'], 'whatsapp');
+
+    $result = app(MessagingService::class)->send($message);
+
+    expect($result->status)->toBe('sent')
+        ->and($result->provider_response['id']['_serialized'])->toBe('true_2348040000000@c.us_ABC123')
+        ->and($result->sent_at)->not->toBeNull();
+
+    Http::assertSent(fn ($request) => $request->url() === 'https://api.wawp.net/v2/send/text'
+        && $request->method() === 'POST'
+        && $request['instance_id'] === 'TESTINSTANCE01'
+        && $request['access_token'] === 'test-access-token'
+        && $request['chatId'] === '2348040000000@c.us'
+        && $request['message'] === 'Test message body');
+});
+
+test('wawp does not leak the access token into the request url', function () {
+    configureWawp();
+    Http::fake(['api.wawp.net/*' => Http::response(['result' => true], 200)]);
+
+    $data = setUpMessagingVendor();
+    app(MessagingService::class)->send(makeDeliveryMessage($data['vendor'], $data['order'], 'whatsapp'));
+
+    Http::assertSent(fn ($request) => ! str_contains($request->url(), 'test-access-token'));
+});
+
+test('cloud api still wins over wawp when both are configured', function () {
+    configureWawp([
+        'services.whatsapp_cloud.token' => 'test-token',
+        'services.whatsapp_cloud.phone_number_id' => '1234567890',
+    ]);
+
+    Http::fake([
+        'graph.facebook.com/*' => Http::response(['messages' => [['id' => 'wamid.CLOUD']]], 200),
+    ]);
+
+    $data = setUpMessagingVendor();
+    $result = app(MessagingService::class)->send(makeDeliveryMessage($data['vendor'], $data['order'], 'whatsapp'));
+
+    expect($result->status)->toBe('sent')
+        ->and($result->provider_response['messages'][0]['id'])->toBe('wamid.CLOUD');
+
+    Http::assertNotSent(fn ($request) => str_contains($request->url(), 'wawp.net'));
+});
+
+test('wawp falls back to the wa link driver when its credentials are absent', function () {
+    configureWawp(['services.wawp.instance_id' => null, 'services.wawp.access_token' => null]);
+
+    $data = setUpMessagingVendor();
+    $result = app(MessagingService::class)->send(makeDeliveryMessage($data['vendor'], $data['order'], 'whatsapp'));
+
+    expect($result->status)->toBe('link_generated')
+        ->and($result->provider_response['driver'])->toBe('wa_link');
+});
+
+test('a wawp session error is recorded as failed rather than throwing', function () {
+    configureWawp();
+
+    Http::fake([
+        'api.wawp.net/*' => Http::response([
+            'code' => 'invalid_session',
+            'message' => 'Session not found. Please verify your instance_id or session_name.',
+        ], 404),
+    ]);
+
+    $data = setUpMessagingVendor();
+    $result = app(MessagingService::class)->send(makeDeliveryMessage($data['vendor'], $data['order'], 'whatsapp'));
+
+    expect($result->status)->toBe('failed')
+        ->and($result->provider_response['error'])->toBeString()
+        ->and($result->sent_at)->toBeNull();
+});
+
+// Session-backed gateways report upstream WhatsApp problems in the body while
+// still answering 200, so a bare status-code check would mark these as sent.
+test('a wawp error body returned under http 200 is still recorded as failed', function () {
+    configureWawp();
+
+    Http::fake([
+        'api.wawp.net/*' => Http::response(['code' => 'invalid_session', 'message' => 'Session closed'], 200),
+    ]);
+
+    $data = setUpMessagingVendor();
+    $result = app(MessagingService::class)->send(makeDeliveryMessage($data['vendor'], $data['order'], 'whatsapp'));
+
+    expect($result->status)->toBe('failed')
+        ->and($result->provider_response['body']['code'])->toBe('invalid_session')
+        ->and($result->sent_at)->toBeNull();
+});
+
+test('a wawp result false envelope is recorded as failed', function () {
+    configureWawp();
+
+    Http::fake(['api.wawp.net/*' => Http::response(['result' => false], 200)]);
+
+    $data = setUpMessagingVendor();
+    $result = app(MessagingService::class)->send(makeDeliveryMessage($data['vendor'], $data['order'], 'whatsapp'));
+
+    expect($result->status)->toBe('failed');
+});
+
+test('an empty wawp 200 body is treated as failed rather than assumed sent', function () {
+    configureWawp();
+
+    Http::fake(['api.wawp.net/*' => Http::response('', 200)]);
+
+    $data = setUpMessagingVendor();
+    $result = app(MessagingService::class)->send(makeDeliveryMessage($data['vendor'], $data['order'], 'whatsapp'));
+
+    expect($result->status)->toBe('failed')
+        ->and($result->sent_at)->toBeNull();
 });
 
 test('an explicit driver override wins over auto-detection', function () {

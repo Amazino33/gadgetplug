@@ -7,6 +7,7 @@ use App\Services\Messaging\Drivers\LogNullDriver;
 use App\Services\Messaging\Drivers\MessagingDriver;
 use App\Services\Messaging\Drivers\TermiiSmsDriver;
 use App\Services\Messaging\Drivers\WaLinkDriver;
+use App\Services\Messaging\Drivers\WawpDriver;
 use App\Services\Messaging\Drivers\WhatsAppCloudApiDriver;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
@@ -61,9 +62,18 @@ class MessagingService
         // Automation is the default: use the real provider when it's configured,
         // otherwise fall back to the free/manual option for that channel.
         return match ($channel) {
-            'whatsapp' => (filled(config('services.whatsapp_cloud.token')) && filled(config('services.whatsapp_cloud.phone_number_id')))
-                ? $this->makeDriver('whatsapp_cloud')
-                : $this->makeDriver('wa_link'),
+            // Cloud API first — it's the sanctioned Meta route. Wawp rides a linked
+            // phone session, so it's the pragmatic second choice, and wa_link (manual
+            // tap) is the last resort when neither is configured.
+            'whatsapp' => match (true) {
+                filled(config('services.whatsapp_cloud.token')) && filled(config('services.whatsapp_cloud.phone_number_id'))
+                    => $this->makeDriver('whatsapp_cloud'),
+
+                filled(config('services.wawp.instance_id')) && filled(config('services.wawp.access_token'))
+                    => $this->makeDriver('wawp'),
+
+                default => $this->makeDriver('wa_link'),
+            },
 
             'sms' => filled(config('services.termii.api_key'))
                 ? $this->makeDriver('termii')
@@ -78,6 +88,7 @@ class MessagingService
         return match ($key) {
             'termii' => app(TermiiSmsDriver::class),
             'whatsapp_cloud' => app(WhatsAppCloudApiDriver::class),
+            'wawp' => app(WawpDriver::class),
             'wa_link' => app(WaLinkDriver::class),
             'log_null' => app(LogNullDriver::class),
             default => throw new InvalidArgumentException("Unknown messaging driver [{$key}]."),

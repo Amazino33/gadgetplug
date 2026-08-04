@@ -70,4 +70,9 @@ return [
         'api_version'     => env('WHATSAPP_CLOUD_API_VERSION', 'v21.0'),
     ],
 
+    'wawp' => [
+        'instance_id'  => env('WAWP_INSTANCE_ID'),
+        'access_token' => env('WAWP_ACCESS_TOKEN'),
+    ],
+
 ];
