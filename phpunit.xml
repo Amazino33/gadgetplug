@@ -35,6 +35,7 @@
         <!-- Force the inert drivers regardless of real keys in a developer's local .env -->
         <env name="MESSAGING_WHATSAPP_DRIVER" value="log_null"/>
         <env name="MESSAGING_SMS_DRIVER" value="log_null"/>
+        <env name="MESSAGING_REDIRECT_ALL_TO" value=""/>
         <!-- Blank the provider credentials as well. Tests that null the *_DRIVER
              config at runtime to exercise auto-selection would otherwise fall
              through to whichever provider has real keys locally and, with no

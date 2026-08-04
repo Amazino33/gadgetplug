@@ -57,6 +57,11 @@ return [
         // Blank = auto-select based on which provider below has real credentials.
         'whatsapp_driver' => env('MESSAGING_WHATSAPP_DRIVER'),
         'sms_driver'      => env('MESSAGING_SMS_DRIVER'),
+
+        // Test-mode safety valve. When set, EVERY delivery message is diverted to
+        // this number instead of the real recipient. Leave blank in normal
+        // operation — while it is set, no customer receives anything.
+        'redirect_all_to' => env('MESSAGING_REDIRECT_ALL_TO'),
     ],
 
     'termii' => [

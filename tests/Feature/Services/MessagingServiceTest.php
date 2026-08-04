@@ -370,6 +370,72 @@ test('an empty wawp 200 body is treated as failed rather than assumed sent', fun
         ->and($result->sent_at)->toBeNull();
 });
 
+// --- Test-mode redirect safety valve ----------------------------------
+
+test('the redirect valve diverts the send to the test number while the row keeps the real recipient', function () {
+    configureWawp();
+    config(['services.messaging.redirect_all_to' => '08136310313']);
+
+    Http::fake(['api.wawp.net/*' => Http::response(['result' => true], 200)]);
+
+    $data = setUpMessagingVendor();
+    $result = app(MessagingService::class)->send(makeDeliveryMessage($data['vendor'], $data['order'], 'whatsapp'));
+
+    // Sent to the test phone...
+    Http::assertSent(fn ($request) => $request['chatId'] === '2348136310313@c.us'
+        && str_contains($request['message'], '[TEST — intended for 2348040000000]')
+        && str_contains($request['message'], 'Test message body'));
+
+    // ...but the order history still records who it was actually for.
+    expect($result->status)->toBe('sent')
+        ->and($result->to_number)->toBe('2348040000000')
+        ->and($result->body)->toBe('Test message body')
+        ->and($result->provider_response['redirected_to'])->toBe('2348136310313');
+});
+
+test('the redirect valve accepts a local-format number', function () {
+    configureWawp();
+    config(['services.messaging.redirect_all_to' => '0813 631 0313']);
+
+    Http::fake(['api.wawp.net/*' => Http::response(['result' => true], 200)]);
+
+    $data = setUpMessagingVendor();
+    app(MessagingService::class)->send(makeDeliveryMessage($data['vendor'], $data['order'], 'whatsapp'));
+
+    Http::assertSent(fn ($request) => $request['chatId'] === '2348136310313@c.us');
+});
+
+test('a blank redirect valve leaves the real recipient untouched', function () {
+    configureWawp();
+    config(['services.messaging.redirect_all_to' => '']);
+
+    Http::fake(['api.wawp.net/*' => Http::response(['result' => true], 200)]);
+
+    $data = setUpMessagingVendor();
+    $result = app(MessagingService::class)->send(makeDeliveryMessage($data['vendor'], $data['order'], 'whatsapp'));
+
+    Http::assertSent(fn ($request) => $request['chatId'] === '2348040000000@c.us'
+        && $request['message'] === 'Test message body');
+
+    expect($result->provider_response)->not->toHaveKey('redirected_to');
+});
+
+test('the redirect valve applies to sms as well as whatsapp', function () {
+    config([
+        'services.termii.api_key' => 'test-api-key',
+        'services.termii.sender_id' => 'TESTSENDER',
+        'services.messaging.sms_driver' => null,
+        'services.messaging.redirect_all_to' => '08136310313',
+    ]);
+
+    Http::fake(['api.ng.termii.com/*' => Http::response(['message_id' => 'x'], 200)]);
+
+    $data = setUpMessagingVendor();
+    app(MessagingService::class)->send(makeDeliveryMessage($data['vendor'], $data['order'], 'sms'));
+
+    Http::assertSent(fn ($request) => $request['to'] === '2348136310313');
+});
+
 test('an explicit driver override wins over auto-detection', function () {
     // Termii credentials ARE present, but sms_driver is explicitly forced to log_null.
     config([

@@ -29,6 +29,12 @@ class MessagingService
             $message->to_number = $normalized;
         }
 
+        // The row keeps the real recipient so order history stays truthful about
+        // who the message was for; only the outbound copy is diverted.
+        $intendedNumber = $message->to_number;
+        $intendedBody   = $message->body;
+        $redirectedTo   = $this->applyTestRedirect($message);
+
         try {
             $result = $driver->send($message);
         } catch (Throwable $e) {
@@ -41,14 +47,44 @@ class MessagingService
             $result = DriverSendResult::failed(['error' => $e->getMessage()]);
         }
 
+        $message->to_number = $intendedNumber;
+        $message->body      = $intendedBody;
+
         $message->update([
-            'to_number' => $message->to_number,
+            'to_number' => $intendedNumber,
             'status' => $result->status,
-            'provider_response' => $result->providerResponse,
+            'provider_response' => $redirectedTo === null
+                ? $result->providerResponse
+                : ['redirected_to' => $redirectedTo] + (array) $result->providerResponse,
             'sent_at' => in_array($result->status, ['sent', 'link_generated'], true) ? now() : null,
         ]);
 
         return $message->fresh();
+    }
+
+    // Test-mode safety valve: when MESSAGING_REDIRECT_ALL_TO is set, every message
+    // goes to that number instead of the real recipient. Lets a provider be
+    // exercised end to end through the real app — real orders, real status
+    // changes — with no possibility of reaching a customer. Returns the number
+    // diverted to, or null when the valve is off.
+    private function applyTestRedirect(DeliveryMessage $message): ?string
+    {
+        $target = PhoneNumber::toNigerianInternational(config('services.messaging.redirect_all_to'));
+
+        if (blank($target) || $target === $message->to_number) {
+            return null;
+        }
+
+        Log::warning('Delivery message redirected — MESSAGING_REDIRECT_ALL_TO is set. Unset it to reach real customers.', [
+            'delivery_message_id' => $message->id,
+            'intended_for' => $message->to_number,
+            'redirected_to' => $target,
+        ]);
+
+        $message->body      = "[TEST — intended for {$message->to_number}]\n\n".$message->body;
+        $message->to_number = $target;
+
+        return $target;
     }
 
     private function resolveDriver(string $channel): MessagingDriver
