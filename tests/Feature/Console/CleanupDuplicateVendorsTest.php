@@ -100,3 +100,52 @@ it('does not delete a lone vendor even when it is empty', function () {
 
     expect(Vendor::count())->toBe(1);
 });
+
+it('can be told a table does not count as real data', function () {
+    $owner   = User::factory()->create();
+    $vendors = duplicateVendors($owner, 3);
+
+    // Every vendor gets the same seeded message templates, so without --ignore
+    // no duplicate is ever removable.
+    foreach ($vendors as $vendor) {
+        App\Models\MessageTemplate::create([
+            'vendor_id'      => $vendor->id,
+            'key'            => 'order_confirmed',
+            'recipient_type' => 'customer',
+            'channel'        => 'whatsapp',
+            'body'           => 'Default body',
+        ]);
+    }
+
+    giveVendorAProduct($vendors[0]);
+
+    // Without the flag: nothing is safe to remove.
+    $this->artisan('vendors:cleanup-duplicates', ['--force' => true])->assertSuccessful();
+    expect(Vendor::count())->toBe(3);
+
+    // With it: the copies carrying nothing but templates go.
+    $this->artisan('vendors:cleanup-duplicates', [
+        '--force'  => true,
+        '--ignore' => ['message_templates'],
+    ])->assertSuccessful();
+
+    expect(Vendor::count())->toBe(1)
+        ->and(Vendor::first()->id)->toBe($vendors[0]->id);
+});
+
+it('still refuses when an ignored table is not the only thing attached', function () {
+    $owner   = User::factory()->create();
+    $vendors = duplicateVendors($owner, 2);
+
+    giveVendorAProduct($vendors[0]);
+    // The second copy has a real product too, so ignoring templates must not
+    // make it disposable.
+    giveVendorAProduct($vendors[1]);
+
+    $this->artisan('vendors:cleanup-duplicates', [
+        '--force'  => true,
+        '--ignore' => ['message_templates'],
+    ])->assertSuccessful();
+
+    expect(Vendor::count())->toBe(2);
+});

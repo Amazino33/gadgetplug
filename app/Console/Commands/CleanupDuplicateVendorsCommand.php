@@ -22,7 +22,8 @@ use Spatie\Permission\Models\Role;
 class CleanupDuplicateVendorsCommand extends Command
 {
     protected $signature = 'vendors:cleanup-duplicates
-                            {--force : Actually delete. Without this the command only reports.}';
+                            {--force : Actually delete. Without this the command only reports.}
+                            {--ignore=* : Table names that should not count as real data, e.g. --ignore=message_templates}';
 
     protected $description = 'Find vendors duplicated by repeated approval and delete the empty copies';
 
@@ -40,8 +41,18 @@ class CleanupDuplicateVendorsCommand extends Command
             return self::SUCCESS;
         }
 
-        $tables = $this->tablesReferencingVendors();
+        $tables  = $this->tablesReferencingVendors();
+        $ignored = $this->option('ignore');
+
         $this->line('Checking '.count($tables).' vendor-owned tables per candidate.');
+
+        if ($ignored !== []) {
+            // Still counted and shown, just not treated as a reason to keep a
+            // vendor alive. Naming them here rather than baking a list into the
+            // command keeps the decision with the person running it.
+            $this->line('Not counting as data: '.implode(', ', $ignored));
+        }
+
         $this->newLine();
 
         $deletable = [];
@@ -59,7 +70,9 @@ class CleanupDuplicateVendorsCommand extends Command
 
             foreach ($vendors as $vendor) {
                 $breakdowns[$vendor->id] = $this->attachedRows($vendor, $tables);
-                $counts[$vendor->id]     = array_sum($breakdowns[$vendor->id]);
+                $counts[$vendor->id]     = collect($breakdowns[$vendor->id])
+                    ->reject(fn ($count, $table) => in_array($table, $ignored, true))
+                    ->sum();
             }
 
             // Keep whichever copy actually holds data. On a tie the oldest wins,
@@ -71,7 +84,7 @@ class CleanupDuplicateVendorsCommand extends Command
 
             foreach ($vendors as $vendor) {
                 $count  = $counts[$vendor->id];
-                $detail = $this->describe($breakdowns[$vendor->id]);
+                $detail = $this->describe($breakdowns[$vendor->id], $ignored);
 
                 if ($vendor->id === $keepId) {
                     $this->line("  <fg=green>keep</>   #{$vendor->id}  slug={$vendor->slug}  rows: {$count}  {$detail}");
@@ -174,15 +187,20 @@ class CleanupDuplicateVendorsCommand extends Command
         return $counts;
     }
 
-    /** @param  array<string, int>  $counts */
-    private function describe(array $counts): string
+    /**
+     * @param  array<string, int>  $counts
+     * @param  array<int, string>  $ignored
+     */
+    private function describe(array $counts, array $ignored = []): string
     {
         if ($counts === []) {
             return '';
         }
 
         return '('.collect($counts)
-            ->map(fn (int $count, string $table) => "{$table}={$count}")
+            ->map(fn (int $count, string $table) => in_array($table, $ignored, true)
+                ? "{$table}={$count} ignored"
+                : "{$table}={$count}")
             ->implode(', ').')';
     }
 }
