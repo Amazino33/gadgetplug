@@ -191,6 +191,56 @@ test('the reminder digests every stalled order into one message', function () {
     expect(storekeeperMessages())->toHaveCount(1);
 });
 
+// The whole point of the activation watermark: an existing store's historical
+// backlog of paid-but-never-shipped orders must not be dragged into the digest.
+test('orders placed before activation are never chased', function () {
+    $data = setUpStorekeeperVendor(['undispatched_after_hours' => 6]);
+
+    $settings = VendorNotificationSetting::forVendor($data['vendor']);
+    expect($settings->remind_orders_from)->not->toBeNull();
+
+    $old = makeStorekeeperOrder($data, 'paid');
+    Order::whereKey($old->id)->update([
+        'created_at' => $settings->remind_orders_from->copy()->subMonths(3),
+        'updated_at' => now()->subMonths(3),
+    ]);
+
+    expect(app(StorekeeperNotifier::class)->undispatchedReminder($data['vendor']))->toBeNull();
+});
+
+test('an order placed after activation is still chased normally', function () {
+    $data = setUpStorekeeperVendor(['undispatched_after_hours' => 6]);
+    $settings = VendorNotificationSetting::forVendor($data['vendor']);
+
+    $new = makeStorekeeperOrder($data, 'paid');
+    Order::whereKey($new->id)->update([
+        'created_at' => $settings->remind_orders_from->copy()->addMinutes(5),
+        'updated_at' => now()->subDay(),
+    ]);
+
+    DeliveryMessage::truncate();
+
+    $message = app(StorekeeperNotifier::class)->undispatchedReminder($data['vendor']);
+
+    expect($message)->not->toBeNull()
+        ->and($message->body)->toContain($new->reference);
+});
+
+test('clearing the watermark lets the whole backlog be chased once', function () {
+    $data = setUpStorekeeperVendor(['undispatched_after_hours' => 6, 'remind_orders_from' => null]);
+
+    $old = makeStorekeeperOrder($data, 'paid');
+    Order::whereKey($old->id)->update([
+        'created_at' => now()->subMonths(3),
+        'updated_at' => now()->subMonths(3),
+    ]);
+
+    DeliveryMessage::truncate();
+
+    expect(app(StorekeeperNotifier::class)->undispatchedReminder($data['vendor'])?->body)
+        ->toContain($old->reference);
+});
+
 test('the reminder sends nothing when every order is inside the follow-up window', function () {
     $data = setUpStorekeeperVendor(['undispatched_after_hours' => 6]);
     makeStorekeeperOrder($data, 'paid');

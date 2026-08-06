@@ -21,6 +21,7 @@ class VendorNotificationSetting extends Model
         'quiet_hours_enabled'      => 'boolean',
         'undispatched_after_hours' => 'integer',
         'last_reminder_sent_at'    => 'datetime',
+        'remind_orders_from'       => 'datetime',
     ];
 
     public const FREQUENCIES = [
@@ -44,9 +45,13 @@ class VendorNotificationSetting extends Model
 
     public static function forVendor(Vendor|int $vendor): self
     {
-        $settings = static::firstOrCreate([
-            'vendor_id' => $vendor instanceof Vendor ? $vendor->id : $vendor,
-        ]);
+        $settings = static::firstOrCreate(
+            ['vendor_id' => $vendor instanceof Vendor ? $vendor->id : $vendor],
+            // Stamped once, on the row that represents this store switching the
+            // feature on. Everything placed before this is history the storekeeper
+            // is not going to be chased about.
+            ['remind_orders_from' => now()],
+        );
 
         // firstOrCreate inserts only vendor_id, so every column filled by a
         // database default comes back unset on the new instance — booleans read

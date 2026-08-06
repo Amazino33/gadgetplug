@@ -71,6 +71,13 @@ class StorekeeperNotifier
         $orders = Order::query()
             ->whereIn('status', self::AWAITING_DISPATCH)
             ->where('updated_at', '<=', $cutoff)
+            // Never chase the pre-activation backlog. Without this, a store that
+            // has ever left an order in paid/confirmed would see its entire
+            // history listed in the first reminder and every one after it.
+            ->when(
+                $settings->remind_orders_from,
+                fn ($query, $from) => $query->where('created_at', '>=', $from),
+            )
             ->whereHas('items', fn ($query) => $query->where('vendor_id', $vendor->id))
             ->orderBy('updated_at')
             ->get();
