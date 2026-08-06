@@ -159,6 +159,11 @@ class User extends Authenticatable implements HasTenants, FilamentUser
         return $this->hasMany(Order::class);
     }
 
+    public function affiliate()
+    {
+        return $this->hasOne(Affiliate::class);
+    }
+
     public function wishlistedProducts()
     {
         return $this->belongsToMany(Product::class, 'wishlists')->withTimestamps();

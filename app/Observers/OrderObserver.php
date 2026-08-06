@@ -7,6 +7,7 @@ use App\Actions\Inventory\ReleaseReservationAction;
 use App\Models\DeliveryMessage;
 use App\Models\MessageTemplate;
 use App\Models\Order;
+use App\Services\Affiliate\CommissionService;
 use App\Services\Messaging\MessagingService;
 use App\Services\Messaging\StorekeeperNotifier;
 use App\Services\Messaging\TemplateRenderer;
@@ -42,6 +43,7 @@ class OrderObserver
         }
 
         $this->applyStatusTransitionSideEffects($order);
+        $this->applyAffiliateCommissionLifecycle($order);
         $this->notifyCustomerOfStatusChange($order);
         $this->notifyStorekeeperOfStatusChange($order);
     }
@@ -69,6 +71,34 @@ class OrderObserver
                 'status'    => $order->status,
                 'exception' => $e->getMessage(),
             ]);
+        }
+    }
+
+    // Delivered starts the commission's hold; cancelled rejects it outright
+    // (the only reject-capable transition that exists today — see Prompt 1's
+    // Phase 0 recon: 'delivered' is currently terminal in the vendor UI, so a
+    // return after delivery has no status to hook here yet). Swallows its own
+    // failures rather than letting a bug in commission logic block a vendor
+    // from updating order status, matching applyStatusTransitionSideEffects's
+    // discipline above.
+    private function applyAffiliateCommissionLifecycle(Order $order): void
+    {
+        if (! $order->wasChanged('status')) {
+            return;
+        }
+
+        try {
+            $commissionService = app(CommissionService::class);
+
+            if ($order->status === 'delivered') {
+                $commissionService->startReturnWindow($order);
+            }
+
+            if ($order->status === 'cancelled') {
+                $commissionService->reject($order, 'order_cancelled');
+            }
+        } catch (\Throwable $e) {
+            Log::error("Affiliate commission lifecycle failed for order {$order->id}: " . $e->getMessage());
         }
     }
 

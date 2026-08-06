@@ -86,7 +86,16 @@ class OrderResource extends Resource
 
                 TextColumn::make('payment_method')
                     ->label('Payment')
-                    ->formatStateUsing(fn ($state) => $state === 'pay_on_delivery' ? 'Pay on Delivery' : 'Paystack'),
+                    ->badge()
+                    ->formatStateUsing(fn ($state) => match ($state) {
+                        'pay_on_delivery' => 'Pay on Delivery',
+                        'wallet'           => 'Reseller (Wallet)',
+                        default            => 'Paystack',
+                    })
+                    ->color(fn ($state) => match ($state) {
+                        'wallet' => 'info',
+                        default  => 'gray',
+                    }),
 
                 TextColumn::make('created_at')->label('Placed')->dateTime('d M Y, H:i')->sortable(),
             ])
@@ -110,6 +119,14 @@ class OrderResource extends Resource
                         $data['value'],
                         fn (Builder $q, $vendorId) => $q->whereHas('items', fn (Builder $q2) => $q2->where('vendor_id', $vendorId))
                     )),
+
+                SelectFilter::make('payment_method')
+                    ->label('Payment')
+                    ->options([
+                        'paystack'        => 'Paystack',
+                        'pay_on_delivery' => 'Pay on Delivery',
+                        'wallet'          => 'Reseller (Wallet)',
+                    ]),
             ])
             ->recordAction('view')
             ->actions([

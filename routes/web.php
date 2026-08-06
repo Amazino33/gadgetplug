@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AffiliateClickController;
 use App\Http\Controllers\Payment\PaystackCallbackController;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
@@ -14,6 +15,8 @@ Volt::route('/checkout', 'checkout')->name('checkout');
 
 Route::get('/payment/callback', PaystackCallbackController::class)->name('payment.callback');
 
+Route::get('/r/{code}', [AffiliateClickController::class, 'redirect'])->name('affiliate.click');
+
 
 Route::redirect('/dashboard', '/account')->name('dashboard');
 
@@ -22,6 +25,7 @@ Route::middleware(['auth'])->prefix('account')->group(function () {
     Volt::route('/orders',         'pages.account.orders')->name('account.orders');
     Volt::route('/wishlist',       'pages.account.wishlist')->name('account.wishlist');
     Volt::route('/become-a-plug',  'pages.account.vendor-apply')->name('account.vendor-apply');
+    Volt::route('/affiliate',      'pages.account.affiliate')->name('account.affiliate');
 });
 
 Route::get('/nuke-cache', function () {

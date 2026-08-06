@@ -1,7 +1,9 @@
 <?php
 
 use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 // Spatie's teams migration creates team_id as part of a composite PRIMARY KEY,
 // which MySQL forbids from being NULL. We replace it with a surrogate auto-increment
@@ -12,9 +14,22 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // Every statement below is MySQL-specific DDL. SQLite (the test-suite
-        // driver) already permits NULL in a non-INTEGER composite primary key
-        // column, so the nullability this migration buys is there by default.
+        // team_id was declared without ->nullable() in the base spatie migration,
+        // so it's NOT NULL on every driver, not just MySQL's composite-PK
+        // restriction — SQLite (the test-suite driver) needs the same fix, just
+        // via Laravel's native column ->change() instead of raw MySQL DDL.
+        if (DB::getDriverName() === 'sqlite') {
+            Schema::table('model_has_roles', function (Blueprint $table) {
+                $table->unsignedBigInteger('team_id')->nullable()->change();
+            });
+
+            Schema::table('model_has_permissions', function (Blueprint $table) {
+                $table->unsignedBigInteger('team_id')->nullable()->change();
+            });
+
+            return;
+        }
+
         if (DB::getDriverName() !== 'mysql') {
             return;
         }

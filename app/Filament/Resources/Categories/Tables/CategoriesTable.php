@@ -17,6 +17,14 @@ class CategoriesTable
             ->columns([
                 TextColumn::make('name')->searchable(),
                 TextColumn::make('slug'),
+                TextColumn::make('commission_rate')
+                    ->label('Commission Rate')
+                    ->formatStateUsing(fn ($state) => $state !== null ? number_format((float) $state, 2) . '%' : '—')
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('reseller_discount')
+                    ->label('Reseller Discount')
+                    ->formatStateUsing(fn ($state) => $state !== null ? number_format((float) $state, 2) . '%' : '—')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 IconColumn::make('is_active')->boolean(),
                 TextColumn::make('created_at')->dateTime()->sortable()->toggleable(isToggledHiddenByDefault: true),
             ])

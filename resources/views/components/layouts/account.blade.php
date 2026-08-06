@@ -24,6 +24,7 @@
                 ['route' => 'account.orders',         'label' => 'Orders'],
                 ['route' => 'account.wishlist',       'label' => 'Wishlist'],
                 ['route' => 'account.vendor-apply',   'label' => 'Become a Plug'],
+                ...(auth()->user()->affiliate ? [['route' => 'account.affiliate', 'label' => 'Affiliate']] : []),
             ] as $nav)
             <a href="{{ route($nav['route']) }}"
                class="flex-shrink-0 px-3.5 py-1.5 rounded-lg text-[12px] font-semibold transition-colors whitespace-nowrap
@@ -46,6 +47,10 @@
                         ['route' => 'account.wishlist',     'label' => 'Wishlist',        'icon' => '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>'],
                         ['route' => 'account.vendor-apply','label' => 'Become a Plug',  'icon' => '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>'],
                     ];
+
+                    if (auth()->user()->affiliate) {
+                        $navItems[] = ['route' => 'account.affiliate', 'label' => 'Affiliate', 'icon' => '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><line x1="17.5" y1="17.5" x2="17.51" y2="17.5"/>'];
+                    }
                 @endphp
                 @foreach($navItems as $nav)
                 <a href="{{ route($nav['route']) }}"

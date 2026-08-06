@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Models\Activity;
@@ -77,5 +78,15 @@ class Order extends Model
     public function activities(): MorphMany
     {
         return $this->morphMany(Activity::class, 'subject')->latest('id');
+    }
+
+    public function affiliateCommission(): HasOne
+    {
+        return $this->hasOne(AffiliateCommission::class);
+    }
+
+    public function walletDebit(): HasOne
+    {
+        return $this->hasOne(WalletTransaction::class)->where('type', 'debit');
     }
 }

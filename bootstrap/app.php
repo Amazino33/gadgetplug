@@ -1,5 +1,7 @@
 <?php
 
+use App\Jobs\ClearAffiliateHoldsJob;
+use App\Jobs\DemoteInactiveAffiliatesJob;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -22,6 +24,15 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->statefulApi();
     })
     ->withSchedule(function (Schedule $schedule): void {
+        // Hourly rather than daily since the hold is measured in days; this keeps
+        // a commission from sitting cleared-but-uncredited for up to a day longer
+        // than its actual hold window.
+        $schedule->job(new ClearAffiliateHoldsJob())->hourly();
+
+        // Daily, not hourly — a 21-day inactivity window doesn't need
+        // hourly granularity the way a multi-day hold does.
+        $schedule->job(new DemoteInactiveAffiliatesJob())->daily();
+
         // Ticks hourly and lets each vendor's own reminder_frequency decide whether
         // it is actually due, so per-store cadence and quiet hours are data rather
         // than schedule definitions. withoutOverlapping guards the shared host:

@@ -2,6 +2,8 @@
 
 namespace App\Filament\Vendor\Resources\Orders\Schemas;
 
+use App\Models\Affiliate;
+use App\Models\Order;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
@@ -43,8 +45,16 @@ class OrderInfolist
                     TextEntry::make('payment_method')
                         ->label('Payment')
                         ->badge()
-                        ->formatStateUsing(fn ($state) => $state === 'pay_on_delivery' ? 'Pay on Delivery' : 'Paystack')
-                        ->color(fn ($state) => $state === 'pay_on_delivery' ? 'warning' : 'success'),
+                        ->formatStateUsing(fn ($state) => match ($state) {
+                            'pay_on_delivery' => 'Pay on Delivery',
+                            'wallet'           => 'Reseller (Wallet)',
+                            default            => 'Paystack',
+                        })
+                        ->color(fn ($state) => match ($state) {
+                            'pay_on_delivery' => 'warning',
+                            'wallet'           => 'info',
+                            default            => 'success',
+                        }),
 
                     TextEntry::make('total_amount')
                         ->label('Total')
@@ -54,6 +64,25 @@ class OrderInfolist
                     TextEntry::make('created_at')
                         ->label('Placed at')
                         ->dateTime('d M Y, g:ia'),
+                ]),
+
+            Section::make('Reseller Purchase')
+                ->columns(3)
+                ->visible(fn (Order $record) => $record->payment_method === 'wallet')
+                ->schema([
+                    TextEntry::make('reseller_affiliate_code')
+                        ->label('Affiliate')
+                        ->getStateUsing(fn (Order $record) => Affiliate::where('user_id', $record->user_id)->first()?->code ?? '—'),
+
+                    TextEntry::make('reseller_affiliate_name')
+                        ->label('Name')
+                        ->getStateUsing(fn (Order $record) => $record->user?->name ?? '—'),
+
+                    TextEntry::make('walletDebit.amount')
+                        ->label('Wallet Debited')
+                        ->weight('bold')
+                        ->color('danger')
+                        ->formatStateUsing(fn ($state) => $state !== null ? '₦' . number_format(abs((float) $state), 2) : '—'),
                 ]),
 
             Section::make('Customer')

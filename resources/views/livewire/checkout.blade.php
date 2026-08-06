@@ -4,6 +4,7 @@ use Livewire\Volt\Component;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
+use App\Services\Affiliate\AttributionService;
 use App\Services\CartService;
 use App\Services\Messaging\PhoneNumber;
 use App\Actions\Inventory\ReserveStockAction;
@@ -18,6 +19,7 @@ new class extends Component {
     public string $lga           = '';
     public string $address       = '';
     public string $paymentMethod = 'paystack';
+    public string $referralCode  = '';
 
     public array $cartItems = [];
     public float $total = 0;
@@ -167,6 +169,19 @@ new class extends Component {
                 // what this sale earned.
                 'unit_cost'  => $item['product']->cost_price,
             ]);
+        }
+
+        // Affiliate attribution — a code entered here beats the cookie from an
+        // earlier click. Self-referral and idempotency are both handled inside
+        // the service; a failure here must never block the order itself.
+        try {
+            app(AttributionService::class)->attributeOrder(
+                $order,
+                trim($this->referralCode) ?: null,
+                request()->cookie(AttributionService::COOKIE_NAME),
+            );
+        } catch (\Exception $e) {
+            \Log::error('Affiliate attribution failed for order ' . $order->id . ': ' . $e->getMessage());
         }
 
         if ($this->paymentMethod === 'pay_on_delivery') {
@@ -495,6 +510,13 @@ new class extends Component {
                             Your order updates are sent here — please use a number with WhatsApp.
                         </p>
                         @error('phone') <p class="text-red-500 text-[11px] mt-1">{{ $message }}</p> @enderror
+                    </div>
+                    <div class="md:col-span-2">
+                        <label class="block text-[12px] font-semibold text-brand-dark dark:text-[#e8f5e9] mb-1.5">
+                            Referral Code <span class="font-normal text-brand-muted">(optional)</span>
+                        </label>
+                        <input type="text" wire:model="referralCode" placeholder="e.g. ABC12345"
+                            class="w-full bg-brand-bg dark:bg-[#0d1a0d] border border-[#d0d9d2] dark:border-[#2a3a2a] rounded-xl px-3.5 py-2.5 text-[13px] text-[#111] dark:text-[#e8f5e9] outline-none focus:border-brand transition-colors placeholder-[#8a9e8c]">
                     </div>
                 </div>
             </div>
