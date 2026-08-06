@@ -49,6 +49,32 @@ class MessageTemplateSeeder extends Seeder
                 'channel'        => 'whatsapp',
                 'body'           => "Hello {{customer_name}} 👋\n\nYour order *{{order_number}}* has been delivered.\n\n*Your items*\n{{order_items}}\n\n*Total:* {{total}}\n\nWe hope you enjoy your purchase. Thank you for shopping with GadgetPlug — we truly appreciate you 💚\n\nWe look forward to serving you again!",
             ],
+            // Storekeeper alerts are internal, so they lead with what needs doing
+            // rather than a greeting, and carry no customer-facing pleasantries.
+            [
+                'key'            => 'storekeeper_new_order',
+                'recipient_type' => 'storekeeper',
+                'channel'        => 'whatsapp',
+                'body'           => "🛒 *New order to pack — {{order_number}}*\n\n*Items ({{item_count}})*\n{{order_items}}\n\n*Customer:* {{customer_name}} ({{customer_phone}})\n*Deliver to:* {{delivery_address}}\n*Total:* {{total}}\n*Payment:* {{payment_method}}\n\nPlease pack this and hand it to a rider.\n— {{store_name}}",
+            ],
+            [
+                'key'            => 'storekeeper_undispatched',
+                'recipient_type' => 'storekeeper',
+                'channel'        => 'whatsapp',
+                'body'           => "⏰ *{{order_count}} order(s) still awaiting dispatch*\n\n{{order_list}}\n\nThe oldest has been waiting {{oldest_wait}}.\nPlease follow these up.\n— {{store_name}}",
+            ],
+            [
+                'key'            => 'storekeeper_low_stock',
+                'recipient_type' => 'storekeeper',
+                'channel'        => 'whatsapp',
+                'body'           => "📉 *Low stock — {{product_count}} product(s)*\n\n{{product_list}}\n\nPlease restock or raise a purchase order.\n— {{store_name}}",
+            ],
+            [
+                'key'            => 'storekeeper_cancelled',
+                'recipient_type' => 'storekeeper',
+                'channel'        => 'whatsapp',
+                'body'           => "❌ *Order cancelled — {{order_number}}*\n\n*Items ({{item_count}})*\n{{order_items}}\n\nThis order was cancelled after payment. If it was already packed, please unpack it and return the items to the shelf.\n— {{store_name}}",
+            ],
             [
                 'key'            => 'rider_assignment',
                 'recipient_type' => 'rider',

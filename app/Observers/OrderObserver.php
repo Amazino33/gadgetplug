@@ -8,6 +8,7 @@ use App\Models\DeliveryMessage;
 use App\Models\MessageTemplate;
 use App\Models\Order;
 use App\Services\Messaging\MessagingService;
+use App\Services\Messaging\StorekeeperNotifier;
 use App\Services\Messaging\TemplateRenderer;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Log;
@@ -42,6 +43,33 @@ class OrderObserver
 
         $this->applyStatusTransitionSideEffects($order);
         $this->notifyCustomerOfStatusChange($order);
+        $this->notifyStorekeeperOfStatusChange($order);
+    }
+
+    // Storekeepers are rarely logged in, so the WhatsApp alert is what actually
+    // reaches them. Failures are swallowed: an internal alert must never be the
+    // reason a customer's order stops progressing.
+    private function notifyStorekeeperOfStatusChange(Order $order): void
+    {
+        if (! $order->wasChanged('status')) {
+            return;
+        }
+
+        try {
+            if (in_array($order->status, StorekeeperNotifier::AWAITING_DISPATCH, true)) {
+                app(StorekeeperNotifier::class)->newOrder($order);
+            }
+
+            if ($order->status === 'cancelled') {
+                app(StorekeeperNotifier::class)->orderCancelled($order);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Storekeeper notification failed.', [
+                'order_id'  => $order->id,
+                'status'    => $order->status,
+                'exception' => $e->getMessage(),
+            ]);
+        }
     }
 
     // Centralized here rather than in each Filament action (ViewOrder, the Orders

@@ -3,6 +3,7 @@
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -19,6 +20,15 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->statefulApi();
+    })
+    ->withSchedule(function (Schedule $schedule): void {
+        // Ticks hourly and lets each vendor's own reminder_frequency decide whether
+        // it is actually due, so per-store cadence and quiet hours are data rather
+        // than schedule definitions. withoutOverlapping guards the shared host:
+        // a run that stalls on a slow WhatsApp API must not stack up behind itself.
+        $schedule->command('storekeeper:remind')
+            ->hourly()
+            ->withoutOverlapping();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // A forbidden page inside a Filament panel sends the user back to that

@@ -22,8 +22,6 @@ class MessagingService
 {
     public function send(DeliveryMessage $message): DeliveryMessage
     {
-        $driver = $this->resolveDriver($message->channel);
-
         $normalized = PhoneNumber::toNigerianInternational($message->to_number);
         if ($normalized !== $message->to_number) {
             $message->to_number = $normalized;
@@ -36,7 +34,13 @@ class MessagingService
         $redirectedTo   = $this->applyTestRedirect($message);
 
         try {
-            $result = $driver->send($message);
+            // Resolution is inside the try on purpose. It throws on a misconfigured
+            // driver or an unknown channel, and this runs from OrderObserver during
+            // checkout — so escaping here would turn a messaging config typo into a
+            // failed customer order. Degrading to a `failed` row keeps the mistake
+            // visible (status, provider_response.error and a log line) without
+            // taking the order flow down with it.
+            $result = $this->resolveDriver($message->channel)->send($message);
         } catch (Throwable $e) {
             Log::warning('Delivery message send failed.', [
                 'delivery_message_id' => $message->id,

@@ -204,6 +204,10 @@ test('message template seeder creates the expected default templates for a vendo
         'customer_out_for_delivery',
         'customer_received',
         'rider_assignment',
+        'storekeeper_cancelled',
+        'storekeeper_low_stock',
+        'storekeeper_new_order',
+        'storekeeper_undispatched',
     ]);
 });
 
