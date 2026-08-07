@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Services\Affiliate\AttributionService;
 use App\Services\CartService;
 use App\Services\Messaging\PhoneNumber;
+use App\Services\Meta\MetaConversionsService;
 use App\Actions\Inventory\ReserveStockAction;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Session;
@@ -30,6 +31,14 @@ new class extends Component {
     public float  $paidTotal     = 0.0;
     public string $paidName      = '';
     public array  $paidItems     = [];
+    public array  $paidProductIds = [];
+
+    // Pixel event_id for whichever event this page load fires — InitiateCheckout
+    // on the form, Purchase on the success screen. Shared with the server-side
+    // CAPI copy (InitiateCheckout: dispatched right here; Purchase: dispatched
+    // from OrderObserver off the order's own reference) so Meta deduplicates
+    // browser + server into one event instead of double-counting.
+    public ?string $pixelEventId = null;
 
     public function mount(): void
     {
@@ -53,7 +62,15 @@ new class extends Component {
                         'subtotal' => $item->unit_price * $item->quantity,
                         'thumb'    => $item->product?->getFirstMediaUrl('product-images', 'thumb') ?? '',
                     ];
+                    if ($item->product) {
+                        $this->paidProductIds[] = $item->product->id;
+                    }
                 }
+
+                // Same event_id the server-side copy uses (dispatched from
+                // OrderObserver off this same order, keyed on its reference) —
+                // Meta dedupes browser + server into one Purchase.
+                $this->pixelEventId = $order->reference;
             }
             return;
         }
@@ -108,6 +125,29 @@ new class extends Component {
             $this->phone   = $user->phone   ?? '';
             $this->address = $user->address ?? '';
         }
+
+        $this->pixelEventId = (string) Str::uuid();
+
+        app(MetaConversionsService::class)->dispatchEvent(
+            eventName: 'InitiateCheckout',
+            eventId: $this->pixelEventId,
+            eventSourceUrl: url()->current(),
+            userData: [
+                'email'      => $this->email ?: null,
+                'phone'      => $this->phone ?: null,
+                'name'       => $this->name ?: null,
+                'fbp'        => request()->cookie('_fbp'),
+                'fbc'        => request()->cookie('_fbc'),
+                'client_ip'  => request()->ip(),
+                'user_agent' => request()->userAgent(),
+            ],
+            customData: [
+                'currency'     => 'NGN',
+                'value'        => $this->total,
+                'content_ids'  => array_map(fn (array $item) => $item['product']->id, $this->cartItems),
+                'content_type' => 'product',
+            ],
+        );
     }
 
     public function processCheckout(): void
@@ -156,6 +196,11 @@ new class extends Component {
             'total_amount'     => $this->total,
             'status'           => 'pending',
             'payment_method'   => $this->paymentMethod,
+            // Captured here (shared by both payment paths) so the server-side
+            // Purchase CAPI event — fired later from OrderObserver, possibly
+            // disconnected from this request — can still include them.
+            'fbp'              => request()->cookie('_fbp'),
+            'fbc'              => request()->cookie('_fbc'),
         ]);
 
         foreach ($this->cartItems as $item) {
@@ -303,6 +348,16 @@ new class extends Component {
     {{-- ════════════════════════════════════════════════════════════════════ --}}
     @if ($paid)
     {{-- ─── SUCCESS STATE ───────────────────────────────────────────────── --}}
+    @if (config('services.meta.pixel_id') && $pixelEventId)
+    <script>
+    fbq('track', 'Purchase', {
+        value: {{ $paidTotal }},
+        currency: 'NGN',
+        content_ids: @json($paidProductIds),
+        content_type: 'product'
+    }, {eventID: '{{ $pixelEventId }}'});
+    </script>
+    @endif
     <div class="flex flex-col items-center text-center">
 
         {{-- Animated checkmark circle --}}
@@ -456,6 +511,17 @@ new class extends Component {
 
     @else
     {{-- ─── CHECKOUT FORM ───────────────────────────────────────────────── --}}
+
+    @if (config('services.meta.pixel_id') && $pixelEventId)
+    <script>
+    fbq('track', 'InitiateCheckout', {
+        value: {{ $total }},
+        currency: 'NGN',
+        content_ids: @json(collect($cartItems)->pluck('product.id')->values()->all()),
+        content_type: 'product'
+    }, {eventID: '{{ $pixelEventId }}'});
+    </script>
+    @endif
 
     @if (session()->has('error'))
     <div class="bg-[#fce4ec] border border-[#f8bbd0] text-red-700 px-4 py-3 rounded-xl mb-5 text-[13px] flex items-start gap-2">

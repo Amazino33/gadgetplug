@@ -548,6 +548,17 @@ $navCategories = \Illuminate\Support\Facades\Cache::remember(
         <span class="font-medium text-[13px]">Item added to cart!</span>
     </div>
 
+    @if (config('services.meta.pixel_id'))
+    {{-- Browser-side AddToCart pixel fire — a dedicated event (not piggybacking
+    on cart-updated above, which also covers decrement/remove/clear) so it
+    fires exactly once per real add, sharing event_id with the server-side
+    CAPI copy already dispatched by the Livewire action for Meta to dedupe. --}}
+    <div x-data x-on:pixel-add-to-cart.window="fbq('track', 'AddToCart', {
+            value: $event.detail.value,
+            currency: 'NGN',
+        }, {eventID: $event.detail.eventId})"></div>
+    @endif
+
     {{-- ─── MOBILE BOTTOM NAV ───────────────────────────────────────────────── --}}
     <nav class="fixed bottom-0 left-0 right-0 bg-white dark:bg-[#162016] border-t border-brand-border dark:border-[#2a3a2a] flex md:hidden z-[100] transition-colors duration-200">
         <a href="{{ route('home') }}" class="flex-1 flex flex-col items-center justify-center gap-0.5 min-h-[44px] py-2 cursor-pointer">

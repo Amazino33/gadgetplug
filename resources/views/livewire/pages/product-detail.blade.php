@@ -5,6 +5,7 @@ use Livewire\Volt\Component;
 use App\Models\Product;
 use App\Models\Wishlist;
 use App\Services\CartService;
+use App\Services\Meta\MetaConversionsService;
 
 new class extends Component {
     public Product $product;
@@ -24,6 +25,42 @@ new class extends Component {
                 ->where('product_id', $product->id)
                 ->exists();
         }
+
+        $this->fireViewContent();
+    }
+
+    /**
+     * @return array{email: ?string, phone: ?string, name: ?string, fbp: ?string, fbc: ?string, client_ip: ?string, user_agent: ?string}
+     */
+    private function currentUserData(): array
+    {
+        $user = auth()->user();
+
+        return [
+            'email'      => $user?->email,
+            'phone'      => $user?->phone,
+            'name'       => $user?->name,
+            'fbp'        => request()->cookie('_fbp'),
+            'fbc'        => request()->cookie('_fbc'),
+            'client_ip'  => request()->ip(),
+            'user_agent' => request()->userAgent(),
+        ];
+    }
+
+    private function fireViewContent(): void
+    {
+        app(MetaConversionsService::class)->dispatchEvent(
+            eventName: 'ViewContent',
+            eventId: (string) Str::uuid(),
+            eventSourceUrl: url()->current(),
+            userData: $this->currentUserData(),
+            customData: [
+                'currency'     => 'NGN',
+                'value'        => (float) $this->product->price,
+                'content_ids'  => [$this->product->id],
+                'content_type' => 'product',
+            ],
+        );
     }
 
     public function toggleWishlist(): void
@@ -65,6 +102,7 @@ new class extends Component {
 
         $this->cartError = null;
         $this->dispatch('cart-updated');
+        $this->fireAddToCart();
     }
 
     public function buyNow(): void
@@ -76,14 +114,42 @@ new class extends Component {
 
         $this->cartError = null;
         $this->dispatch('cart-updated');
+        $this->fireAddToCart();
         $this->redirectRoute('checkout');
+    }
+
+    // Server CAPI copy dispatched right here (this method runs inside a real
+    // request, so cookies/IP/UA are available); browser copy is a separate
+    // dispatched event picked up by an Alpine listener in the storefront
+    // layout — reusing 'cart-updated' would over-fire (it also covers
+    // decrement/remove/clear in cart.blade.php), so this gets its own event.
+    private function fireAddToCart(): void
+    {
+        $eventId = (string) Str::uuid();
+
+        app(MetaConversionsService::class)->dispatchEvent(
+            eventName: 'AddToCart',
+            eventId: $eventId,
+            eventSourceUrl: url()->current(),
+            userData: $this->currentUserData(),
+            customData: [
+                'currency'     => 'NGN',
+                'value'        => (float) $this->product->price * $this->quantity,
+                'content_ids'  => [$this->product->id],
+                'content_type' => 'product',
+            ],
+        );
+
+        $this->dispatch('pixel-add-to-cart', eventId: $eventId, value: (float) $this->product->price * $this->quantity);
     }
 }; ?>
 
 @php
 $allImages  = $product->getMedia('product-images');
 $firstImage = $allImages->first();
-$defaultUrl = $firstImage ? $firstImage->getUrl() : '';
+// The 'preview' conversion (800x800, already generated on upload) — not the
+// raw original — since this is the largest-contentful-paint image on the page.
+$defaultUrl = $firstImage ? $firstImage->getUrl('preview') : '';
 
 $categoryIcon = \App\Support\CategoryIcon::for($product->category?->name);
 @endphp
@@ -111,7 +177,7 @@ $categoryIcon = \App\Support\CategoryIcon::for($product->category?->name);
     </div>
 @endif
 
-<div class="px-4 md:px-6 py-6 pb-40 md:pb-6 bg-[#f8fcf8] dark:bg-[#0d1a0d] min-h-screen">
+<div class="px-4 md:px-6 py-6 pb-52 md:pb-6 bg-[#f8fcf8] dark:bg-[#0d1a0d] min-h-screen">
 
     {{-- ─── BREADCRUMB ──────────────────────────────────────────────────────── --}}
     <nav class="flex items-center gap-1.5 text-[12px] text-brand-muted mb-6">
@@ -138,7 +204,7 @@ $categoryIcon = \App\Support\CategoryIcon::for($product->category?->name);
             {{-- Main image — 4:3 on mobile to keep title above fold; square on desktop --}}
             <div class="aspect-[4/3] lg:aspect-square w-full bg-brand-bg dark:bg-[#1a2a1a] rounded-2xl border border-brand-border dark:border-[#2a3a2a] overflow-hidden relative">
                 @if ($firstImage)
-                    <img :src="current" alt="{{ $product->name }}"
+                    <img :src="current" alt="{{ $product->name }}" fetchpriority="high"
                         class="w-full h-full object-cover transition-all duration-300">
                 @else
                     <div class="w-full h-full flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-[#f0f8f0] to-[#e8f5e9] dark:from-[#1a2a1a] dark:to-[#162016]">
@@ -166,7 +232,7 @@ $categoryIcon = \App\Support\CategoryIcon::for($product->category?->name);
             @if ($allImages->count() > 1)
             <div class="grid grid-cols-4 gap-2">
                 @foreach ($allImages as $image)
-                @php $previewUrl = $image->getUrl(); @endphp
+                @php $previewUrl = $image->getUrl('preview'); @endphp
                 <button @click="current = '{{ $previewUrl }}'"
                     class="aspect-square rounded-xl overflow-hidden border-2 transition-all duration-200 focus:outline-none"
                     :class="current === '{{ $previewUrl }}' ? 'border-brand opacity-100' : 'border-transparent opacity-60 hover:opacity-100 hover:border-brand-border'">
@@ -215,62 +281,10 @@ $categoryIcon = \App\Support\CategoryIcon::for($product->category?->name);
                 @endif
             </div>
 
-            {{-- Quantity selector --}}
-            @if ($product->stock_quantity > 0)
-            <div class="mb-4">
-                <label class="text-[12px] font-semibold text-brand-dark dark:text-[#e8f5e9] mb-2 block">Quantity</label>
-                <div class="flex items-center gap-0">
-                    <button wire:click="decrementQty"
-                        class="w-10 h-10 rounded-l-xl bg-brand-bg dark:bg-[#1a2a1a] border border-brand-border dark:border-[#2a3a2a] flex items-center justify-center text-brand font-bold text-lg hover:bg-brand hover:text-white hover:border-brand transition-colors cursor-pointer"
-                        @disabled($quantity <= 1)>
-                        −
-                    </button>
-                    <div class="w-14 h-10 border-y border-brand-border dark:border-[#2a3a2a] bg-white dark:bg-[#1a2a1a] flex items-center justify-center font-montserrat font-bold text-[15px] text-brand-dark dark:text-[#e8f5e9]">
-                        {{ $quantity }}
-                    </div>
-                    <button wire:click="incrementQty"
-                        class="w-10 h-10 rounded-r-xl bg-brand-bg dark:bg-[#1a2a1a] border border-brand-border dark:border-[#2a3a2a] flex items-center justify-center text-brand font-bold text-lg hover:bg-brand hover:text-white hover:border-brand transition-colors cursor-pointer"
-                        @disabled($quantity >= $product->stock_quantity)>
-                        +
-                    </button>
-                </div>
-            </div>
-            @endif
-
-            {{-- Add to cart + Buy Now --}}
-            <div class="hidden md:flex gap-2.5 mb-6">
-                <button wire:click="addToCart"
-                    class="flex-1 flex items-center justify-center gap-2 bg-brand hover:bg-[#055002] text-white font-montserrat font-bold text-[13px] py-3.5 rounded-xl border-0 cursor-pointer transition-all hover:-translate-y-px disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
-                    @disabled($product->stock_quantity < 1)>
-                    <svg class="w-4 h-4 fill-none flex-shrink-0" style="stroke:currentColor;stroke-width:2.5" viewBox="0 0 24 24">
-                        <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
-                        <line x1="3" y1="6" x2="21" y2="6"/>
-                        <path d="M16 10a4 4 0 0 1-8 0"/>
-                    </svg>
-                    Add to Cart
-                </button>
-                <button wire:click="buyNow"
-                    class="flex-1 flex items-center justify-center gap-2 bg-brand-orange hover:bg-[#e06610] text-white font-montserrat font-bold text-[13px] py-3.5 rounded-xl border-0 cursor-pointer transition-all hover:-translate-y-px disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
-                    @disabled($product->stock_quantity < 1)>
-                    <svg class="w-4 h-4 fill-none flex-shrink-0" style="stroke:currentColor;stroke-width:2" viewBox="0 0 24 24">
-                        <path d="M5 12h14M12 5l7 7-7 7"/>
-                    </svg>
-                    Buy Now
-                </button>
-                <button wire:click="toggleWishlist"
-                    class="w-12 h-[50px] rounded-xl flex items-center justify-center transition-colors cursor-pointer flex-shrink-0 border
-                        {{ $wishlisted
-                            ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-500'
-                            : 'bg-brand-bg dark:bg-[#1a2a1a] border-brand-border dark:border-[#2a3a2a] text-[#5a7a5c] hover:border-red-300 hover:text-red-400' }}"
-                    title="{{ $wishlisted ? 'Remove from wishlist' : 'Add to wishlist' }}">
-                    <svg class="w-5 h-5" fill="{{ $wishlisted ? 'currentColor' : 'none' }}" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
-                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-                    </svg>
-                </button>
-            </div>
-
-            {{-- Trust mini-badges --}}
-            <div class="flex flex-col gap-2 p-4 bg-[#f8fcf8] dark:bg-[#162016] rounded-xl border border-[#e0eee0] dark:border-[#2a3a2a]">
+            {{-- Trust mini-badges — directly under price, above the fold on
+            mobile. "Test before you pay" is the scam-killer; it must be
+            visible without scrolling. --}}
+            <div class="flex flex-col gap-2 p-4 mb-5 bg-[#f8fcf8] dark:bg-[#162016] rounded-xl border border-[#e0eee0] dark:border-[#2a3a2a]">
                 @foreach([
                     ['icon'=>'shield','text'=>'Verified vendor — CAC registered business'],
                     ['icon'=>'clock','text'=>'Test before you pay — rider brings to you'],
@@ -294,6 +308,62 @@ $categoryIcon = \App\Support\CategoryIcon::for($product->category?->name);
                     <span class="text-[11px] text-[#4a6b4c] dark:text-[#b0c8b0]">{{ $badge['text'] }}</span>
                 </div>
                 @endforeach
+            </div>
+
+            {{-- Quantity selector --}}
+            @if ($product->stock_quantity > 0)
+            <div class="mb-4">
+                <label class="text-[12px] font-semibold text-brand-dark dark:text-[#e8f5e9] mb-2 block">Quantity</label>
+                <div class="flex items-center gap-0">
+                    <button wire:click="decrementQty"
+                        class="w-10 h-10 rounded-l-xl bg-brand-bg dark:bg-[#1a2a1a] border border-brand-border dark:border-[#2a3a2a] flex items-center justify-center text-brand font-bold text-lg hover:bg-brand hover:text-white hover:border-brand transition-colors cursor-pointer"
+                        @disabled($quantity <= 1)>
+                        −
+                    </button>
+                    <div class="w-14 h-10 border-y border-brand-border dark:border-[#2a3a2a] bg-white dark:bg-[#1a2a1a] flex items-center justify-center font-montserrat font-bold text-[15px] text-brand-dark dark:text-[#e8f5e9]">
+                        {{ $quantity }}
+                    </div>
+                    <button wire:click="incrementQty"
+                        class="w-10 h-10 rounded-r-xl bg-brand-bg dark:bg-[#1a2a1a] border border-brand-border dark:border-[#2a3a2a] flex items-center justify-center text-brand font-bold text-lg hover:bg-brand hover:text-white hover:border-brand transition-colors cursor-pointer"
+                        @disabled($quantity >= $product->stock_quantity)>
+                        +
+                    </button>
+                </div>
+            </div>
+            @endif
+
+            {{-- Buy Now (dominant) + Add to Cart (secondary) --}}
+            <div class="hidden md:flex flex-col gap-2.5 mb-6">
+                <button wire:click="buyNow"
+                    class="w-full flex items-center justify-center gap-2 bg-brand-orange hover:bg-[#e06610] text-white font-montserrat font-bold text-[15px] py-4 rounded-xl border-0 cursor-pointer transition-all hover:-translate-y-px shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
+                    @disabled($product->stock_quantity < 1)>
+                    <svg class="w-5 h-5 fill-none flex-shrink-0" style="stroke:currentColor;stroke-width:2" viewBox="0 0 24 24">
+                        <path d="M5 12h14M12 5l7 7-7 7"/>
+                    </svg>
+                    Buy Now
+                </button>
+                <div class="flex gap-2.5">
+                    <button wire:click="addToCart"
+                        class="flex-1 flex items-center justify-center gap-2 bg-white dark:bg-[#1a2a1a] border-2 border-brand text-brand hover:bg-brand hover:text-white font-montserrat font-bold text-[13px] py-3 rounded-xl cursor-pointer transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        @disabled($product->stock_quantity < 1)>
+                        <svg class="w-4 h-4 fill-none flex-shrink-0" style="stroke:currentColor;stroke-width:2.5" viewBox="0 0 24 24">
+                            <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
+                            <line x1="3" y1="6" x2="21" y2="6"/>
+                            <path d="M16 10a4 4 0 0 1-8 0"/>
+                        </svg>
+                        Add to Cart
+                    </button>
+                    <button wire:click="toggleWishlist"
+                        class="w-12 h-[46px] rounded-xl flex items-center justify-center transition-colors cursor-pointer flex-shrink-0 border
+                            {{ $wishlisted
+                                ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-500'
+                                : 'bg-brand-bg dark:bg-[#1a2a1a] border-brand-border dark:border-[#2a3a2a] text-[#5a7a5c] hover:border-red-300 hover:text-red-400' }}"
+                        title="{{ $wishlisted ? 'Remove from wishlist' : 'Add to wishlist' }}">
+                        <svg class="w-5 h-5" fill="{{ $wishlisted ? 'currentColor' : 'none' }}" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                        </svg>
+                    </button>
+                </div>
             </div>
 
             {{-- Description --}}
@@ -328,11 +398,21 @@ $categoryIcon = \App\Support\CategoryIcon::for($product->category?->name);
     @endif
 
     {{-- ─── MOBILE STICKY CTA BAR ──────────────────────────────────────────── --}}
-    <div class="fixed left-0 right-0 md:hidden bg-white dark:bg-[#1a2a1a] border-t border-brand-border dark:border-[#2a3a2a] px-4 py-3"
+    {{-- Buy Now dominant (full width, top); Add to Cart + wishlist secondary
+    (smaller, outlined) below it — same hierarchy as the desktop buttons. --}}
+    <div class="fixed left-0 right-0 md:hidden bg-white dark:bg-[#1a2a1a] border-t border-brand-border dark:border-[#2a3a2a] px-4 py-3 flex flex-col gap-2"
          style="bottom: 3rem; z-index: 50;">
+        <button wire:click="buyNow"
+            class="w-full flex items-center justify-center gap-2 bg-brand-orange hover:bg-[#e06610] text-white font-montserrat font-bold text-[14px] py-3.5 rounded-xl transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+            @disabled($product->stock_quantity < 1)>
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M5 12h14M12 5l7 7-7 7"/>
+            </svg>
+            Buy Now
+        </button>
         <div class="flex gap-2.5">
             <button wire:click="addToCart"
-                class="flex-1 flex items-center justify-center gap-2 bg-brand hover:bg-[#055002] text-white font-montserrat font-bold text-[13px] py-3.5 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                class="flex-1 flex items-center justify-center gap-2 bg-white dark:bg-[#1a2a1a] border-2 border-brand text-brand font-montserrat font-bold text-[12px] py-2.5 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 @disabled($product->stock_quantity < 1)>
                 <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
                     <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
@@ -341,16 +421,8 @@ $categoryIcon = \App\Support\CategoryIcon::for($product->category?->name);
                 </svg>
                 Add to Cart
             </button>
-            <button wire:click="buyNow"
-                class="flex-1 flex items-center justify-center gap-2 bg-brand-orange hover:bg-[#e06610] text-white font-montserrat font-bold text-[13px] py-3.5 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                @disabled($product->stock_quantity < 1)>
-                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                    <path d="M5 12h14M12 5l7 7-7 7"/>
-                </svg>
-                Buy Now
-            </button>
             <button wire:click="toggleWishlist"
-                class="w-12 h-[50px] rounded-xl flex items-center justify-center flex-shrink-0 border transition-colors
+                class="w-11 h-[42px] rounded-xl flex items-center justify-center flex-shrink-0 border transition-colors
                     {{ $wishlisted
                         ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-500'
                         : 'bg-brand-bg dark:bg-[#0d1a0d] border-brand-border dark:border-[#2a3a2a] text-[#5a7a5c]' }}"

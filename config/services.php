@@ -80,4 +80,15 @@ return [
         'access_token' => env('WAWP_ACCESS_TOKEN'),
     ],
 
+    'meta' => [
+        'pixel_id'          => env('META_PIXEL_ID'),
+        'capi_access_token' => env('META_CAPI_ACCESS_TOKEN'),
+        // Set only in Events Manager → Test Events while verifying. Leave
+        // unset in production — every event sent with it attached is
+        // diverted to the Test Events tab instead of counting toward the
+        // real dataset.
+        'test_event_code'  => env('META_TEST_EVENT_CODE'),
+        'graph_version'    => env('META_GRAPH_VERSION', 'v26.0'),
+    ],
+
 ];

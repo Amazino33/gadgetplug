@@ -11,6 +11,7 @@ use App\Services\Affiliate\CommissionService;
 use App\Services\Messaging\MessagingService;
 use App\Services\Messaging\StorekeeperNotifier;
 use App\Services\Messaging\TemplateRenderer;
+use App\Services\Meta\MetaConversionsService;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Log;
 
@@ -44,8 +45,75 @@ class OrderObserver
 
         $this->applyStatusTransitionSideEffects($order);
         $this->applyAffiliateCommissionLifecycle($order);
+        $this->applyMetaConversionEvents($order);
         $this->notifyCustomerOfStatusChange($order);
         $this->notifyStorekeeperOfStatusChange($order);
+    }
+
+    // Server-side CAPI copy of Purchase — fires on the same "money is settled"
+    // transition CUSTOMER_STATUS_TEMPLATES above already uses (confirmed for
+    // POD, paid for Paystack), keyed on the order's own reference so Meta
+    // dedupes it against the browser-side copy checkout's success screen
+    // fires separately. Deliberately NOT tied to the customer's browser
+    // completing that redirect back — if a Paystack payment clears but the
+    // customer never returns, this still reaches Meta; recovering exactly
+    // that kind of loss is the point of having a server-side copy at all.
+    //
+    // PaymentConfirmed is a separate custom event, POD only, fired on the
+    // same 'confirmed' transition (there's no other "cash collected"
+    // checkpoint in this app today — see Prompt recon) — kept as its own
+    // event_id/name so it's never confused with or counted as Purchase.
+    private function applyMetaConversionEvents(Order $order): void
+    {
+        if (! $order->wasChanged('status')) {
+            return;
+        }
+
+        if (! in_array($order->status, ['confirmed', 'paid'], true)) {
+            return;
+        }
+
+        try {
+            $order->loadMissing('items.product');
+
+            $service = app(MetaConversionsService::class);
+            $userData = [
+                'email'      => $order->customer_email,
+                'phone'      => $order->customer_phone,
+                'name'       => $order->customer_name,
+                'city'       => $order->local_government,
+                'fbp'        => $order->fbp,
+                'fbc'        => $order->fbc,
+            ];
+
+            $service->dispatchEvent(
+                eventName: 'Purchase',
+                eventId: $order->reference,
+                eventSourceUrl: route('checkout'),
+                userData: $userData,
+                customData: [
+                    'currency'     => 'NGN',
+                    'value'        => (float) $order->total_amount,
+                    'content_ids'  => $order->items->pluck('product_id')->all(),
+                    'content_type' => 'product',
+                ],
+            );
+
+            if ($order->status === 'confirmed' && $order->payment_method === 'pay_on_delivery') {
+                $service->dispatchEvent(
+                    eventName: 'PaymentConfirmed',
+                    eventId: $order->reference . '-payment-confirmed',
+                    eventSourceUrl: route('checkout'),
+                    userData: $userData,
+                    customData: [
+                        'currency' => 'NGN',
+                        'value'    => (float) $order->total_amount,
+                    ],
+                );
+            }
+        } catch (\Throwable $e) {
+            Log::error("Meta conversion event dispatch failed for order {$order->id}: " . $e->getMessage());
+        }
     }
 
     // Storekeepers are rarely logged in, so the WhatsApp alert is what actually
