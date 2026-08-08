@@ -168,7 +168,11 @@ class AffiliateTaskService
         return $value >= (float) $task->auto_target;
     }
 
-    private function isEligible(AffiliateTask $task, Affiliate $affiliate): bool
+    /**
+     * Public so callers (e.g. the affiliate's own dashboard) can show *why*
+     * a task isn't currently submittable, not just reject the attempt.
+     */
+    public function isEligible(AffiliateTask $task, Affiliate $affiliate): bool
     {
         $hasPendingSubmission = AffiliateTaskSubmission::where('affiliate_task_id', $task->id)
             ->where('affiliate_id', $affiliate->id)

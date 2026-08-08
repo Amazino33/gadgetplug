@@ -1,14 +1,29 @@
 <?php
 
 use Livewire\Volt\Component;
+use Livewire\WithFileUploads;
+use Livewire\WithPagination;
 use App\Models\Affiliate;
+use App\Models\AffiliateCommission;
+use App\Models\AffiliateLevel;
+use App\Models\AffiliateTask;
 use App\Models\Product;
+use App\Models\WalletTransaction;
+use App\Services\Affiliate\AffiliateLevelProgressionService;
+use App\Services\Affiliate\AffiliateTaskService;
 use App\Services\Affiliate\QrCodeService;
+use App\Services\Affiliate\WalletService;
 
 new class extends Component {
+    use WithFileUploads, WithPagination;
+
     public ?Affiliate $affiliate = null;
     public string $productSearch = '';
     public ?int $selectedProductId = null;
+
+    public ?int $submittingTaskId = null;
+    public string $taskNotes = '';
+    public $proofFile = null;
 
     public function mount(): void
     {
@@ -21,7 +36,12 @@ new class extends Component {
             return collect();
         }
 
-        return Product::where('status', 'published')
+        // Must actually be reachable on the storefront (visibleOnline checks
+        // status + show_online + the publish/unpublish date window) — a
+        // product that matched the old plain status='published' check but
+        // failed any of those would generate a link/QR that silently falls
+        // back to the homepage instead of landing on that product.
+        return Product::visibleOnline()
             ->where('name', 'like', '%' . $this->productSearch . '%')
             ->limit(8)
             ->get();
@@ -66,6 +86,114 @@ new class extends Component {
             ? app(QrCodeService::class)->productQrSvg($this->affiliate, $this->selectedProduct)
             : null;
     }
+
+    // ─── Wallet ─────────────────────────────────────────────────────────
+
+    public function getPendingBalanceProperty(): float
+    {
+        return $this->affiliate ? app(WalletService::class)->pendingBalance($this->affiliate->id) : 0.0;
+    }
+
+    public function getAvailableBalanceProperty(): float
+    {
+        return $this->affiliate ? app(WalletService::class)->availableBalance($this->affiliate->id) : 0.0;
+    }
+
+    public function getWalletHistoryProperty()
+    {
+        return $this->affiliate
+            ? WalletTransaction::where('affiliate_id', $this->affiliate->id)->latest()->paginate(8, ['*'], 'walletPage')
+            : null;
+    }
+
+    // ─── Level & progress ───────────────────────────────────────────────
+
+    public function getLifetimeValueProperty(): float
+    {
+        return $this->affiliate ? app(AffiliateLevelProgressionService::class)->totalProgressValue($this->affiliate->id) : 0.0;
+    }
+
+    public function getNextLevelProperty(): ?AffiliateLevel
+    {
+        if (! $this->affiliate) {
+            return null;
+        }
+
+        $currentSortOrder = $this->affiliate->level?->sort_order ?? -1;
+
+        return AffiliateLevel::where('is_active', true)
+            ->where('sort_order', '>', $currentSortOrder)
+            ->orderBy('sort_order')
+            ->first();
+    }
+
+    // ─── Commissions ────────────────────────────────────────────────────
+
+    public function getCommissionsProperty()
+    {
+        return $this->affiliate
+            ? AffiliateCommission::where('affiliate_id', $this->affiliate->id)->with('order')->latest()->paginate(8, ['*'], 'commissionsPage')
+            : null;
+    }
+
+    // ─── Tasks ──────────────────────────────────────────────────────────
+
+    public function getAvailableTasksProperty()
+    {
+        return AffiliateTask::where('is_active', true)->orderByDesc('verification_type')->get();
+    }
+
+    public function getMySubmissionsProperty()
+    {
+        return $this->affiliate
+            ? $this->affiliate->taskSubmissions()->with('task')->latest()->paginate(8, ['*'], 'submissionsPage')
+            : null;
+    }
+
+    public function taskEligibility(AffiliateTask $task): bool
+    {
+        return $this->affiliate && app(AffiliateTaskService::class)->isEligible($task, $this->affiliate);
+    }
+
+    public function openTaskSubmission(int $taskId): void
+    {
+        $this->submittingTaskId = $taskId;
+        $this->taskNotes = '';
+        $this->proofFile = null;
+        $this->resetErrorBag();
+    }
+
+    public function cancelTaskSubmission(): void
+    {
+        $this->submittingTaskId = null;
+        $this->taskNotes = '';
+        $this->proofFile = null;
+    }
+
+    public function submitTask(): void
+    {
+        $this->validate([
+            'taskNotes' => 'nullable|string|max:1000',
+            'proofFile' => 'nullable|image|max:5120',
+        ]);
+
+        $task = AffiliateTask::findOrFail($this->submittingTaskId);
+
+        try {
+            $submission = app(AffiliateTaskService::class)->submit($task, $this->affiliate, $this->taskNotes ?: null);
+
+            if ($this->proofFile) {
+                $submission->addMedia($this->proofFile->getRealPath())
+                    ->usingFileName($this->proofFile->getClientOriginalName())
+                    ->toMediaCollection('proof');
+            }
+
+            $this->cancelTaskSubmission();
+            session()->flash('taskSubmitted', 'Submitted! An admin will review it soon.');
+        } catch (\RuntimeException $e) {
+            $this->addError('submission', $e->getMessage());
+        }
+    }
 }; ?>
 
 <div>
@@ -83,6 +211,229 @@ new class extends Component {
         </div>
     @else
         <div class="space-y-5">
+
+            @if (session('taskSubmitted'))
+            <div class="bg-[#e8f5e9] dark:bg-[#1a2a1a] border border-[#c0e8c0] dark:border-[#2a3a2a] text-brand rounded-xl px-4 py-3 text-[12px] font-semibold">
+                {{ session('taskSubmitted') }}
+            </div>
+            @endif
+
+            {{-- Wallet + Level summary --}}
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+                {{-- Wallet --}}
+                <div class="bg-white dark:bg-[#162016] border border-brand-border dark:border-[#2a3a2a] rounded-2xl p-5 md:p-6">
+                    <h2 class="font-montserrat font-bold text-[15px] text-brand-dark dark:text-[#e8f5e9] mb-4">Wallet</h2>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <div class="text-[11px] text-brand-muted mb-1">Available</div>
+                            <div class="font-montserrat font-black text-[22px] text-brand">₦{{ number_format($this->availableBalance, 2) }}</div>
+                        </div>
+                        <div>
+                            <div class="text-[11px] text-brand-muted mb-1">Pending</div>
+                            <div class="font-montserrat font-black text-[22px] text-brand-dark dark:text-[#e8f5e9]">₦{{ number_format($this->pendingBalance, 2) }}</div>
+                        </div>
+                    </div>
+                    <p class="text-[11px] text-brand-muted mt-3">
+                        Available is what's actually payable — pending is still in its return-window hold.
+                    </p>
+                </div>
+
+                {{-- Level --}}
+                <div class="bg-white dark:bg-[#162016] border border-brand-border dark:border-[#2a3a2a] rounded-2xl p-5 md:p-6">
+                    <h2 class="font-montserrat font-bold text-[15px] text-brand-dark dark:text-[#e8f5e9] mb-4">Level</h2>
+                    @if ($affiliate->level)
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[12px] font-bold bg-[#e8f5e9] dark:bg-[#1a2a1a] text-brand">
+                                {{ $affiliate->level->name }}
+                            </span>
+                        </div>
+                    @else
+                        <div class="text-[13px] text-brand-muted mb-2">No level yet</div>
+                    @endif
+
+                    @if ($this->nextLevel)
+                        @php
+                        $remaining = max((float) $this->nextLevel->target - $this->lifetimeValue, 0);
+                        $target = max((float) $this->nextLevel->target, 1);
+                        $progressPct = min(100, (int) (($this->lifetimeValue / $target) * 100));
+                        @endphp
+                        <p class="text-[11px] text-brand-muted mb-1.5">
+                            ₦{{ number_format($remaining, 2) }} more to reach {{ $this->nextLevel->name }}
+                        </p>
+                        <div class="w-full h-1.5 bg-brand-bg dark:bg-[#0d1a0d] rounded-full overflow-hidden">
+                            <div class="h-full bg-brand" style="width: {{ $progressPct }}%"></div>
+                        </div>
+                    @else
+                        <p class="text-[11px] text-brand-muted">Highest level reached 🎉</p>
+                    @endif
+                </div>
+            </div>
+
+            {{-- Wallet history --}}
+            <div class="bg-white dark:bg-[#162016] border border-brand-border dark:border-[#2a3a2a] rounded-2xl overflow-hidden">
+                <div class="px-5 md:px-6 py-4 border-b border-brand-border dark:border-[#2a3a2a]">
+                    <h2 class="font-montserrat font-bold text-[15px] text-brand-dark dark:text-[#e8f5e9]">Wallet History</h2>
+                </div>
+                @if ($this->walletHistory->isEmpty())
+                    <div class="px-6 py-10 text-center text-[12px] text-brand-muted">Nothing here yet.</div>
+                @else
+                    <div class="divide-y divide-brand-border dark:divide-[#2a3a2a]">
+                        @foreach ($this->walletHistory as $tx)
+                        <div class="px-5 md:px-6 py-3 flex items-center justify-between gap-3">
+                            <div>
+                                <div class="text-[12px] font-medium text-[#111] dark:text-[#e8f5e9]">{{ $tx->description ?? ucfirst($tx->type) }}</div>
+                                <div class="text-[10px] text-brand-muted">{{ $tx->created_at->format('d M Y, g:ia') }}</div>
+                            </div>
+                            <span class="font-montserrat font-bold text-[13px] {{ (float) $tx->amount >= 0 ? 'text-brand' : 'text-red-500' }}">
+                                {{ (float) $tx->amount >= 0 ? '+' : '' }}₦{{ number_format((float) $tx->amount, 2) }}
+                            </span>
+                        </div>
+                        @endforeach
+                    </div>
+                    @if ($this->walletHistory->hasPages())
+                    <div class="px-5 md:px-6 py-4 border-t border-brand-border dark:border-[#2a3a2a]">
+                        {{ $this->walletHistory->links() }}
+                    </div>
+                    @endif
+                @endif
+            </div>
+
+            {{-- Commission history --}}
+            <div class="bg-white dark:bg-[#162016] border border-brand-border dark:border-[#2a3a2a] rounded-2xl overflow-hidden">
+                <div class="px-5 md:px-6 py-4 border-b border-brand-border dark:border-[#2a3a2a]">
+                    <h2 class="font-montserrat font-bold text-[15px] text-brand-dark dark:text-[#e8f5e9]">Commissions</h2>
+                </div>
+                @if ($this->commissions->isEmpty())
+                    <div class="px-6 py-10 text-center text-[12px] text-brand-muted">No referred orders yet.</div>
+                @else
+                    <div class="divide-y divide-brand-border dark:divide-[#2a3a2a]">
+                        @foreach ($this->commissions as $commission)
+                        @php
+                        $statusLabel = match($commission->status) {
+                            'pending'       => 'Pending',
+                            'return_window' => 'In Return Window',
+                            'available'     => 'Available',
+                            'rejected'      => 'Rejected',
+                            default         => ucfirst($commission->status),
+                        };
+                        $statusClass = match($commission->status) {
+                            'available'     => 'bg-[#e8f5e9] text-brand dark:bg-[#1a2a1a] dark:text-brand-lime',
+                            'return_window' => 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400',
+                            'rejected'      => 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400',
+                            default         => 'bg-gray-100 text-gray-600 dark:bg-[#1a2a1a] dark:text-[#b0c8b0]',
+                        };
+                        @endphp
+                        <div class="px-5 md:px-6 py-3 flex items-center justify-between gap-3">
+                            <div>
+                                <div class="text-[12px] font-medium text-[#111] dark:text-[#e8f5e9]">{{ $commission->order->reference ?? '—' }}</div>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-[0.4px] {{ $statusClass }}">{{ $statusLabel }}</span>
+                            </div>
+                            <span class="font-montserrat font-bold text-[13px] text-brand">₦{{ number_format((float) $commission->amount, 2) }}</span>
+                        </div>
+                        @endforeach
+                    </div>
+                    @if ($this->commissions->hasPages())
+                    <div class="px-5 md:px-6 py-4 border-t border-brand-border dark:border-[#2a3a2a]">
+                        {{ $this->commissions->links() }}
+                    </div>
+                    @endif
+                @endif
+            </div>
+
+            {{-- Tasks --}}
+            <div class="bg-white dark:bg-[#162016] border border-brand-border dark:border-[#2a3a2a] rounded-2xl overflow-hidden">
+                <div class="px-5 md:px-6 py-4 border-b border-brand-border dark:border-[#2a3a2a]">
+                    <h2 class="font-montserrat font-bold text-[15px] text-brand-dark dark:text-[#e8f5e9]">Tasks</h2>
+                </div>
+
+                @if ($this->availableTasks->isEmpty())
+                    <div class="px-6 py-10 text-center text-[12px] text-brand-muted">No tasks available right now.</div>
+                @else
+                    <div class="divide-y divide-brand-border dark:divide-[#2a3a2a]">
+                        @foreach ($this->availableTasks as $task)
+                        <div class="px-5 md:px-6 py-4">
+                            <div class="flex items-start justify-between gap-3 mb-1">
+                                <div>
+                                    <div class="text-[13px] font-semibold text-brand-dark dark:text-[#e8f5e9]">{{ $task->name }}</div>
+                                    @if ($task->description)
+                                    <div class="text-[11px] text-brand-muted mt-0.5">{{ $task->description }}</div>
+                                    @endif
+                                </div>
+                                <span class="font-montserrat font-bold text-[12px] text-brand flex-shrink-0">₦{{ number_format((float) $task->reward_amount, 2) }}</span>
+                            </div>
+
+                            @if ($task->verification_type === 'auto')
+                                <p class="text-[11px] text-brand-muted mt-2">Completes automatically — no action needed.</p>
+                            @elseif ($submittingTaskId === $task->id)
+                                <form wire:submit="submitTask" class="mt-3 space-y-2.5">
+                                    <textarea wire:model="taskNotes" rows="2" placeholder="Optional note (e.g. a link to your post)"
+                                        class="w-full px-3 py-2 bg-brand-bg dark:bg-[#0d1a0d] border border-[#d0d9d2] dark:border-[#2a3a2a] rounded-xl text-[12px] text-[#111] dark:text-[#e8f5e9] focus:outline-none focus:border-brand resize-none"></textarea>
+                                    <input type="file" wire:model="proofFile" accept="image/*"
+                                        class="w-full text-[11px] text-brand-muted file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-brand file:text-white file:text-[11px] file:font-semibold">
+                                    @error('proofFile') <p class="text-red-500 text-[11px]">{{ $message }}</p> @enderror
+                                    @error('submission') <p class="text-red-500 text-[11px]">{{ $message }}</p> @enderror
+                                    <div class="flex gap-2">
+                                        <button type="submit"
+                                            class="h-9 px-4 bg-brand hover:bg-[#055002] text-white font-montserrat font-bold text-[11px] rounded-xl transition-colors">
+                                            <span wire:loading.remove wire:target="submitTask">Submit</span>
+                                            <span wire:loading wire:target="submitTask">Submitting…</span>
+                                        </button>
+                                        <button type="button" wire:click="cancelTaskSubmission"
+                                            class="h-9 px-4 border border-brand-border dark:border-[#2a3a2a] text-brand-muted font-montserrat font-bold text-[11px] rounded-xl transition-colors">
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </form>
+                            @elseif ($this->taskEligibility($task))
+                                <button wire:click="openTaskSubmission({{ $task->id }})"
+                                    class="mt-2 h-8 px-3.5 border border-brand text-brand hover:bg-brand hover:text-white font-montserrat font-bold text-[11px] rounded-lg transition-colors">
+                                    Submit
+                                </button>
+                            @else
+                                <p class="text-[11px] text-brand-muted mt-2">Not eligible right now — already submitted, limit reached, or still in cooldown.</p>
+                            @endif
+                        </div>
+                        @endforeach
+                    </div>
+                @endif
+
+                {{-- My submission history --}}
+                @if (! $this->mySubmissions->isEmpty())
+                <div class="px-5 md:px-6 py-4 border-t border-brand-border dark:border-[#2a3a2a]">
+                    <h3 class="text-[12px] font-bold text-brand-dark dark:text-[#e8f5e9] mb-3">Your Submissions</h3>
+                    <div class="space-y-2.5">
+                        @foreach ($this->mySubmissions as $submission)
+                        @php
+                        $subStatusLabel = match($submission->status) {
+                            'submitted' => 'Pending Review',
+                            'approved'  => 'Approved',
+                            'rejected'  => 'Rejected',
+                            default     => ucfirst($submission->status),
+                        };
+                        $subStatusClass = match($submission->status) {
+                            'approved'  => 'bg-[#e8f5e9] text-brand dark:bg-[#1a2a1a] dark:text-brand-lime',
+                            'rejected'  => 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400',
+                            default     => 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400',
+                        };
+                        @endphp
+                        <div class="flex items-center justify-between gap-3">
+                            <div>
+                                <span class="text-[12px] text-[#111] dark:text-[#e8f5e9]">{{ $submission->task->name ?? 'Task' }}</span>
+                                @if ($submission->status === 'rejected' && $submission->rejected_reason)
+                                <div class="text-[10px] text-red-500 mt-0.5">{{ $submission->rejected_reason }}</div>
+                                @endif
+                            </div>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-[0.4px] flex-shrink-0 {{ $subStatusClass }}">{{ $subStatusLabel }}</span>
+                        </div>
+                        @endforeach
+                    </div>
+                    @if ($this->mySubmissions->hasPages())
+                    <div class="mt-3">{{ $this->mySubmissions->links() }}</div>
+                    @endif
+                </div>
+                @endif
+            </div>
 
             {{-- Referral link + QR --}}
             <div class="bg-white dark:bg-[#162016] border border-brand-border dark:border-[#2a3a2a] rounded-2xl p-5 md:p-6">
