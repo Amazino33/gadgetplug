@@ -2,6 +2,7 @@
 
 namespace App\Filament\Vendor\Resources\Products\Tables;
 
+use App\Filament\Vendor\Resources\Products\Schemas\ProductForm;
 use App\Models\AuditSession;
 use App\Models\Product;
 use Filament\Actions\Action;
@@ -31,6 +32,7 @@ class ProductsTable
         // closure evaluation does not reliably receive $livewire the way
         // per-column hidden()/visible() closures do.
         $isGrid = $table->getLivewire()->displayMode === 'grid';
+        $canSeeCostPrice = ProductForm::canSeeCostPrice();
 
         return $table
             ->contentGrid($isGrid
@@ -40,6 +42,7 @@ class ProductsTable
             ->columns([
                 ViewColumn::make('card')
                     ->view('filament.vendor.products.grid-card')
+                    ->viewData(['canSeeCostPrice' => $canSeeCostPrice])
                     ->visible($isGrid),
 
                 Split::make([
@@ -78,7 +81,7 @@ class ProductsTable
                     ->label('Price')
                     ->money('NGN')
                     ->weight(FontWeight::Bold)
-                    ->description(fn (Product $record): ?string => $record->cost_price !== null
+                    ->description(fn (Product $record): ?string => ($canSeeCostPrice && $record->cost_price !== null)
                         ? 'Cost ₦' . number_format((float) $record->cost_price, 2)
                         : null, position: 'above')
                     ->sortable()

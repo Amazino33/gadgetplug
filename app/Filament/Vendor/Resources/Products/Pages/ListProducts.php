@@ -3,6 +3,7 @@
 namespace App\Filament\Vendor\Resources\Products\Pages;
 
 use App\Filament\Vendor\Resources\Products\ProductResource;
+use App\Filament\Vendor\Resources\Products\Schemas\ProductForm;
 use App\Models\Product;
 use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
@@ -35,6 +36,11 @@ class ListProducts extends ListRecords
 
     /** @var array<int> */
     public array $selected = [];
+
+    public function canSeeCostPrice(): bool
+    {
+        return ProductForm::canSeeCostPrice();
+    }
 
     public function updatingSearch(): void
     {

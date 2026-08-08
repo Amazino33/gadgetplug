@@ -65,7 +65,7 @@
 
     <div class="flex items-end justify-between border-t border-gray-100 dark:border-white/5 pt-3">
         <div>
-            @if($product->cost_price !== null)
+            @if(($canSeeCostPrice ?? false) && $product->cost_price !== null)
             <p class="text-[11px] text-gray-400 dark:text-gray-500">Cost ₦{{ number_format((float) $product->cost_price, 2) }}</p>
             @endif
             <p class="font-montserrat text-base font-bold text-gray-900 dark:text-white">₦{{ number_format((float) $product->price, 2) }}</p>

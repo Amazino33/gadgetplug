@@ -16,6 +16,7 @@ class VendorPermissionsSeeder extends Seeder
             'create_products',
             'edit_products',
             'delete_products',
+            'view_cost_price',
 
             // Order Items
             'view_order_items',

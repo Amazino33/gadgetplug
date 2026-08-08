@@ -3,6 +3,7 @@
         $products = $this->getProducts();
         $idsOnPage = $products->pluck('id')->all();
         $allOnPageSelected = count($idsOnPage) > 0 && count(array_intersect($idsOnPage, $selected)) === count($idsOnPage);
+        $canSeeCostPrice = $this->canSeeCostPrice();
     @endphp
 
     <div class="space-y-4">
@@ -41,7 +42,7 @@
             {{-- GRID VIEW --}}
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 @forelse($products as $product)
-                    @include('filament.vendor.products.grid-card', ['record' => $product])
+                    @include('filament.vendor.products.grid-card', ['record' => $product, 'canSeeCostPrice' => $canSeeCostPrice])
                 @empty
                     <div class="col-span-full py-12 text-center text-sm text-gray-400">No products found.</div>
                 @endforelse
@@ -68,7 +69,7 @@
                     </thead>
                     <tbody class="divide-y divide-gray-100 dark:divide-white/5">
                         @forelse($products as $product)
-                            @include('filament.vendor.products.table-row', ['product' => $product])
+                            @include('filament.vendor.products.table-row', ['product' => $product, 'canSeeCostPrice' => $canSeeCostPrice])
                         @empty
                             <tr><td colspan="6" class="py-12 text-center text-sm text-gray-400">No products found.</td></tr>
                         @endforelse
@@ -79,7 +80,7 @@
             {{-- MOBILE CARDS --}}
             <div class="md:hidden space-y-3">
                 @forelse($products as $product)
-                    @include('filament.vendor.products.mobile-card', ['product' => $product])
+                    @include('filament.vendor.products.mobile-card', ['product' => $product, 'canSeeCostPrice' => $canSeeCostPrice])
                 @empty
                     <p class="py-12 text-center text-sm text-gray-400">No products found.</p>
                 @endforelse

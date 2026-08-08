@@ -6,20 +6,34 @@ use App\Models\Supplier;
 use App\Models\Product;
 use App\Models\Procurement;
 use App\Models\ProcurementItem;
+use App\Models\Vendor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class ProcurementWizardController extends Controller
 {
+    // The wizard writes real Procurement/ProcurementItem rows and shows every
+    // product's cost price, so it needs the same manage_procurement gate as
+    // ProcurementResource in the Filament panel — not just "is logged in".
+    // hasVendorPermission() already short-circuits true for the vendor's
+    // owner, so this one call covers both cases.
+    private function resolveAuthorizedVendor(Request $request): Vendor
+    {
+        $user = $request->user();
+        $vendor = $user->ownedVendors()->first() ?? $user->memberVendors()->first();
+
+        abort_unless(
+            $vendor && $user->hasVendorPermission($vendor->id, 'manage_procurement'),
+            403,
+            'You are not authorized to run procurement for this store.'
+        );
+
+        return $vendor;
+    }
+
     public function create(Request $request)
     {
-        $vendor = $request->user()->ownedVendors()->first()
-            ?? $request->user()->memberVendors()->first()
-            ?? (\App\Models\Vendor::first());
-
-        if (! $vendor) {
-            abort(403, 'No vendor associated with your account. Please log in as a vendor user.');
-        }
+        $vendor = $this->resolveAuthorizedVendor($request);
 
         $suppliers = Supplier::where('vendor_id', $vendor->id)
             ->orderByDesc('rating')
@@ -54,13 +68,7 @@ class ProcurementWizardController extends Controller
             return redirect()->route('procurement.create');
         }
 
-        $vendor = $request->user()->ownedVendors()->first()
-            ?? $request->user()->memberVendors()->first()
-            ?? (\App\Models\Vendor::first());
-
-        if (! $vendor) {
-            abort(403, 'No vendor associated with your account. Please log in as a vendor user.');
-        }
+        $vendor = $this->resolveAuthorizedVendor($request);
 
         $supplier = Supplier::findOrFail(session('procurement.supplier_id'));
         $products = Product::where('vendor_id', $vendor->id)->orderBy('name')->get();
@@ -95,13 +103,7 @@ class ProcurementWizardController extends Controller
             return redirect()->route('procurement.items');
         }
 
-        $vendor = $request->user()->ownedVendors()->first()
-            ?? $request->user()->memberVendors()->first()
-            ?? (\App\Models\Vendor::first());
-
-        if (! $vendor) {
-            abort(403, 'No vendor associated with your account. Please log in as a vendor user.');
-        }
+        $vendor = $this->resolveAuthorizedVendor($request);
 
         $supplier   = Supplier::findOrFail(session('procurement.supplier_id'));
         $items      = session('procurement.items', []);
@@ -132,9 +134,7 @@ class ProcurementWizardController extends Controller
             return redirect()->route('procurement.financials');
         }
 
-        $vendor = $request->user()->ownedVendors()->first()
-            ?? $request->user()->memberVendors()->first()
-            ?? (\App\Models\Vendor::first());
+        $vendor = $this->resolveAuthorizedVendor($request);
         $supplier   = Supplier::findOrFail(session('procurement.supplier_id'));
         $items      = session('procurement.items', []);
         $financials = session('procurement.financials');
@@ -146,9 +146,7 @@ class ProcurementWizardController extends Controller
 
     public function submit(Request $request)
     {
-        $vendor = $request->user()->ownedVendors()->first()
-            ?? $request->user()->memberVendors()->first()
-            ?? (\App\Models\Vendor::first());
+        $vendor = $this->resolveAuthorizedVendor($request);
         $financials = session('procurement.financials');
         $items      = session('procurement.items', []);
         $subtotal   = collect($items)->sum(fn($i) => $i['quantity'] * $i['unit_cost']);

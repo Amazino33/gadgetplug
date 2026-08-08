@@ -43,6 +43,18 @@ class ProductForm
         return array_diff_key($data, array_flip(self::AI_TRANSIENT_FIELDS));
     }
 
+    public static function canSeeCostPrice(): bool
+    {
+        $user = auth()->user();
+        $vendor = filament()->getTenant();
+
+        return $user && $vendor && (
+            $user->isSuperAdmin() ||
+            $vendor->isOwner($user) ||
+            $user->hasVendorPermission($vendor->id, 'view_cost_price')
+        );
+    }
+
     public static function configure(Schema $schema): Schema
     {
         return $schema
@@ -226,7 +238,8 @@ class ProductForm
                                         ->prefix('₦')
                                         ->placeholder('Leave blank if unknown')
                                         ->helperText('Optional — shown as "—" in reports until set.')
-                                        ->live(),
+                                        ->live()
+                                        ->hidden(fn () => ! self::canSeeCostPrice()),
 
                                     TextInput::make('price')
                                         ->numeric()
@@ -237,6 +250,7 @@ class ProductForm
 
                                     Placeholder::make('margin_preview')
                                         ->label('')
+                                        ->hidden(fn () => ! self::canSeeCostPrice())
                                         ->content(function ($get): HtmlString {
                                             $price = (float) ($get('price') ?? 0);
 

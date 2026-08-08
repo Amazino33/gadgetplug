@@ -67,15 +67,20 @@ class InventoryOverviewWidget extends BaseWidget
         ];
     }
 
-    public static function canView(): bool 
+    public static function canView(): bool
     {
         $user = auth()->user();
         $vendor = filament()->getTenant();
 
+        // Matches InventoryPage::canAccess() rather than manage_inventory —
+        // this widget's stats include store-wide cost/profit/margin, which
+        // manage_inventory (storekeeper has it) was never meant to grant.
+        // Currently only reachable via that page anyway, but shouldn't rely
+        // on the parent page alone to keep it out of a storekeeper's reach.
         return $vendor && (
             $user->isSuperAdmin() ||
             $vendor->isOwner($user) ||
-            $user->hasVendorPermission($vendor->id, 'manage_inventory')
+            $user->hasVendorPermission($vendor->id, 'view_inventory_reports')
         );
     }
 }

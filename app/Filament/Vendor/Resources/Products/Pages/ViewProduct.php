@@ -3,6 +3,7 @@
 namespace App\Filament\Vendor\Resources\Products\Pages;
 
 use App\Filament\Vendor\Resources\Products\ProductResource;
+use App\Filament\Vendor\Resources\Products\Schemas\ProductForm;
 use App\Models\Product;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Placeholder;
@@ -104,12 +105,21 @@ class ViewProduct extends ViewRecord
     private function pricingBlock(Product $record): string
     {
         $rows = [
-            ['Cost price', $this->money($record->cost_price !== null ? (float) $record->cost_price : null)],
             ['Selling price', $this->money((float) $record->price)],
-            ['Profit / unit', $this->money($record->profit)],
-            ['Margin', $this->percent($record->margin_percent)],
-            ['Markup', $this->percent($record->markup_percent)],
         ];
+
+        // Profit/margin/markup all reveal cost price by back-calculation, so
+        // they're gated the same as the raw figure — see
+        // ProductForm::canSeeCostPrice() for the shared permission check.
+        if (ProductForm::canSeeCostPrice()) {
+            $rows = [
+                ['Cost price', $this->money($record->cost_price !== null ? (float) $record->cost_price : null)],
+                ['Selling price', $this->money((float) $record->price)],
+                ['Profit / unit', $this->money($record->profit)],
+                ['Margin', $this->percent($record->margin_percent)],
+                ['Markup', $this->percent($record->markup_percent)],
+            ];
+        }
 
         $html = '<div class="mt-4 rounded-xl border border-gray-200 dark:border-white/10 divide-y divide-gray-100 dark:divide-white/5">';
         foreach ($rows as [$label, $value]) {
