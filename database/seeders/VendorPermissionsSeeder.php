@@ -52,6 +52,9 @@ class VendorPermissionsSeeder extends Seeder
 
             // Payouts
             'view_payouts',
+
+            // Notification Settings
+            'manage_notification_settings',
         ];
 
         foreach ($permissions as $permission) {

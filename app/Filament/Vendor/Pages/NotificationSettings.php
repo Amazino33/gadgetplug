@@ -32,6 +32,18 @@ class NotificationSettings extends Page
 
     public ?array $data = [];
 
+    public static function canAccess(): bool
+    {
+        $user = auth()->user();
+        $vendor = filament()->getTenant();
+
+        return $vendor && (
+            $user->isSuperAdmin() ||
+            $vendor->isOwner($user) ||
+            $user->hasVendorPermission($vendor->id, 'manage_notification_settings')
+        );
+    }
+
     public function mount(): void
     {
         $settings = VendorNotificationSetting::forVendor(filament()->getTenant());

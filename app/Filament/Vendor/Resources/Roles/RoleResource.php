@@ -73,6 +73,7 @@ class RoleResource extends ShieldRoleResource
                         'approve_procurement', 'manage_procurement',
                         'manage_logistics',
                         'view_payouts',
+                        'manage_notification_settings',
                     ])
                 )
                 ->getOptionLabelFromRecordUsing(fn ($record) => Str::headline($record->name))

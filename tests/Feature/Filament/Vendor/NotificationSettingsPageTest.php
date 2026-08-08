@@ -4,6 +4,8 @@ use App\Filament\Vendor\Pages\NotificationSettings;
 use App\Models\User;
 use App\Models\Vendor;
 use App\Models\VendorNotificationSetting;
+use App\Services\VendorRoles;
+use Database\Seeders\VendorPermissionsSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -23,6 +25,56 @@ function actAsSettingsVendor(): array
 
     return compact('owner', 'vendor');
 }
+
+test('a storekeeper cannot access the WhatsApp alert settings page', function () {
+    (new VendorPermissionsSeeder())->run();
+
+    $owner = User::factory()->create();
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Storekeeper Visibility Store']);
+    VendorRoles::seedFor($vendor);
+
+    $storekeeper = User::factory()->create();
+    $vendor->users()->syncWithoutDetaching([$storekeeper->id]);
+    setPermissionsTeamId($vendor->id);
+    $storekeeper->assignRole('storekeeper');
+
+    $response = $this->actingAs($storekeeper)->get(
+        route('filament.vendor.pages.notification-settings', ['tenant' => $vendor->slug])
+    );
+
+    $response->assertRedirect(
+        route('filament.vendor.home', ['tenant' => $vendor->slug])
+    );
+});
+
+test('a role explicitly granted manage_notification_settings can access the page', function () {
+    (new VendorPermissionsSeeder())->run();
+
+    $owner = User::factory()->create();
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Delegated Settings Store']);
+    VendorRoles::seedFor($vendor);
+
+    $manager = User::factory()->create();
+    $vendor->users()->syncWithoutDetaching([$manager->id]);
+    setPermissionsTeamId($vendor->id);
+    $manager->assignRole('store_admin');
+
+    \Spatie\Permission\Models\Role::where(['name' => 'store_admin', 'team_id' => $vendor->id])
+        ->first()
+        ->givePermissionTo('manage_notification_settings');
+
+    $response = $this->actingAs($manager)->get(
+        route('filament.vendor.pages.notification-settings', ['tenant' => $vendor->slug])
+    );
+
+    $response->assertOk();
+});
+
+test('the vendor owner can always access the WhatsApp alert settings page', function () {
+    actAsSettingsVendor();
+
+    Livewire::test(NotificationSettings::class)->assertSuccessful();
+});
 
 test('the page renders with the migration defaults for a store that has never saved', function () {
     $data = actAsSettingsVendor();
