@@ -142,6 +142,55 @@ test('submitting a manual task with a proof screenshot creates a submission and 
         ->and($submission->getMedia('proof'))->toHaveCount(1);
 });
 
+test('an affiliate can save their bank details from the dashboard', function () {
+    $affiliate = makeDashboardAffiliate();
+    $this->actingAs($affiliate->user);
+
+    Volt::test('pages.account.affiliate')
+        ->set('bankName', 'GTBank')
+        ->set('accountNumber', '0123456789')
+        ->set('accountName', 'Jane Doe')
+        ->call('saveBankDetails');
+
+    expect($affiliate->fresh())
+        ->bank_name->toBe('GTBank')
+        ->account_number->toBe('0123456789')
+        ->account_name->toBe('Jane Doe');
+});
+
+test('saving bank details rejects an account number that is not exactly 10 digits', function () {
+    $affiliate = makeDashboardAffiliate();
+    $this->actingAs($affiliate->user);
+
+    Volt::test('pages.account.affiliate')
+        ->set('bankName', 'GTBank')
+        ->set('accountNumber', '12345')
+        ->set('accountName', 'Jane Doe')
+        ->call('saveBankDetails')
+        ->assertHasErrors(['accountNumber']);
+
+    expect($affiliate->fresh()->account_number)->toBeNull();
+});
+
+test('a missing-bank-details warning shows until bank details are saved', function () {
+    $affiliate = makeDashboardAffiliate();
+    $this->actingAs($affiliate->user);
+
+    Volt::test('pages.account.affiliate')
+        ->assertSee('Add your bank details below so we can pay you.');
+
+    $affiliate->update(['bank_name' => 'GTBank', 'account_number' => '0123456789', 'account_name' => 'Jane Doe']);
+
+    // Re-authenticate with a freshly-fetched user — the guard caches the
+    // resolved user (and its lazy-loaded `affiliate` relation) for the rest
+    // of the test, so reusing the same auth session here would silently
+    // rebuild the component on stale, pre-update data.
+    $this->actingAs(User::find($affiliate->user_id));
+
+    Volt::test('pages.account.affiliate')
+        ->assertDontSee('Add your bank details below so we can pay you.');
+});
+
 test('a task with no remaining eligibility shows a not-eligible message instead of a submit button', function () {
     $affiliate = makeDashboardAffiliate();
     $this->actingAs($affiliate->user);

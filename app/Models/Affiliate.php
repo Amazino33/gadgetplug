@@ -80,4 +80,9 @@ class Affiliate extends Model implements HasMedia
 
         return $code;
     }
+
+    public function hasBankDetails(): bool
+    {
+        return filled($this->bank_name) && filled($this->account_number) && filled($this->account_name);
+    }
 }

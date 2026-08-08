@@ -13,9 +13,17 @@ use Spatie\Permission\Models\Role;
 
 uses(RefreshDatabase::class);
 
-function makePayoutAffiliate(float $availableBalance): Affiliate
+function makePayoutAffiliate(float $availableBalance, bool $withBankDetails = true): Affiliate
 {
     $affiliate = Affiliate::findOrCreateForUser(User::factory()->create());
+
+    if ($withBankDetails) {
+        $affiliate->update([
+            'bank_name'      => 'GTBank',
+            'account_number' => '0123456789',
+            'account_name'   => $affiliate->user->name,
+        ]);
+    }
 
     if ($availableBalance != 0.0) {
         WalletTransaction::create([
@@ -104,4 +112,45 @@ test('paying out one affiliate does not touch another affiliate not selected in 
 
     expect(AffiliatePayout::where('affiliate_id', $untouched->id)->exists())->toBeFalse()
         ->and(app(App\Services\Affiliate\WalletService::class)->availableBalance($untouched->id))->toBe(3000.0);
+});
+
+test('the paid payout snapshots the affiliate\'s bank details', function () {
+    AffiliateSetting::current()->update(['min_payout_amount' => 2000]);
+
+    $this->actingAs(actingAsSuperAdminForPayout());
+    $affiliate = makePayoutAffiliate(5000);
+
+    Livewire::test(AffiliatePayoutBatch::class)
+        ->callTableBulkAction('payOut', [$affiliate->id]);
+
+    $payout = AffiliatePayout::where('affiliate_id', $affiliate->id)->first();
+
+    expect($payout->bank_name)->toBe('GTBank')
+        ->and($payout->account_number)->toBe('0123456789')
+        ->and($payout->account_name)->toBe($affiliate->user->name);
+});
+
+test('an eligible affiliate with no bank details is skipped, not paid', function () {
+    AffiliateSetting::current()->update(['min_payout_amount' => 2000]);
+
+    $this->actingAs(actingAsSuperAdminForPayout());
+    $affiliate = makePayoutAffiliate(5000, withBankDetails: false);
+
+    Livewire::test(AffiliatePayoutBatch::class)
+        ->callTableBulkAction('payOut', [$affiliate->id]);
+
+    expect(AffiliatePayout::where('affiliate_id', $affiliate->id)->exists())->toBeFalse()
+        ->and(app(App\Services\Affiliate\WalletService::class)->availableBalance($affiliate->id))->toBe(5000.0);
+});
+
+test('the navigation badge shows the count of affiliates eligible for payout', function () {
+    AffiliateSetting::current()->update(['min_payout_amount' => 2000]);
+
+    $this->actingAs(actingAsSuperAdminForPayout());
+
+    makePayoutAffiliate(5000);
+    makePayoutAffiliate(3000);
+    makePayoutAffiliate(500);
+
+    expect(AffiliatePayoutBatch::getNavigationBadge())->toBe('2');
 });

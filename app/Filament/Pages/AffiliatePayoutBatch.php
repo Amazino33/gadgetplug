@@ -52,6 +52,18 @@ class AffiliatePayoutBatch extends Page implements HasTable
         return auth()->user()?->hasRole('super_admin') ?? false;
     }
 
+    public static function getNavigationBadge(): ?string
+    {
+        $minPayout = (float) AffiliateSetting::current()->min_payout_amount;
+        $walletService = app(WalletService::class);
+
+        $count = Affiliate::where('is_active', true)->get()
+            ->filter(fn (Affiliate $affiliate) => $walletService->availableBalance($affiliate->id) >= $minPayout)
+            ->count();
+
+        return $count > 0 ? (string) $count : null;
+    }
+
     public function table(Table $table): Table
     {
         return $table
@@ -80,6 +92,12 @@ class AffiliatePayoutBatch extends Page implements HasTable
                     ->color('success')
                     ->getStateUsing(fn (Affiliate $record) => app(WalletService::class)->availableBalance($record->id))
                     ->formatStateUsing(fn ($state) => '₦' . number_format((float) $state, 2)),
+                TextColumn::make('bank_name')
+                    ->label('Bank Details')
+                    ->getStateUsing(fn (Affiliate $record) => $record->hasBankDetails()
+                        ? "{$record->bank_name} — {$record->account_number} ({$record->account_name})"
+                        : 'Missing — cannot pay')
+                    ->color(fn (Affiliate $record) => $record->hasBankDetails() ? null : 'danger'),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
@@ -100,8 +118,17 @@ class AffiliatePayoutBatch extends Page implements HasTable
         $batchReference = 'PAYOUT-' . now()->format('Y-m-d-His');
         $paidCount = 0;
         $totalPaid = 0.0;
+        $missingBankCount = 0;
 
         foreach ($affiliates as $affiliate) {
+            // Skipped outside the transaction — nothing to write, just a count
+            // for the summary notification so the admin knows who to chase.
+            if (! $affiliate->hasBankDetails()) {
+                $missingBankCount++;
+
+                continue;
+            }
+
             DB::transaction(function () use ($affiliate, $walletService, $batchReference, &$paidCount, &$totalPaid) {
                 // Re-check inside the transaction — the balance could have
                 // moved between the table rendering and this action running.
@@ -115,6 +142,9 @@ class AffiliatePayoutBatch extends Page implements HasTable
                     'affiliate_id'    => $affiliate->id,
                     'batch_reference' => $batchReference,
                     'amount'          => $balance,
+                    'bank_name'       => $affiliate->bank_name,
+                    'account_number'  => $affiliate->account_number,
+                    'account_name'    => $affiliate->account_name,
                     'status'          => 'paid',
                     'paid_at'         => now(),
                     'paid_by'         => auth()->id(),
@@ -133,10 +163,16 @@ class AffiliatePayoutBatch extends Page implements HasTable
             });
         }
 
+        $title = $paidCount > 0
+            ? "Paid {$paidCount} affiliate(s) — ₦" . number_format($totalPaid, 2) . ' total.'
+            : 'Nothing to pay — select at least one affiliate with a positive balance and bank details.';
+
+        if ($missingBankCount > 0) {
+            $title .= " Skipped {$missingBankCount} without bank details.";
+        }
+
         Notification::make()
-            ->title($paidCount > 0
-                ? "Paid {$paidCount} affiliate(s) — ₦" . number_format($totalPaid, 2) . ' total.'
-                : 'Nothing to pay — select at least one affiliate with a positive balance.')
+            ->title($title)
             ->success()
             ->send();
     }

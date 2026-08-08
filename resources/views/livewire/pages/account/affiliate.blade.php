@@ -25,9 +25,38 @@ new class extends Component {
     public string $taskNotes = '';
     public $proofFile = null;
 
+    public string $bankName = '';
+    public string $accountNumber = '';
+    public string $accountName = '';
+
     public function mount(): void
     {
         $this->affiliate = auth()->user()->affiliate;
+
+        if ($this->affiliate) {
+            $this->bankName = $this->affiliate->bank_name ?? '';
+            $this->accountNumber = $this->affiliate->account_number ?? '';
+            $this->accountName = $this->affiliate->account_name ?? '';
+        }
+    }
+
+    // ─── Bank details ───────────────────────────────────────────────────
+
+    public function saveBankDetails(): void
+    {
+        $this->validate([
+            'bankName'      => 'required|string|max:100',
+            'accountNumber' => 'required|digits:10',
+            'accountName'   => 'required|string|max:150',
+        ]);
+
+        $this->affiliate->update([
+            'bank_name'      => $this->bankName,
+            'account_number' => $this->accountNumber,
+            'account_name'   => $this->accountName,
+        ]);
+
+        session()->flash('bankDetailsSaved', 'Bank details saved — you\'re set to receive weekly payouts.');
     }
 
     public function getProductResultsProperty()
@@ -268,6 +297,54 @@ new class extends Component {
                         <p class="text-[11px] text-brand-muted">Highest level reached 🎉</p>
                     @endif
                 </div>
+            </div>
+
+            {{-- Bank details --}}
+            <div class="bg-white dark:bg-[#162016] border border-brand-border dark:border-[#2a3a2a] rounded-2xl p-5 md:p-6">
+                <h2 class="font-montserrat font-bold text-[15px] text-brand-dark dark:text-[#e8f5e9] mb-1">Payout Bank Details</h2>
+                <p class="text-[12px] text-brand-muted mb-4">
+                    Payouts run weekly, straight to this account. Keep it up to date.
+                </p>
+
+                @if (session('bankDetailsSaved'))
+                <div class="bg-[#e8f5e9] dark:bg-[#1a2a1a] border border-[#c0e8c0] dark:border-[#2a3a2a] text-brand rounded-xl px-4 py-3 text-[12px] font-semibold mb-4">
+                    {{ session('bankDetailsSaved') }}
+                </div>
+                @endif
+
+                @if (! $affiliate->hasBankDetails())
+                <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400 rounded-xl px-4 py-3 text-[12px] font-semibold mb-4">
+                    Add your bank details below so we can pay you.
+                </div>
+                @endif
+
+                <form wire:submit="saveBankDetails" class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-[11px] text-brand-muted mb-1">Bank Name</label>
+                        <input wire:model="bankName" type="text" placeholder="e.g. GTBank"
+                            class="w-full h-10 px-3.5 bg-brand-bg dark:bg-[#0d1a0d] border border-[#d0d9d2] dark:border-[#2a3a2a] rounded-xl text-[12px] text-[#111] dark:text-[#e8f5e9] focus:outline-none focus:border-brand transition-colors">
+                        @error('bankName') <p class="text-red-500 text-[11px] mt-1">{{ $message }}</p> @enderror
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-brand-muted mb-1">Account Number</label>
+                        <input wire:model="accountNumber" type="text" inputmode="numeric" maxlength="10" placeholder="0123456789"
+                            class="w-full h-10 px-3.5 bg-brand-bg dark:bg-[#0d1a0d] border border-[#d0d9d2] dark:border-[#2a3a2a] rounded-xl text-[12px] text-[#111] dark:text-[#e8f5e9] focus:outline-none focus:border-brand transition-colors">
+                        @error('accountNumber') <p class="text-red-500 text-[11px] mt-1">{{ $message }}</p> @enderror
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-brand-muted mb-1">Account Name</label>
+                        <input wire:model="accountName" type="text" placeholder="As it appears on the account"
+                            class="w-full h-10 px-3.5 bg-brand-bg dark:bg-[#0d1a0d] border border-[#d0d9d2] dark:border-[#2a3a2a] rounded-xl text-[12px] text-[#111] dark:text-[#e8f5e9] focus:outline-none focus:border-brand transition-colors">
+                        @error('accountName') <p class="text-red-500 text-[11px] mt-1">{{ $message }}</p> @enderror
+                    </div>
+                    <div class="md:col-span-3">
+                        <button type="submit"
+                            class="h-10 px-5 bg-brand hover:bg-[#055002] text-white font-montserrat font-bold text-[12px] rounded-xl transition-colors">
+                            <span wire:loading.remove wire:target="saveBankDetails">Save Bank Details</span>
+                            <span wire:loading wire:target="saveBankDetails">Saving…</span>
+                        </button>
+                    </div>
+                </form>
             </div>
 
             {{-- Wallet history --}}
