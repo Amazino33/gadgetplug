@@ -23,8 +23,9 @@
                 ['route' => 'account.profile',       'label' => 'Profile'],
                 ['route' => 'account.orders',         'label' => 'Orders'],
                 ['route' => 'account.wishlist',       'label' => 'Wishlist'],
-                ['route' => 'account.vendor-apply',   'label' => 'Become a Plug'],
-                ...(auth()->user()->affiliate ? [['route' => 'account.affiliate', 'label' => 'Affiliate']] : []),
+                ...(auth()->user()->affiliate
+                    ? [['route' => 'account.affiliate', 'label' => 'Affiliate']]
+                    : [['route' => 'account.affiliate-apply', 'label' => 'Become an Affiliate']]),
             ] as $nav)
             <a href="{{ route($nav['route']) }}"
                class="flex-shrink-0 px-3.5 py-1.5 rounded-lg text-[12px] font-semibold transition-colors whitespace-nowrap
@@ -45,12 +46,11 @@
                         ['route' => 'account.profile',     'label' => 'Profile',         'icon' => '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>'],
                         ['route' => 'account.orders',       'label' => 'My Orders',       'icon' => '<path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/>'],
                         ['route' => 'account.wishlist',     'label' => 'Wishlist',        'icon' => '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>'],
-                        ['route' => 'account.vendor-apply','label' => 'Become a Plug',  'icon' => '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>'],
                     ];
 
-                    if (auth()->user()->affiliate) {
-                        $navItems[] = ['route' => 'account.affiliate', 'label' => 'Affiliate', 'icon' => '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><line x1="17.5" y1="17.5" x2="17.51" y2="17.5"/>'];
-                    }
+                    $navItems[] = auth()->user()->affiliate
+                        ? ['route' => 'account.affiliate', 'label' => 'Affiliate', 'icon' => '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><line x1="17.5" y1="17.5" x2="17.51" y2="17.5"/>']
+                        : ['route' => 'account.affiliate-apply', 'label' => 'Become an Affiliate', 'icon' => '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>'];
                 @endphp
                 @foreach($navItems as $nav)
                 <a href="{{ route($nav['route']) }}"

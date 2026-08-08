@@ -24,8 +24,9 @@ Route::middleware(['auth'])->prefix('account')->group(function () {
     Volt::route('/',               'pages.account.profile')->name('account.profile');
     Volt::route('/orders',         'pages.account.orders')->name('account.orders');
     Volt::route('/wishlist',       'pages.account.wishlist')->name('account.wishlist');
-    Volt::route('/become-a-plug',  'pages.account.vendor-apply')->name('account.vendor-apply');
-    Volt::route('/affiliate',      'pages.account.affiliate')->name('account.affiliate');
+    Volt::route('/become-a-plug',       'pages.account.vendor-apply')->name('account.vendor-apply');
+    Volt::route('/become-an-affiliate', 'pages.account.affiliate-apply')->name('account.affiliate-apply');
+    Volt::route('/affiliate',           'pages.account.affiliate')->name('account.affiliate');
 });
 
 Route::get('/nuke-cache', function () {

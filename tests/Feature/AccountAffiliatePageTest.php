@@ -58,10 +58,10 @@ test('searching for a product and selecting it reveals a product-specific link a
 test('the affiliate nav tab only appears for users who have an affiliate profile', function () {
     $nonAffiliate = User::factory()->create();
     $this->actingAs($nonAffiliate);
-    $this->get('/account')->assertDontSee('Affiliate');
+    $this->get('/account')->assertSee('Become an Affiliate')->assertDontSee('Become a Plug');
 
     $affiliateUser = User::factory()->create();
     Affiliate::findOrCreateForUser($affiliateUser);
     $this->actingAs($affiliateUser);
-    $this->get('/account')->assertSee('Affiliate');
+    $this->get('/account')->assertDontSee('Become an Affiliate');
 });
