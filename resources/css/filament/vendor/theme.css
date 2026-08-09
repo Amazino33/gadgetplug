@@ -2,3 +2,83 @@
 
 @source '../../../../app/Filament/Vendor/**/*';
 @source '../../../../resources/views/filament/vendor/**/*';
+
+/* Sidebar menu filter (resources/views/filament/vendor/partials/nav-search.blade.php).
+   Plain CSS rather than utility classes: this markup is injected through a render
+   hook into Filament's own sidebar, so it has to sit alongside Filament's styles
+   and follow the panel's light/dark theme. */
+.gp-nav-search {
+    padding: 0.5rem 0.75rem 0.25rem;
+}
+
+.gp-nav-search-field {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.gp-nav-search-icon {
+    position: absolute;
+    inset-inline-start: 0.625rem;
+    width: 1rem;
+    height: 1rem;
+    pointer-events: none;
+    color: var(--gray-400);
+}
+
+.gp-nav-search-input {
+    width: 100%;
+    padding: 0.4rem 1.9rem;
+    font-size: 0.8125rem;
+    line-height: 1.25rem;
+    color: var(--gray-950);
+    background-color: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: 0.5rem;
+    outline: none;
+    transition: border-color 150ms, box-shadow 150ms;
+}
+
+.gp-nav-search-input::placeholder { color: var(--gray-400); }
+
+.gp-nav-search-input:focus {
+    border-color: var(--primary-500);
+    box-shadow: 0 0 0 1px var(--primary-500);
+}
+
+/* The native search clear affordance would sit on top of ours */
+.gp-nav-search-input::-webkit-search-cancel-button { appearance: none; }
+
+.gp-nav-search-clear {
+    position: absolute;
+    inset-inline-end: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.15rem;
+    height: 1.15rem;
+    font-size: 1rem;
+    line-height: 1;
+    color: var(--gray-400);
+    border-radius: 9999px;
+    cursor: pointer;
+}
+
+.gp-nav-search-clear:hover { color: var(--gray-700); background-color: var(--gray-200); }
+
+.gp-nav-search-empty {
+    padding: 0.5rem 0.25rem 0;
+    font-size: 0.75rem;
+    color: var(--gray-400);
+}
+
+:where(.dark) .gp-nav-search-input {
+    color: var(--gray-100);
+    background-color: var(--gray-900);
+    border-color: var(--gray-700);
+}
+
+:where(.dark) .gp-nav-search-clear:hover {
+    color: var(--gray-200);
+    background-color: var(--gray-700);
+}

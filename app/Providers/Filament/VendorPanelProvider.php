@@ -33,6 +33,12 @@ class VendorPanelProvider extends PanelProvider
         return $panel
             ->id('vendor')
             ->path('plug')
+            // Off for staff: no vendor resource declares searchable attributes, so
+            // this box could only ever answer "No search results found" — worse
+            // than absent, because staff conclude the product isn't in the system.
+            // The sidebar menu filter below is what they actually needed. Global
+            // search stays enabled on the admin panel.
+            ->globalSearch(false)
             ->viteTheme('resources/css/filament/vendor/theme.css')
             ->colors([
                 'primary' => Color::Amber,
@@ -92,6 +98,12 @@ class VendorPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::BODY_END,
                 fn() => Blade::render('<x-barcode-scanner />'),
+            )
+            // Replaces the global search removed above: filters the sidebar itself
+            // so staff can jump to a page without scrolling the whole menu.
+            ->renderHook(
+                PanelsRenderHook::SIDEBAR_NAV_START,
+                fn() => view('filament.vendor.partials.nav-search'),
             );
     }
 }
