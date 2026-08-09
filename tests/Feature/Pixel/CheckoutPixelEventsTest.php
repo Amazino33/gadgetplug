@@ -13,7 +13,7 @@ use Livewire\Volt\Volt;
 function makeCheckoutPixelProduct(array $attrs = []): Product
 {
     $owner    = User::factory()->create();
-    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Checkout Pixel Store ' . uniqid()]);
+    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Checkout Pixel Store ' . uniqid(), 'online_sales_enabled' => true]);
     $category = Category::create(['name' => 'Checkout Pixel Category ' . uniqid()]);
 
     return Product::create(array_merge([

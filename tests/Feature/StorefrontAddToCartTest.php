@@ -13,7 +13,7 @@ uses(RefreshDatabase::class);
 function addToCartTestProduct(int $stock): Product
 {
     $owner    = User::factory()->create();
-    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Add To Cart Store']);
+    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Add To Cart Store', 'online_sales_enabled' => true]);
     $category = Category::create(['name' => 'Add To Cart Category']);
 
     return Product::create([

@@ -10,7 +10,7 @@ use Livewire\Volt\Volt;
 function makeAffiliatePageProduct(): Product
 {
     $owner    = User::factory()->create();
-    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Affiliate Page Store ' . uniqid()]);
+    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Affiliate Page Store ' . uniqid(), 'online_sales_enabled' => true]);
     $category = Category::create(['name' => 'Affiliate Page Category ' . uniqid()]);
 
     return Product::create([

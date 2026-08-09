@@ -19,7 +19,7 @@ uses(RefreshDatabase::class);
 function setUpOrderLogisticsVendor(): array
 {
     $owner    = User::factory()->create();
-    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Order Logistics Store']);
+    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Order Logistics Store', 'online_sales_enabled' => true]);
     $category = Category::create(['name' => 'Order Logistics Category']);
     $product  = Product::create([
         'vendor_id'      => $vendor->id,

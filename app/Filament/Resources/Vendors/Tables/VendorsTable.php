@@ -37,6 +37,11 @@ class VendorsTable
                     ->boolean()
                     ->alignCenter(),
 
+                IconColumn::make('online_sales_enabled')
+                    ->label('Online Sales')
+                    ->boolean()
+                    ->alignCenter(),
+
                 TextColumn::make('products_count')
                     ->label('Products')
                     ->counts('products')
@@ -62,8 +67,18 @@ class VendorsTable
             ->defaultSort('created_at', 'desc')
             ->filters([
                 TernaryFilter::make('is_verified')->label('Verified'),
+                TernaryFilter::make('online_sales_enabled')->label('Online Sales'),
             ])
             ->recordActions([
+                Action::make('toggleOnlineSales')
+                    ->label(fn ($record) => $record->online_sales_enabled ? 'Disable Online Sales' : 'Enable Online Sales')
+                    ->icon(fn ($record) => $record->online_sales_enabled ? 'heroicon-o-x-circle' : 'heroicon-o-check-circle')
+                    ->color(fn ($record) => $record->online_sales_enabled ? 'danger' : 'success')
+                    ->requiresConfirmation()
+                    ->modalDescription(fn ($record) => $record->online_sales_enabled
+                        ? 'This vendor\'s products will disappear from the storefront and Orders will be hidden from their panel. POS/offline sales are unaffected. Existing online orders are untouched.'
+                        : 'This vendor\'s products will become visible on the storefront and they will regain access to Orders in their panel.')
+                    ->action(fn ($record) => $record->update(['online_sales_enabled' => ! $record->online_sales_enabled])),
                 Action::make('open_panel')
                     ->label('Open Panel')
                     ->icon('heroicon-o-arrow-top-right-on-square')

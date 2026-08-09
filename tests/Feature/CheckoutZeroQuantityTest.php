@@ -14,7 +14,7 @@ uses(RefreshDatabase::class);
 function checkoutTestProduct(): Product
 {
     $owner    = User::factory()->create();
-    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Checkout Guard Store']);
+    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Checkout Guard Store', 'online_sales_enabled' => true]);
     $category = Category::create(['name' => 'Checkout Guard Category']);
 
     return Product::create([

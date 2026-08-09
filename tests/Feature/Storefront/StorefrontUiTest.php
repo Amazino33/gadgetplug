@@ -17,6 +17,7 @@ function storefrontProduct(array $attributes = []): Product
     $vendor = Vendor::create([
         'user_id' => $owner->id,
         'name'    => 'Leisure Hub',
+        'online_sales_enabled' => true,
     ]);
 
     $category = Category::firstOrCreate(['name' => 'Smartphones']);

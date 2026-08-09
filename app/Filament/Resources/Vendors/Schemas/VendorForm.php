@@ -24,6 +24,9 @@ class VendorForm
                 ->helperText('Use lowercase letters and dashes (e.g., supreme-gadgets)'),
             Toggle::make('is_verified')
                 ->default(true),
+            Toggle::make('online_sales_enabled')
+                ->label('Online Sales Enabled')
+                ->helperText('When off, this vendor\'s products disappear from the storefront, new online orders against them are blocked, and Orders is hidden from their panel. POS/offline sales are unaffected. Existing online orders are untouched.'),
             Toggle::make('owner_can_manage_roles')
                 ->label('Allow owner to manage roles')
                 ->helperText('Grants the vendor owner access to create and assign roles for their team.'),

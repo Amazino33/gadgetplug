@@ -17,7 +17,7 @@ uses(RefreshDatabase::class);
 function setUpOrdersListVendor(): array
 {
     $owner  = User::factory()->create();
-    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Orders List Store']);
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Orders List Store', 'online_sales_enabled' => true]);
 
     return compact('owner', 'vendor');
 }

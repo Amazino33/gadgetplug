@@ -21,7 +21,7 @@ function setUpStockEffectsFixture(string $initialStatus = 'paid'): array
     config(['services.messaging.whatsapp_driver' => 'log_null', 'services.messaging.sms_driver' => 'log_null']);
 
     $owner    = User::factory()->create();
-    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Stock Effects Store']);
+    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Stock Effects Store', 'online_sales_enabled' => true]);
     $category = Category::create(['name' => 'Stock Effects Category']);
     $product  = Product::create([
         'vendor_id'      => $vendor->id,

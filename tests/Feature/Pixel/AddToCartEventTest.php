@@ -11,7 +11,7 @@ use Livewire\Volt\Volt;
 function makeAddToCartPixelProduct(array $attrs = []): Product
 {
     $owner    = User::factory()->create();
-    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Add To Cart Store ' . uniqid()]);
+    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Add To Cart Store ' . uniqid(), 'online_sales_enabled' => true]);
     $category = Category::create(['name' => 'Add To Cart Category ' . uniqid()]);
 
     return Product::create(array_merge([

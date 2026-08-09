@@ -72,7 +72,8 @@ class Product extends Model implements HasMedia
     // these two further gate which sales channel(s) it's actually exposed to.
     public function scopeVisibleOnline(Builder $query): void
     {
-        $query->published()->where('show_online', true);
+        $query->published()->where('show_online', true)
+              ->whereHas('vendor', fn (Builder $q) => $q->where('online_sales_enabled', true));
     }
 
     public function scopeVisibleInPos(Builder $query): void

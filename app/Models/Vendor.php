@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Collection;
 use App\Models\VendorPayout;
@@ -10,18 +11,19 @@ use Spatie\Sluggable\SlugOptions;
 
 class Vendor extends Model
 {
-    use HasSlug;
+    use HasFactory, HasSlug;
 
     protected $fillable = [
         'user_id', 'name', 'slug', 'logo', 'is_verified',
         'description', 'whatsapp', 'bank_name', 'account_number', 'account_name',
         'pos_vat_enabled', 'pos_vat_rate', 'pos_blind_count_participants',
         'pos_blind_count_frequency', 'pos_blind_count_custom_days', 'owner_can_manage_roles',
-        'pos_min_margin_percent',
+        'pos_min_margin_percent', 'online_sales_enabled',
     ];
 
     protected $casts = [
         'pos_min_margin_percent' => 'decimal:2',
+        'online_sales_enabled'   => 'boolean',
     ];
 
     public function getSlugOptions(): SlugOptions
@@ -79,6 +81,11 @@ class Vendor extends Model
     public function isOwner(User $user): bool
     {
         return $this->user_id === $user->id;
+    }
+
+    public function canSellOnline(): bool
+    {
+        return (bool) $this->online_sales_enabled;
     }
 
     public function canAccess(User $user): bool

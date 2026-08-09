@@ -80,10 +80,16 @@ class OrderResource extends Resource
         $vendor = filament()->getTenant();
         $user   = auth()->user();
 
+        // Online orders are the whole point of this resource — a vendor with
+        // online sales switched off loses it entirely, same as any other
+        // permission-gated page. Super admin still needs to reach it for
+        // support/audit even while a vendor is disabled.
         return $vendor && (
             $user->isSuperAdmin() ||
-            $vendor->isOwner($user) ||
-            $user->hasVendorPermission($vendor->id, 'view_any_order_items')
+            ($vendor->canSellOnline() && (
+                $vendor->isOwner($user) ||
+                $user->hasVendorPermission($vendor->id, 'view_any_order_items')
+            ))
         );
     }
 

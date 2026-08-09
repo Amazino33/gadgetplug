@@ -82,8 +82,9 @@ new class extends Component {
         }
 
         $productIds = array_keys($cart);
-        $products   = Product::with('media')->whereIn('id', $productIds)->get()->keyBy('id');
+        $products   = Product::with(['media', 'vendor'])->whereIn('id', $productIds)->get()->keyBy('id');
         $droppedZeroQty = false;
+        $droppedUnavailableVendor = false;
 
         foreach ($cart as $productId => $item) {
             $product = $products->get($productId);
@@ -99,6 +100,14 @@ new class extends Component {
                 continue;
             }
 
+            // A vendor disabled after this product was added to the session
+            // cart — drop just their item, not the customer's whole cart.
+            if (! $product->vendor?->canSellOnline()) {
+                unset($cart[$productId]);
+                $droppedUnavailableVendor = true;
+                continue;
+            }
+
             $this->total += $product->price * $item['quantity'];
             $this->cartItems[] = [
                 'product'  => $product,
@@ -108,8 +117,13 @@ new class extends Component {
             ];
         }
 
-        if ($droppedZeroQty) {
+        if ($droppedZeroQty || $droppedUnavailableVendor) {
             Session::put('cart', $cart);
+        }
+
+        if ($droppedUnavailableVendor) {
+            session()->flash('error', 'Some items in your cart are no longer available and have been removed.');
+        } elseif ($droppedZeroQty) {
             session()->flash('error', 'One or more items in your cart were out of stock and have been removed.');
         }
 
@@ -179,6 +193,16 @@ new class extends Component {
 
         if (empty($this->cartItems) || $this->total <= 0) {
             session()->flash('error', 'Your cart is empty or out of stock. Please review it before checking out.');
+            $this->redirectRoute('cart');
+            return;
+        }
+
+        // Final guard against a vendor being disabled between page load and
+        // submission — mount() already filtered this on load, so this should
+        // essentially never trigger. If it does, don't silently complete a
+        // partial order; send the customer back to review their cart.
+        if (collect($this->cartItems)->contains(fn (array $item) => ! $item['product']->vendor?->canSellOnline())) {
+            session()->flash('error', 'Some items in your cart became unavailable. Please review your cart and try again.');
             $this->redirectRoute('cart');
             return;
         }

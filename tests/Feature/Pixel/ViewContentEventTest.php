@@ -11,7 +11,7 @@ use Livewire\Volt\Volt;
 function makePixelProduct(array $attrs = []): Product
 {
     $owner    = User::factory()->create();
-    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Pixel Store ' . uniqid()]);
+    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Pixel Store ' . uniqid(), 'online_sales_enabled' => true]);
     $category = Category::create(['name' => 'Pixel Category ' . uniqid()]);
 
     return Product::create(array_merge([

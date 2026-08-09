@@ -11,4 +11,24 @@ class VendorObserver
     {
         VendorRoles::seedFor($vendor);
     }
+
+    // Covers every path that flips the flag — the admin edit form's Toggle
+    // and the vendors table's quick-toggle action both just call ->update(),
+    // so one hook here logs both instead of duplicating the activity() call
+    // at each call site.
+    public function updated(Vendor $vendor): void
+    {
+        if (! $vendor->wasChanged('online_sales_enabled')) {
+            return;
+        }
+
+        activity()
+            ->causedBy(auth()->user())
+            ->performedOn($vendor)
+            ->withProperties([
+                'from' => $vendor->getOriginal('online_sales_enabled'),
+                'to'   => $vendor->online_sales_enabled,
+            ])
+            ->log('Online sales ' . ($vendor->online_sales_enabled ? 'enabled' : 'disabled') . ' for vendor');
+    }
 }

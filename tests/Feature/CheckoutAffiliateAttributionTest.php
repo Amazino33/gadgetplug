@@ -16,7 +16,7 @@ use Livewire\Volt\Volt;
 function makeCheckoutProduct(): Product
 {
     $owner    = User::factory()->create();
-    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Checkout Attribution Store']);
+    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Checkout Attribution Store', 'online_sales_enabled' => true]);
     $category = Category::create(['name' => 'Checkout Attribution Category']);
 
     return Product::create([

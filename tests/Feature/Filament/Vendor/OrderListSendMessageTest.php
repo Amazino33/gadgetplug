@@ -22,7 +22,7 @@ function setUpListMessagingVendor(string $storeName = 'List Messaging Store'): a
     config(['services.messaging.whatsapp_driver' => 'log_null', 'services.messaging.sms_driver' => 'log_null']);
 
     $owner = User::factory()->create();
-    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => $storeName]);
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => $storeName, 'online_sales_enabled' => true]);
     MessageTemplateSeeder::forVendor($vendor);
 
     $category = Category::create(['name' => 'List Cat '.uniqid()]);

@@ -14,7 +14,7 @@ use Carbon\CarbonImmutable;
 function makeReportVendor(string $name): array
 {
     $owner = User::factory()->create();
-    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => $name]);
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => $name, 'online_sales_enabled' => true]);
     $category = Category::firstOrCreate(['name' => 'Reporting Test Category']);
 
     $product = Product::create([

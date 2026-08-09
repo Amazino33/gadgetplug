@@ -17,7 +17,7 @@ uses(RefreshDatabase::class);
 function cartServiceProduct(int $stock = 5): Product
 {
     $owner    = User::factory()->create();
-    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Cart Service Store']);
+    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Cart Service Store', 'online_sales_enabled' => true]);
     $category = Category::create(['name' => 'Cart Service Category']);
 
     return Product::create([

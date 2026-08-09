@@ -59,24 +59,22 @@ class OrderItemResource extends Resource
 
     public static function canAccess(): bool
     {
-        $vendor = filament()->getTenant();
-        $user   = auth()->user();
-
-        if (! $vendor) return false;
-
-        return $user->isSuperAdmin()
-            || $vendor->isOwner($user)
-            || $user->hasVendorPermission($vendor->id, 'view_any_order_items');
+        return static::isAuthorized();
     }
 
     private static function isAuthorized(): bool
     {
         $vendor = filament()->getTenant();
         $user   = auth()->user();
+
+        // Same online-sales gate as OrderResource — super admin bypasses it,
+        // everyone else on a disabled vendor loses this resource entirely.
         return $vendor && (
             $user->isSuperAdmin() ||
-            $vendor->isOwner($user) ||
-            $user->hasVendorPermission($vendor->id, 'view_any_order_items')
+            ($vendor->canSellOnline() && (
+                $vendor->isOwner($user) ||
+                $user->hasVendorPermission($vendor->id, 'view_any_order_items')
+            ))
         );
     }
 
@@ -92,8 +90,10 @@ class OrderItemResource extends Resource
 
         $allowed = $vendor && (
             $user->isSuperAdmin() ||
-            $vendor->isOwner($user) ||
-            $user->hasVendorPermission($vendor->id, 'edit_order_items')
+            ($vendor->canSellOnline() && (
+                $vendor->isOwner($user) ||
+                $user->hasVendorPermission($vendor->id, 'edit_order_items')
+            ))
         );
 
         return $allowed ? Response::allow() : Response::deny();
@@ -103,7 +103,7 @@ class OrderItemResource extends Resource
     {
         $vendor = filament()->getTenant();
         $user   = auth()->user();
-        $allowed = $vendor && ($user->isSuperAdmin() || $vendor->isOwner($user));
+        $allowed = $vendor && ($user->isSuperAdmin() || ($vendor->canSellOnline() && $vendor->isOwner($user)));
         return $allowed ? Response::allow() : Response::deny();
     }
 
@@ -111,7 +111,7 @@ class OrderItemResource extends Resource
     {
         $vendor  = filament()->getTenant();
         $user    = auth()->user();
-        $allowed = $vendor && ($user->isSuperAdmin() || $vendor->isOwner($user));
+        $allowed = $vendor && ($user->isSuperAdmin() || ($vendor->canSellOnline() && $vendor->isOwner($user)));
         return $allowed ? Response::allow() : Response::deny();
     }
 }
