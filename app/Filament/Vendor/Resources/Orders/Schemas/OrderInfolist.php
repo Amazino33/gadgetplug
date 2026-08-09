@@ -126,14 +126,14 @@ class OrderInfolist
                         ->weight('bold'),
 
                     TextEntry::make('delivery_cost')
-                        ->label('Delivery Cost')
+                        ->label('What You Pay to Deliver')
                         ->placeholder('Not recorded yet')
                         ->money('NGN'),
 
                     TextEntry::make('posted_at')
-                        ->label('Payment Status')
-                        ->placeholder('Unpaid')
-                        ->formatStateUsing(fn ($state) => $state ? 'Posted' : 'Unpaid')
+                        ->label('Have You Paid It?')
+                        ->placeholder('Not yet')
+                        ->formatStateUsing(fn ($state) => $state ? 'Yes, paid' : 'Not yet')
                         ->badge()
                         ->color(fn ($state) => $state ? 'success' : 'warning')
                         ->visible(fn (Order $record) => filled($record->delivery_cost)),

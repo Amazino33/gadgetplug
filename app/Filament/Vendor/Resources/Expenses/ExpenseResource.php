@@ -60,18 +60,19 @@ class ExpenseResource extends Resource
                 ->columns(2)
                 ->schema([
                     Select::make('category')
-                        ->label('Category')
+                        ->label('What kind of cost is this?')
                         ->options(Expense::CATEGORIES)
                         ->required()
                         ->disabled(fn (?Expense $record) => $record?->isPosted() ?? false)
                         ->helperText(
-                            'Advertising: Facebook/marketing spend. ' .
-                            'Logistics (Other): a bike repair, a standalone retainer, fuel not tied to a specific procurement trip — never a procurement leg or an order delivery, both of those are recorded on the procurement/order itself. ' .
-                            'Other: rent, airtime, anything else.'
+                            '• Advertising — Facebook/Instagram boosts, influencer pay, any marketing spend. ' .
+                            '• Logistics (Other) — a bike repair, a rider\'s monthly retainer, fuel not tied to one specific supplier trip. Do NOT use this for stock-collection costs (record those as a "Logistics" stage when creating the procurement) or for a customer\'s delivery cost (record that on the order itself, under "Assign & Notify Rider") — both of those are already tracked elsewhere and would be counted twice if entered here too. ' .
+                            '• Other — rent, airtime, electricity, anything that doesn\'t fit above.'
                         )
                         ->columnSpanFull(),
 
                     TextInput::make('amount')
+                        ->label('Amount (₦)')
                         ->numeric()
                         ->prefix('₦')
                         ->required()
@@ -79,21 +80,24 @@ class ExpenseResource extends Resource
                         ->disabled(fn (?Expense $record) => $record?->isPosted() ?? false),
 
                     DatePicker::make('incurred_at')
-                        ->label('Date Incurred')
+                        ->label('Date This Happened')
                         ->required()
-                        ->default(now()),
+                        ->default(now())
+                        ->helperText('When the cost was incurred — not necessarily the same day you pay it.'),
 
                     Select::make('financial_account_id')
                         ->label('Paid From')
                         ->options(fn () => FinancialAccount::where('vendor_id', filament()->getTenant()?->id)->pluck('name', 'id'))
-                        ->placeholder('Leave blank if not yet paid')
+                        ->placeholder('Leave blank — not paid yet')
                         ->helperText(fn (?Expense $record) => $record?->isPosted()
-                            ? 'Posted — this expense has already been recorded against this account and cannot be moved.'
-                            : 'Selecting an account and saving records this expense as paid, posting it to the ledger immediately.')
+                            ? 'Already paid from this account — locked in and can\'t be changed. If this was a mistake, let us know rather than trying to edit it.'
+                            : 'Pick the account once you\'ve actually paid this. The moment you save with an account selected, the amount is deducted from that account\'s balance right away. Leave it blank if you haven\'t paid yet — you can come back and add it later.')
                         ->disabled(fn (?Expense $record) => $record?->isPosted() ?? false)
                         ->columnSpanFull(),
 
                     Textarea::make('description')
+                        ->label('Note (optional)')
+                        ->placeholder('e.g. which campaign, which rider, what it was for')
                         ->rows(2)
                         ->columnSpanFull(),
                 ]),

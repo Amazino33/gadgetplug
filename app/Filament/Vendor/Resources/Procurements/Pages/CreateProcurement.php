@@ -168,38 +168,43 @@ class CreateProcurement extends CreateRecord
 
             // ── Step 3: Logistics ──────────────────────────────────────────────
             Step::make('Logistics')
-                ->description('How did the stock get here?')
+                ->description('What did it cost to move this stock to your store?')
                 ->icon('heroicon-o-truck')
                 ->schema([
+                    Placeholder::make('logistics_intro')
+                        ->label('')
+                        ->content('If getting this stock to you involved more than one trip or hand-off (e.g. park to park, then park to store), add each stage below with what it cost. This is separate from what you paid the supplier for the goods themselves, and separate from what you charge customers for delivery — it only tracks your own cost of transporting stock inward.')
+                        ->columnSpanFull(),
+
                     Repeater::make('legs')
                         ->relationship()
                         ->label('')
                         ->schema([
                             Grid::make(['default' => 1, 'sm' => 3])->schema([
                                 TextInput::make('route_label')
-                                    ->label('Route')
+                                    ->label('Stage (from → to)')
                                     ->placeholder('e.g. Supplier → Eket park')
                                     ->required()
                                     ->columnSpan(2),
 
                                 TextInput::make('amount')
-                                    ->label('Amount')
+                                    ->label('Cost (₦)')
                                     ->numeric()
                                     ->prefix('₦')
                                     ->required()
                                     ->minValue(0),
                             ]),
                         ])
-                        ->addActionLabel('＋ Add Leg')
+                        ->addActionLabel('＋ Add Another Stage')
                         ->reorderable(true)
                         ->orderColumn('sort_order')
                         ->collapsible()
-                        ->itemLabel(fn (array $state): ?string => $state['route_label'] ?? 'New Leg')
-                        ->helperText('Optional — leave empty if the stock came straight from the supplier with no separate movement cost.')
+                        ->itemLabel(fn (array $state): ?string => $state['route_label'] ?? 'New Stage')
+                        ->helperText('Optional — leave this empty if the supplier delivered straight to your store with no separate transport cost.')
                         ->columnSpanFull(),
 
                     Placeholder::make('logistics_total_preview')
-                        ->label('Total Logistics Cost')
+                        ->label('Total Transport Cost')
                         ->content(function ($get): HtmlString {
                             $legs  = $get('legs') ?? [];
                             $total = collect($legs)->sum(fn ($l) => (float) ($l['amount'] ?? 0));

@@ -57,13 +57,14 @@ class FinancialAccountResource extends Resource
     {
         return $schema->components([
             Section::make()
-                ->description('The starting figure this account carries before any ledger movement — set once, then leave it. Once the ledger for this account has real entries, correct with a ledger entry instead of editing this again.')
+                ->description('How much was already in this account before you started tracking it here — e.g. what was actually in your bank or cash box on the day you began using this page. This is NOT the current balance; every payment you record afterwards updates that automatically (see the table below). Set this once and leave it — if it needs correcting later, use a new entry in the ledger tab rather than changing this figure.')
                 ->schema([
                     TextInput::make('opening_balance')
                         ->label('Opening Balance')
                         ->numeric()
                         ->prefix('₦')
-                        ->required(),
+                        ->required()
+                        ->helperText('The starting amount only — not what\'s in the account today.'),
                 ]),
         ]);
     }

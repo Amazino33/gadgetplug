@@ -82,8 +82,8 @@ class ViewProcurement extends ViewRecord
                     ->content(new HtmlString($this->buildItemsTable($record))),
             ]),
 
-            Section::make('Logistics')
-                ->description('Movement legs getting stock from supplier to store — separate from product cost, never folded into it.')
+            Section::make('Transport Cost')
+                ->description('What it cost to move this stock to your store — kept separate from what you paid the supplier for the goods, so the two are never mixed up in your reports.')
                 ->schema([
                     Placeholder::make('legs_table')->label('')
                         ->content(new HtmlString($this->buildLegsTable($record))),
@@ -121,13 +121,13 @@ class ViewProcurement extends ViewRecord
                     }),
 
                 Action::make('recordLogisticsPayment')
-                    ->label('Record Logistics Payment')
+                    ->label('Pay Transport Cost')
                     ->icon('heroicon-o-banknotes')
                     ->color('gray')
                     ->size('lg')
                     ->requiresConfirmation()
-                    ->modalHeading('Record Logistics Payment')
-                    ->modalDescription('Posts an outgoing ledger entry for every unpaid logistics leg on this procurement, from the account you choose. Re-running this only posts legs that are still unpaid — already-posted legs are skipped.')
+                    ->modalHeading('Pay Transport Cost')
+                    ->modalDescription('Deducts every unpaid stage above from the account you choose, all at once. Safe to run more than once — anything already paid is skipped, never charged twice.')
                     ->schema([
                         Select::make('financial_account_id')
                             ->label('Paid From')
@@ -147,7 +147,7 @@ class ViewProcurement extends ViewRecord
                                 direction: 'out',
                                 amount: (float) $leg->amount,
                                 source: $leg,
-                                description: "Logistics leg — {$leg->route_label} ({$this->record->reference})",
+                                description: "Transport cost — {$leg->route_label} ({$this->record->reference})",
                                 createdBy: auth()->id(),
                             );
 
@@ -155,7 +155,7 @@ class ViewProcurement extends ViewRecord
                             $posted++;
                         }
 
-                        Notification::make()->title("Recorded payment for {$posted} logistics leg(s).")->success()->send();
+                        Notification::make()->title("Paid {$posted} transport stage(s).")->success()->send();
                         $this->refreshFormData([]);
                     }),
 
@@ -233,8 +233,8 @@ class ViewProcurement extends ViewRecord
             <table class='w-full text-left'>
                 <thead>
                     <tr class='bg-gray-50 dark:bg-gray-800 text-xs font-semibold text-gray-500 uppercase tracking-wider'>
-                        <th class='px-4 py-3'>Route</th>
-                        <th class='px-4 py-3'>Amount</th>
+                        <th class='px-4 py-3'>Stage</th>
+                        <th class='px-4 py-3'>Cost</th>
                         <th class='px-4 py-3'>Status</th>
                     </tr>
                 </thead>

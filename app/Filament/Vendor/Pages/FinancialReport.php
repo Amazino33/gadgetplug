@@ -88,14 +88,16 @@ class FinancialReport extends Page
                 ->label('Set Initial Capital')
                 ->icon('heroicon-o-banknotes')
                 ->color('gray')
+                ->modalHeading('Set Initial Capital')
+                ->modalDescription('The total value you started this business with — cash you put in, plus the value of any stock you bought to open with. This is a one-time reference figure, not a live balance: it does NOT update automatically and it is NOT the same as your current Bank or Cash balance below, which move as you trade. It only exists so this page can show you "started with X, currently holding Y — am I actually ahead?"')
                 ->schema([
                     TextInput::make('initial_capital')
-                        ->label('Initial Capital (₦)')
+                        ->label('Total Starting Capital (₦)')
                         ->numeric()
                         ->prefix('₦')
                         ->minValue(0)
                         ->required()
-                        ->helperText('The figure the business started with. Set this once, early on — changing it later just moves the "are we up from where we began" comparison, it never rewrites any period\'s profit.'),
+                        ->helperText('Everything you started with combined — cash and opening stock together, not just what\'s in the bank today. Set this once, early on; you can still change it later, but doing so only moves this comparison, it never rewrites any past period\'s profit.'),
                 ])
                 ->fillForm(fn () => ['initial_capital' => filament()->getTenant()->initial_capital])
                 ->action(function (array $data): void {

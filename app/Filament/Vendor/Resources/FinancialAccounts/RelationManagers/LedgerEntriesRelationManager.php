@@ -20,6 +20,26 @@ class LedgerEntriesRelationManager extends RelationManager
 
     protected static ?string $title = 'Ledger';
 
+    // Plain-English names for what's shown in the "Source" column — a raw
+    // class_basename() (e.g. "ProcurementLogisticsLeg") means nothing to a
+    // vendor reading their own money history.
+    private const SOURCE_LABELS = [
+        'Order'                   => 'Order',
+        'Expense'                 => 'Expense',
+        'ProcurementLogisticsLeg' => 'Logistics (Procurement)',
+    ];
+
+    private static function sourceLabel(?string $morphClass): ?string
+    {
+        if (! $morphClass) {
+            return null;
+        }
+
+        $basename = class_basename($morphClass);
+
+        return self::SOURCE_LABELS[$basename] ?? $basename;
+    }
+
     public function table(Table $table): Table
     {
         return $table
@@ -40,9 +60,9 @@ class LedgerEntriesRelationManager extends RelationManager
                     ->weight('bold'),
 
                 TextColumn::make('source_type')
-                    ->label('Source')
-                    ->placeholder('Manual')
-                    ->formatStateUsing(fn (?string $state) => $state ? class_basename($state) : null),
+                    ->label('What this was for')
+                    ->placeholder('Manual entry')
+                    ->formatStateUsing(fn (?string $state) => self::sourceLabel($state)),
 
                 TextColumn::make('description')
                     ->wrap()
@@ -56,6 +76,7 @@ class LedgerEntriesRelationManager extends RelationManager
             ->defaultSort('occurred_at', 'desc')
             ->filters([
                 Filter::make('occurred_at')
+                    ->label('Date range')
                     ->schema([
                         DatePicker::make('from'),
                         DatePicker::make('until'),
@@ -67,12 +88,12 @@ class LedgerEntriesRelationManager extends RelationManager
                     }),
 
                 SelectFilter::make('source_type')
-                    ->label('Source')
+                    ->label('What it was for')
                     ->options(fn (): array => FinancialLedgerEntry::query()
                         ->whereNotNull('source_type')
                         ->distinct()
                         ->pluck('source_type', 'source_type')
-                        ->mapWithKeys(fn ($type) => [$type => class_basename($type)])
+                        ->mapWithKeys(fn ($type) => [$type => self::sourceLabel($type)])
                         ->all()
                     ),
             ]);

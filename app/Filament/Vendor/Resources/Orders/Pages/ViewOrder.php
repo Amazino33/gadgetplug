@@ -58,10 +58,10 @@ class ViewOrder extends ViewRecord
                         ->visible(fn ($get) => in_array($get('status'), ['shipped', 'delivered'])),
 
                     Select::make('payment_channel')
-                        ->label('How was payment collected?')
+                        ->label('How did the customer pay on delivery?')
                         ->options(['cash' => 'Cash', 'bank_transfer' => 'Bank Transfer'])
                         ->required()
-                        ->helperText('Cash-on-delivery collection — this posts the order total to that account as revenue.')
+                        ->helperText('The full order amount will be added to whichever account you pick here, as money received — this only happens once, right now.')
                         ->visible(fn ($get) => $get('status') === 'delivered' && $this->record->payment_method === 'pay_on_delivery'),
                 ])
                 ->action(function (array $data): void {
@@ -144,14 +144,14 @@ class ViewOrder extends ViewRecord
                         ->visible(fn ($get) => filled($get('delivery_person_id'))),
 
                     TextInput::make('delivery_cost')
-                        ->label('Delivery Cost (what we pay)')
+                        ->label('What You Pay the Rider/Company (₦)')
                         ->numeric()
                         ->prefix('₦')
                         ->minValue(0)
                         ->disabled(fn () => $this->record->isDeliveryCostPosted())
                         ->helperText(fn () => $this->record->isDeliveryCostPosted()
-                            ? 'Already posted to the ledger — this figure is now frozen. Use a manual ledger correction to fix a mistake.'
-                            : 'The amount GadgetPlug pays the rider/company — not any fee charged to the customer.'),
+                            ? 'Already paid and recorded — this amount is locked in. If it was entered wrong, contact support rather than trying to change it here.'
+                            : 'What YOU pay the rider or logistics company to deliver this order — not any delivery fee you charged the customer.'),
                 ])
                 ->fillForm(fn () => [
                     'logistics_company_id' => $this->record->logistics_company_id,
@@ -186,12 +186,12 @@ class ViewOrder extends ViewRecord
                 }),
 
             Action::make('recordDeliveryPayment')
-                ->label('Record Delivery Payment')
+                ->label('Pay Delivery Cost')
                 ->icon('heroicon-o-banknotes')
                 ->color('gray')
                 ->requiresConfirmation()
-                ->modalHeading('Record Delivery Payment')
-                ->modalDescription(fn () => 'Posts an outgoing ledger entry of ₦' . number_format((float) $this->record->delivery_cost, 2) . ' from the account you choose. This cannot be undone from here — the figure is frozen once posted.')
+                ->modalHeading('Pay Delivery Cost')
+                ->modalDescription(fn () => 'Deducts ₦' . number_format((float) $this->record->delivery_cost, 2) . ' from the account you choose, right now. Once confirmed, this amount is locked in and can\'t be edited from here.')
                 ->schema([
                     Select::make('financial_account_id')
                         ->label('Paid From')
