@@ -67,6 +67,8 @@ Route::middleware(['auth'])->prefix('procurement')->name('procurement.')->group(
     Route::post('/supplier',  [App\Http\Controllers\ProcurementWizardController::class, 'storeSupplier'])->name('storeSupplier');
     Route::get('/items',      [App\Http\Controllers\ProcurementWizardController::class, 'items'])->name('items');
     Route::post('/items',     [App\Http\Controllers\ProcurementWizardController::class, 'storeItems'])->name('storeItems');
+    Route::get('/logistics',  [App\Http\Controllers\ProcurementWizardController::class, 'logistics'])->name('logistics');
+    Route::post('/logistics', [App\Http\Controllers\ProcurementWizardController::class, 'storeLogistics'])->name('storeLogistics');
     Route::get('/financials', [App\Http\Controllers\ProcurementWizardController::class, 'financials'])->name('financials');
     Route::post('/financials',[App\Http\Controllers\ProcurementWizardController::class, 'storeFinancials'])->name('storeFinancials');
     Route::get('/confirm',    [App\Http\Controllers\ProcurementWizardController::class, 'confirm'])->name('confirm');

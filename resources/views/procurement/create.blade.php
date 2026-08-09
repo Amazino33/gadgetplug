@@ -10,7 +10,7 @@
     <div class="bg-white dark:bg-zinc-800 rounded-xl p-6 shadow-[0px_4px_20px_rgba(0,0,0,0.04)] border border-[#becab5]/30 dark:border-zinc-700 mb-6">
         <div class="flex items-center justify-between relative">
             <div class="absolute left-10 right-10 top-5 h-0.5 bg-[#e1e3e4] dark:bg-zinc-700 -z-10"></div>
-            @foreach([['1','Supplier',true],['2','Items',false],['3','Financials',false],['4','Confirm',false]] as [$num,$label,$active])
+            @foreach([['1','Supplier',true],['2','Items',false],['3','Logistics',false],['4','Financials',false],['5','Confirm',false]] as [$num,$label,$active])
             <div class="flex flex-col items-center gap-2 bg-white dark:bg-zinc-800 px-2">
                 <div class="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shadow-sm
                     {{ $active ? 'bg-[#016c00] text-white' : 'bg-[#e7e8e9] dark:bg-zinc-700 text-[#6f7b68] dark:text-zinc-400 border border-[#becab5] dark:border-zinc-600' }}"

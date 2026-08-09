@@ -16,8 +16,8 @@
         </div>
         <div class="flex items-center justify-between relative">
             <div class="absolute left-4 right-4 top-4 h-0.5 bg-[#e1e3e4] dark:bg-zinc-700 -z-10"></div>
-            <div class="absolute left-4 w-1/4 top-4 h-0.5 bg-[#016c00] -z-10"></div>
-            @foreach([['1','Supplier','completed'],['2','Items','active'],['3','Financials','pending'],['4','Confirm','pending']] as [$num,$label,$state])
+            <div class="absolute left-4 w-1/5 top-4 h-0.5 bg-[#016c00] -z-10"></div>
+            @foreach([['1','Supplier','completed'],['2','Items','active'],['3','Logistics','pending'],['4','Financials','pending'],['5','Confirm','pending']] as [$num,$label,$state])
             <div class="flex flex-col items-center gap-2 bg-white dark:bg-zinc-800 px-2">
                 <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold
                     {{ $state === 'completed' ? 'bg-[#016c00] text-white' : ($state === 'active' ? 'bg-[#016c00] text-white ring-4 ring-[#016c00]/20' : 'bg-[#e7e8e9] dark:bg-zinc-700 text-[#6f7b68] dark:text-zinc-400') }}"
@@ -81,7 +81,7 @@
                 <button type="submit"
                     class="flex items-center gap-2 px-6 py-2.5 bg-[#016c00] text-white text-sm font-bold rounded-lg hover:bg-green-800 transition-colors"
                     style="font-family:'Montserrat',sans-serif;">
-                    Next: Financials <span class="material-symbols-outlined text-sm">arrow_forward</span>
+                    Next: Transport Cost <span class="material-symbols-outlined text-sm">arrow_forward</span>
                 </button>
             </div>
         </div>

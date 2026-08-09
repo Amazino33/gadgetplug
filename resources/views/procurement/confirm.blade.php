@@ -6,8 +6,8 @@
         <p class="text-sm text-[#6f7b68] dark:text-zinc-400 mb-4">Please review your procurement before submitting for approval.</p>
         <div class="flex items-center justify-between relative">
             <div class="absolute left-4 right-4 top-4 h-0.5 bg-[#e1e3e4] dark:bg-zinc-700 -z-10"></div>
-            <div class="absolute left-4 top-4 h-0.5 bg-[#016c00] -z-10" style="width:75%"></div>
-            @foreach([['1','Supplier','completed'],['2','Items','completed'],['3','Financials','completed'],['4','Confirm','active']] as [$num,$label,$state])
+            <div class="absolute left-4 top-4 h-0.5 bg-[#016c00] -z-10" style="width:80%"></div>
+            @foreach([['1','Supplier','completed'],['2','Items','completed'],['3','Logistics','completed'],['4','Financials','completed'],['5','Confirm','active']] as [$num,$label,$state])
             <div class="flex flex-col items-center gap-2 bg-white dark:bg-zinc-800 px-2">
                 <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold
                     {{ $state === 'completed' ? 'bg-[#016c00] text-white' : ($state === 'active' ? 'bg-[#016c00] text-white ring-4 ring-[#016c00]/20' : 'bg-[#e7e8e9] dark:bg-zinc-700 text-[#6f7b68] dark:text-zinc-400') }}"
@@ -92,6 +92,27 @@
                     @endforeach
                 </div>
             </div>
+
+            {{-- Transport Stages --}}
+            @if(count($legs) > 0)
+            <div class="bg-white dark:bg-zinc-800 rounded-xl border border-[#becab5]/30 dark:border-zinc-700 shadow-[0px_4px_20px_rgba(0,0,0,0.04)] overflow-hidden">
+                <div class="px-5 py-4 border-b border-[#e1e3e4] dark:border-zinc-700">
+                    <h2 class="text-base font-semibold text-[#191c1d] dark:text-zinc-100" style="font-family:'Montserrat',sans-serif;">Transport Cost ({{ count($legs) }} stage{{ count($legs) === 1 ? '' : 's' }})</h2>
+                </div>
+                <div class="divide-y divide-[#e1e3e4] dark:divide-zinc-700">
+                    @foreach($legs as $leg)
+                    <div class="px-5 py-3 flex items-center justify-between gap-4">
+                        <p class="text-sm font-semibold text-[#191c1d] dark:text-zinc-100">{{ $leg['route_label'] }}</p>
+                        <p class="text-sm font-bold text-[#191c1d] dark:text-zinc-100" style="font-family:'Montserrat',sans-serif;">₦{{ number_format($leg['amount'], 2) }}</p>
+                    </div>
+                    @endforeach
+                </div>
+                <div class="px-5 py-3 flex items-center justify-between bg-gray-50 dark:bg-white/5">
+                    <p class="text-sm font-bold text-[#191c1d] dark:text-zinc-100">Total Transport Cost</p>
+                    <p class="text-sm font-bold text-[#191c1d] dark:text-zinc-100" style="font-family:'Montserrat',sans-serif;">₦{{ number_format($logisticsTotal, 2) }}</p>
+                </div>
+            </div>
+            @endif
         </div>
 
         {{-- Right: Payment Summary --}}

@@ -5,8 +5,8 @@
         <h1 class="text-2xl font-bold text-[#191c1d] dark:text-zinc-100 mb-4" style="font-family:'Montserrat',sans-serif;">Financial Details</h1>
         <div class="flex items-center justify-between relative">
             <div class="absolute left-4 right-4 top-4 h-0.5 bg-[#e1e3e4] dark:bg-zinc-700 -z-10"></div>
-            <div class="absolute left-4 top-4 h-0.5 bg-[#016c00] -z-10" style="width:50%"></div>
-            @foreach([['1','Supplier','completed'],['2','Items','completed'],['3','Financials','active'],['4','Confirm','pending']] as [$num,$label,$state])
+            <div class="absolute left-4 top-4 h-0.5 bg-[#016c00] -z-10" style="width:60%"></div>
+            @foreach([['1','Supplier','completed'],['2','Items','completed'],['3','Logistics','completed'],['4','Financials','active'],['5','Confirm','pending']] as [$num,$label,$state])
             <div class="flex flex-col items-center gap-2 bg-white dark:bg-zinc-800 px-2">
                 <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold
                     {{ $state === 'completed' ? 'bg-[#016c00] text-white' : ($state === 'active' ? 'bg-[#016c00] text-white ring-4 ring-[#016c00]/20' : 'bg-[#e7e8e9] dark:bg-zinc-700 text-[#6f7b68] dark:text-zinc-400') }}"
@@ -109,6 +109,12 @@
                             <span>Tax (0%)</span>
                             <span class="font-bold">₦0.00</span>
                         </div>
+                        @if($logisticsTotal > 0)
+                        <div class="flex justify-between text-sm text-[#6f7b68] dark:text-zinc-400">
+                            <span>Transport Cost</span>
+                            <span class="font-bold" style="font-family:'Montserrat',sans-serif;">₦{{ number_format($logisticsTotal, 2) }}</span>
+                        </div>
+                        @endif
                         <div id="balanceRow" class="flex justify-between text-sm text-orange-600 dark:text-orange-400 hidden">
                             <span>Balance Due</span>
                             <span class="font-bold" id="balanceAmount">₦0.00</span>
@@ -126,7 +132,7 @@
 
     {{-- Bottom Bar --}}
     <div class="sticky bottom-0 bg-white dark:bg-zinc-800 border-t border-[#e1e3e4] dark:border-zinc-700 flex justify-between items-center px-6 py-4 -mx-6 shadow-[0px_-4px_20px_rgba(0,0,0,0.04)] mt-6">
-        <a href="{{ route('procurement.items') }}"
+        <a href="{{ route('procurement.logistics') }}"
             class="flex items-center gap-2 px-6 py-2.5 border border-[#becab5] dark:border-zinc-600 rounded-lg text-[#6f7b68] dark:text-zinc-400 text-sm font-semibold hover:bg-[#f3f4f5] dark:hover:bg-zinc-700 transition-colors">
             <span class="material-symbols-outlined text-sm">arrow_back</span> Back
         </a>

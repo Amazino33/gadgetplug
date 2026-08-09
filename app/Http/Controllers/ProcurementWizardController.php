@@ -6,6 +6,7 @@ use App\Models\Supplier;
 use App\Models\Product;
 use App\Models\Procurement;
 use App\Models\ProcurementItem;
+use App\Models\ProcurementLogisticsLeg;
 use App\Models\Vendor;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -94,6 +95,33 @@ class ProcurementWizardController extends Controller
 
         session(['procurement.items' => $request->items]);
 
+        return redirect()->route('procurement.logistics');
+    }
+
+    public function logistics(Request $request)
+    {
+        if (! session('procurement.items')) {
+            return redirect()->route('procurement.items');
+        }
+
+        $vendor = $this->resolveAuthorizedVendor($request);
+
+        $supplier = Supplier::findOrFail(session('procurement.supplier_id'));
+        $legs     = session('procurement.logistics', []);
+
+        return view('procurement.logistics', compact('vendor', 'supplier', 'legs'));
+    }
+
+    public function storeLogistics(Request $request)
+    {
+        $request->validate([
+            'legs'                 => 'nullable|array',
+            'legs.*.route_label'   => 'required|string|max:255',
+            'legs.*.amount'        => 'required|numeric|min:0',
+        ]);
+
+        session(['procurement.logistics' => $request->legs ?? []]);
+
         return redirect()->route('procurement.financials');
     }
 
@@ -110,9 +138,10 @@ class ProcurementWizardController extends Controller
         $products   = Product::whereIn('id', array_column($items, 'product_id'))->get()->keyBy('id');
         $financials = session('procurement.financials', []);
 
-        $subtotal = collect($items)->sum(fn($i) => $i['quantity'] * $i['unit_cost']);
+        $subtotal       = collect($items)->sum(fn($i) => $i['quantity'] * $i['unit_cost']);
+        $logisticsTotal = collect(session('procurement.logistics', []))->sum(fn($l) => (float) $l['amount']);
 
-        return view('procurement.financials', compact('vendor', 'supplier', 'items', 'products', 'subtotal', 'financials'));
+        return view('procurement.financials', compact('vendor', 'supplier', 'items', 'products', 'subtotal', 'financials', 'logisticsTotal'));
     }
 
     public function storeFinancials(Request $request)
@@ -140,8 +169,10 @@ class ProcurementWizardController extends Controller
         $financials = session('procurement.financials');
         $products   = Product::whereIn('id', array_column($items, 'product_id'))->get()->keyBy('id');
         $subtotal   = collect($items)->sum(fn($i) => $i['quantity'] * $i['unit_cost']);
+        $legs       = session('procurement.logistics', []);
+        $logisticsTotal = collect($legs)->sum(fn($l) => (float) $l['amount']);
 
-        return view('procurement.confirm', compact('vendor', 'supplier', 'items', 'products', 'financials', 'subtotal'));
+        return view('procurement.confirm', compact('vendor', 'supplier', 'items', 'products', 'financials', 'subtotal', 'legs', 'logisticsTotal'));
     }
 
     public function submit(Request $request)
@@ -159,7 +190,9 @@ class ProcurementWizardController extends Controller
             default                      => 'part_payment',
         };
 
-        DB::transaction(function () use ($vendor, $financials, $items, $subtotal, $amountPaid, $paymentStatus) {
+        $legs = session('procurement.logistics', []);
+
+        DB::transaction(function () use ($vendor, $financials, $items, $subtotal, $amountPaid, $paymentStatus, $legs) {
             $procurement = Procurement::create([
                 'vendor_id'      => $vendor->id,
                 'supplier_id'    => session('procurement.supplier_id'),
@@ -184,9 +217,18 @@ class ProcurementWizardController extends Controller
                     'selling_price'  => $item['selling_price'],
                 ]);
             }
+
+            foreach ($legs as $index => $leg) {
+                ProcurementLogisticsLeg::create([
+                    'procurement_id' => $procurement->id,
+                    'route_label'    => $leg['route_label'],
+                    'amount'         => $leg['amount'],
+                    'sort_order'     => $index,
+                ]);
+            }
         });
 
-        session()->forget(['procurement.supplier_id', 'procurement.items', 'procurement.financials', 'procurement.receipt_image']);
+        session()->forget(['procurement.supplier_id', 'procurement.items', 'procurement.logistics', 'procurement.financials', 'procurement.receipt_image']);
 
         return redirect()->route('procurement.create')
             ->with('success', 'Procurement submitted successfully and is pending approval.');
