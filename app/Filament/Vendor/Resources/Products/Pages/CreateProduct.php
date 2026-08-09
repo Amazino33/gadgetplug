@@ -12,7 +12,10 @@ class CreateProduct extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        return ProductForm::stripTransientAiFields($data);
+        $data = ProductForm::stripTransientAiFields($data);
+        $data['vendor_id'] = filament()->getTenant()->id;
+
+        return $data;
     }
 
     protected function getFormActions(): array

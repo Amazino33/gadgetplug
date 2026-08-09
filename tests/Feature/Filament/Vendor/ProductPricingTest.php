@@ -1,5 +1,6 @@
 <?php
 
+use App\Filament\Vendor\Resources\Products\Pages\CreateProduct;
 use App\Filament\Vendor\Resources\Products\Pages\ListProducts;
 use App\Filament\Vendor\Resources\Products\Pages\ViewProduct;
 use App\Models\Category;
@@ -59,6 +60,47 @@ test('profit, margin, and markup are null when cost price is missing, never fake
         ->and($product->profit)->toBeNull()
         ->and($product->margin_percent)->toBeNull()
         ->and($product->markup_percent)->toBeNull();
+});
+
+test('the create form still blocks a selling price at or below cost price when cost price is visible', function () {
+    $data = setUpProductVendor();
+
+    $this->actingAs($data['owner']);
+    Filament::setCurrentPanel(Filament::getPanel('vendor'));
+    Filament::setTenant($data['vendor']);
+
+    Livewire::test(CreateProduct::class)
+        ->fillForm([
+            'category_id' => $data['category']->id,
+            'name'        => 'Underpriced Widget',
+            'cost_price'  => 3000,
+            'price'       => 3000,
+        ])
+        ->call('create')
+        ->assertHasFormErrors(['price']);
+
+    expect(Product::where('name', 'Underpriced Widget')->exists())->toBeFalse();
+});
+
+test('the create form allows a price above cost price when cost price is visible', function () {
+    $data = setUpProductVendor();
+
+    $this->actingAs($data['owner']);
+    Filament::setCurrentPanel(Filament::getPanel('vendor'));
+    Filament::setTenant($data['vendor']);
+
+    Livewire::test(CreateProduct::class)
+        ->fillForm([
+            'category_id' => $data['category']->id,
+            'name'        => 'Properly Priced Widget',
+            'cost_price'  => 3000,
+            'price'       => 3001,
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    expect(Product::where('name', 'Properly Priced Widget')->first())
+        ->not->toBeNull();
 });
 
 test('margin percent does not divide by zero when price is zero', function () {

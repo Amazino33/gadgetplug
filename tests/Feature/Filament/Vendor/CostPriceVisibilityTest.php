@@ -1,5 +1,6 @@
 <?php
 
+use App\Filament\Vendor\Resources\Products\Pages\CreateProduct;
 use App\Filament\Vendor\Resources\Products\Pages\EditProduct;
 use App\Filament\Vendor\Resources\Products\Pages\ListProducts;
 use App\Filament\Vendor\Resources\Products\Pages\ViewProduct;
@@ -139,6 +140,36 @@ test('the cost price field and margin preview are hidden on the edit form for a 
         ->assertOk()
         ->assertDontSee('Leave blank if unknown')
         ->assertDontSee('Margin / Markup');
+});
+
+test('a role without view_cost_price can create a new product with only a selling price', function () {
+    $data = setUpCostPriceVendor();
+
+    // product_manager has create_products by default, but not view_cost_price —
+    // the cost_price field never renders for them, so it's never submitted at
+    // all (unlike editing an existing product, where the hidden field still
+    // carries the record's already-set value through).
+    $manager = User::factory()->create();
+    $data['vendor']->users()->syncWithoutDetaching([$manager->id]);
+    setPermissionsTeamId($data['vendor']->id);
+    $manager->assignRole('product_manager');
+
+    $this->actingAs($manager);
+    Filament::setCurrentPanel(Filament::getPanel('vendor'));
+    Filament::setTenant($data['vendor']);
+
+    Livewire::test(CreateProduct::class)
+        ->fillForm([
+            'category_id' => $data['category']->id,
+            'name'        => 'No Cost Data Widget',
+            'price'       => 4500,
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $product = Product::where('name', 'No Cost Data Widget')->firstOrFail();
+    expect((float) $product->price)->toBe(4500.0)
+        ->and($product->cost_price)->toBeNull();
 });
 
 test('saving the edit form without cost-price access does not wipe the existing cost price', function () {

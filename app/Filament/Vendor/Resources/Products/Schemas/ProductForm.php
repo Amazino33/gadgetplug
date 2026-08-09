@@ -245,7 +245,19 @@ class ProductForm
                                         ->numeric()
                                         ->required()
                                         ->prefix('₦')
-                                        ->gt('cost_price')
+                                        // Not ->gt('cost_price'): that compares against the
+                                        // sibling field's raw state, and Laravel's gt rule
+                                        // fails closed when it resolves to null — which it
+                                        // always does for staff without view_cost_price (the
+                                        // field is hidden, never submitted), permanently
+                                        // blocking them from saving any product. Comparing
+                                        // against the literal value only when one exists
+                                        // fixes that and skips the check when cost price is
+                                        // legitimately left blank.
+                                        ->rule(
+                                            fn (Get $get): string => 'gt:' . $get('cost_price'),
+                                            fn (Get $get): bool => filled($get('cost_price')),
+                                        )
                                         ->live(),
 
                                     Placeholder::make('margin_preview')
