@@ -18,12 +18,13 @@ class Vendor extends Model
         'description', 'whatsapp', 'bank_name', 'account_number', 'account_name',
         'pos_vat_enabled', 'pos_vat_rate', 'pos_blind_count_participants',
         'pos_blind_count_frequency', 'pos_blind_count_custom_days', 'owner_can_manage_roles',
-        'pos_min_margin_percent', 'online_sales_enabled',
+        'pos_min_margin_percent', 'online_sales_enabled', 'initial_capital',
     ];
 
     protected $casts = [
         'pos_min_margin_percent' => 'decimal:2',
         'online_sales_enabled'   => 'boolean',
+        'initial_capital'        => 'decimal:2',
     ];
 
     public function getSlugOptions(): SlugOptions

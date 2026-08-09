@@ -124,6 +124,19 @@ class OrderInfolist
                         ->label('Rider')
                         ->placeholder('Not assigned yet')
                         ->weight('bold'),
+
+                    TextEntry::make('delivery_cost')
+                        ->label('Delivery Cost')
+                        ->placeholder('Not recorded yet')
+                        ->money('NGN'),
+
+                    TextEntry::make('posted_at')
+                        ->label('Payment Status')
+                        ->placeholder('Unpaid')
+                        ->formatStateUsing(fn ($state) => $state ? 'Posted' : 'Unpaid')
+                        ->badge()
+                        ->color(fn ($state) => $state ? 'success' : 'warning')
+                        ->visible(fn (Order $record) => filled($record->delivery_cost)),
                 ]),
 
             Section::make('Items Ordered')

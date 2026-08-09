@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use LogicException;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Models\Activity;
 use Spatie\Activitylog\Traits\LogsActivity;
@@ -22,10 +23,39 @@ class Order extends Model
     // silently / skip" toggle) without affecting any other caller of ->update().
     public bool $skipCustomerNotification = false;
 
+    protected static function booted(): void
+    {
+        // Only delivery_cost is guarded here — unlike a procurement, an order
+        // is genuinely still editable after this (status changes, etc.), so
+        // this can't be a blanket "no updates once posted" guard the way
+        // ProcurementLogisticsLeg's is. Once posted_at is set, the recorded
+        // cost is frozen; financial_account_id/posted_at themselves stay
+        // writable since setting them together is the posting action itself.
+        static::updating(function (self $order) {
+            // getOriginal(), not the live attribute — the posting action itself
+            // sets posted_at in the same update() call as financial_account_id
+            // (never delivery_cost), but a guard reading the live value would
+            // also wrongly block a hypothetical simultaneous first-time set of
+            // delivery_cost + posted_at. Only a delivery_cost change on a row
+            // that was ALREADY posted before this update began is refused.
+            if ($order->getOriginal('posted_at') !== null && $order->isDirty('delivery_cost')) {
+                throw new LogicException('Delivery cost cannot be changed after it has been posted to the ledger. Use a manual ledger correction instead.');
+            }
+
+            // Same getOriginal() reasoning — refuses a channel change on a
+            // row already recognized before this update began, not the
+            // simultaneous first-time set of payment_channel + revenue_recognized_at
+            // that recognition itself performs.
+            if ($order->getOriginal('revenue_recognized_at') !== null && $order->isDirty('payment_channel')) {
+                throw new LogicException('Payment channel cannot be changed after revenue has been recognized. Use a manual ledger correction instead.');
+            }
+        });
+    }
+
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['status', 'payment_status', 'logistics_company_id', 'delivery_person_id'])
+            ->logOnly(['status', 'payment_status', 'logistics_company_id', 'delivery_person_id', 'delivery_cost', 'payment_channel', 'revenue_recognized_at'])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs();
     }
@@ -58,6 +88,21 @@ class Order extends Model
     public function deliveryPerson(): BelongsTo
     {
         return $this->belongsTo(DeliveryPerson::class);
+    }
+
+    public function financialAccount(): BelongsTo
+    {
+        return $this->belongsTo(FinancialAccount::class);
+    }
+
+    public function isDeliveryCostPosted(): bool
+    {
+        return $this->posted_at !== null;
+    }
+
+    public function isRevenueRecognized(): bool
+    {
+        return $this->revenue_recognized_at !== null;
     }
 
     public function deliveryMessages(): HasMany

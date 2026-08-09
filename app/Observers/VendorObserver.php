@@ -3,6 +3,7 @@
 namespace App\Observers;
 
 use App\Models\Vendor;
+use App\Services\FinancialAccounts;
 use App\Services\VendorRoles;
 
 class VendorObserver
@@ -10,6 +11,7 @@ class VendorObserver
     public function created(Vendor $vendor): void
     {
         VendorRoles::seedFor($vendor);
+        FinancialAccounts::seedFor($vendor);
     }
 
     // Covers every path that flips the flag — the admin edit form's Toggle

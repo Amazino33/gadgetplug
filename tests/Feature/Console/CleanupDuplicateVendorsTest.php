@@ -40,7 +40,7 @@ it('reports without deleting anything unless forced', function () {
     $owner = User::factory()->create();
     duplicateVendors($owner, 4);
 
-    $this->artisan('vendors:cleanup-duplicates')
+    $this->artisan('vendors:cleanup-duplicates', ['--ignore' => ['financial_accounts']])
         ->expectsOutputToContain('would be deleted')
         ->assertSuccessful();
 
@@ -55,7 +55,7 @@ it('deletes the empty copies and keeps the one holding the data', function () {
     $realOne = $vendors[3];
     giveVendorAProduct($realOne);
 
-    $this->artisan('vendors:cleanup-duplicates', ['--force' => true])->assertSuccessful();
+    $this->artisan('vendors:cleanup-duplicates', ['--force' => true, '--ignore' => ['financial_accounts']])->assertSuccessful();
 
     expect(Vendor::count())->toBe(1)
         ->and(Vendor::first()->id)->toBe($realOne->id)
@@ -71,7 +71,7 @@ it('never deletes a duplicate that has data of its own', function () {
     giveVendorAProduct($vendors[0]);
     giveVendorAProduct($vendors[1]);
 
-    $this->artisan('vendors:cleanup-duplicates', ['--force' => true])->assertSuccessful();
+    $this->artisan('vendors:cleanup-duplicates', ['--force' => true, '--ignore' => ['financial_accounts']])->assertSuccessful();
 
     expect(Vendor::whereIn('id', [$vendors[0]->id, $vendors[1]->id])->count())->toBe(2)
         ->and(Vendor::find($vendors[2]->id))->toBeNull()
@@ -126,7 +126,7 @@ it('can be told a table does not count as real data', function () {
     // With it: the copies carrying nothing but templates go.
     $this->artisan('vendors:cleanup-duplicates', [
         '--force'  => true,
-        '--ignore' => ['message_templates'],
+        '--ignore' => ['message_templates', 'financial_accounts'],
     ])->assertSuccessful();
 
     expect(Vendor::count())->toBe(1)
@@ -176,7 +176,7 @@ it('removes duplicates that have seeded roles with users assigned to them', func
 
     $this->artisan('vendors:cleanup-duplicates', [
         '--force'  => true,
-        '--ignore' => ['message_templates'],
+        '--ignore' => ['message_templates', 'financial_accounts'],
     ])->assertSuccessful();
 
     expect(Vendor::count())->toBe(1)

@@ -4,13 +4,16 @@ namespace App\Filament\Vendor\Resources\Orders\Pages;
 
 use App\Filament\Vendor\Resources\Orders\OrderResource;
 use App\Models\DeliveryMessage;
+use App\Models\FinancialAccount;
 use App\Models\MessageTemplate;
 use App\Models\Order;
+use App\Services\FinancialLedger;
 use App\Services\Messaging\MessagingService;
 use App\Services\Messaging\TemplateRenderer;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
@@ -53,6 +56,13 @@ class ViewOrder extends ViewRecord
                         ->helperText('Sends the matching customer update automatically. Turn off to change status silently.')
                         ->default(true)
                         ->visible(fn ($get) => in_array($get('status'), ['shipped', 'delivered'])),
+
+                    Select::make('payment_channel')
+                        ->label('How was payment collected?')
+                        ->options(['cash' => 'Cash', 'bank_transfer' => 'Bank Transfer'])
+                        ->required()
+                        ->helperText('Cash-on-delivery collection — this posts the order total to that account as revenue.')
+                        ->visible(fn ($get) => $get('status') === 'delivered' && $this->record->payment_method === 'pay_on_delivery'),
                 ])
                 ->action(function (array $data): void {
                     $newStatus = $data['status'];
@@ -61,8 +71,17 @@ class ViewOrder extends ViewRecord
                     // Physical stock deduction (on 'shipped') and reservation release (on
                     // 'cancelled') now happen centrally in OrderObserver::updated(), so
                     // they apply no matter which UI changed the status — not just here.
+                    // Revenue recognition (Prompt 4) is centralized there too; this only
+                    // captures the channel a POD delivery needs it to act on.
                     $order->skipCustomerNotification = ! ($data['notify_customer'] ?? true);
-                    $order->update(['status' => $newStatus]);
+
+                    $update = ['status' => $newStatus];
+
+                    if ($newStatus === 'delivered' && $order->payment_method === 'pay_on_delivery' && ! $order->isRevenueRecognized()) {
+                        $update['payment_channel'] = $data['payment_channel'] ?? null;
+                    }
+
+                    $order->update($update);
                     $this->refreshFormData(['status']);
 
                     Notification::make()
@@ -123,11 +142,22 @@ class ViewOrder extends ViewRecord
                         ->helperText('Sends the "rider_assignment" template to the assigned rider immediately.')
                         ->default(true)
                         ->visible(fn ($get) => filled($get('delivery_person_id'))),
+
+                    TextInput::make('delivery_cost')
+                        ->label('Delivery Cost (what we pay)')
+                        ->numeric()
+                        ->prefix('₦')
+                        ->minValue(0)
+                        ->disabled(fn () => $this->record->isDeliveryCostPosted())
+                        ->helperText(fn () => $this->record->isDeliveryCostPosted()
+                            ? 'Already posted to the ledger — this figure is now frozen. Use a manual ledger correction to fix a mistake.'
+                            : 'The amount GadgetPlug pays the rider/company — not any fee charged to the customer.'),
                 ])
                 ->fillForm(fn () => [
                     'logistics_company_id' => $this->record->logistics_company_id,
                     'delivery_person_id' => $this->record->delivery_person_id,
                     'notify_rider' => true,
+                    'delivery_cost' => $this->record->delivery_cost,
                 ])
                 ->action(function (array $data): void {
                     $order = $this->record;
@@ -135,9 +165,13 @@ class ViewOrder extends ViewRecord
                     $order->update([
                         'logistics_company_id' => $data['logistics_company_id'],
                         'delivery_person_id' => $data['delivery_person_id'],
+                        // Disabled (and so absent from $data) once posted — the
+                        // model guard would refuse this anyway, but skipping it
+                        // here avoids relying on that as the only line of defense.
+                        ...($order->isDeliveryCostPosted() ? [] : ['delivery_cost' => $data['delivery_cost'] ?? null]),
                     ]);
 
-                    $this->refreshFormData(['logisticsCompany.name', 'deliveryPerson.name']);
+                    $this->refreshFormData(['logisticsCompany.name', 'deliveryPerson.name', 'delivery_cost']);
 
                     if (($data['notify_rider'] ?? false) && $data['delivery_person_id']) {
                         $this->sendRiderAssignmentMessage($order->refresh());
@@ -149,6 +183,41 @@ class ViewOrder extends ViewRecord
                         ->title('Logistics assignment updated')
                         ->success()
                         ->send();
+                }),
+
+            Action::make('recordDeliveryPayment')
+                ->label('Record Delivery Payment')
+                ->icon('heroicon-o-banknotes')
+                ->color('gray')
+                ->requiresConfirmation()
+                ->modalHeading('Record Delivery Payment')
+                ->modalDescription(fn () => 'Posts an outgoing ledger entry of ₦' . number_format((float) $this->record->delivery_cost, 2) . ' from the account you choose. This cannot be undone from here — the figure is frozen once posted.')
+                ->schema([
+                    Select::make('financial_account_id')
+                        ->label('Paid From')
+                        ->options(fn () => FinancialAccount::where('vendor_id', filament()->getTenant()->id)->pluck('name', 'id'))
+                        ->required(),
+                ])
+                ->visible(fn () => filled($this->record->delivery_cost)
+                    && ! $this->record->isDeliveryCostPosted()
+                    && auth()->user()->hasVendorPermission(filament()->getTenant()->id, 'manage_logistics'))
+                ->action(function (array $data): void {
+                    $order = $this->record;
+                    $account = FinancialAccount::findOrFail($data['financial_account_id']);
+
+                    FinancialLedger::postEntry(
+                        account: $account,
+                        direction: 'out',
+                        amount: (float) $order->delivery_cost,
+                        source: $order,
+                        description: "Delivery cost — order {$order->reference}",
+                        createdBy: auth()->id(),
+                    );
+
+                    $order->update(['financial_account_id' => $account->id, 'posted_at' => now()]);
+                    $this->refreshFormData(['financial_account_id', 'posted_at']);
+
+                    Notification::make()->title('Delivery payment recorded.')->success()->send();
                 }),
 
             Action::make('sendMessage')

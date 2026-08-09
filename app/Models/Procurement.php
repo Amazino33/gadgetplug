@@ -62,6 +62,19 @@ class Procurement extends Model
         return $this->hasMany(ProcurementItem::class);
     }
 
+    public function legs(): HasMany
+    {
+        return $this->hasMany(ProcurementLogisticsLeg::class)->orderBy('sort_order');
+    }
+
+    // Kept separate from total_cost/recalculate() on purpose — logistics is
+    // never folded into product cost or this procurement's total_cost, so it
+    // must never feed back into that column's math.
+    public function logisticsTotal(): float
+    {
+        return (float) $this->legs()->sum('amount');
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');

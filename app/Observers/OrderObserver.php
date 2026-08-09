@@ -5,9 +5,12 @@ namespace App\Observers;
 use App\Actions\Inventory\DispatchStockAction;
 use App\Actions\Inventory\ReleaseReservationAction;
 use App\Models\DeliveryMessage;
+use App\Models\FinancialAccount;
+use App\Models\FinancialLedgerEntry;
 use App\Models\MessageTemplate;
 use App\Models\Order;
 use App\Services\Affiliate\CommissionService;
+use App\Services\FinancialLedger;
 use App\Services\Messaging\MessagingService;
 use App\Services\Messaging\StorekeeperNotifier;
 use App\Services\Messaging\TemplateRenderer;
@@ -45,9 +48,126 @@ class OrderObserver
 
         $this->applyStatusTransitionSideEffects($order);
         $this->applyAffiliateCommissionLifecycle($order);
+        $this->applyRevenueRecognition($order);
+        $this->applyRevenueReversal($order);
         $this->applyMetaConversionEvents($order);
         $this->notifyCustomerOfStatusChange($order);
         $this->notifyStorekeeperOfStatusChange($order);
+    }
+
+    // Centralized here — not in ViewOrder's updateStatus alone — because
+    // status can also change from the Orders list row action, ListOrders'
+    // custom table, and Order Items' own status form (see Prompt 4 recon).
+    // Same reasoning as applyStatusTransitionSideEffects below: whichever UI
+    // changed the status, this fires. POD needs payment_channel already on
+    // the order to post (only ViewOrder's updateStatus captures it today —
+    // delivered via one of the other three entry points recognizes nothing
+    // and is left for the safety net to surface, never guessed at).
+    private function applyRevenueRecognition(Order $order): void
+    {
+        if (! $order->wasChanged('status') || $order->isRevenueRecognized()) {
+            return;
+        }
+
+        if (in_array($order->status, ['cancelled', 'paid_but_failed_stock'], true)) {
+            return;
+        }
+
+        $isPrepaidRecognition = $order->payment_method === 'paystack' && $order->status === 'paid';
+        $isPodRecognition     = $order->payment_method === 'pay_on_delivery' && $order->status === 'delivered';
+
+        if (! $isPrepaidRecognition && ! $isPodRecognition) {
+            return;
+        }
+
+        if ($isPodRecognition && ! $order->payment_channel) {
+            // Delivered without a captured channel — nothing to post to.
+            // Not an error: this is the known gap the safety net surfaces.
+            return;
+        }
+
+        $vendorId = $order->items()->value('vendor_id');
+
+        if (! $vendorId) {
+            return;
+        }
+
+        $channel = $isPrepaidRecognition ? 'bank_transfer' : $order->payment_channel;
+        $type    = $channel === 'cash' ? 'cash' : 'bank';
+
+        $account = FinancialAccount::where('vendor_id', $vendorId)->where('type', $type)->first();
+
+        if (! $account) {
+            Log::error("Revenue recognition skipped for order {$order->id}: no {$type} account found for vendor {$vendorId}.");
+
+            return;
+        }
+
+        try {
+            FinancialLedger::postEntry(
+                account: $account,
+                direction: 'in',
+                amount: (float) $order->total_amount,
+                source: $order,
+                description: "Revenue recognized — order {$order->reference} ({$channel})",
+                createdBy: auth()->id(),
+            );
+
+            // Quietly — setting these here must not re-trigger this same
+            // observer method (or any other side effect) recursively.
+            $order->updateQuietly([
+                'revenue_recognized_at' => now(),
+                'payment_channel'       => $channel,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error("Revenue recognition failed for order {$order->id}: " . $e->getMessage());
+        }
+    }
+
+    // Cancelling a previously-recognized order — today this is only reachable
+    // for a prepaid order (paid → cancelled): POD's cancellable window is
+    // pending/confirmed/paid, all of which are before delivery, the only POD
+    // recognition trigger, so a POD order is never both recognized and still
+    // cancellable. Kept general rather than paystack-only in case a future
+    // status change ever makes a delivered order cancellable too.
+    //
+    // Never edits/deletes the original 'in' entry — posts a reversing 'out'
+    // sourced from that entry itself, not the order. Order already owns the
+    // 'out' direction (delivery cost, Prompt 2); sourcing the reversal from
+    // the order too would recreate the exact collision the
+    // (source_type, source_id, direction) uniqueness fix above exists to
+    // prevent. revenue_recognized_at is deliberately left set, not cleared —
+    // it remains true that recognition happened at that timestamp; the
+    // reversing entry is the correction, not an erasure of history.
+    private function applyRevenueReversal(Order $order): void
+    {
+        if (! $order->wasChanged('status') || $order->status !== 'cancelled' || ! $order->isRevenueRecognized()) {
+            return;
+        }
+
+        $original = FinancialLedgerEntry::where('source_type', $order->getMorphClass())
+            ->where('source_id', $order->id)
+            ->where('direction', 'in')
+            ->first();
+
+        if (! $original) {
+            Log::error("Revenue reversal skipped for order {$order->id}: recognized but no original ledger entry found.");
+
+            return;
+        }
+
+        try {
+            FinancialLedger::postEntry(
+                account: $original->account,
+                direction: 'out',
+                amount: (float) $original->amount,
+                source: $original,
+                description: "Reversal — order {$order->reference} cancelled after revenue recognition",
+                createdBy: auth()->id(),
+            );
+        } catch (\Throwable $e) {
+            Log::error("Revenue reversal failed for order {$order->id}: " . $e->getMessage());
+        }
     }
 
     // Server-side CAPI copy of Purchase — fires on the same "money is settled"

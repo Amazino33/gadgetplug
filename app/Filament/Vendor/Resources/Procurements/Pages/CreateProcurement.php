@@ -166,7 +166,53 @@ class CreateProcurement extends CreateRecord
                         ->columnSpanFull(),
                 ]),
 
-            // ── Step 3: Financials ─────────────────────────────────────────────
+            // ── Step 3: Logistics ──────────────────────────────────────────────
+            Step::make('Logistics')
+                ->description('How did the stock get here?')
+                ->icon('heroicon-o-truck')
+                ->schema([
+                    Repeater::make('legs')
+                        ->relationship()
+                        ->label('')
+                        ->schema([
+                            Grid::make(['default' => 1, 'sm' => 3])->schema([
+                                TextInput::make('route_label')
+                                    ->label('Route')
+                                    ->placeholder('e.g. Supplier → Eket park')
+                                    ->required()
+                                    ->columnSpan(2),
+
+                                TextInput::make('amount')
+                                    ->label('Amount')
+                                    ->numeric()
+                                    ->prefix('₦')
+                                    ->required()
+                                    ->minValue(0),
+                            ]),
+                        ])
+                        ->addActionLabel('＋ Add Leg')
+                        ->reorderable(true)
+                        ->orderColumn('sort_order')
+                        ->collapsible()
+                        ->itemLabel(fn (array $state): ?string => $state['route_label'] ?? 'New Leg')
+                        ->helperText('Optional — leave empty if the stock came straight from the supplier with no separate movement cost.')
+                        ->columnSpanFull(),
+
+                    Placeholder::make('logistics_total_preview')
+                        ->label('Total Logistics Cost')
+                        ->content(function ($get): HtmlString {
+                            $legs  = $get('legs') ?? [];
+                            $total = collect($legs)->sum(fn ($l) => (float) ($l['amount'] ?? 0));
+
+                            return new HtmlString(
+                                '<span class="text-2xl font-extrabold text-primary-600">₦' .
+                                number_format($total, 2) . '</span>'
+                            );
+                        })
+                        ->columnSpanFull(),
+                ]),
+
+            // ── Step 4: Financials ─────────────────────────────────────────────
             Step::make('Financials')
                 ->description('How much was paid?')
                 ->icon('heroicon-o-banknotes')
@@ -196,7 +242,7 @@ class CreateProcurement extends CreateRecord
                         ->columnSpanFull(),
                 ]),
 
-            // ── Step 4: Confirm ────────────────────────────────────────────────
+            // ── Step 5: Confirm ────────────────────────────────────────────────
             Step::make('Confirm')
                 ->description('Submit for approval')
                 ->icon('heroicon-o-check-badge')

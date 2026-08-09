@@ -56,6 +56,15 @@ class VendorPermissionsSeeder extends Seeder
 
             // Notification Settings
             'manage_notification_settings',
+
+            // Financial Accounts
+            'manage_financial_accounts',
+
+            // Expenses
+            'manage_expenses',
+
+            // Financial Report
+            'manage_financial_reports',
         ];
 
         foreach ($permissions as $permission) {

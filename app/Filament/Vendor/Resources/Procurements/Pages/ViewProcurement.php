@@ -4,9 +4,13 @@ namespace App\Filament\Vendor\Resources\Procurements\Pages;
 
 use App\Actions\Procurement\ApproveProcurementAction;
 use App\Filament\Vendor\Resources\Procurements\ProcurementResource;
+use App\Models\FinancialAccount;
 use App\Models\Procurement;
+use App\Models\ProcurementLogisticsLeg;
+use App\Services\FinancialLedger;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
@@ -77,6 +81,14 @@ class ViewProcurement extends ViewRecord
                 Placeholder::make('items_table')->label('')
                     ->content(new HtmlString($this->buildItemsTable($record))),
             ]),
+
+            Section::make('Logistics')
+                ->description('Movement legs getting stock from supplier to store — separate from product cost, never folded into it.')
+                ->schema([
+                    Placeholder::make('legs_table')->label('')
+                        ->content(new HtmlString($this->buildLegsTable($record))),
+                ])
+                ->visible($record->legs()->exists()),
         ]);
     }
 
@@ -106,6 +118,45 @@ class ViewProcurement extends ViewRecord
                         } catch (\Throwable $e) {
                             Notification::make()->title('Error: ' . $e->getMessage())->danger()->send();
                         }
+                    }),
+
+                Action::make('recordLogisticsPayment')
+                    ->label('Record Logistics Payment')
+                    ->icon('heroicon-o-banknotes')
+                    ->color('gray')
+                    ->size('lg')
+                    ->requiresConfirmation()
+                    ->modalHeading('Record Logistics Payment')
+                    ->modalDescription('Posts an outgoing ledger entry for every unpaid logistics leg on this procurement, from the account you choose. Re-running this only posts legs that are still unpaid — already-posted legs are skipped.')
+                    ->schema([
+                        Select::make('financial_account_id')
+                            ->label('Paid From')
+                            ->options(fn () => FinancialAccount::where('vendor_id', $vendor->id)->pluck('name', 'id'))
+                            ->required(),
+                    ])
+                    ->visible(fn () => ! $this->record->isVoided()
+                        && $this->record->legs()->whereNull('posted_at')->exists()
+                        && $user->hasVendorPermission($vendor->id, 'manage_procurement'))
+                    ->action(function (array $data): void {
+                        $account = FinancialAccount::findOrFail($data['financial_account_id']);
+                        $posted  = 0;
+
+                        foreach ($this->record->legs()->whereNull('posted_at')->get() as $leg) {
+                            FinancialLedger::postEntry(
+                                account: $account,
+                                direction: 'out',
+                                amount: (float) $leg->amount,
+                                source: $leg,
+                                description: "Logistics leg — {$leg->route_label} ({$this->record->reference})",
+                                createdBy: auth()->id(),
+                            );
+
+                            $leg->update(['financial_account_id' => $account->id, 'posted_at' => now()]);
+                            $posted++;
+                        }
+
+                        Notification::make()->title("Recorded payment for {$posted} logistics leg(s).")->success()->send();
+                        $this->refreshFormData([]);
                     }),
 
                 Action::make('void')
@@ -157,6 +208,44 @@ class ViewProcurement extends ViewRecord
                     </tr>
                 </thead>
                 <tbody>{$rows}</tbody>
+            </table>
+        </div>";
+    }
+
+    private function buildLegsTable(Procurement $record): string
+    {
+        $rows = '';
+        foreach ($record->legs as $leg) {
+            $status = $leg->isPosted()
+                ? $this->badge('Paid — ' . ($leg->financialAccount->name ?? '—'), 'success')
+                : $this->badge('Unpaid', 'warning');
+
+            $rows .= "<tr class='border-b border-gray-100 dark:border-gray-700'>
+                <td class='px-4 py-3 text-sm font-medium'>" . e($leg->route_label) . "</td>
+                <td class='px-4 py-3 text-sm'>₦" . number_format($leg->amount, 2) . "</td>
+                <td class='px-4 py-3 text-sm'>{$status}</td>
+            </tr>";
+        }
+
+        $total = $record->logisticsTotal();
+
+        return "<div class='overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700'>
+            <table class='w-full text-left'>
+                <thead>
+                    <tr class='bg-gray-50 dark:bg-gray-800 text-xs font-semibold text-gray-500 uppercase tracking-wider'>
+                        <th class='px-4 py-3'>Route</th>
+                        <th class='px-4 py-3'>Amount</th>
+                        <th class='px-4 py-3'>Status</th>
+                    </tr>
+                </thead>
+                <tbody>{$rows}</tbody>
+                <tfoot>
+                    <tr>
+                        <td class='px-4 py-3 text-sm font-bold'>Total</td>
+                        <td class='px-4 py-3 text-sm font-bold'>₦" . number_format($total, 2) . "</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
             </table>
         </div>";
     }
