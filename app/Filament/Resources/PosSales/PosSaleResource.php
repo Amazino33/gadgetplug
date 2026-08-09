@@ -102,7 +102,8 @@ class PosSaleResource extends Resource
                     ]),
                 SelectFilter::make('vendor_id')
                     ->label('Store')
-                    ->options(fn () => Vendor::pluck('name', 'id')),
+                    ->options(fn () => Vendor::pluck('name', 'id'))
+                    ->searchable(),
             ]);
     }
 

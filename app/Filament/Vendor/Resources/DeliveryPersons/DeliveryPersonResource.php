@@ -91,7 +91,8 @@ class DeliveryPersonResource extends Resource
                         name: 'logisticsCompany',
                         titleAttribute: 'name',
                         modifyQueryUsing: fn ($query) => $query->where('vendor_id', filament()->getTenant()->id),
-                    ),
+                    )
+                    ->searchable(),
                 TernaryFilter::make('is_active')->label('Active'),
             ])
             ->recordActions([EditAction::make(), DeleteAction::make()])

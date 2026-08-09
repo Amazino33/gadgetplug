@@ -196,6 +196,7 @@ class ViewOrder extends ViewRecord
                     Select::make('financial_account_id')
                         ->label('Paid From')
                         ->options(fn () => FinancialAccount::where('vendor_id', filament()->getTenant()->id)->pluck('name', 'id'))
+                        ->searchable()
                         ->required(),
                 ])
                 ->visible(fn () => filled($this->record->delivery_cost)
@@ -242,6 +243,7 @@ class ViewOrder extends ViewRecord
                             ->where('recipient_type', $get('recipient_type'))
                             ->where('is_active', true)
                             ->pluck('key', 'key'))
+                        ->searchable()
                         ->placeholder('Choose a template (optional)')
                         ->live()
                         ->afterStateUpdated(function ($state, $set): void {

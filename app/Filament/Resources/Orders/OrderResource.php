@@ -115,6 +115,7 @@ class OrderResource extends Resource
                 SelectFilter::make('vendor_id')
                     ->label('Store')
                     ->options(fn () => Vendor::pluck('name', 'id'))
+                    ->searchable()
                     ->query(fn (Builder $query, array $data) => $query->when(
                         $data['value'],
                         fn (Builder $q, $vendorId) => $q->whereHas('items', fn (Builder $q2) => $q2->where('vendor_id', $vendorId))

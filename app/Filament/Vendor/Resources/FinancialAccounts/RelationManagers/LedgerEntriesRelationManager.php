@@ -95,7 +95,8 @@ class LedgerEntriesRelationManager extends RelationManager
                         ->pluck('source_type', 'source_type')
                         ->mapWithKeys(fn ($type) => [$type => self::sourceLabel($type)])
                         ->all()
-                    ),
+                    )
+                    ->searchable(),
             ]);
     }
 }

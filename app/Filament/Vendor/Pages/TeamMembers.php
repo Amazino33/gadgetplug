@@ -60,6 +60,7 @@ class TeamMembers extends Page
                     Select::make('role_id')
                         ->label('Role')
                         ->options(fn () => $this->vendorRoleOptions())
+                        ->searchable()
                         ->placeholder('Select a role…')
                         ->helperText('Create roles first via Settings → Roles.'),
                 ])
@@ -74,6 +75,7 @@ class TeamMembers extends Page
                     Select::make('user_id')
                         ->label('Staff Member')
                         ->options(fn () => filament()->getTenant()->users()->get()->pluck('name', 'id'))
+                        ->searchable()
                         ->required(),
 
                     TextInput::make('pin')
@@ -99,6 +101,7 @@ class TeamMembers extends Page
                     Select::make('user_id')
                         ->label('Member')
                         ->options(fn () => filament()->getTenant()->users()->get()->pluck('name', 'id'))
+                        ->searchable()
                         ->required()
                         ->live()
                         ->afterStateUpdated(function (callable $set, $state) {
@@ -113,6 +116,7 @@ class TeamMembers extends Page
                     Select::make('role_id')
                         ->label('Role')
                         ->options(fn () => $this->vendorRoleOptions())
+                        ->searchable()
                         ->placeholder('Select a role…')
                         ->helperText('Create and configure roles via Settings → Roles.'),
                 ])

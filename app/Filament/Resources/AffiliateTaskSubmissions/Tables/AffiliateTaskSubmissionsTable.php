@@ -45,7 +45,7 @@ class AffiliateTaskSubmissionsTable
             ->defaultSort('submitted_at', 'desc')
             ->filters([
                 SelectFilter::make('status')->options(['submitted' => 'Pending', 'approved' => 'Approved', 'rejected' => 'Rejected']),
-                SelectFilter::make('affiliate_task_id')->label('Task')->relationship('task', 'name'),
+                SelectFilter::make('affiliate_task_id')->label('Task')->relationship('task', 'name')->searchable(),
             ])
             ->recordActions([
                 Action::make('approve')

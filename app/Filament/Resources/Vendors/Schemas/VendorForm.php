@@ -15,6 +15,7 @@ class VendorForm
             ->schema([
             Select::make('user_id')
                 ->relationship('user', 'name')
+                ->searchable()
                 ->required()
                 ->label('Shop Owner'),
             TextInput::make('name')

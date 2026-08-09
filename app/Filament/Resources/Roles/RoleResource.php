@@ -73,6 +73,7 @@ class RoleResource extends Resource
                                     /** @phpstan-ignore-next-line */
                                     ->default(Filament::getTenant()?->id)
                                     ->options(fn (): array => in_array(Utils::getTenantModel(), [null, '', '0'], true) ? [] : Utils::getTenantModel()::pluck('name', 'id')->toArray())
+                                    ->searchable()
                                     ->visible(fn (): bool => static::shield()->isCentralApp() && Utils::isTenancyEnabled())
                                     ->dehydrated(fn (): bool => static::shield()->isCentralApp() && Utils::isTenancyEnabled()),
                                 static::getSelectAllFormComponent(),
@@ -121,7 +122,8 @@ class RoleResource extends Resource
             ->filters([
                 SelectFilter::make('team_id')
                     ->label('Vendor')
-                    ->options(fn (): array => Vendor::orderBy('name')->pluck('name', 'id')->toArray()),
+                    ->options(fn (): array => Vendor::orderBy('name')->pluck('name', 'id')->toArray())
+                    ->searchable(),
             ])
             ->defaultSort('team_id')
             ->recordActions([

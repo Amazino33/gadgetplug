@@ -132,6 +132,7 @@ class ViewProcurement extends ViewRecord
                         Select::make('financial_account_id')
                             ->label('Paid From')
                             ->options(fn () => FinancialAccount::where('vendor_id', $vendor->id)->pluck('name', 'id'))
+                            ->searchable()
                             ->required(),
                     ])
                     ->visible(fn () => ! $this->record->isVoided()

@@ -50,7 +50,8 @@ class AffiliateCommissionsTable
                     ]),
                 SelectFilter::make('affiliate_id')
                     ->label('Affiliate')
-                    ->relationship('affiliate', 'code'),
+                    ->relationship('affiliate', 'code')
+                    ->searchable(),
             ])
             ->recordActions([
                 Action::make('viewOrder')

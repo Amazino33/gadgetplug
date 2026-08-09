@@ -106,7 +106,8 @@ class InventoryLedgerResource extends Resource
 
                 SelectFilter::make('transaction_type')
                     ->label('Movement')
-                    ->options(self::TYPE_LABELS),
+                    ->options(self::TYPE_LABELS)
+                    ->searchable(),
             ]);
     }
 

@@ -45,6 +45,7 @@ class TeamMembersRelationManager extends RelationManager
                             ->label('Roles')
                             ->multiple()
                             ->options(fn () => Role::where('team_id', $this->getOwnerRecord()->id)->pluck('name', 'name'))
+                            ->searchable()
                             ->placeholder('Select roles to assign...'),
                     ])
                     ->fillForm(fn (User $record): array => [

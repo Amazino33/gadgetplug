@@ -120,7 +120,8 @@ class PosSaleResource extends Resource
                     ]),
                 SelectFilter::make('cashier_id')
                     ->label('Cashier')
-                    ->relationship('cashier', 'name'),
+                    ->relationship('cashier', 'name')
+                    ->searchable(),
             ]);
     }
 

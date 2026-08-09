@@ -30,12 +30,16 @@
         </div>
     </div>
 
-    <form method="POST" action="{{ route('procurement.storeItems') }}" id="itemsForm">
+    <form method="POST" action="{{ route('procurement.storeItems') }}" id="itemsForm" onsubmit="return validateItemsForm()">
         @csrf
 
         @error('items')
             <p class="text-red-600 dark:text-red-400 text-sm mb-4">{{ $message }}</p>
         @enderror
+
+        <p id="productFormError" class="hidden text-red-600 dark:text-red-400 text-sm mb-4">
+            Pick a product from the search results for every row — start typing in the Product field to see matches.
+        </p>
 
         {{-- Items Header --}}
         <div class="flex justify-between items-center mb-4">
@@ -97,18 +101,21 @@
         function addItem(prefill = null) {
             const list = document.getElementById('itemsList');
             const idx = itemIndex++;
-            const options = products.map(p => `<option value="${p.id}" ${prefill && prefill.product_id == p.id ? 'selected' : ''}>${p.name}</option>`).join('');
+            const prefillProduct = prefill ? products.find(p => p.id == prefill.product_id) : null;
 
             const html = `
             <div class="item-row bg-white dark:bg-zinc-800 rounded-xl p-4 border border-[#becab5]/50 dark:border-zinc-700 shadow-[0px_4px_20px_rgba(0,0,0,0.04)] flex flex-col lg:flex-row gap-4 lg:items-end" id="row_${idx}">
 
-                <div class="flex-1 min-w-[180px]">
+                <div class="flex-1 min-w-[180px] relative">
                     <label class="text-[10px] font-bold text-[#6f7b68] dark:text-zinc-500 uppercase tracking-wider block mb-1">Product</label>
-                    <select name="items[${idx}][product_id]" required onchange="onProductChange(this, ${idx})"
-                        class="w-full px-3 py-2 border border-[#becab5] dark:border-zinc-600 rounded-lg text-sm focus:border-[#016c00] focus:ring-2 focus:ring-[#016c00]/20 outline-none bg-white dark:bg-zinc-900 dark:text-zinc-100">
-                        <option value="">Select product...</option>
-                        ${options}
-                    </select>
+                    <input type="text" id="productSearch_${idx}" placeholder="Type to search product…" autocomplete="off"
+                        value="${escapeHtml(prefillProduct?.name ?? '')}"
+                        oninput="onProductSearchInput(${idx})"
+                        onfocus="onProductSearchFocus(${idx})"
+                        onblur="onProductSearchBlur(${idx})"
+                        class="product-search w-full px-3 py-2 border border-[#becab5] dark:border-zinc-600 rounded-lg text-sm focus:border-[#016c00] focus:ring-2 focus:ring-[#016c00]/20 outline-none bg-white dark:bg-zinc-900 dark:text-zinc-100">
+                    <input type="hidden" name="items[${idx}][product_id]" id="productId_${idx}" value="${prefillProduct?.id ?? ''}">
+                    <div id="productResults_${idx}" class="hidden absolute z-20 top-full left-0 right-0 mt-1 bg-white dark:bg-zinc-900 border border-[#becab5] dark:border-zinc-600 rounded-lg shadow-lg max-h-56 overflow-y-auto"></div>
                 </div>
 
                 <div class="w-full lg:w-44">
@@ -180,13 +187,71 @@
             recalculate();
         }
 
-        function onProductChange(select, idx) {
-            const product = products.find(p => p.id == select.value);
-            if (product) {
-                const priceInput = document.getElementById(`price_${idx}`);
-                if (priceInput && !priceInput.value) priceInput.value = product.price;
-            }
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str ?? '';
+            return div.innerHTML;
+        }
+
+        function renderProductResults(idx, query) {
+            const box = document.getElementById(`productResults_${idx}`);
+            const q = query.trim().toLowerCase();
+            const matches = (q ? products.filter(p => p.name.toLowerCase().includes(q)) : products).slice(0, 20);
+
+            box.innerHTML = matches.length
+                ? matches.map(p => `
+                    <button type="button" onmousedown="selectProduct(${idx}, ${p.id})"
+                        class="w-full text-left px-3 py-2 text-sm hover:bg-[#f3f4f5] dark:hover:bg-zinc-700 text-[#191c1d] dark:text-zinc-100 border-b border-gray-50 dark:border-zinc-800 last:border-0">
+                        ${escapeHtml(p.name)}
+                    </button>`).join('')
+                : `<div class="px-3 py-2 text-sm text-[#6f7b68] dark:text-zinc-400">No matching products</div>`;
+
+            box.classList.remove('hidden');
+        }
+
+        function onProductSearchInput(idx) {
+            document.getElementById(`productId_${idx}`).value = '';
+            renderProductResults(idx, document.getElementById(`productSearch_${idx}`).value);
+        }
+
+        function onProductSearchFocus(idx) {
+            renderProductResults(idx, document.getElementById(`productSearch_${idx}`).value);
+        }
+
+        function onProductSearchBlur(idx) {
+            // Deferred so the result button's onmousedown still fires first.
+            setTimeout(() => document.getElementById(`productResults_${idx}`)?.classList.add('hidden'), 150);
+        }
+
+        function selectProduct(idx, productId) {
+            const product = products.find(p => p.id == productId);
+            if (!product) return;
+
+            document.getElementById(`productId_${idx}`).value = product.id;
+            document.getElementById(`productSearch_${idx}`).value = product.name;
+            document.getElementById(`productSearch_${idx}`).classList.remove('border-red-400');
+            document.getElementById(`productResults_${idx}`).classList.add('hidden');
+
+            const priceInput = document.getElementById(`price_${idx}`);
+            if (priceInput && !priceInput.value) priceInput.value = product.price;
+
             recalculate();
+        }
+
+        function validateItemsForm() {
+            const rows = document.querySelectorAll('.item-row');
+            for (const row of rows) {
+                const hidden = row.querySelector('input[name*="[product_id]"]');
+                if (!hidden || !hidden.value) {
+                    const search = row.querySelector('.product-search');
+                    search?.classList.add('border-red-400');
+                    search?.focus();
+                    document.getElementById('productFormError').classList.remove('hidden');
+                    return false;
+                }
+            }
+            document.getElementById('productFormError').classList.add('hidden');
+            return true;
         }
 
         function recalculate() {

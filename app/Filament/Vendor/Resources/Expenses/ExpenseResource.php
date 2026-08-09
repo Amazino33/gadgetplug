@@ -88,6 +88,7 @@ class ExpenseResource extends Resource
                     Select::make('financial_account_id')
                         ->label('Paid From')
                         ->options(fn () => FinancialAccount::where('vendor_id', filament()->getTenant()?->id)->pluck('name', 'id'))
+                        ->searchable()
                         ->placeholder('Leave blank — not paid yet')
                         ->helperText(fn (?Expense $record) => $record?->isPosted()
                             ? 'Already paid from this account — locked in and can\'t be changed. If this was a mistake, let us know rather than trying to edit it.'

@@ -83,7 +83,7 @@ class ProcurementResource extends Resource
             ->filters([
                 SelectFilter::make('status')
                     ->options(['pending' => 'Pending', 'approved' => 'Approved', 'voided' => 'Voided']),
-                SelectFilter::make('vendor_id')->label('Store')->relationship('vendor', 'name'),
+                SelectFilter::make('vendor_id')->label('Store')->relationship('vendor', 'name')->searchable(),
             ])
             ->recordAction('view')
             ->actions([

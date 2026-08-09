@@ -52,7 +52,11 @@ const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect, autoFocus 
         setQuery('');
         setResults([]);
         setOpen(false);
-        inputRef.current?.focus();
+        // Deferred: refocusing synchronously here re-fires the input's onFocus
+        // handler with a stale (non-empty) `query` closure from before this
+        // batch commits, which calls setOpen(true) again and undoes the close
+        // above. Waiting a tick lets the empty-query render commit first.
+        setTimeout(() => inputRef.current?.focus(), 0);
     };
 
     const onChange = (e) => {

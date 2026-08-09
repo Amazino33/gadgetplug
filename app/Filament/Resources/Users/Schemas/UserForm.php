@@ -34,6 +34,7 @@ class UserForm
                         return \Spatie\Permission\Models\Role::whereNull('team_id')->pluck('name', 'name');
                     })
                     ->multiple()
+                    ->searchable()
                     ->afterStateHydrated(function ($component, $record) {
                         if (! $record) return;
                         app(\Spatie\Permission\PermissionRegistrar::class)->setPermissionsTeamId(null);
