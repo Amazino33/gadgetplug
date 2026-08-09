@@ -6,9 +6,10 @@ use App\Http\Controllers\Pos\PosCustomerController;
 use App\Http\Controllers\Pos\PosSaleController;
 use App\Http\Controllers\Pos\PosSessionController;
 use App\Http\Controllers\Pos\PosSyncController;
+use App\Http\Middleware\NoStoreApiResponse;
 use Illuminate\Support\Facades\Route;
 
-Route::prefix('pos')->group(function () {
+Route::prefix('pos')->middleware(NoStoreApiResponse::class)->group(function () {
 
     // PIN auth — no token required
     Route::post('auth/login',  [PosAuthController::class, 'login']);

@@ -5,6 +5,7 @@ export default function SuspendTray({ vendorId, cart, customer, onSuspend, onRes
     const [slots, setSlots]     = useState([null, null, null]);
     const [label, setLabel]     = useState('');
     const [loading, setLoading] = useState(false);
+    const [error, setError]     = useState('');
 
     useEffect(() => { loadSlots(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -14,11 +15,15 @@ export default function SuspendTray({ vendorId, cart, customer, onSuspend, onRes
             const arr = [null, null, null];
             data.forEach((s) => { arr[s.slot - 1] = s; });
             setSlots(arr);
-        } catch { /* offline */ }
+            setError('');
+        } catch {
+            setError('Could not load held sales — check your connection and try again.');
+        }
     };
 
     const suspend = async (slot) => {
         setLoading(true);
+        setError('');
         try {
             await api.post('/suspended', {
                 vendor_id:   vendorId,
@@ -28,21 +33,35 @@ export default function SuspendTray({ vendorId, cart, customer, onSuspend, onRes
                 cart_data:   { items: cart, customer },
             });
             onSuspend();
-        } catch { /* handle */ } finally {
+        } catch {
+            // Cart is deliberately left untouched here — the caller only
+            // clears it from onSuspend(), which never fires on failure — so
+            // a failed suspend can't quietly lose the sale it was trying to
+            // hold onto.
+            setError("Couldn't hold this sale — it has NOT been saved. Check your connection and try again.");
+        } finally {
             setLoading(false);
         }
     };
 
     const resume = async (slot) => {
+        setError('');
         try {
             const { data } = await api.post(`/suspended/${slot}/resume`, { vendor_id: vendorId });
             onResume(data);
-        } catch { /* handle */ }
+        } catch {
+            setError("Couldn't resume this sale — check your connection and try again.");
+        }
     };
 
     const clear = async (slot) => {
-        await api.delete(`/suspended/${slot}`, { data: { vendor_id: vendorId } });
-        loadSlots();
+        setError('');
+        try {
+            await api.delete(`/suspended/${slot}`, { data: { vendor_id: vendorId } });
+            loadSlots();
+        } catch {
+            setError("Couldn't clear this slot — check your connection and try again.");
+        }
     };
 
     return (
@@ -52,6 +71,12 @@ export default function SuspendTray({ vendorId, cart, customer, onSuspend, onRes
                     <h2 className="font-bold text-gray-800">Suspend / Resume Sale</h2>
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
                 </div>
+
+                {error && (
+                    <div className="mb-4 px-3 py-2.5 rounded-lg bg-red-50 border border-red-200 text-xs font-semibold text-red-600">
+                        {error}
+                    </div>
+                )}
 
                 {/* Existing holds */}
                 <div className="space-y-2 mb-5">
