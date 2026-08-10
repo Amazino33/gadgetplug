@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace App\Filament\Vendor\Resources\AuditSessions;
 
 use App\Filament\Vendor\Resources\AuditSessions\Pages;
+use App\Filament\Vendor\Resources\Products\Schemas\ProductForm;
 use App\Models\AuditSession;
 use App\Models\User;
 use App\Actions\Inventory\ProcessAuditCountAction;
 use App\Actions\Inventory\AdjustStockAction;
+use App\Services\StockAccountabilityLedger;
+use Filament\Forms\Components\Textarea;
 use Filament\Resources\Resource;
 use Filament\Tables\Table;
 use Filament\Tables\Columns\ImageColumn;
@@ -98,45 +101,63 @@ class AuditSessionResource extends Resource
                     ),
 
                 // ── 6. Unit Variance (physical count − system qty) ───────────────
+                // Measured against the baseline frozen when the count was taken,
+                // not against live stock. Reading it live meant every sale made
+                // after the count quietly enlarged the "variance".
                 TextColumn::make('unit_variance')
                     ->label('Unit Variance')
                     ->alignCenter()
                     ->getStateUsing(function (AuditSession $r): string {
-                        $counted   = $r->count_b ?? $r->count_a ?? 0;
-                        $systemQty = $r->product?->stock_quantity ?? 0;
-                        $diff      = (int) $counted - (int) $systemQty;
-                        return ($diff > 0 ? '+' : '') . $diff;
+                        $diff = $r->countedVariance();
+
+                        return $diff === null ? '—' : ($diff > 0 ? '+' : '').$diff;
                     })
                     ->color(function (AuditSession $r): string {
-                        $counted   = $r->count_b ?? $r->count_a ?? 0;
-                        $systemQty = $r->product?->stock_quantity ?? 0;
-                        $diff      = (int) $counted - (int) $systemQty;
+                        $diff = $r->countedVariance();
+
                         return match (true) {
-                            $diff < 0 => 'danger',
-                            $diff > 0 => 'warning',
-                            default   => 'success',
+                            $diff === null => 'gray',
+                            $diff < 0      => 'danger',
+                            $diff > 0      => 'warning',
+                            default        => 'success',
                         };
                     })
+                    ->tooltip(fn (AuditSession $r): ?string => $r->system_quantity === null
+                        ? 'No baseline was recorded for this count, so its variance cannot be measured.'
+                        : "Counted {$r->countedQuantity()} against a system figure of {$r->system_quantity} at count time.")
                     ->badge(),
 
                 // ── 7. Value at Risk ─────────────────────────────────────────────
+                // Derived from cost price, so it discloses cost by arithmetic —
+                // anyone who can see a variance of 3 units and a value of ₦7,710
+                // knows the unit cost. It was previously ungated here while the
+                // Products screens hid cost behind view_cost_price, which made
+                // that gate bypassable by opening this page instead.
                 TextColumn::make('value_at_risk')
                     ->label('Value at Risk (₦)')
                     ->alignRight()
+                    ->visible(fn (): bool => ProductForm::canSeeCostPrice())
                     ->getStateUsing(function (AuditSession $r): string {
-                        $counted    = $r->count_b ?? $r->count_a ?? 0;
-                        $systemQty  = $r->product?->stock_quantity ?? 0;
-                        $diff       = (int) $counted - (int) $systemQty;
-                        $costPrice  = (float) ($r->product?->cost_price ?? 0);
-                        $value      = $diff * $costPrice;
-                        $prefix     = $value < 0 ? '−' : ($value > 0 ? '+' : '');
-                        return $prefix . '₦' . number_format(abs($value), 2);
+                        $diff = $r->countedVariance();
+
+                        if ($diff === null || $r->product?->cost_price === null) {
+                            return '—';
+                        }
+
+                        $value  = $diff * (float) $r->product->cost_price;
+                        $prefix = $value < 0 ? '−' : ($value > 0 ? '+' : '');
+
+                        return $prefix.'₦'.number_format(abs($value), 2);
                     })
                     ->color(function (AuditSession $r): string {
-                        $counted   = $r->count_b ?? $r->count_a ?? 0;
-                        $systemQty = $r->product?->stock_quantity ?? 0;
-                        $diff      = (int) $counted - (int) $systemQty;
-                        return $diff < 0 ? 'danger' : ($diff > 0 ? 'warning' : 'success');
+                        $diff = $r->countedVariance();
+
+                        return match (true) {
+                            $diff === null => 'gray',
+                            $diff < 0      => 'danger',
+                            $diff > 0      => 'warning',
+                            default        => 'success',
+                        };
                     }),
 
                 // ── 8. Status badge ──────────────────────────────────────────────
@@ -300,6 +321,95 @@ class AuditSessionResource extends Resource
                     })
                     ->successNotificationTitle('Discrepancy resolved.'),
 
+                // ── Owner attributes the settled variance to someone ─────────────
+                //
+                // Deliberately separate from resolving. Resolving corrects the
+                // shelf figure and is an inventory job; this decides who answers
+                // for the loss and whether money is owed, which is the owner's
+                // call alone. Keeping them apart also means correcting stock is
+                // never held up waiting on a decision about a person.
+                Action::make('attribute_shortage')
+                    ->label('Attribute')
+                    ->icon('heroicon-o-scale')
+                    ->color('danger')
+                    ->modalHeading('Attribute this variance')
+                    ->modalDescription(fn (AuditSession $record): string => $record->system_quantity === null
+                        ? 'This count has no recorded baseline, so its variance cannot be attributed.'
+                        : sprintf(
+                            'Counted %d against a system figure of %d at count time — a variance of %+d unit(s).',
+                            $record->countedQuantity(),
+                            $record->system_quantity,
+                            $record->countedVariance(),
+                        ))
+                    ->slideOver()
+                    ->form([
+                        Select::make('storekeeper_id')
+                            ->label('Accountable staff member')
+                            ->helperText('Leave blank to record the loss against the store without naming anyone.')
+                            // No "primary storekeeper" exists in the data model,
+                            // so the owner picks explicitly rather than the system
+                            // guessing from whoever happened to count.
+                            ->options(fn (AuditSession $record): array => User::query()
+                                ->whereHas('memberVendors', fn ($q) => $q->where('vendors.id', $record->vendor_id))
+                                ->orderBy('name')
+                                ->pluck('name', 'id')
+                                ->toArray())
+                            ->searchable()
+                            ->placeholder('Nobody — record against the store'),
+
+                        Select::make('disposition')
+                            ->label('What happens to the value')
+                            ->options([
+                                'written_off' => 'Write off as a business loss',
+                                'recoverable' => 'Recoverable — the staff member owes it',
+                                'recorded'    => 'Record only, no financial effect',
+                            ])
+                            ->default('written_off')
+                            ->required()
+                            ->live()
+                            ->helperText(fn ($state): string => match ($state) {
+                                'recoverable' => 'Adds to what this person owes until it is settled or reversed.',
+                                'recorded'    => 'Keeps the record with no amount attached.',
+                                default       => 'Absorbed by the business. No cash moves, so nothing posts to a bank or cash account.',
+                            }),
+
+                        Select::make('reason_code')
+                            ->label('Reason')
+                            ->options([
+                                'Damaged in Store'        => 'Damaged in Store',
+                                'Suspected Theft'         => 'Suspected Theft',
+                                'Waybill Shortage'        => 'Waybill Shortage',
+                                'Data Entry Error'        => 'Data Entry Error',
+                                'Supplier Short Delivery' => 'Supplier Short Delivery',
+                                'Other'                   => 'Other',
+                            ])
+                            ->searchable(),
+
+                        Textarea::make('note')->label('Note (optional)')->rows(2),
+                    ])
+                    ->visible(fn (AuditSession $record): bool =>
+                        $record->isSettled()
+                        && $record->system_quantity !== null
+                        && (int) $record->countedVariance() !== 0
+                        && static::canAttribute($record)
+                    )
+                    ->action(function (AuditSession $record, array $data, StockAccountabilityLedger $ledger): void {
+                        try {
+                            $ledger->attribute(
+                                audit: $record,
+                                disposition: $data['disposition'],
+                                storekeeperId: $data['storekeeper_id'] ? (int) $data['storekeeper_id'] : null,
+                                resolvedBy: (int) auth()->id(),
+                                reasonCode: $data['reason_code'] ?? $record->reason_code,
+                                note: $data['note'] ?? null,
+                            );
+
+                            Notification::make()->title('Variance attributed.')->success()->send();
+                        } catch (\Throwable $e) {
+                            Notification::make()->title($e->getMessage())->danger()->send();
+                        }
+                    }),
+
             ])
             ->defaultSort('created_at', 'desc')
             ->toolbarActions([
@@ -308,6 +418,20 @@ class AuditSessionResource extends Resource
                         ->visible(fn () => auth()->user()->isSuperAdmin() || filament()->getTenant()?->isOwner(auth()->user())),
                 ]),
             ]);
+    }
+
+    // Deciding that a named person owes money is an owner's call, not a
+    // delegable inventory permission — so this is not wired to a Spatie
+    // permission that could be handed to a manager from the Roles screen.
+    public static function canAttribute(AuditSession $record): bool
+    {
+        $user = auth()->user();
+
+        if (! $user) {
+            return false;
+        }
+
+        return $user->isSuperAdmin() || $record->vendor?->isOwner($user) === true;
     }
 
     public static function getPages(): array

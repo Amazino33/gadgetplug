@@ -721,6 +721,9 @@ class BlindCount extends Page
                 AuditSession::create([
                     'vendor_id'        => $session->vendor_id,
                     'product_id'       => $productId,
+                    // The baseline this count is measured against, frozen now.
+                    // Read live afterwards it would drift with every sale.
+                    'system_quantity'  => (int) $product->stock_quantity,
                     'storekeeper_a_id' => $session->storekeeper_a_id,
                     'storekeeper_b_id' => null,
                     'count_a'          => $count,
@@ -785,10 +788,13 @@ class BlindCount extends Page
                 $countA  = (int) ($aEntries[$productId]?->count ?? 0);
                 $countB  = (int) ($bEntries[$productId]?->count ?? 0);
                 $matched = $countA === $countB;
+                $product = Product::find($productId);
 
                 AuditSession::create([
                     'vendor_id'        => $session->vendor_id,
                     'product_id'       => $productId,
+                    // Frozen baseline — see the solo path above.
+                    'system_quantity'  => (int) $product->stock_quantity,
                     'storekeeper_a_id' => $session->storekeeper_a_id,
                     'storekeeper_b_id' => $session->storekeeper_b_id,
                     'count_a'          => $countA,
@@ -797,7 +803,6 @@ class BlindCount extends Page
                 ]);
 
                 if ($matched) {
-                    $product    = Product::find($productId);
                     $difference = $countB - (int) $product->stock_quantity;
                     if ($difference !== 0) {
                         $adjustStock->execute(
