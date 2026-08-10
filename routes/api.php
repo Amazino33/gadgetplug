@@ -42,10 +42,10 @@ Route::prefix('pos')->middleware(NoStoreApiResponse::class)->group(function () {
         Route::get('sessions/active',              [PosSessionController::class, 'active']);
 
         // Suspended sales
-        Route::get('suspended',                    [PosSessionController::class, 'listSuspended']);
-        Route::post('suspended',                   [PosSessionController::class, 'suspend']);
-        Route::post('suspended/{slot}/resume',     [PosSessionController::class, 'resume']);
-        Route::delete('suspended/{slot}',          [PosSessionController::class, 'clearSlot']);
+        Route::get('suspended',                          [PosSessionController::class, 'listSuspended']);
+        Route::post('suspended',                         [PosSessionController::class, 'suspend']);
+        Route::post('suspended/{suspendedSale}/resume',  [PosSessionController::class, 'resume']);
+        Route::delete('suspended/{suspendedSale}',       [PosSessionController::class, 'clearSuspended']);
 
         // Offline sync — bulk submit queued transactions
         Route::post('sync', [PosSyncController::class, 'sync']);

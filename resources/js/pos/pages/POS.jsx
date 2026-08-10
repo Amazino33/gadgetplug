@@ -11,7 +11,6 @@ import ActionGrid from '../components/ActionGrid';
 import PaymentModal from '../components/PaymentModal';
 import CustomerModal from '../components/CustomerModal';
 import DiscountModal from '../components/DiscountModal';
-import SuspendTray from '../components/SuspendTray';
 import QuantityModal from '../components/QuantityModal';
 import PriceModal from '../components/PriceModal';
 import ReturnModal from '../components/ReturnModal';
@@ -61,6 +60,8 @@ export default function POS({ user, vendorId, onLogout }) {
     const [lastSale, setLastSale]         = useState(null);
     const [saleError, setSaleError]       = useState(null);
     const [stuckSales, setStuckSales]     = useState([]);
+    const [pendingSales, setPendingSales] = useState([]);
+    const [pendingError, setPendingError] = useState(null);
     const [isReprintView, setIsReprintView] = useState(false);
     const [showMobileMore, setShowMobileMore] = useState(false);
     const [isDark, setIsDark] = useState(() => localStorage.getItem('darkMode') === 'true');
@@ -94,6 +95,64 @@ export default function POS({ user, vendorId, onLogout }) {
             setSession(data);
             localStorage.setItem('pos_session', JSON.stringify(data));
         } catch { /* offline — continue */ }
+    };
+
+    // ── Pending (suspended) sales ────────────────────────────────────
+    // No slots, no popup: any held sale just shows up in the sidebar for
+    // whichever cashier gets to it. Polled so a sale suspended on one
+    // terminal shows up here without needing a manual refresh.
+
+    const loadPendingSales = useCallback(async () => {
+        try {
+            const { data } = await api.get('/suspended', { params: { vendor_id: vendorId } });
+            setPendingSales(data);
+        } catch { /* offline — keep showing the last known list */ }
+    }, [vendorId]);
+
+    useEffect(() => {
+        loadPendingSales();
+        const interval = setInterval(loadPendingSales, 20000);
+        return () => clearInterval(interval);
+    }, [loadPendingSales]);
+
+    const suspendCurrentSale = async () => {
+        if (cartEmpty) return;
+        setPendingError(null);
+        try {
+            await api.post('/suspended', {
+                vendor_id:   vendorId,
+                customer_id: customer?.id ?? null,
+                label:       customer?.name ?? null,
+                cart_data:   { items: cart, customer },
+            });
+            clearCart();
+            loadPendingSales();
+        } catch {
+            setPendingError("Couldn't hold this sale — it has NOT been saved. Check your connection and try again.");
+        }
+    };
+
+    const resumePendingSale = async (sale) => {
+        if (!cartEmpty) return;
+        setPendingError(null);
+        try {
+            const { data } = await api.post(`/suspended/${sale.id}/resume`, { vendor_id: vendorId });
+            setCart(data.cart_data.items || []);
+            setCustomer(data.cart_data.customer || null);
+            loadPendingSales();
+        } catch {
+            setPendingError("Couldn't resume this sale — check your connection and try again.");
+        }
+    };
+
+    const clearPendingSale = async (id) => {
+        setPendingError(null);
+        try {
+            await api.delete(`/suspended/${id}`, { data: { vendor_id: vendorId } });
+            loadPendingSales();
+        } catch {
+            setPendingError("Couldn't discard this held sale — check your connection and try again.");
+        }
     };
 
     // ── Cart operations ──────────────────────────────────────────────
@@ -247,7 +306,7 @@ export default function POS({ user, vendorId, onLogout }) {
         F2:     () => { if (!lastSale && !cartEmpty) setModal('discount'); },
         c:      () => { if (!lastSale) setModal('customer'); },
         C:      () => { if (!lastSale) setModal('customer'); },
-        F9:     () => { if (!lastSale && !cartEmpty) setModal('suspend'); },
+        F9:     () => { if (!lastSale && !cartEmpty) suspendCurrentSale(); },
         F10:    () => { if (!lastSale && !cartEmpty) setModal('payment'); },
         F12:    () => { if (!lastSale && !cartEmpty) completeSale({ paymentMethod: 'cash', amountTendered: total }); },
         Escape: () => { if (saleError) setSaleError(null); else if (lastSale) setLastSale(null); else if (showMobileMore) setShowMobileMore(false); else setModal(null); },
@@ -410,14 +469,19 @@ export default function POS({ user, vendorId, onLogout }) {
                         </button>
 
                         <button
-                            onClick={() => !cartEmpty && setModal('suspend')}
+                            onClick={() => !cartEmpty && suspendCurrentSale()}
                             disabled={cartEmpty}
-                            className="flex flex-col items-center gap-1 active:scale-95 transition-all disabled:opacity-40"
+                            className="relative flex flex-col items-center gap-1 active:scale-95 transition-all disabled:opacity-40"
                         >
                             <span className="w-11 h-11 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
                                 <svg className="w-5 h-5 text-gray-700 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
+                                {pendingSales.length > 0 && (
+                                    <span className="absolute top-0 right-1 w-4 h-4 rounded-full bg-[#F97316] text-white text-[9px] font-bold flex items-center justify-center">
+                                        {pendingSales.length}
+                                    </span>
+                                )}
                             </span>
                             <span className="text-[11px] font-medium text-gray-600 dark:text-gray-400">Suspend</span>
                         </button>
@@ -483,10 +547,14 @@ export default function POS({ user, vendorId, onLogout }) {
                     onDiscount={() => setModal('discount')}
                     onCustomer={() => setModal('customer')}
                     onQuickCash={() => !cartEmpty && completeSale({ paymentMethod: 'cash', amountTendered: total })}
-                    onSuspend={() => !cartEmpty && setModal('suspend')}
+                    onSuspend={suspendCurrentSale}
                     onPayment={() => !cartEmpty && setModal('payment')}
                     onVoid={clearCart}
                     onZReport={() => setModal('zreport')}
+                    pendingSales={pendingSales}
+                    onResumePending={resumePendingSale}
+                    onClearPending={clearPendingSale}
+                    pendingError={pendingError}
                     onReturn={() => setModal('return')}
                 />
             </div>
@@ -524,6 +592,46 @@ export default function POS({ user, vendorId, onLogout }) {
                                 color="green"
                             />
                         </div>
+
+                        {pendingError && (
+                            <div className="mb-3 px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-xs font-semibold text-red-600">
+                                {pendingError}
+                            </div>
+                        )}
+
+                        {pendingSales.length > 0 && (
+                            <div className="border-t border-gray-100 dark:border-gray-800 pt-3 mb-1">
+                                <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">
+                                    Pending Sales ({pendingSales.length})
+                                </p>
+                                <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                                    {pendingSales.map((sale) => (
+                                        <div key={sale.id}
+                                            className="flex items-center gap-2 bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-900 rounded-lg px-3 py-2">
+                                            <button
+                                                onClick={() => { if (cartEmpty) { resumePendingSale(sale); setShowMobileMore(false); } }}
+                                                disabled={!cartEmpty}
+                                                className="flex-1 min-w-0 text-left disabled:opacity-50"
+                                            >
+                                                <p className="text-xs font-semibold text-gray-700 dark:text-gray-200 truncate">
+                                                    {sale.label || sale.customer?.name || `Sale #${sale.id}`}
+                                                </p>
+                                                <p className="text-[10px] text-gray-400">
+                                                    {sale.cart_data?.items?.length ?? 0} item(s)
+                                                </p>
+                                            </button>
+                                            <button
+                                                onClick={() => clearPendingSale(sale.id)}
+                                                className="text-red-400 hover:text-red-600 text-xs shrink-0 px-1"
+                                                aria-label="Discard held sale"
+                                            >
+                                                ✕
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         <div className="border-t border-gray-100 dark:border-gray-800 pt-3 space-y-0">
                             {CONFIG.panelUrl && (
@@ -576,20 +684,6 @@ export default function POS({ user, vendorId, onLogout }) {
                     subtotal={subtotal}
                     current={cartDiscount}
                     onApply={(d) => { setCartDiscount(d); setModal(null); }}
-                    onClose={() => setModal(null)}
-                />
-            )}
-            {modal === 'suspend' && (
-                <SuspendTray
-                    vendorId={vendorId}
-                    cart={cart}
-                    customer={customer}
-                    onSuspend={() => { clearCart(); setModal(null); }}
-                    onResume={(resumed) => {
-                        setCart(resumed.cart_data.items || []);
-                        setCustomer(resumed.cart_data.customer || null);
-                        setModal(null);
-                    }}
                     onClose={() => setModal(null)}
                 />
             )}

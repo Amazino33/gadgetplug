@@ -146,63 +146,62 @@ class PosSessionController extends Controller
     }
 
     // ── Suspended sales ─────────────────────────────────────────────
+    //
+    // No fixed slot count — any cashier on the vendor can hold as many sales
+    // as needed and see every other cashier's held sales too, since the
+    // whole point is "pause this one, come back to it later" rather than a
+    // per-cashier scratchpad.
 
     public function listSuspended(Request $request): JsonResponse
     {
         $request->validate(['vendor_id' => 'required|integer']);
 
-        $slots = PosSuspendedSale::where('vendor_id', $request->vendor_id)
+        $sales = PosSuspendedSale::where('vendor_id', $request->vendor_id)
             ->with('customer:id,name,phone')
+            ->oldest()
             ->get();
 
-        return response()->json($slots);
+        return response()->json($sales);
     }
 
     public function suspend(Request $request): JsonResponse
     {
         $request->validate([
             'vendor_id'   => 'required|integer',
-            'slot'        => 'required|integer|between:1,3',
             'label'       => 'nullable|string|max:80',
             'customer_id' => 'nullable|integer',
             'cart_data'   => 'required|array',
         ]);
 
-        $suspended = PosSuspendedSale::updateOrCreate(
-            ['vendor_id' => $request->vendor_id, 'slot' => $request->slot],
-            [
-                'cashier_id'  => $request->user()->id,
-                'customer_id' => $request->customer_id,
-                'label'       => $request->label,
-                'cart_data'   => $request->cart_data,
-            ]
-        );
+        $suspended = PosSuspendedSale::create([
+            'vendor_id'   => $request->vendor_id,
+            'cashier_id'  => $request->user()->id,
+            'customer_id' => $request->customer_id,
+            'label'       => $request->label,
+            'cart_data'   => $request->cart_data,
+        ]);
 
         return response()->json($suspended, 201);
     }
 
-    public function resume(Request $request, int $slot): JsonResponse
+    public function resume(Request $request, PosSuspendedSale $suspendedSale): JsonResponse
     {
         $request->validate(['vendor_id' => 'required|integer']);
+        abort_unless($suspendedSale->vendor_id === (int) $request->vendor_id, 404);
 
-        $suspended = PosSuspendedSale::where('vendor_id', $request->vendor_id)
-            ->where('slot', $slot)
-            ->firstOrFail();
-
-        $data = $suspended->toArray();
-        $suspended->delete();
+        $data = $suspendedSale->toArray();
+        $suspendedSale->delete();
 
         return response()->json($data);
     }
 
-    public function clearSlot(Request $request, int $slot): JsonResponse
+    public function clearSuspended(Request $request, PosSuspendedSale $suspendedSale): JsonResponse
     {
         $request->validate(['vendor_id' => 'required|integer']);
+        abort_unless($suspendedSale->vendor_id === (int) $request->vendor_id, 404);
 
-        PosSuspendedSale::where('vendor_id', $request->vendor_id)
-            ->where('slot', $slot)
-            ->delete();
+        $suspendedSale->delete();
 
-        return response()->json(['message' => 'Slot cleared.']);
+        return response()->json(['message' => 'Held sale cleared.']);
     }
 }

@@ -1,3 +1,5 @@
+import { timeAgo } from '../lib/format';
+
 const Btn = ({ label, hotkey, color = 'default', disabled = false, onClick, wide = false }) => {
     const colors = {
         default: 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50',
@@ -31,6 +33,7 @@ export default function ActionGrid({
     onDiscount, onCustomer,
     onQuickCash, onSuspend, onPayment, onVoid,
     onZReport, onReturn,
+    pendingSales = [], onResumePending, onClearPending, pendingError,
 }) {
     return (
         <div className="w-64 shrink-0 bg-[#F9FAFB] border-l border-gray-200 p-3 flex flex-col gap-3 overflow-y-auto">
@@ -94,6 +97,51 @@ export default function ActionGrid({
                         <span className="text-sm font-bold">Void Order</span>
                     </button>
                 </div>
+
+                {pendingError && (
+                    <div className="mt-3 px-2.5 py-2 rounded-lg bg-red-50 border border-red-200 text-[11px] font-semibold text-red-600">
+                        {pendingError}
+                    </div>
+                )}
+
+                {pendingSales.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-gray-200">
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">
+                            Pending Sales ({pendingSales.length})
+                        </p>
+                        <div className="space-y-1.5 max-h-52 overflow-y-auto">
+                            {pendingSales.map((sale) => (
+                                <div key={sale.id}
+                                    className="flex items-center gap-2 bg-orange-50 border border-orange-200 rounded-lg px-2.5 py-2">
+                                    <button
+                                        onClick={() => cartEmpty && onResumePending(sale)}
+                                        disabled={!cartEmpty}
+                                        className="flex-1 min-w-0 text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <p className="text-xs font-semibold text-gray-700 truncate">
+                                            {sale.label || sale.customer?.name || `Sale #${sale.id}`}
+                                        </p>
+                                        <p className="text-[10px] text-gray-400">
+                                            {sale.cart_data?.items?.length ?? 0} item(s) · {timeAgo(sale.created_at)}
+                                        </p>
+                                    </button>
+                                    <button
+                                        onClick={() => onClearPending(sale.id)}
+                                        className="text-red-400 hover:text-red-600 text-xs shrink-0 px-1"
+                                        aria-label="Discard held sale"
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                        {!cartEmpty && (
+                            <p className="text-[10px] text-gray-400 mt-1.5 px-1">
+                                Clear or complete the current cart to resume one of these.
+                            </p>
+                        )}
+                    </div>
+                )}
             </div>
         </div>
     );

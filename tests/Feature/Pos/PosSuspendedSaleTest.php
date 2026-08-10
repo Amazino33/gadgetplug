@@ -7,9 +7,11 @@ use Laravel\Sanctum\Sanctum;
 
 // A held sale must still be visible on any later request, from any cashier
 // on the same till/vendor — the whole point of "suspend" is picking it back
-// up. These guard the full round trip and the no-store headers that stop an
-// intermediary (carrier data-saving proxies, in particular) from serving a
-// stale/empty list back to a cashier who just suspended a sale.
+// up later, for whoever gets to it. These guard the full round trip, that
+// there's no cap on how many sales can be held at once, and the no-store
+// headers that stop an intermediary (carrier data-saving proxies, in
+// particular) from serving a stale/empty list back to a cashier who just
+// suspended a sale.
 
 function suspendedSaleVendor(): array
 {
@@ -25,7 +27,6 @@ test('a suspended sale is visible in the list right after suspending', function 
 
     $this->postJson('/api/pos/suspended', [
         'vendor_id'   => $data['vendor']->id,
-        'slot'        => 1,
         'label'       => 'Hold 1',
         'customer_id' => null,
         'cart_data'   => ['items' => [['id' => 1, 'name' => 'Widget', 'price' => 500, 'qty' => 2]], 'customer' => null],
@@ -34,8 +35,24 @@ test('a suspended sale is visible in the list right after suspending', function 
     $this->getJson('/api/pos/suspended?vendor_id=' . $data['vendor']->id)
         ->assertOk()
         ->assertJsonCount(1)
-        ->assertJsonPath('0.slot', 1)
         ->assertJsonPath('0.label', 'Hold 1');
+});
+
+test('there is no cap on how many sales can be held at once', function () {
+    $data = suspendedSaleVendor();
+    Sanctum::actingAs($data['owner']);
+
+    foreach (range(1, 5) as $i) {
+        $this->postJson('/api/pos/suspended', [
+            'vendor_id' => $data['vendor']->id,
+            'label'     => "Hold {$i}",
+            'cart_data' => ['items' => [], 'customer' => null],
+        ])->assertCreated();
+    }
+
+    $this->getJson('/api/pos/suspended?vendor_id=' . $data['vendor']->id)
+        ->assertOk()
+        ->assertJsonCount(5);
 });
 
 test('a different cashier on the same vendor can still see a held sale', function () {
@@ -47,7 +64,6 @@ test('a different cashier on the same vendor can still see a held sale', functio
     Sanctum::actingAs($firstCashier);
     $this->postJson('/api/pos/suspended', [
         'vendor_id'   => $data['vendor']->id,
-        'slot'        => 2,
         'label'       => 'Hold 2',
         'customer_id' => null,
         'cart_data'   => ['items' => [['id' => 1, 'name' => 'Widget', 'price' => 500, 'qty' => 1]], 'customer' => null],
@@ -72,40 +88,59 @@ test('suspended-sale list responses tell intermediaries never to cache them', fu
     expect($response->headers->get('Cache-Control'))->toContain('no-store');
 });
 
-test('resuming a slot returns its cart and removes it from the held list', function () {
+test('resuming a held sale returns its cart and removes it from the list', function () {
     $data = suspendedSaleVendor();
     Sanctum::actingAs($data['owner']);
 
-    PosSuspendedSale::create([
-        'vendor_id'   => $data['vendor']->id,
-        'cashier_id'  => $data['owner']->id,
-        'slot'        => 1,
-        'label'       => 'Hold 1',
-        'cart_data'   => ['items' => [['id' => 1, 'name' => 'Widget', 'price' => 500, 'qty' => 1]], 'customer' => null],
+    $suspended = PosSuspendedSale::create([
+        'vendor_id'  => $data['vendor']->id,
+        'cashier_id' => $data['owner']->id,
+        'label'      => 'Hold 1',
+        'cart_data'  => ['items' => [['id' => 1, 'name' => 'Widget', 'price' => 500, 'qty' => 1]], 'customer' => null],
     ]);
 
-    $this->postJson('/api/pos/suspended/1/resume', ['vendor_id' => $data['vendor']->id])
+    $this->postJson("/api/pos/suspended/{$suspended->id}/resume", ['vendor_id' => $data['vendor']->id])
         ->assertOk()
         ->assertJsonPath('cart_data.items.0.name', 'Widget');
 
-    expect(PosSuspendedSale::where('vendor_id', $data['vendor']->id)->where('slot', 1)->exists())
-        ->toBeFalse();
+    expect(PosSuspendedSale::find($suspended->id))->toBeNull();
 });
 
-test('suspending to the same slot twice overwrites it rather than erroring', function () {
+test('a vendor cannot resume or clear another vendor\'s held sale', function () {
+    $data      = suspendedSaleVendor();
+    $otherData = suspendedSaleVendor();
+
+    $suspended = PosSuspendedSale::create([
+        'vendor_id'  => $otherData['vendor']->id,
+        'cashier_id' => $otherData['owner']->id,
+        'label'      => 'Someone else\'s hold',
+        'cart_data'  => ['items' => [], 'customer' => null],
+    ]);
+
+    Sanctum::actingAs($data['owner']);
+
+    $this->postJson("/api/pos/suspended/{$suspended->id}/resume", ['vendor_id' => $data['vendor']->id])
+        ->assertNotFound();
+
+    $this->deleteJson("/api/pos/suspended/{$suspended->id}", ['vendor_id' => $data['vendor']->id])
+        ->assertNotFound();
+
+    expect(PosSuspendedSale::find($suspended->id))->not->toBeNull();
+});
+
+test('clearing a held sale removes it without resuming it', function () {
     $data = suspendedSaleVendor();
     Sanctum::actingAs($data['owner']);
 
-    $this->postJson('/api/pos/suspended', [
-        'vendor_id' => $data['vendor']->id, 'slot' => 1, 'label' => 'First',
-        'cart_data' => ['items' => [], 'customer' => null],
-    ])->assertCreated();
+    $suspended = PosSuspendedSale::create([
+        'vendor_id'  => $data['vendor']->id,
+        'cashier_id' => $data['owner']->id,
+        'label'      => 'Hold 1',
+        'cart_data'  => ['items' => [], 'customer' => null],
+    ]);
 
-    $this->postJson('/api/pos/suspended', [
-        'vendor_id' => $data['vendor']->id, 'slot' => 1, 'label' => 'Second',
-        'cart_data' => ['items' => [], 'customer' => null],
-    ])->assertCreated();
+    $this->deleteJson("/api/pos/suspended/{$suspended->id}", ['vendor_id' => $data['vendor']->id])
+        ->assertOk();
 
-    expect(PosSuspendedSale::where('vendor_id', $data['vendor']->id)->where('slot', 1)->count())->toBe(1)
-        ->and(PosSuspendedSale::where('vendor_id', $data['vendor']->id)->where('slot', 1)->first()->label)->toBe('Second');
+    expect(PosSuspendedSale::find($suspended->id))->toBeNull();
 });
