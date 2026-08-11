@@ -73,14 +73,24 @@ class FinancialReportService
         ];
     }
 
-    private function recognizedSales(int $vendorId, CarbonInterface $from, CarbonInterface $to): array
+    // The single source of truth for "which order_items count as delivered" —
+    // ProductVelocityService (app/Services/Reporting/ProductVelocityService.php)
+    // reuses this exact join/filter for restock velocity, so revenue and
+    // velocity can never disagree about what sold. Public and static so it can
+    // be called without instantiating the whole report service.
+    public static function recognizedOrderItemsQuery(int $vendorId, CarbonInterface $from, CarbonInterface $to)
     {
-        $row = OrderItem::query()
+        return OrderItem::query()
             ->join('orders', 'orders.id', '=', 'order_items.order_id')
-            ->join('products', 'products.id', '=', 'order_items.product_id')
             ->where('order_items.vendor_id', $vendorId)
             ->whereNotNull('orders.revenue_recognized_at')
-            ->whereBetween('orders.revenue_recognized_at', [$from, $to])
+            ->whereBetween('orders.revenue_recognized_at', [$from, $to]);
+    }
+
+    private function recognizedSales(int $vendorId, CarbonInterface $from, CarbonInterface $to): array
+    {
+        $row = self::recognizedOrderItemsQuery($vendorId, $from, $to)
+            ->join('products', 'products.id', '=', 'order_items.product_id')
             ->selectRaw('COALESCE(SUM(order_items.quantity * order_items.unit_price), 0) as revenue')
             ->selectRaw('COALESCE(SUM(order_items.quantity * COALESCE(order_items.unit_cost, products.cost_price)), 0) as product_cost')
             ->selectRaw('SUM(CASE WHEN order_items.unit_cost IS NULL THEN 1 ELSE 0 END) as estimated_lines')

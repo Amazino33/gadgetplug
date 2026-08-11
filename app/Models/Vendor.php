@@ -19,13 +19,35 @@ class Vendor extends Model
         'pos_vat_enabled', 'pos_vat_rate', 'pos_blind_count_participants',
         'pos_blind_count_frequency', 'pos_blind_count_custom_days', 'owner_can_manage_roles',
         'pos_min_margin_percent', 'online_sales_enabled', 'initial_capital',
+        'restock_window_days', 'restock_lead_time_days', 'restock_target_cover_days', 'restock_safety_buffer_days',
     ];
 
     protected $casts = [
-        'pos_min_margin_percent' => 'decimal:2',
-        'online_sales_enabled'   => 'boolean',
-        'initial_capital'        => 'decimal:2',
+        'pos_min_margin_percent'     => 'decimal:2',
+        'online_sales_enabled'      => 'boolean',
+        'initial_capital'           => 'decimal:2',
+        'restock_window_days'       => 'integer',
+        'restock_lead_time_days'    => 'integer',
+        'restock_target_cover_days' => 'integer',
+        'restock_safety_buffer_days' => 'integer',
     ];
+
+    // Single place both RestockReport and the reports-hub Restock card resolve
+    // "what settings does this vendor actually use" — each column is nullable
+    // and falls back to ProductVelocityService's own defaults, so there is
+    // exactly one place either fallback set lives.
+    /**
+     * @return array{windowDays: int, leadTimeDays: int, targetCoverDays: int, safetyBufferDays: ?int}
+     */
+    public function restockSettings(): array
+    {
+        return [
+            'windowDays'       => $this->restock_window_days ?? 30,
+            'leadTimeDays'     => $this->restock_lead_time_days ?? 5,
+            'targetCoverDays'  => $this->restock_target_cover_days ?? 30,
+            'safetyBufferDays' => $this->restock_safety_buffer_days,
+        ];
+    }
 
     public function getSlugOptions(): SlugOptions
     {

@@ -44,6 +44,7 @@ class VendorPermissionsSeeder extends Seeder
             'perform_inventory_count',
             'authorize_recount',
             'view_inventory_reports',
+            'view_restock_report',
             'view_audit_sessions',
             'approve_procurement',
             'manage_procurement',
