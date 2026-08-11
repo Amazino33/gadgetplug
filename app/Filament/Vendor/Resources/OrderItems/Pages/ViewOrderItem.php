@@ -9,6 +9,7 @@ use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
+use Filament\Schemas\Components\Utilities\Get;
 use Illuminate\Database\Eloquent\Model;
 
 
@@ -67,10 +68,39 @@ class ViewOrderItem extends ViewRecord
                             ],
                             default => [],
                         })
-                        ->required(),
+                        ->required()
+                        ->live(),
+
+                    // Mirrors ListOrders::requiresPaymentChannel() exactly — this
+                    // was the one remaining entry point that let a pay-on-delivery
+                    // order reach 'delivered' without ever being asked how the
+                    // customer paid, leaving it stuck off the Financial Report
+                    // with no error to say so.
+                    Select::make('payment_channel')
+                        ->label('How did the customer pay?')
+                        ->options(['cash' => 'Cash', 'bank_transfer' => 'Bank Transfer'])
+                        ->required()
+                        ->helperText('Cash goes to your cash account, bank transfer to your bank account.')
+                        ->visible(fn (Get $get) => $this->requiresPaymentChannel($get('status'))),
                 ])
                 ->action(function (array $data): void {
-                    $this->record->order->update(['status' => $data['status']]);
+                    $order = $this->record->order;
+
+                    if ($this->requiresPaymentChannel($data['status']) && ! in_array($data['payment_channel'] ?? null, ['cash', 'bank_transfer'], true)) {
+                        Notification::make()
+                            ->title('Say how the customer paid before marking this delivered.')
+                            ->body('Pick Cash or Bank Transfer — that is what puts the money into your accounts and onto the Financial Report.')
+                            ->warning()
+                            ->send();
+
+                        return;
+                    }
+
+                    $order->update(array_filter([
+                        'status'          => $data['status'],
+                        'payment_channel' => $this->requiresPaymentChannel($data['status']) ? $data['payment_channel'] : null,
+                    ]));
+
                     $this->record->refresh()->load(['order.items.product', 'product']);
 
                     Notification::make()
@@ -88,5 +118,14 @@ class ViewOrderItem extends ViewRecord
                     ['delivered', 'cancelled', 'paid_but_failed_stock']
                 )),
         ];
+    }
+
+    private function requiresPaymentChannel(?string $newStatus): bool
+    {
+        $order = $this->record->order;
+
+        return $newStatus === 'delivered'
+            && $order->payment_method === 'pay_on_delivery'
+            && ! $order->isRevenueRecognized();
     }
 }
