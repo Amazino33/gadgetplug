@@ -11,6 +11,7 @@ use App\Models\BlindCountEntry;
 use App\Models\BlindCountSession;
 use App\Models\Product;
 use App\Models\User;
+use App\Services\ShortageCaseService;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\DB;
@@ -718,7 +719,7 @@ class BlindCount extends Page
                 $difference = $count - (int) $product->stock_quantity;
                 $matched    = $difference === 0;
 
-                AuditSession::create([
+                $line = AuditSession::create([
                     'vendor_id'        => $session->vendor_id,
                     'product_id'       => $productId,
                     // The baseline this count is measured against, frozen now.
@@ -732,6 +733,12 @@ class BlindCount extends Page
                 ]);
 
                 if (! $matched) {
+                    // A balanced line opens nothing — the service returns null
+                    // for zero variance, so the real cases are not buried in
+                    // noise. Opening the case is deferred from the stock fix on
+                    // purpose: correcting the shelf figure must never wait on a
+                    // decision about a person.
+                    app(ShortageCaseService::class)->openForCountLine($line);
                     $discrepancies++;
                 }
             }
@@ -790,7 +797,7 @@ class BlindCount extends Page
                 $matched = $countA === $countB;
                 $product = Product::find($productId);
 
-                AuditSession::create([
+                $line = AuditSession::create([
                     'vendor_id'        => $session->vendor_id,
                     'product_id'       => $productId,
                     // Frozen baseline — see the solo path above.
@@ -817,6 +824,13 @@ class BlindCount extends Page
                 } else {
                     $discrepancies++;
                 }
+
+                // Outside the matched branch on purpose. Two counters agreeing is
+                // not the same as nothing being missing: they can agree on 7
+                // against a baseline of 10, which is a settled, accepted
+                // three-unit loss and exactly the case worth opening. The service
+                // returns null when the variance really is zero.
+                app(ShortageCaseService::class)->openForCountLine($line);
             }
         });
 

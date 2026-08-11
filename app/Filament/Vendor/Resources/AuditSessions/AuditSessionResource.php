@@ -10,7 +10,8 @@ use App\Models\AuditSession;
 use App\Models\User;
 use App\Actions\Inventory\ProcessAuditCountAction;
 use App\Actions\Inventory\AdjustStockAction;
-use App\Services\StockAccountabilityLedger;
+use App\Models\InventoryShortageCase;
+use App\Services\ShortageCaseService;
 use Filament\Forms\Components\Textarea;
 use Filament\Resources\Resource;
 use Filament\Tables\Table;
@@ -185,6 +186,72 @@ class AuditSessionResource extends Resource
                     ->color('warning')
                     ->placeholder('—'),
 
+                // ── Shortage case ────────────────────────────────────────────────
+                TextColumn::make('case_status')
+                    ->label('Case')
+                    ->badge()
+                    ->getStateUsing(fn (AuditSession $r): string => match (static::caseFor($r)?->status) {
+                        'pending_disposition' => 'Awaiting decision',
+                        'investigating'       => 'Investigating',
+                        'charged'             => 'Charged',
+                        'written_off'         => 'Written off',
+                        // A balanced line never opens a case, and that is the
+                        // normal outcome rather than something missing.
+                        default               => 'Balanced',
+                    })
+                    ->color(fn (AuditSession $r): string => match (static::caseFor($r)?->status) {
+                        'pending_disposition' => 'warning',
+                        'investigating'       => 'info',
+                        'charged'             => 'danger',
+                        'written_off'         => 'gray',
+                        default               => 'success',
+                    }),
+
+                TextColumn::make('charged_to')
+                    ->label('Accountable')
+                    ->getStateUsing(fn (AuditSession $r): string => static::caseFor($r)?->chargedStorekeeper?->name ?? '—')
+                    ->placeholder('—')
+                    ->toggleable(),
+
+                // Retail. Safe without the cost permission — it is what the store
+                // lost in sales, and discloses nothing about margin on its own.
+                TextColumn::make('charge_amount')
+                    ->label('Charge (₦)')
+                    ->alignRight()
+                    ->getStateUsing(function (AuditSession $r): string {
+                        $case = static::caseFor($r);
+
+                        return $case ? '₦'.number_format((float) $case->charge_amount, 2) : '—';
+                    })
+                    ->description(fn (AuditSession $r): ?string => static::caseFor($r)?->price_fallback
+                        ? 'charged at cost — no retail price'
+                        : null),
+
+                // Cost breakdown. Gated behind the same permission as everywhere
+                // else, because cost and margin each give the other away once the
+                // retail charge is known.
+                TextColumn::make('cost_component')
+                    ->label('Cost part (₦)')
+                    ->alignRight()
+                    ->visible(fn (): bool => ProductForm::canSeeCostPrice())
+                    ->getStateUsing(function (AuditSession $r): string {
+                        $case = static::caseFor($r);
+
+                        return $case ? '₦'.number_format((float) $case->cost_component, 2) : '—';
+                    })
+                    ->toggleable(),
+
+                TextColumn::make('margin_component')
+                    ->label('Margin part (₦)')
+                    ->alignRight()
+                    ->visible(fn (): bool => ProductForm::canSeeCostPrice())
+                    ->getStateUsing(function (AuditSession $r): string {
+                        $case = static::caseFor($r);
+
+                        return $case ? '₦'.number_format((float) $case->margin_component, 2) : '—';
+                    })
+                    ->toggleable(),
+
                 // ── 10. Financial write-off value ────────────────────────────────
                 TextColumn::make('loss_value')
                     ->label('Write-Off (₦)')
@@ -321,90 +388,119 @@ class AuditSessionResource extends Resource
                     })
                     ->successNotificationTitle('Discrepancy resolved.'),
 
-                // ── Owner attributes the settled variance to someone ─────────────
+                // ── Owner names who carries the loss ─────────────────────────────
                 //
-                // Deliberately separate from resolving. Resolving corrects the
-                // shelf figure and is an inventory job; this decides who answers
-                // for the loss and whether money is owed, which is the owner's
-                // call alone. Keeping them apart also means correcting stock is
-                // never held up waiting on a decision about a person.
-                Action::make('attribute_shortage')
-                    ->label('Attribute')
-                    ->icon('heroicon-o-scale')
-                    ->color('danger')
-                    ->modalHeading('Attribute this variance')
-                    ->modalDescription(fn (AuditSession $record): string => $record->system_quantity === null
-                        ? 'This count has no recorded baseline, so its variance cannot be attributed.'
-                        : sprintf(
-                            'Counted %d against a system figure of %d at count time — a variance of %+d unit(s).',
-                            $record->countedQuantity(),
-                            $record->system_quantity,
-                            $record->countedVariance(),
-                        ))
-                    ->slideOver()
+                // Separate from disposing because a case opens unattributed: this
+                // store has no assigned-storekeeper concept to default to, so
+                // somebody must be named before a charge is possible.
+                Action::make('assign_accountable')
+                    ->label('Assign')
+                    ->icon('heroicon-o-user-plus')
+                    ->color('gray')
+                    ->modalHeading('Who is accountable for this shortage?')
                     ->form([
                         Select::make('storekeeper_id')
                             ->label('Accountable staff member')
-                            ->helperText('Leave blank to record the loss against the store without naming anyone.')
-                            // No "primary storekeeper" exists in the data model,
-                            // so the owner picks explicitly rather than the system
-                            // guessing from whoever happened to count.
+                            ->helperText('Leave blank to leave the loss unattributed.')
                             ->options(fn (AuditSession $record): array => User::query()
                                 ->whereHas('memberVendors', fn ($q) => $q->where('vendors.id', $record->vendor_id))
                                 ->orderBy('name')
                                 ->pluck('name', 'id')
                                 ->toArray())
                             ->searchable()
-                            ->placeholder('Nobody — record against the store'),
+                            ->placeholder('Nobody'),
+                    ])
+                    ->visible(fn (AuditSession $record): bool => static::caseFor($record)?->awaitsDisposition() === true)
+                    ->action(function (AuditSession $record, array $data, ShortageCaseService $cases): void {
+                        $case = static::caseFor($record);
 
+                        // The real gate. Hiding the button is presentation; this
+                        // is what denies a storekeeper who calls the action
+                        // directly, and what blocks reassigning a case onto
+                        // yourself to route around self-disposition.
+                        if (! $case || auth()->user()->cannot('reassign', $case)) {
+                            Notification::make()->title('Only the store owner can assign accountability.')->danger()->send();
+
+                            return;
+                        }
+
+                        try {
+                            $cases->reassign($case, $data['storekeeper_id'] ? (int) $data['storekeeper_id'] : null);
+                            Notification::make()->title('Accountability updated.')->success()->send();
+                        } catch (\Throwable $e) {
+                            Notification::make()->title($e->getMessage())->danger()->send();
+                        }
+                    }),
+
+                // ── Owner disposes the case ──────────────────────────────────────
+                Action::make('dispose_case')
+                    ->label('Dispose')
+                    ->icon('heroicon-o-scale')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->modalHeading('Decide what happens to this shortage')
+                    ->modalDescription(function (AuditSession $record): string {
+                        $case = static::caseFor($record);
+
+                        if (! $case) {
+                            return '';
+                        }
+
+                        $who = $case->chargedStorekeeper?->name ?? 'nobody yet';
+
+                        return sprintf(
+                            '%d unit(s) short, %s at retail. Currently assigned to: %s.',
+                            $case->shortage_qty,
+                            '₦'.number_format((float) $case->charge_amount, 2),
+                            $who,
+                        );
+                    })
+                    ->slideOver()
+                    ->form([
                         Select::make('disposition')
-                            ->label('What happens to the value')
+                            ->label('Decision')
                             ->options([
-                                'written_off' => 'Write off as a business loss',
-                                'recoverable' => 'Recoverable — the staff member owes it',
-                                'recorded'    => 'Record only, no financial effect',
+                                'write_off'   => 'Write off — the company absorbs it',
+                                'charge'      => 'Charge the assigned staff member',
+                                'investigate' => 'Investigate — park it, decide later',
                             ])
-                            ->default('written_off')
                             ->required()
                             ->live()
                             ->helperText(fn ($state): string => match ($state) {
-                                'recoverable' => 'Adds to what this person owes until it is settled or reversed.',
-                                'recorded'    => 'Keeps the record with no amount attached.',
-                                default       => 'Absorbed by the business. No cash moves, so nothing posts to a bank or cash account.',
+                                'charge'      => 'Posts one charge to the accountability ledger at the frozen retail figure.',
+                                'investigate' => 'No money moves. Can be charged or written off later.',
+                                default       => 'No staff debt. Only the cost is a real loss — the margin was never earned.',
                             }),
 
-                        Select::make('reason_code')
+                        Textarea::make('reason')
                             ->label('Reason')
-                            ->options([
-                                'Damaged in Store'        => 'Damaged in Store',
-                                'Suspected Theft'         => 'Suspected Theft',
-                                'Waybill Shortage'        => 'Waybill Shortage',
-                                'Data Entry Error'        => 'Data Entry Error',
-                                'Supplier Short Delivery' => 'Supplier Short Delivery',
-                                'Other'                   => 'Other',
-                            ])
-                            ->searchable(),
-
-                        Textarea::make('note')->label('Note (optional)')->rows(2),
+                            ->rows(2)
+                            // Investigating is a holding position, so it does not
+                            // demand a justification the owner may not have yet.
+                            ->required(fn ($get): bool => in_array($get('disposition'), ['write_off', 'charge'], true)),
                     ])
-                    ->visible(fn (AuditSession $record): bool =>
-                        $record->isSettled()
-                        && $record->system_quantity !== null
-                        && (int) $record->countedVariance() !== 0
-                        && static::canAttribute($record)
-                    )
-                    ->action(function (AuditSession $record, array $data, StockAccountabilityLedger $ledger): void {
-                        try {
-                            $ledger->attribute(
-                                audit: $record,
-                                disposition: $data['disposition'],
-                                storekeeperId: $data['storekeeper_id'] ? (int) $data['storekeeper_id'] : null,
-                                resolvedBy: (int) auth()->id(),
-                                reasonCode: $data['reason_code'] ?? $record->reason_code,
-                                note: $data['note'] ?? null,
-                            );
+                    ->visible(fn (AuditSession $record): bool => static::caseFor($record)?->awaitsDisposition() === true)
+                    ->action(function (AuditSession $record, array $data, ShortageCaseService $cases): void {
+                        $case = static::caseFor($record);
 
-                            Notification::make()->title('Variance attributed.')->success()->send();
+                        if (! $case || auth()->user()->cannot('dispose', $case)) {
+                            Notification::make()
+                                ->title('You cannot dispose this case.')
+                                ->body('Disposition is the store owner\'s decision, and nobody may dispose a shortage charged to themselves.')
+                                ->danger()
+                                ->send();
+
+                            return;
+                        }
+
+                        try {
+                            match ($data['disposition']) {
+                                'write_off'   => $cases->writeOff($case, (int) auth()->id(), $data['reason']),
+                                'charge'      => $cases->charge($case, (int) auth()->id(), $data['reason']),
+                                'investigate' => $cases->investigate($case, (int) auth()->id(), $data['reason'] ?? null),
+                            };
+
+                            Notification::make()->title('Case disposed.')->success()->send();
                         } catch (\Throwable $e) {
                             Notification::make()->title($e->getMessage())->danger()->send();
                         }
@@ -423,15 +519,10 @@ class AuditSessionResource extends Resource
     // Deciding that a named person owes money is an owner's call, not a
     // delegable inventory permission — so this is not wired to a Spatie
     // permission that could be handed to a manager from the Roles screen.
-    public static function canAttribute(AuditSession $record): bool
+    /** The shortage case opened for this count line, if the variance was non-zero. */
+    public static function caseFor(AuditSession $record): ?InventoryShortageCase
     {
-        $user = auth()->user();
-
-        if (! $user) {
-            return false;
-        }
-
-        return $user->isSuperAdmin() || $record->vendor?->isOwner($user) === true;
+        return InventoryShortageCase::where('count_line_id', $record->id)->first();
     }
 
     public static function getPages(): array

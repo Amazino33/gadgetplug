@@ -37,8 +37,34 @@ class AccountabilityLedger
             throw new InvalidArgumentException('A charge needs a non-zero shortage quantity.');
         }
 
-        $snapshot = FrozenLossSnapshot::forProduct($product, $shortageQty);
+        return $this->postChargeFromSnapshot(
+            vendorId: $vendorId,
+            snapshot: FrozenLossSnapshot::forProduct($product, $shortageQty),
+            naturalKey: $naturalKey,
+            storekeeperId: $storekeeperId,
+            caseId: $caseId,
+            createdBy: $createdBy,
+            note: $note,
+        );
+    }
 
+    /**
+     * Post a charge from a snapshot that was frozen earlier.
+     *
+     * This is the form to use whenever the loss was established at one moment
+     * and the charge is written at another — a case opened at count commit and
+     * disposed days later, say. Passing the Product instead would re-price the
+     * loss at today's figures, which defeats the entire point of freezing.
+     */
+    public function postChargeFromSnapshot(
+        int $vendorId,
+        FrozenLossSnapshot $snapshot,
+        string $naturalKey,
+        ?int $storekeeperId = null,
+        ?int $caseId = null,
+        ?int $createdBy = null,
+        ?string $note = null,
+    ): AccountabilityLedgerEntry {
         return $this->post(
             naturalKey: $naturalKey,
             attributes: array_merge($snapshot->toLedgerColumns(), [
