@@ -77,6 +77,7 @@ class RoleResource extends ShieldRoleResource
                         'manage_financial_accounts',
                         'manage_expenses',
                         'manage_financial_reports',
+                        'view_reports_hub',
                     ])
                 )
                 ->getOptionLabelFromRecordUsing(fn ($record) => Str::headline($record->name))

@@ -66,6 +66,9 @@ class VendorPermissionsSeeder extends Seeder
 
             // Financial Report
             'manage_financial_reports',
+
+            // Reports Hub
+            'view_reports_hub',
         ];
 
         foreach ($permissions as $permission) {
