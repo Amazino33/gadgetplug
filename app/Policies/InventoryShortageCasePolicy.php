@@ -47,6 +47,27 @@ class InventoryShortageCasePolicy
         return $this->isOwnerOf($user, $case);
     }
 
+    /**
+     * Recording money back, or abandoning the remainder.
+     *
+     * Owner-only like disposition, and with the same self-dealing block: a
+     * person must not be able to mark their own debt as recovered, or write off
+     * what they themselves owe.
+     */
+    public function recordRecovery(User $user, InventoryShortageCase $case): bool
+    {
+        if ($case->charged_storekeeper_id !== null && $case->charged_storekeeper_id === $user->id) {
+            return false;
+        }
+
+        // Only a live charge can be recovered against.
+        if ($case->status !== 'charged') {
+            return false;
+        }
+
+        return $this->isOwnerOf($user, $case);
+    }
+
     /** Changing who carries the loss is the same class of decision. */
     public function reassign(User $user, InventoryShortageCase $case): bool
     {

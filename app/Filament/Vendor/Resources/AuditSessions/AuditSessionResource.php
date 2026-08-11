@@ -23,6 +23,7 @@ use Filament\Actions\DeleteBulkAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
+use Illuminate\Support\Str;
 use Exception;
 use BackedEnum;
 use UnitEnum;
@@ -501,6 +502,131 @@ class AuditSessionResource extends Resource
                             };
 
                             Notification::make()->title('Case disposed.')->success()->send();
+                        } catch (\Throwable $e) {
+                            Notification::make()->title($e->getMessage())->danger()->send();
+                        }
+                    }),
+
+                // ── Owner records money coming back ──────────────────────────────
+                //
+                // v1 is manual entry throughout. The ordering of the options is
+                // the recommended precedence — net against cash the storekeeper
+                // already holds before reaching for salary — but nothing here
+                // cascades automatically; the owner chooses.
+                Action::make('record_recovery')
+                    ->label('Record recovery')
+                    ->icon('heroicon-o-banknotes')
+                    ->color('success')
+                    ->modalHeading('Record money recovered')
+                    ->modalDescription(function (AuditSession $record): string {
+                        $case = static::caseFor($record);
+
+                        return $case
+                            ? 'Outstanding on this case: ₦'.number_format(app(ShortageCaseService::class)->outstandingFor($case), 2)
+                            : '';
+                    })
+                    ->slideOver()
+                    ->form([
+                        Select::make('type')
+                            ->label('How was it recovered?')
+                            ->options([
+                                'recovery_cash'   => 'Cash the storekeeper holds or owes',
+                                'recovery_salary' => 'Salary deduction',
+                                'recovery_manual' => 'Paid back directly',
+                            ])
+                            ->default('recovery_cash')
+                            ->required()
+                            ->helperText('Net against cash held first where possible, then salary for any remainder.'),
+
+                        TextInput::make('amount')
+                            ->label('Amount (₦)')
+                            ->numeric()
+                            ->required()
+                            ->minValue(0.01)
+                            // Advisory only. The service re-checks inside its
+                            // transaction, which is what actually prevents two
+                            // concurrent part-payments both slipping through.
+                            ->maxValue(fn (AuditSession $record): float => static::caseFor($record)
+                                ? app(ShortageCaseService::class)->outstandingFor(static::caseFor($record))
+                                : 0)
+                            ->helperText('Part payments are fine — the case closes itself once nothing is left.'),
+
+                        Textarea::make('note')->label('Note (optional)')->rows(2),
+                    ])
+                    ->visible(fn (AuditSession $record): bool => static::caseFor($record)?->status === 'charged')
+                    ->action(function (AuditSession $record, array $data, ShortageCaseService $cases): void {
+                        $case = static::caseFor($record);
+
+                        if (! $case || auth()->user()->cannot('recordRecovery', $case)) {
+                            Notification::make()->title('Only the store owner can record a recovery.')->danger()->send();
+
+                            return;
+                        }
+
+                        try {
+                            $cases->recover(
+                                case: $case,
+                                type: $data['type'],
+                                amount: (float) $data['amount'],
+                                // Keyed on the case and a fresh id, so a
+                                // double-submitted form posts once.
+                                eventKey: 'case:'.$case->id.':recovery:'.Str::ulid(),
+                                recordedBy: (int) auth()->id(),
+                                note: $data['note'] ?? null,
+                            );
+
+                            Notification::make()->title('Recovery recorded.')->success()->send();
+                        } catch (\Throwable $e) {
+                            Notification::make()->title($e->getMessage())->danger()->send();
+                        }
+                    }),
+
+                // ── Owner gives up on the remainder ──────────────────────────────
+                Action::make('convert_to_writeoff')
+                    ->label('Write off remainder')
+                    ->icon('heroicon-o-scissors')
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    ->modalHeading('Write off what is left')
+                    ->modalDescription(function (AuditSession $record): string {
+                        $case = static::caseFor($record);
+
+                        if (! $case) {
+                            return '';
+                        }
+
+                        $outstanding = app(ShortageCaseService::class)->outstandingFor($case);
+
+                        return sprintf(
+                            'Stops pursuing ₦%s. The company absorbs the unrecovered cost; margin that was never earned is simply not recognised.',
+                            number_format($outstanding, 2),
+                        );
+                    })
+                    ->form([
+                        Textarea::make('reason')
+                            ->label('Why is the remainder unrecoverable?')
+                            ->rows(2)
+                            ->required(),
+                    ])
+                    ->visible(fn (AuditSession $record): bool => static::caseFor($record)?->status === 'charged')
+                    ->action(function (AuditSession $record, array $data, ShortageCaseService $cases): void {
+                        $case = static::caseFor($record);
+
+                        if (! $case || auth()->user()->cannot('recordRecovery', $case)) {
+                            Notification::make()->title('Only the store owner can write off a remainder.')->danger()->send();
+
+                            return;
+                        }
+
+                        try {
+                            $cases->convertToWriteOff(
+                                case: $case,
+                                eventKey: "case:{$case->id}:writeoff_conversion",
+                                recordedBy: (int) auth()->id(),
+                                reason: $data['reason'],
+                            );
+
+                            Notification::make()->title('Remainder written off.')->success()->send();
                         } catch (\Throwable $e) {
                             Notification::make()->title($e->getMessage())->danger()->send();
                         }

@@ -49,6 +49,9 @@ return new class extends Migration
                 'written_off',
                 'charged',
                 'investigating',
+                // Charged and paid back in full. Distinct from written_off:
+                // the company absorbed nothing.
+                'recovered',
             ])->default('pending_disposition');
 
             $table->foreignId('disposed_by')->nullable()->constrained('users')->nullOnDelete();
