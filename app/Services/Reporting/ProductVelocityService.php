@@ -8,6 +8,7 @@ use App\Models\InventoryLedger;
 use App\Models\PosSaleItem;
 use App\Models\Product;
 use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 
 // Reusable velocity + stock-availability classifier — the restock report
@@ -42,6 +43,74 @@ class ProductVelocityService
             ->get(['id', 'vendor_id', 'stock_quantity', 'created_at']);
 
         return $this->analyze($products, $windowDays, $leadTimeDays, $targetCoverDays, $safetyBufferDays, $withStockoutGuard);
+    }
+
+    // Ranks products by units actually sold in an arbitrary [from, to] range
+    // — "who sold the most this week/month" — as opposed to forVendor()'s
+    // trailing-window restock tiering. Reuses the exact same two sources
+    // (recognizedOrderItemsQuery for online, the same POS filter for POS) so
+    // "top sellers" and "restock velocity" can never disagree about a sale.
+    /**
+     * @return Collection<int, TopSellerRow>
+     */
+    public function topSellers(
+        int $vendorId,
+        CarbonInterface $from,
+        CarbonInterface $to,
+        ?int $categoryId = null,
+        int $limit = 20,
+    ): Collection {
+        $onlineRows = FinancialReportService::recognizedOrderItemsQuery($vendorId, $from, $to)
+            ->groupBy('order_items.product_id')
+            ->selectRaw('order_items.product_id, SUM(order_items.quantity) as units, SUM(order_items.quantity * order_items.unit_price) as revenue')
+            ->get()
+            ->keyBy('product_id');
+
+        $posRows = PosSaleItem::query()
+            ->join('pos_sales', 'pos_sales.id', '=', 'pos_sale_items.pos_sale_id')
+            ->where('pos_sales.vendor_id', $vendorId)
+            ->where('pos_sales.status', '!=', 'voided')
+            ->whereBetween('pos_sales.completed_at', [$from, $to])
+            ->groupBy('pos_sale_items.product_id')
+            ->selectRaw('pos_sale_items.product_id, SUM(pos_sale_items.quantity) as units, SUM(pos_sale_items.quantity * pos_sale_items.unit_price) as revenue')
+            ->get()
+            ->keyBy('product_id');
+
+        $productIds = $onlineRows->keys()->merge($posRows->keys())->unique();
+
+        if ($productIds->isEmpty()) {
+            return collect();
+        }
+
+        $products = Product::whereIn('id', $productIds)
+            ->where('vendor_id', $vendorId)
+            ->when($categoryId, fn ($q) => $q->where('category_id', $categoryId))
+            ->with('category:id,name')
+            ->get()
+            ->keyBy('id');
+
+        // Normalized to calendar-day boundaries before diffing — diffing the
+        // raw timestamps is one day short or long depending on the time-of-day
+        // each end happens to carry (e.g. a 4-day-and-23-hours gap rounds
+        // unpredictably), where diffing two midnights never does.
+        $days = max(1, CarbonImmutable::parse($from)->startOfDay()->diffInDays(CarbonImmutable::parse($to)->startOfDay()) + 1);
+
+        return $productIds
+            ->filter(fn ($id) => $products->has($id))
+            ->map(function ($id) use ($onlineRows, $posRows, $products, $days) {
+                $units = (int) (($onlineRows[$id]->units ?? 0) + ($posRows[$id]->units ?? 0));
+                $revenue = (float) (($onlineRows[$id]->revenue ?? 0) + ($posRows[$id]->revenue ?? 0));
+
+                return new TopSellerRow(
+                    product: $products[$id],
+                    unitsSold: $units,
+                    revenue: $revenue,
+                    dailyVelocity: $units / $days,
+                );
+            })
+            ->sortByDesc(fn (TopSellerRow $row) => $row->unitsSold)
+            ->values()
+            ->take($limit);
     }
 
     public function forProduct(
