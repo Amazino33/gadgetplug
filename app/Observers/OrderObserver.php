@@ -2,10 +2,10 @@
 
 namespace App\Observers;
 
+use App\Actions\Finance\RecognizeOrderRevenueAction;
 use App\Actions\Inventory\DispatchStockAction;
 use App\Actions\Inventory\ReleaseReservationAction;
 use App\Models\DeliveryMessage;
-use App\Models\FinancialAccount;
 use App\Models\FinancialLedgerEntry;
 use App\Models\MessageTemplate;
 use App\Models\Order;
@@ -80,48 +80,12 @@ class OrderObserver
             return;
         }
 
-        if ($isPodRecognition && ! $order->payment_channel) {
-            // Delivered without a captured channel — nothing to post to.
-            // Not an error: this is the known gap the safety net surfaces.
-            return;
-        }
-
-        $vendorId = $order->items()->value('vendor_id');
-
-        if (! $vendorId) {
-            return;
-        }
-
-        $channel = $isPrepaidRecognition ? 'bank_transfer' : $order->payment_channel;
-        $type    = $channel === 'cash' ? 'cash' : 'bank';
-
-        $account = FinancialAccount::where('vendor_id', $vendorId)->where('type', $type)->first();
-
-        if (! $account) {
-            Log::error("Revenue recognition skipped for order {$order->id}: no {$type} account found for vendor {$vendorId}.");
-
-            return;
-        }
-
-        try {
-            FinancialLedger::postEntry(
-                account: $account,
-                direction: 'in',
-                amount: (float) $order->total_amount,
-                source: $order,
-                description: "Revenue recognized — order {$order->reference} ({$channel})",
-                createdBy: auth()->id(),
-            );
-
-            // Quietly — setting these here must not re-trigger this same
-            // observer method (or any other side effect) recursively.
-            $order->updateQuietly([
-                'revenue_recognized_at' => now(),
-                'payment_channel'       => $channel,
-            ]);
-        } catch (\Throwable $e) {
-            Log::error("Revenue recognition failed for order {$order->id}: " . $e->getMessage());
-        }
+        // Which transitions count is decided here; what recognition *is* lives in
+        // the action, shared with the order page's manual recovery. A POD order
+        // delivered without a captured channel returns 'no_channel' and stays
+        // unrecognized — not an error, just money still waiting to be recorded,
+        // which the order page's "Record Payment Received" action clears.
+        app(RecognizeOrderRevenueAction::class)->execute($order);
     }
 
     // Cancelling a previously-recognized order — today this is only reachable

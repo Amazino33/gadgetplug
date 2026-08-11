@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\TrackAffiliateEngagement;
 use App\Jobs\ClearAffiliateHoldsJob;
 use App\Jobs\DemoteInactiveAffiliatesJob;
 use Filament\Facades\Filament;
@@ -22,6 +23,11 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->statefulApi();
+
+        // Appended so it runs after the session is started and sees the final
+        // response — it counts pages a referred visitor actually landed on,
+        // which is what the engaged-visit reward is paid against.
+        $middleware->web(append: [TrackAffiliateEngagement::class]);
     })
     ->withSchedule(function (Schedule $schedule): void {
         // Hourly rather than daily since the hold is measured in days; this keeps

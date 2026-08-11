@@ -1,5 +1,7 @@
 <?php
 
+use App\Actions\Finance\RecognizeOrderRevenueAction;
+use App\Filament\Vendor\Resources\Orders\Pages\ListOrders;
 use App\Filament\Vendor\Resources\Orders\Pages\ViewOrder;
 use App\Models\Category;
 use App\Models\FinancialAccount;
@@ -195,6 +197,119 @@ test('the Meta Purchase event path is untouched by recognition — the confirmed
 
     expect($order->status)->toBe('paid')
         ->and($order->isRevenueRecognized())->toBeTrue();
+});
+
+// ─── Every entry point captures the channel ─────────────────────────
+
+test('the orders list refuses to mark a POD order delivered without saying how the customer paid', function () {
+    $data = setUpRecognitionVendor();
+    $order = makeRecognitionOrder($data, 'pay_on_delivery', 'shipped');
+    actAsRecognitionOwner($data);
+
+    Livewire::test(ListOrders::class)
+        ->call('updateOrderStatus', $order->id, 'delivered', null, null);
+
+    // Status is left alone entirely — a delivered order with no money recorded
+    // anywhere is exactly the state this refusal exists to prevent.
+    expect($order->fresh()->status)->toBe('shipped')
+        ->and($order->fresh()->isRevenueRecognized())->toBeFalse()
+        ->and(FinancialLedgerEntry::count())->toBe(0);
+});
+
+test('the orders list recognizes revenue when the channel is given', function () {
+    $data = setUpRecognitionVendor();
+    $order = makeRecognitionOrder($data, 'pay_on_delivery', 'shipped');
+    $cash = FinancialAccount::where('vendor_id', $data['vendor']->id)->where('type', 'cash')->first();
+    actAsRecognitionOwner($data);
+
+    Livewire::test(ListOrders::class)
+        ->call('updateOrderStatus', $order->id, 'delivered', null, 'cash');
+
+    $order->refresh();
+
+    expect($order->status)->toBe('delivered')
+        ->and($order->isRevenueRecognized())->toBeTrue()
+        ->and($order->payment_channel)->toBe('cash')
+        ->and($cash->fresh()->balance())->toBe(5000.0);
+});
+
+test('a prepaid order is never blocked by the channel check — nothing to ask', function () {
+    $data = setUpRecognitionVendor();
+    $order = makeRecognitionOrder($data, 'paystack', 'shipped');
+    actAsRecognitionOwner($data);
+
+    Livewire::test(ListOrders::class)
+        ->call('updateOrderStatus', $order->id, 'delivered', null, null);
+
+    expect($order->fresh()->status)->toBe('delivered');
+});
+
+// ─── Manual recovery for money already earned ───────────────────────
+
+test('the order page can record a payment for an order delivered without a channel', function () {
+    $data = setUpRecognitionVendor();
+    $order = makeRecognitionOrder($data, 'pay_on_delivery', 'shipped');
+    $cash = FinancialAccount::where('vendor_id', $data['vendor']->id)->where('type', 'cash')->first();
+
+    // The gap as it exists in production: delivered, but recognized nowhere.
+    $order->update(['status' => 'delivered']);
+    expect($order->fresh()->isRevenueRecognized())->toBeFalse();
+
+    actAsRecognitionOwner($data);
+
+    Livewire::test(ViewOrder::class, ['record' => $order->getRouteKey()])
+        ->mountAction('recordPaymentReceived')
+        ->setActionData(['payment_channel' => 'cash'])
+        ->callMountedAction()
+        ->assertHasNoActionErrors();
+
+    $order->refresh();
+
+    expect($order->isRevenueRecognized())->toBeTrue()
+        ->and($order->payment_channel)->toBe('cash')
+        ->and($cash->fresh()->balance())->toBe(5000.0);
+});
+
+test('the record payment action disappears once revenue is recognized, so one sale can never be counted twice', function () {
+    $data = setUpRecognitionVendor();
+    $order = makeRecognitionOrder($data, 'pay_on_delivery', 'shipped');
+    $order->update(['status' => 'delivered', 'payment_channel' => 'cash']);
+    actAsRecognitionOwner($data);
+
+    expect($order->fresh()->isRevenueRecognized())->toBeTrue();
+
+    Livewire::test(ViewOrder::class, ['record' => $order->fresh()->getRouteKey()])
+        ->assertActionHidden('recordPaymentReceived');
+});
+
+test('the record payment action is offered on an unrecognized order and hidden on a fresh one', function () {
+    $data = setUpRecognitionVendor();
+    $order = makeRecognitionOrder($data, 'pay_on_delivery', 'shipped');
+    actAsRecognitionOwner($data);
+
+    // Still in transit — nothing to record yet.
+    Livewire::test(ViewOrder::class, ['record' => $order->getRouteKey()])
+        ->assertActionHidden('recordPaymentReceived');
+
+    $order->update(['status' => 'delivered']);
+
+    Livewire::test(ViewOrder::class, ['record' => $order->fresh()->getRouteKey()])
+        ->assertActionVisible('recordPaymentReceived');
+});
+
+test('recording a payment twice posts one entry, not two', function () {
+    $data = setUpRecognitionVendor();
+    $order = makeRecognitionOrder($data, 'pay_on_delivery', 'shipped');
+    $order->update(['status' => 'delivered']);
+    $cash = FinancialAccount::where('vendor_id', $data['vendor']->id)->where('type', 'cash')->first();
+
+    app(RecognizeOrderRevenueAction::class)->execute($order->fresh(), 'cash');
+    $secondAttempt = app(RecognizeOrderRevenueAction::class)->execute($order->fresh(), 'cash');
+
+    expect($secondAttempt)->toBe('already_recognized')
+        ->and($cash->fresh()->balance())->toBe(5000.0)
+        ->and(FinancialLedgerEntry::where('source_type', $order->getMorphClass())
+            ->where('source_id', $order->id)->where('direction', 'in')->count())->toBe(1);
 });
 
 // ─── Cancellation reversal ──────────────────────────────────────────

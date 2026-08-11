@@ -48,4 +48,9 @@ class WalletTransaction extends Model
     {
         return $this->belongsTo(Order::class);
     }
+
+    public function click(): BelongsTo
+    {
+        return $this->belongsTo(AffiliateClick::class, 'affiliate_click_id');
+    }
 }

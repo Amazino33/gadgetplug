@@ -73,6 +73,33 @@ test('the margin cap field round-trips between the stored fraction and the displ
         ->and($settings->inactivity_demotion_days)->toBe(30);
 });
 
+test('the engaged visit reward controls persist, including the kill switch', function () {
+    $admin = User::factory()->create();
+    $admin->assignRole(Role::firstOrCreate(['name' => 'super_admin', 'guard_name' => 'web']));
+
+    $this->actingAs($admin);
+
+    // Defaults out of the migration — ₦2 a visit, on.
+    Livewire::test(AffiliateSettings::class)
+        ->assertSet('data.click_rewards_enabled', true)
+        ->assertSet('data.click_reward_amount', '2.00')
+        ->fillForm([
+            'click_rewards_enabled'       => false,
+            'click_reward_amount'         => 3.50,
+            'click_reward_daily_cap'      => 500,
+            'click_reward_daily_ip_limit' => 2,
+        ])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    $settings = AffiliateSetting::current();
+
+    expect($settings->click_rewards_enabled)->toBeFalse()
+        ->and((float) $settings->click_reward_amount)->toBe(3.5)
+        ->and((float) $settings->click_reward_daily_cap)->toBe(500.0)
+        ->and($settings->click_reward_daily_ip_limit)->toBe(2);
+});
+
 test('the platform default reseller discount persists as a plain percentage', function () {
     $admin = User::factory()->create();
     $admin->assignRole(Role::firstOrCreate(['name' => 'super_admin', 'guard_name' => 'web']));

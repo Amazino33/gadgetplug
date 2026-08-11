@@ -4,6 +4,7 @@ use Livewire\Volt\Component;
 use Livewire\WithFileUploads;
 use Livewire\WithPagination;
 use App\Models\Affiliate;
+use App\Models\AffiliateClick;
 use App\Models\AffiliateCommission;
 use App\Models\AffiliateLevel;
 use App\Models\AffiliateTask;
@@ -133,6 +134,28 @@ new class extends Component {
         return $this->affiliate
             ? WalletTransaction::where('affiliate_id', $this->affiliate->id)->latest()->paginate(8, ['*'], 'walletPage')
             : null;
+    }
+
+    // ─── Traffic ────────────────────────────────────────────────────────
+
+    /**
+     * Visits are shown as a funnel — arrived, then engaged — because the gap
+     * between the two is the number the affiliate can actually act on: it's
+     * the share of their audience that bounced.
+     */
+    public function getTrafficStatsProperty(): array
+    {
+        if (! $this->affiliate) {
+            return ['clicks' => 0, 'engaged' => 0, 'earned' => 0.0];
+        }
+
+        $clicks = AffiliateClick::where('affiliate_id', $this->affiliate->id);
+
+        return [
+            'clicks'  => (clone $clicks)->count(),
+            'engaged' => (clone $clicks)->engaged()->count(),
+            'earned'  => (float) (clone $clicks)->sum('reward_amount'),
+        ];
     }
 
     // ─── Level & progress ───────────────────────────────────────────────
@@ -297,6 +320,28 @@ new class extends Component {
                         <p class="text-[11px] text-brand-muted">Highest level reached 🎉</p>
                     @endif
                 </div>
+            </div>
+
+            {{-- Traffic --}}
+            <div class="bg-white dark:bg-[#162016] border border-brand-border dark:border-[#2a3a2a] rounded-2xl p-5 md:p-6">
+                <h2 class="font-montserrat font-bold text-[15px] text-brand-dark dark:text-[#e8f5e9] mb-4">Your Traffic</h2>
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <div class="text-[11px] text-brand-muted mb-1">Visits</div>
+                        <div class="font-montserrat font-black text-[22px] text-brand-dark dark:text-[#e8f5e9]">{{ number_format($this->trafficStats['clicks']) }}</div>
+                    </div>
+                    <div>
+                        <div class="text-[11px] text-brand-muted mb-1">Engaged</div>
+                        <div class="font-montserrat font-black text-[22px] text-brand-dark dark:text-[#e8f5e9]">{{ number_format($this->trafficStats['engaged']) }}</div>
+                    </div>
+                    <div>
+                        <div class="text-[11px] text-brand-muted mb-1">Earned from visits</div>
+                        <div class="font-montserrat font-black text-[22px] text-brand">₦{{ number_format($this->trafficStats['earned'], 2) }}</div>
+                    </div>
+                </div>
+                <p class="text-[11px] text-brand-muted mt-3">
+                    A visit pays only once the person opens a second page — that's how we know they actually looked around instead of landing and leaving. When they buy, you earn the full commission on top.
+                </p>
             </div>
 
             {{-- Bank details --}}

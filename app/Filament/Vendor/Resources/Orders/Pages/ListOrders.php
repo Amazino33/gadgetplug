@@ -77,6 +77,19 @@ class ListOrders extends ListRecords
         };
     }
 
+    // Whether marking this order into $newStatus needs the owner to say how the
+    // customer paid. Only pay-on-delivery, only on delivery, and only while the
+    // money is still uncounted — once revenue is recognized the channel is
+    // settled history and asking again could only confuse or double-count.
+    // Public because the row partials ask it to decide whether the shared status
+    // modal shows the payment picker.
+    public function requiresPaymentChannel(Order $order, string $newStatus = 'delivered'): bool
+    {
+        return $newStatus === 'delivered'
+            && $order->payment_method === 'pay_on_delivery'
+            && ! $order->isRevenueRecognized();
+    }
+
     // Templates for the row's send-message modal, pre-rendered against this order
     // so picking one fills the textarea with the exact text that will be sent,
     // with no extra round trip. Same source of truth as the order page's
@@ -164,7 +177,7 @@ class ListOrders extends ListRecords
         };
     }
 
-    public function updateOrderStatus(int $orderId, ?string $newStatus, ?string $note = null): void
+    public function updateOrderStatus(int $orderId, ?string $newStatus, ?string $note = null, ?string $paymentChannel = null): void
     {
         $order = $this->findOwnedOrder($orderId);
         $statusChanged = false;
@@ -175,7 +188,25 @@ class ListOrders extends ListRecords
                 return;
             }
 
-            $order->update(['status' => $newStatus]);
+            // A pay-on-delivery order marked delivered without saying how the
+            // customer paid used to go through silently and never reach the
+            // Financial Report — the sale showed as revenue on the Sales Report
+            // while the money was recorded nowhere. Refused here rather than
+            // guessed at: only the person who took the money knows which it was.
+            if ($this->requiresPaymentChannel($order, $newStatus) && ! in_array($paymentChannel, ['cash', 'bank_transfer'], true)) {
+                Notification::make()
+                    ->title('Say how the customer paid before marking this delivered.')
+                    ->body('Pick Cash or Bank Transfer — that is what puts the money into your accounts and onto the Financial Report.')
+                    ->warning()
+                    ->send();
+
+                return;
+            }
+
+            $order->update(array_filter([
+                'status'          => $newStatus,
+                'payment_channel' => $this->requiresPaymentChannel($order, $newStatus) ? $paymentChannel : null,
+            ]));
             $statusChanged = true;
         }
 

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Vendor\Resources\Orders\Pages;
 
+use App\Actions\Finance\RecognizeOrderRevenueAction;
 use App\Filament\Vendor\Resources\Orders\OrderResource;
 use App\Models\DeliveryMessage;
 use App\Models\FinancialAccount;
@@ -95,6 +96,55 @@ class ViewOrder extends ViewRecord
                         ->send();
                 })
                 ->visible(fn () => ! in_array($this->record->status, ['delivered', 'cancelled', 'paid_but_failed_stock'])),
+
+            // The recovery path for money that was earned but never recorded: an
+            // order marked delivered from the orders list (or by an older build
+            // that never asked how the customer paid) sits at 'delivered' with no
+            // revenue_recognized_at, so it shows on the Sales Report but not in
+            // the Financial Report. This is how the owner closes that gap without
+            // touching the ledger by hand. Hidden the moment revenue is
+            // recognized, so it can never be used to count one sale twice.
+            Action::make('recordPaymentReceived')
+                ->label('Record Payment Received')
+                ->icon('heroicon-o-banknotes')
+                ->color('success')
+                ->requiresConfirmation()
+                ->modalHeading('Record Payment Received')
+                ->modalDescription(fn () => 'Adds ₦'.number_format((float) $this->record->total_amount, 2).' to the account you pick, as money received on this order. Do this only if the customer has actually paid — it happens once and cannot be undone from here.')
+                ->schema([
+                    Select::make('payment_channel')
+                        ->label('How did the customer pay?')
+                        ->options(['cash' => 'Cash', 'bank_transfer' => 'Bank Transfer'])
+                        ->required()
+                        ->helperText('Cash goes to your cash account, bank transfer to your bank account.'),
+                ])
+                ->visible(fn () => in_array($this->record->status, ['paid', 'delivered'], true)
+                    && ! $this->record->isRevenueRecognized()
+                    && auth()->user()->hasVendorPermission(filament()->getTenant()->id, 'manage_financial_accounts'))
+                ->action(function (array $data): void {
+                    $reason = app(RecognizeOrderRevenueAction::class)
+                        ->execute($this->record, $data['payment_channel']);
+
+                    if ($reason !== null) {
+                        Notification::make()
+                            ->title(match ($reason) {
+                                'already_recognized' => 'This order was already counted — nothing changed.',
+                                'no_account'         => 'No matching account. Create a cash and a bank account under Financial Accounts first.',
+                                default              => 'Could not record this payment. Try again, or contact support if it keeps failing.',
+                            })
+                            ->warning()
+                            ->send();
+
+                        return;
+                    }
+
+                    $this->refreshFormData(['payment_channel', 'revenue_recognized_at']);
+
+                    Notification::make()
+                        ->title('Payment recorded — this order now counts in the Financial Report.')
+                        ->success()
+                        ->send();
+                }),
 
             Action::make('assignLogistics')
                 ->label('Assign & Notify Rider')

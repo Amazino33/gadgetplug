@@ -45,6 +45,19 @@ class AffiliatesTable
                     ->counts('commissions')
                     ->alignCenter(),
 
+                // Traffic earnings next to order count is the abuse tell: an
+                // affiliate whose visit rewards dwarf their sales is sending
+                // clicks, not customers. Same per-row query shape the balance
+                // columns above already use.
+                TextColumn::make('engaged_visits')
+                    ->label('Engaged Visits')
+                    ->alignCenter()
+                    ->getStateUsing(fn (Affiliate $record) => $record->clicks()->engaged()->count())
+                    ->description(fn (Affiliate $record) => '₦' . number_format(
+                        (float) $record->clicks()->sum('reward_amount'), 2
+                    ) . ' earned')
+                    ->toggleable(),
+
                 IconColumn::make('is_active')->label('Active')->boolean(),
 
                 TextColumn::make('created_at')->label('Joined')->date('d M Y')->sortable()->toggleable(isToggledHiddenByDefault: true),

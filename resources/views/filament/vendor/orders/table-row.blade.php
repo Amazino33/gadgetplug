@@ -74,7 +74,7 @@
             </button>
             <button type="button"
                 x-data
-                x-on:click="window.dispatchEvent(new CustomEvent('open-update-status', { detail: { id: {{ $order->id }}, options: @js($statusOptions) } }))"
+                x-on:click="window.dispatchEvent(new CustomEvent('open-update-status', { detail: { id: {{ $order->id }}, options: @js($statusOptions), needsChannel: @js($this->requiresPaymentChannel($order)) } }))"
                 title="Update status / add note" aria-label="Update status or add a note for order {{ $order->reference }}"
                 class="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:text-amber-600">
                 <x-heroicon-o-pencil-square class="h-4 w-4"/>

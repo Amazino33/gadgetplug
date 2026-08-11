@@ -10,11 +10,15 @@
             options: [],
             newStatus: '',
             note: '',
-            openModal(id, options) {
+            needsChannel: false,
+            paymentChannel: '',
+            openModal(id, options, needsChannel = false) {
                 this.orderId = id;
                 this.options = options;
                 this.newStatus = '';
                 this.note = '';
+                this.needsChannel = needsChannel;
+                this.paymentChannel = '';
                 this.open = true;
             },
 
@@ -53,7 +57,7 @@
                 this.msgSending = false;
             }
         }"
-        x-on:open-update-status.window="openModal($event.detail.id, $event.detail.options)"
+        x-on:open-update-status.window="openModal($event.detail.id, $event.detail.options, $event.detail.needsChannel)"
         x-on:open-send-message.window="openMessageModal($event.detail)"
     >
         {{-- Toolbar --}}
@@ -138,6 +142,24 @@
                     </div>
                 </template>
 
+                {{-- Only for a pay-on-delivery order being marked delivered: this
+                     is what puts the money into an account and onto the Financial
+                     Report. Without it the sale is counted as revenue nowhere. --}}
+                <template x-if="needsChannel && newStatus === 'delivered'">
+                    <div class="mb-4">
+                        <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">How did the customer pay?</label>
+                        <select x-model="paymentChannel"
+                            class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+                            <option value="">Choose one</option>
+                            <option value="cash">Cash</option>
+                            <option value="bank_transfer">Bank Transfer</option>
+                        </select>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            The full order amount is added to that account as money received — once, right now.
+                        </p>
+                    </div>
+                </template>
+
                 <div class="mb-4">
                     <label class="mb-1 block text-xs font-medium text-gray-500 dark:text-gray-400">Note (optional)</label>
                     <textarea x-model="note" rows="3"
@@ -151,7 +173,7 @@
                         Cancel
                     </button>
                     <button type="button"
-                        x-on:click="$wire.updateOrderStatus(orderId, newStatus || null, note || null); open = false"
+                        x-on:click="$wire.updateOrderStatus(orderId, newStatus || null, note || null, paymentChannel || null); open = false"
                         class="rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-700">
                         Save
                     </button>

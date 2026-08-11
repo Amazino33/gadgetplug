@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Models\AffiliateSetting;
 use BackedEnum;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -44,6 +45,10 @@ class AffiliateSettings extends Page
             'min_payout_amount',
             'inactivity_demotion_days',
             'margin_cap_fraction',
+            'click_rewards_enabled',
+            'click_reward_amount',
+            'click_reward_daily_cap',
+            'click_reward_daily_ip_limit',
         ]);
 
         // Stored as a 0.00–1.00 fraction (CommissionService multiplies it
@@ -117,6 +122,39 @@ class AffiliateSettings extends Page
                             ->suffix('%')
                             ->required()
                             ->helperText('A level-boosted commission can never exceed this fraction of the item\'s margin — protects thin-margin categories regardless of level.'),
+                    ])
+                    ->columns(2),
+
+                Section::make('Engaged Visit Rewards')
+                    ->description('Paid when a referred visitor loads a second page — proof they saw the site and clicked on, rather than landing and leaving. This is separate from, and stacks with, the sale commission above.')
+                    ->schema([
+                        Toggle::make('click_rewards_enabled')
+                            ->label('Pay for engaged visits')
+                            ->helperText('Turn off to stop all traffic rewards immediately. Sale commissions are unaffected.'),
+
+                        TextInput::make('click_reward_amount')
+                            ->label('Reward per Engaged Visit (₦)')
+                            ->numeric()
+                            ->minValue(0)
+                            ->prefix('₦')
+                            ->required()
+                            ->helperText('Credited straight to the affiliate\'s available balance — there is no return window, since a visit cannot be reversed.'),
+
+                        TextInput::make('click_reward_daily_cap')
+                            ->label('Daily Cap per Affiliate (₦)')
+                            ->numeric()
+                            ->minValue(0)
+                            ->prefix('₦')
+                            ->required()
+                            ->helperText('Most an affiliate can earn from traffic in one day. Visits past the cap still count as engaged but pay nothing.'),
+
+                        TextInput::make('click_reward_daily_ip_limit')
+                            ->label('Rewarded Visits per IP per Day')
+                            ->numeric()
+                            ->integer()
+                            ->minValue(0)
+                            ->required()
+                            ->helperText('Stops one person farming the reward by re-opening the same link. 1 means the same visitor is worth paying for once a day.'),
                     ])
                     ->columns(2),
             ]);

@@ -16,6 +16,10 @@ class AffiliateSetting extends Model
         'min_payout_amount'                  => 'decimal:2',
         'margin_cap_fraction'                => 'decimal:2',
         'platform_default_reseller_discount' => 'decimal:2',
+        'click_rewards_enabled'              => 'boolean',
+        'click_reward_amount'                => 'decimal:2',
+        'click_reward_daily_cap'             => 'decimal:2',
+        'click_reward_daily_ip_limit'        => 'integer',
     ];
 
     public static function current(): self

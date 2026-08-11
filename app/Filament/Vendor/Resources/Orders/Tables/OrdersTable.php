@@ -108,9 +108,32 @@ class OrdersTable
                                 ],
                                 default => [],
                             })
+                            ->live()
                             ->required(),
+
+                        // Without this, marking a pay-on-delivery order delivered
+                        // from the list left the observer with no channel to post
+                        // to, so the sale showed on the Sales Report and never
+                        // reached the Financial Report. Asked here for the same
+                        // reason the order page asks it.
+                        Select::make('payment_channel')
+                            ->label('How did the customer pay on delivery?')
+                            ->options(['cash' => 'Cash', 'bank_transfer' => 'Bank Transfer'])
+                            ->required()
+                            ->helperText('The full order amount is added to whichever account you pick, as money received — once, right now.')
+                            ->visible(fn(Order $record, $get) => $get('status') === 'delivered'
+                                && $record->payment_method === 'pay_on_delivery'
+                                && ! $record->isRevenueRecognized()),
                     ])
-                    ->action(fn(Order $record, array $data) => $record->update(['status' => $data['status']]))
+                    ->action(function (Order $record, array $data): void {
+                        $update = ['status' => $data['status']];
+
+                        if (filled($data['payment_channel'] ?? null)) {
+                            $update['payment_channel'] = $data['payment_channel'];
+                        }
+
+                        $record->update($update);
+                    })
                     ->visible(fn(Order $record) => !in_array($record->status, ['delivered', 'cancelled', 'paid_but_failed_stock'])),
             ]);
     }
