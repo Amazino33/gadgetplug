@@ -60,6 +60,50 @@ class Order extends Model
             ->dontSubmitEmptyLogs();
     }
 
+    protected function casts(): array
+    {
+        return [
+            'preferred_delivery_date'    => 'date',
+            'delivery_preference_set_at' => 'datetime',
+        ];
+    }
+
+    // What the customer tapped on the success screen. 'scheduled' means they
+    // picked a specific date; the date itself is in preferred_delivery_date.
+    public const URGENCY_TODAY     = 'today';
+    public const URGENCY_TOMORROW  = 'tomorrow';
+    public const URGENCY_SCHEDULED = 'scheduled';
+
+    public const URGENCIES = [
+        self::URGENCY_TODAY,
+        self::URGENCY_TOMORROW,
+        self::URGENCY_SCHEDULED,
+    ];
+
+    /** How far ahead a customer may schedule delivery, in days. */
+    public const MAX_SCHEDULE_DAYS = 30;
+
+    // Reads the choice back the way dispatch needs it: the tapped urgency first,
+    // because "Today" carries intent that a bare date does not.
+    public function deliveryPreferenceLabel(): ?string
+    {
+        if (! $this->delivery_urgency) {
+            return null;
+        }
+
+        return match ($this->delivery_urgency) {
+            self::URGENCY_TODAY    => 'Today',
+            self::URGENCY_TOMORROW => 'Tomorrow',
+            default                => $this->preferred_delivery_date?->format('D, j M Y') ?? 'Scheduled',
+        };
+    }
+
+    // True when the customer wants it today or the scheduled day has arrived.
+    public function isDeliveryWantedToday(): bool
+    {
+        return $this->preferred_delivery_date?->isToday() ?? false;
+    }
+
     public function tapActivity(Activity $activity, string $eventName): void
     {
         // Order has no direct vendor_id column — resolve it via its items instead

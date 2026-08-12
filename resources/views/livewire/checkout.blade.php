@@ -40,6 +40,12 @@ new class extends Component {
     // browser + server into one event instead of double-counting.
     public ?string $pixelEventId = null;
 
+    // When the customer wants the order. Asked after checkout rather than during
+    // it, so it never stands between them and paying.
+    public string $deliveryUrgency = '';
+    public string $deliveryDate    = '';
+    public bool   $showDatePicker  = false;
+
     public function mount(): void
     {
         // Show success screen after Paystack or Pay-on-Delivery completion
@@ -71,6 +77,9 @@ new class extends Component {
                 // OrderObserver off this same order, keyed on its reference) —
                 // Meta dedupes browser + server into one Purchase.
                 $this->pixelEventId = $order->reference;
+
+                $this->deliveryUrgency = $order->delivery_urgency ?? '';
+                $this->deliveryDate    = $order->preferred_delivery_date?->format('Y-m-d') ?? '';
             }
             return;
         }
@@ -162,6 +171,68 @@ new class extends Component {
                 'content_type' => 'product',
             ],
         );
+    }
+
+    // One tap records the choice — no separate save step, because anything the
+    // customer has to confirm after paying, most of them simply won't.
+    public function chooseDelivery(string $urgency, ?string $date = null): void
+    {
+        // Only ever writes the order this browser just paid for. $paidReference
+        // comes from the server-side session in mount(), not from the request,
+        // so a crafted call cannot retarget somebody else's order.
+        if (! $this->paid || $this->paidReference === '') {
+            return;
+        }
+
+        if (! in_array($urgency, Order::URGENCIES, true)) {
+            return;
+        }
+
+        $resolved = match ($urgency) {
+            Order::URGENCY_TODAY    => now()->startOfDay(),
+            Order::URGENCY_TOMORROW => now()->addDay()->startOfDay(),
+            // Falls back to the bound input, which is how the Confirm button
+            // passes the picked date — wire:model ships it with this same call.
+            default                 => $this->parseScheduledDate($date ?: $this->deliveryDate),
+        };
+
+        if ($resolved === null) {
+            $this->addError('deliveryDate', 'Pick a date between today and ' . now()->addDays(Order::MAX_SCHEDULE_DAYS)->format('j M Y') . '.');
+            return;
+        }
+
+        $this->resetErrorBag('deliveryDate');
+
+        Order::where('reference', $this->paidReference)->update([
+            'delivery_urgency'           => $urgency,
+            'preferred_delivery_date'    => $resolved->toDateString(),
+            'delivery_preference_set_at' => now(),
+        ]);
+
+        $this->deliveryUrgency = $urgency;
+        $this->deliveryDate    = $resolved->toDateString();
+        $this->showDatePicker  = false;
+    }
+
+    // Rejects anything outside today .. today + MAX_SCHEDULE_DAYS, including
+    // unparseable input, rather than silently storing a nonsense date.
+    private function parseScheduledDate(?string $date): ?\Illuminate\Support\Carbon
+    {
+        if (! $date) {
+            return null;
+        }
+
+        try {
+            $parsed = \Illuminate\Support\Carbon::createFromFormat('Y-m-d', $date)->startOfDay();
+        } catch (\Throwable) {
+            return null;
+        }
+
+        if ($parsed->lt(now()->startOfDay()) || $parsed->gt(now()->addDays(Order::MAX_SCHEDULE_DAYS)->startOfDay())) {
+            return null;
+        }
+
+        return $parsed;
     }
 
     public function processCheckout(): void
@@ -408,6 +479,89 @@ new class extends Component {
         </div>
 
         <div class="w-full max-w-[620px] space-y-4 text-left">
+
+            {{-- When do you want it? Asked only after payment, so it never sits
+                 between the customer and the checkout button. One tap records. --}}
+            @php
+                $minDate = now()->format('Y-m-d');
+                $maxDate = now()->addDays(\App\Models\Order::MAX_SCHEDULE_DAYS)->format('Y-m-d');
+                $chosen  = $deliveryUrgency !== '';
+            @endphp
+
+            <div class="bg-white dark:bg-[#1a2a1a] rounded-2xl border border-brand-border dark:border-[#2a3a2a] overflow-hidden"
+                 wire:key="delivery-preference">
+                <div class="px-5 py-4 border-b border-brand-border dark:border-[#2a3a2a] bg-gradient-to-br from-[#f0f8f0] to-[#e8f5e9] dark:from-[#1a2a1a] dark:to-[#162016] flex items-center justify-between gap-3">
+                    <h3 class="font-montserrat font-bold text-[14px] text-brand-dark dark:text-[#e8f5e9]">
+                        When do you want it?
+                    </h3>
+                    @if($chosen)
+                    <span class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-brand shrink-0">
+                        <svg class="w-3.5 h-3.5 fill-none" style="stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                        Saved
+                    </span>
+                    @endif
+                </div>
+
+                <div class="p-5">
+                    <p class="text-[12px] text-brand-muted mb-3">
+                        {{ $chosen
+                            ? 'We have noted this. Tap another option any time to change it.'
+                            : 'Tap one so we know how urgently to get it to you. Optional.' }}
+                    </p>
+
+                    <div class="grid grid-cols-3 gap-2">
+                        @foreach([
+                            ['key' => \App\Models\Order::URGENCY_TODAY,    'label' => 'Today',      'sub' => now()->format('D, j M')],
+                            ['key' => \App\Models\Order::URGENCY_TOMORROW, 'label' => 'Tomorrow',   'sub' => now()->addDay()->format('D, j M')],
+                            ['key' => \App\Models\Order::URGENCY_SCHEDULED,'label' => 'Pick a date','sub' => 'Choose'],
+                        ] as $option)
+                            @php $active = $deliveryUrgency === $option['key']; @endphp
+                            <button type="button"
+                                wire:key="urgency-{{ $option['key'] }}"
+                                @if($option['key'] === \App\Models\Order::URGENCY_SCHEDULED)
+                                    wire:click="$set('showDatePicker', true)"
+                                @else
+                                    wire:click="chooseDelivery('{{ $option['key'] }}')"
+                                @endif
+                                wire:loading.attr="disabled"
+                                aria-pressed="{{ $active ? 'true' : 'false' }}"
+                                class="rounded-xl border px-2 py-3 text-center transition-colors focus:outline-none focus:ring-2 focus:ring-brand focus:ring-offset-1
+                                    {{ $active
+                                        ? 'border-brand bg-[#e8f5e9] dark:bg-[#1f3a1f] ring-1 ring-brand'
+                                        : 'border-brand-border dark:border-[#2a3a2a] bg-white dark:bg-[#162016] hover:border-brand' }}">
+                                <span class="block font-montserrat font-bold text-[13px] {{ $active ? 'text-brand' : 'text-brand-dark dark:text-[#e8f5e9]' }}">
+                                    {{ $option['label'] }}
+                                </span>
+                                <span class="block text-[10px] mt-0.5 {{ $active ? 'text-brand' : 'text-brand-muted' }}">
+                                    {{ $option['key'] === \App\Models\Order::URGENCY_SCHEDULED && $active && $deliveryDate
+                                        ? \Illuminate\Support\Carbon::parse($deliveryDate)->format('D, j M')
+                                        : $option['sub'] }}
+                                </span>
+                            </button>
+                        @endforeach
+                    </div>
+
+                    @if($showDatePicker || ($deliveryUrgency === \App\Models\Order::URGENCY_SCHEDULED && $errors->has('deliveryDate')))
+                    <div class="mt-3 flex flex-col sm:flex-row gap-2">
+                        <input type="date"
+                            wire:model="deliveryDate"
+                            min="{{ $minDate }}"
+                            max="{{ $maxDate }}"
+                            aria-label="Preferred delivery date"
+                            class="flex-1 rounded-xl border border-brand-border dark:border-[#2a3a2a] bg-white dark:bg-[#162016] text-brand-dark dark:text-[#e8f5e9] px-3 py-2.5 text-[13px] focus:outline-none focus:border-brand">
+                        <button type="button"
+                            wire:click="chooseDelivery('{{ \App\Models\Order::URGENCY_SCHEDULED }}')"
+                            wire:loading.attr="disabled"
+                            class="rounded-xl bg-brand hover:opacity-90 disabled:opacity-60 text-white font-montserrat font-bold text-[13px] px-5 py-2.5 transition-opacity">
+                            Confirm date
+                        </button>
+                    </div>
+                    @error('deliveryDate')
+                        <p class="mt-2 text-[11px] text-red-600 dark:text-red-400">{{ $message }}</p>
+                    @enderror
+                    @endif
+                </div>
+            </div>
 
             {{-- What happens next timeline --}}
             <div class="bg-white dark:bg-[#1a2a1a] rounded-2xl border border-brand-border dark:border-[#2a3a2a] overflow-hidden">

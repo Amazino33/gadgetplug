@@ -27,6 +27,26 @@ class OrdersTable
                     ->searchable()
                     ->description(fn(Order $record): string => $record->customer_phone),
 
+                // The customer's own answer to "when do you want it", captured on
+                // the checkout success screen. Colour-coded because this column
+                // exists to be scanned for urgency, not read line by line.
+                // isToday() precedes isPast(): a date cast lands at midnight, so
+                // today is already "past" by mid-morning and would otherwise
+                // never reach its own branch.
+                TextColumn::make('preferred_delivery_date')
+                    ->label('Wanted')
+                    ->badge()
+                    ->sortable()
+                    ->placeholder('Not set')
+                    ->formatStateUsing(fn ($state, Order $record) => $record->deliveryPreferenceLabel() ?? '—')
+                    ->color(fn ($state, Order $record) => match (true) {
+                        $record->preferred_delivery_date === null     => 'gray',
+                        $record->preferred_delivery_date->isToday()   => 'danger',
+                        $record->preferred_delivery_date->isPast()    => 'danger',
+                        $record->preferred_delivery_date->isTomorrow()=> 'warning',
+                        default                                       => 'success',
+                    }),
+
                 TextColumn::make('payment_method')
                     ->label('Payment')
                     ->badge()
