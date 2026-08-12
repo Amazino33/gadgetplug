@@ -11,7 +11,7 @@ use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\User;
 use App\Models\Vendor;
-use App\Models\WalletTransaction;
+use App\Models\PlugPointTransaction;
 use App\Services\Affiliate\AffiliateLevelProgressionService;
 use App\Services\Affiliate\AffiliateTaskService;
 use Spatie\Permission\Models\Role;
@@ -33,8 +33,9 @@ function makeManualTask(array $attrs = []): AffiliateTask
 {
     return AffiliateTask::create(array_merge([
         'name'                           => 'Post to Facebook',
+        'task_type'                      => 'manual',
         'verification_type'              => 'manual',
-        'reward_amount'                  => 500,
+        'points_reward'                  => 500,
         'counts_toward_level'            => false,
         'max_completions_per_affiliate'  => 1,
         'is_active'                      => true,
@@ -45,10 +46,11 @@ function makeAutoTask(array $attrs = []): AffiliateTask
 {
     return AffiliateTask::create(array_merge([
         'name'                           => 'Reach ₦50,000 in cleared sales',
+        'task_type'                      => 'auto',
         'verification_type'              => 'auto',
         'auto_metric'                    => 'cleared_sales_value',
         'auto_target'                    => 50000,
-        'reward_amount'                  => 1000,
+        'points_reward'                  => 1000,
         'counts_toward_level'            => false,
         'max_completions_per_affiliate'  => 1,
         'is_active'                      => true,
@@ -110,9 +112,9 @@ function makeTaskEngineAvailableSale(Affiliate $affiliate, float $baseAmount): A
 
 // --- Manual submission: approve / reject ---
 
-test('approving a manual submission credits the wallet exactly once', function () {
+test('approving a manual submission credits Plug Points exactly once', function () {
     $affiliate = makeTaskAffiliate();
-    $task      = makeManualTask(['reward_amount' => 750]);
+    $task      = makeManualTask(['points_reward' => 750]);
     $reviewer  = makeReviewer();
 
     $submission = app(AffiliateTaskService::class)->submit($task, $affiliate, 'Here is my post: link.example');
@@ -120,8 +122,8 @@ test('approving a manual submission credits the wallet exactly once', function (
 
     expect($submission->fresh()->status)->toBe('approved')
         ->and($submission->fresh()->reviewed_by)->toBe($reviewer->id)
-        ->and(WalletTransaction::where('affiliate_task_submission_id', $submission->id)->count())->toBe(1)
-        ->and((float) WalletTransaction::where('affiliate_task_submission_id', $submission->id)->first()->amount)->toBe(750.0);
+        ->and(PlugPointTransaction::where('affiliate_task_submission_id', $submission->id)->count())->toBe(1)
+        ->and(PlugPointTransaction::where('affiliate_task_submission_id', $submission->id)->first()->points)->toBe(750);
 });
 
 test('approving the same submission twice never double-credits', function () {
@@ -135,7 +137,7 @@ test('approving the same submission twice never double-credits', function () {
     $service->approve($submission, $reviewer);
     $service->approve($submission->fresh(), $reviewer);
 
-    expect(WalletTransaction::where('affiliate_task_submission_id', $submission->id)->count())->toBe(1);
+    expect(PlugPointTransaction::where('affiliate_task_submission_id', $submission->id)->count())->toBe(1);
 });
 
 test('rejecting a submission credits nothing and records the reason', function () {
@@ -148,7 +150,7 @@ test('rejecting a submission credits nothing and records the reason', function (
 
     expect($submission->fresh()->status)->toBe('rejected')
         ->and($submission->fresh()->rejected_reason)->toBe('Screenshot does not show the post.')
-        ->and(WalletTransaction::where('affiliate_task_submission_id', $submission->id)->count())->toBe(0);
+        ->and(PlugPointTransaction::where('affiliate_task_submission_id', $submission->id)->count())->toBe(0);
 });
 
 // --- Eligibility guards ---
@@ -209,19 +211,19 @@ test('a rejected submission does not count against the completion cap', function
 
 test('an auto task completes exactly once when the affiliate crosses the threshold', function () {
     $affiliate = makeTaskAffiliate();
-    makeAutoTask(['auto_target' => 50000, 'reward_amount' => 1000]);
+    makeAutoTask(['auto_target' => 50000, 'points_reward' => 1000]);
 
     makeTaskEngineAvailableSale($affiliate, 60000);
 
     app(AffiliateTaskService::class)->evaluateAuto($affiliate);
 
     expect(AffiliateTaskSubmission::where('affiliate_id', $affiliate->id)->where('status', 'approved')->count())->toBe(1)
-        ->and(WalletTransaction::where('affiliate_id', $affiliate->id)->sum('amount'))->toEqual(1000.0);
+        ->and(PlugPointTransaction::where('affiliate_id', $affiliate->id)->sum('points'))->toEqual(1000);
 });
 
 test('re-evaluating an auto task after completion does not re-credit', function () {
     $affiliate = makeTaskAffiliate();
-    makeAutoTask(['auto_target' => 50000, 'reward_amount' => 1000]);
+    makeAutoTask(['auto_target' => 50000, 'points_reward' => 1000]);
 
     makeTaskEngineAvailableSale($affiliate, 60000);
 
@@ -231,7 +233,7 @@ test('re-evaluating an auto task after completion does not re-credit', function 
     $service->evaluateAuto($affiliate);
 
     expect(AffiliateTaskSubmission::where('affiliate_id', $affiliate->id)->count())->toBe(1)
-        ->and(WalletTransaction::where('affiliate_id', $affiliate->id)->sum('amount'))->toEqual(1000.0);
+        ->and(PlugPointTransaction::where('affiliate_id', $affiliate->id)->sum('points'))->toEqual(1000);
 });
 
 test('an auto task below its threshold does not complete', function () {

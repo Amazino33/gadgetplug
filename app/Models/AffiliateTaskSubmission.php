@@ -23,6 +23,11 @@ class AffiliateTaskSubmission extends Model implements HasMedia
         'submitted_at'          => 'datetime',
         'reviewed_at'           => 'datetime',
         'level_progress_value'  => 'decimal:2',
+        'share_date'            => 'date',
+        'reported_reach'        => 'integer',
+        'points_awarded'        => 'integer',
+        'streak_day'            => 'integer',
+        'streak_bonus_points'   => 'integer',
     ];
 
     public function registerMediaCollections(): void
@@ -58,5 +63,18 @@ class AffiliateTaskSubmission extends Model implements HasMedia
     public function walletTransactions(): HasMany
     {
         return $this->hasMany(WalletTransaction::class, 'affiliate_task_submission_id');
+    }
+
+    // Where task rewards actually land now. The wallet relation above is kept
+    // for the audit trail of submissions credited in cash before Plug Points
+    // existed — it is no longer written to.
+    public function plugPointTransactions(): HasMany
+    {
+        return $this->hasMany(PlugPointTransaction::class, 'affiliate_task_submission_id');
+    }
+
+    public function reachBand(): BelongsTo
+    {
+        return $this->belongsTo(AffiliateReachBand::class, 'affiliate_reach_band_id');
     }
 }

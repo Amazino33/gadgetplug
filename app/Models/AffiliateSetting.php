@@ -20,6 +20,11 @@ class AffiliateSetting extends Model
         'click_reward_amount'                => 'decimal:2',
         'click_reward_daily_cap'             => 'decimal:2',
         'click_reward_daily_ip_limit'        => 'integer',
+        'naira_per_point'                    => 'decimal:4',
+        'min_points_conversion'              => 'integer',
+        'daily_share_points_cap'             => 'integer',
+        'streak_bonus_points'                => 'integer',
+        'streak_bonus_every_days'            => 'integer',
     ];
 
     public static function current(): self

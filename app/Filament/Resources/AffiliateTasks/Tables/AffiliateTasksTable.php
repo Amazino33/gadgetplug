@@ -17,12 +17,27 @@ class AffiliateTasksTable
             ->columns([
                 TextColumn::make('name')->weight('bold')->searchable(),
 
-                TextColumn::make('verification_type')
+                TextColumn::make('task_type')
+                    ->label('Type')
                     ->badge()
-                    ->formatStateUsing(fn ($state) => $state === 'auto' ? 'Auto' : 'Manual')
-                    ->color(fn ($state) => $state === 'auto' ? 'info' : 'warning'),
+                    ->formatStateUsing(fn ($state) => match ($state) {
+                        'auto'               => 'Auto',
+                        'daily_social_share' => 'Daily Share',
+                        default              => 'Manual',
+                    })
+                    ->color(fn ($state) => match ($state) {
+                        'auto'               => 'info',
+                        'daily_social_share' => 'success',
+                        default              => 'warning',
+                    }),
 
-                TextColumn::make('reward_amount')->label('Reward')->money('NGN'),
+                // Rewards are Plug Points, not cash. A daily share has no flat
+                // figure — it pays whatever band the reported reach lands in.
+                TextColumn::make('points_reward')
+                    ->label('Reward')
+                    ->formatStateUsing(fn ($state, $record) => $record->task_type === 'daily_social_share'
+                        ? 'By reach band'
+                        : number_format((int) $state) . ' pts'),
 
                 IconColumn::make('counts_toward_level')->label('Level Progress')->boolean(),
 
@@ -36,7 +51,11 @@ class AffiliateTasksTable
             ])
             ->defaultSort('created_at', 'desc')
             ->filters([
-                SelectFilter::make('verification_type')->options(['auto' => 'Auto', 'manual' => 'Manual']),
+                SelectFilter::make('task_type')->label('Type')->options([
+                    'auto'               => 'Auto',
+                    'manual'             => 'Manual',
+                    'daily_social_share' => 'Daily Share',
+                ]),
                 TernaryFilter::make('is_active')->label('Active'),
             ])
             ->recordActions([

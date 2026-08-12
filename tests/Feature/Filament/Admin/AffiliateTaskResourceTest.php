@@ -41,8 +41,8 @@ test('creating a manual task from the admin UI persists it correctly', function 
     Livewire::test(CreateAffiliateTask::class)
         ->fillForm([
             'name'               => 'Post to Facebook',
-            'verification_type'  => 'manual',
-            'reward_amount'      => 500,
+            'task_type'          => 'manual',
+            'points_reward'      => 500,
             'is_active'          => true,
         ])
         ->call('create')
@@ -51,8 +51,9 @@ test('creating a manual task from the admin UI persists it correctly', function 
     $task = AffiliateTask::where('name', 'Post to Facebook')->first();
 
     expect($task)->not->toBeNull()
+        ->and($task->task_type)->toBe('manual')
         ->and($task->verification_type)->toBe('manual')
-        ->and((float) $task->reward_amount)->toBe(500.0);
+        ->and($task->points_reward)->toBe(500);
 });
 
 test('creating an auto task persists the metric and target correctly', function () {
@@ -61,10 +62,10 @@ test('creating an auto task persists the metric and target correctly', function 
     Livewire::test(CreateAffiliateTask::class)
         ->fillForm([
             'name'               => 'Reach ₦50,000',
-            'verification_type'  => 'auto',
+            'task_type'          => 'auto',
             'auto_metric'        => 'cleared_sales_value',
             'auto_target'        => 50000,
-            'reward_amount'      => 1000,
+            'points_reward'      => 1000,
             'is_active'          => true,
         ])
         ->call('create')
@@ -82,8 +83,9 @@ test('the tasks list shows name, type, reward and submission count', function ()
 
     AffiliateTask::create([
         'name'               => 'Refer a friend',
+        'task_type'          => 'manual',
         'verification_type'  => 'manual',
-        'reward_amount'      => 250,
+        'points_reward'      => 250,
         'is_active'          => true,
     ]);
 

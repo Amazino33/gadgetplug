@@ -45,6 +45,18 @@ class Affiliate extends Model implements HasMedia
         return $this->hasMany(WalletTransaction::class);
     }
 
+    // The Points economy — separate from the wallet above, bridged only by an
+    // explicit conversion.
+    public function plugPointTransactions(): HasMany
+    {
+        return $this->hasMany(PlugPointTransaction::class);
+    }
+
+    public function pointConversions(): HasMany
+    {
+        return $this->hasMany(AffiliatePointConversion::class);
+    }
+
     public function payouts(): HasMany
     {
         return $this->hasMany(AffiliatePayout::class);

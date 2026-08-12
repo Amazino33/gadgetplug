@@ -4,7 +4,9 @@ namespace App\Filament\Pages;
 
 use App\Models\AffiliateSetting;
 use BackedEnum;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\TimePicker;
 use Filament\Forms\Components\Toggle;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Notifications\Notification;
@@ -49,6 +51,14 @@ class AffiliateSettings extends Page
             'click_reward_amount',
             'click_reward_daily_cap',
             'click_reward_daily_ip_limit',
+            'naira_per_point',
+            'min_points_conversion',
+            'share_timezone',
+            'share_window_opens_at',
+            'share_window_closes_at',
+            'daily_share_points_cap',
+            'streak_bonus_points',
+            'streak_bonus_every_days',
         ]);
 
         // Stored as a 0.00–1.00 fraction (CommissionService multiplies it
@@ -155,6 +165,78 @@ class AffiliateSettings extends Page
                             ->minValue(0)
                             ->required()
                             ->helperText('Stops one person farming the reward by re-opening the same link. 1 means the same visitor is worth paying for once a day.'),
+                    ])
+                    ->columns(2),
+
+                Section::make('Plug Points')
+                    ->description('Task rewards are paid in Plug Points, a separate economy from commissions. Points only become spendable cash when the affiliate converts them, at the rate configured here.')
+                    ->schema([
+                        TextInput::make('naira_per_point')
+                            ->label('Conversion Rate (₦ per point)')
+                            ->numeric()
+                            ->minValue(0)
+                            ->step(0.0001)
+                            ->prefix('₦')
+                            ->required()
+                            ->helperText('Frozen onto each conversion at the moment it happens, so changing it never restates what an affiliate already converted.'),
+
+                        TextInput::make('min_points_conversion')
+                            ->label('Minimum Points per Conversion')
+                            ->numeric()
+                            ->integer()
+                            ->minValue(1)
+                            ->required()
+                            ->helperText('An affiliate cannot convert below this, which keeps the wallet ledger free of trivial dust credits.'),
+                    ])
+                    ->columns(2),
+
+                Section::make('Daily Social Share')
+                    ->description('Reward bands live under Affiliates → Reach Bands. These control when a share can be submitted and how much a day can pay.')
+                    ->schema([
+                        Select::make('share_timezone')
+                            ->label('Share Timezone')
+                            ->options([
+                                'Africa/Lagos'   => 'Africa/Lagos (WAT)',
+                                'Africa/Accra'   => 'Africa/Accra (GMT)',
+                                'Africa/Nairobi' => 'Africa/Nairobi (EAT)',
+                                'UTC'            => 'UTC',
+                            ])
+                            ->required()
+                            ->helperText('The app runs on UTC, so the submission window and the streak\'s idea of "a day" are both resolved against this zone.'),
+
+                        TextInput::make('daily_share_points_cap')
+                            ->label('Daily Points Cap per Affiliate')
+                            ->numeric()
+                            ->integer()
+                            ->minValue(0)
+                            ->required()
+                            ->helperText('Most Plug Points one affiliate can earn from shares in a single day, across however many submissions.'),
+
+                        TimePicker::make('share_window_opens_at')
+                            ->label('Window Opens')
+                            ->seconds(false)
+                            ->required(),
+
+                        TimePicker::make('share_window_closes_at')
+                            ->label('Window Closes')
+                            ->seconds(false)
+                            ->required()
+                            ->helperText('A closing time earlier than the opening time is treated as a window that wraps past midnight.'),
+
+                        TextInput::make('streak_bonus_points')
+                            ->label('Streak Bonus (points)')
+                            ->numeric()
+                            ->integer()
+                            ->minValue(0)
+                            ->required(),
+
+                        TextInput::make('streak_bonus_every_days')
+                            ->label('Streak Bonus Every N Days')
+                            ->numeric()
+                            ->integer()
+                            ->minValue(1)
+                            ->required()
+                            ->helperText('The bonus lands on every Nth consecutive share day. Missing a day resets the streak to zero.'),
                     ])
                     ->columns(2),
             ]);

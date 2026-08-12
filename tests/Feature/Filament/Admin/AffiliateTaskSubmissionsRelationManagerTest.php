@@ -20,8 +20,9 @@ test('an affiliate\'s task submission history is visible on their detail page', 
     $affiliate = Affiliate::findOrCreateForUser(User::factory()->create());
     $task = AffiliateTask::create([
         'name'               => 'Post to Instagram',
+        'task_type'          => 'manual',
         'verification_type'  => 'manual',
-        'reward_amount'      => 300,
+        'points_reward'      => 300,
         'is_active'          => true,
     ]);
 

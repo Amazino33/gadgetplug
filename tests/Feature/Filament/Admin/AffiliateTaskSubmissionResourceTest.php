@@ -7,7 +7,7 @@ use App\Models\AffiliateTask;
 use App\Models\AffiliateTaskSubmission;
 use App\Models\User;
 use App\Models\Vendor;
-use App\Models\WalletTransaction;
+use App\Models\PlugPointTransaction;
 use App\Services\Affiliate\AffiliateTaskService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -28,8 +28,9 @@ function makeReviewQueueSubmission(): AffiliateTaskSubmission
     $affiliate = Affiliate::findOrCreateForUser(User::factory()->create());
     $task = AffiliateTask::create([
         'name'               => 'Post to Facebook',
+        'task_type'          => 'manual',
         'verification_type'  => 'manual',
-        'reward_amount'      => 500,
+        'points_reward'      => 500,
         'is_active'          => true,
     ]);
 
@@ -64,7 +65,7 @@ test('the navigation badge shows the count of pending submissions', function () 
     expect(AffiliateTaskSubmissionResource::getNavigationBadge())->toBe('2');
 });
 
-test('approving from the review queue table action credits the wallet through the service', function () {
+test('approving from the review queue table action credits Plug Points through the service', function () {
     $admin = actingAsSuperAdminForSubmissions();
     $this->actingAs($admin);
 
@@ -75,7 +76,7 @@ test('approving from the review queue table action credits the wallet through th
 
     expect($submission->fresh()->status)->toBe('approved')
         ->and($submission->fresh()->reviewed_by)->toBe($admin->id)
-        ->and(WalletTransaction::where('affiliate_task_submission_id', $submission->id)->count())->toBe(1);
+        ->and(PlugPointTransaction::where('affiliate_task_submission_id', $submission->id)->count())->toBe(1);
 });
 
 test('rejecting from the review queue table action records the reason and credits nothing', function () {
@@ -89,7 +90,7 @@ test('rejecting from the review queue table action records the reason and credit
 
     expect($submission->fresh()->status)->toBe('rejected')
         ->and($submission->fresh()->rejected_reason)->toBe('Screenshot unclear')
-        ->and(WalletTransaction::where('affiliate_task_submission_id', $submission->id)->count())->toBe(0);
+        ->and(PlugPointTransaction::where('affiliate_task_submission_id', $submission->id)->count())->toBe(0);
 });
 
 test('the default pending tab hides already-reviewed submissions', function () {

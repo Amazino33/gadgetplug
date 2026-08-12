@@ -100,6 +100,38 @@ test('the engaged visit reward controls persist, including the kill switch', fun
         ->and($settings->click_reward_daily_ip_limit)->toBe(2);
 });
 
+test('the Plug Points and daily-share controls persist, so no reward number is hardcoded', function () {
+    $admin = User::factory()->create();
+    $admin->assignRole(Role::firstOrCreate(['name' => 'super_admin', 'guard_name' => 'web']));
+
+    $this->actingAs($admin);
+
+    Livewire::test(AffiliateSettings::class)
+        ->fillForm([
+            'naira_per_point'         => 0.75,
+            'min_points_conversion'   => 2500,
+            'share_timezone'          => 'Africa/Lagos',
+            'share_window_opens_at'   => '09:30',
+            'share_window_closes_at'  => '21:00',
+            'daily_share_points_cap'  => 90,
+            'streak_bonus_points'     => 40,
+            'streak_bonus_every_days' => 5,
+        ])
+        ->call('save')
+        ->assertHasNoFormErrors();
+
+    $settings = AffiliateSetting::current();
+
+    expect((float) $settings->naira_per_point)->toBe(0.75)
+        ->and($settings->min_points_conversion)->toBe(2500)
+        ->and($settings->share_timezone)->toBe('Africa/Lagos')
+        ->and($settings->daily_share_points_cap)->toBe(90)
+        ->and($settings->streak_bonus_points)->toBe(40)
+        ->and($settings->streak_bonus_every_days)->toBe(5)
+        ->and($settings->share_window_opens_at)->toContain('09:30')
+        ->and($settings->share_window_closes_at)->toContain('21:00');
+});
+
 test('the platform default reseller discount persists as a plain percentage', function () {
     $admin = User::factory()->create();
     $admin->assignRole(Role::firstOrCreate(['name' => 'super_admin', 'guard_name' => 'web']));

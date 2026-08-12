@@ -19,12 +19,18 @@ class AffiliateTask extends Model
         'counts_toward_level'           => 'boolean',
         'level_progress_value'          => 'decimal:2',
         'is_active'                     => 'boolean',
+        'points_reward'                 => 'integer',
     ];
+
+    public function scopeDailyShare($query)
+    {
+        return $query->where('task_type', 'daily_social_share');
+    }
 
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['name', 'verification_type', 'auto_metric', 'auto_target', 'reward_amount', 'counts_toward_level', 'level_progress_value', 'max_completions_per_affiliate', 'cooldown_days', 'is_active'])
+            ->logOnly(['name', 'task_type', 'verification_type', 'auto_metric', 'auto_target', 'points_reward', 'reward_amount', 'counts_toward_level', 'level_progress_value', 'max_completions_per_affiliate', 'cooldown_days', 'is_active'])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs();
     }

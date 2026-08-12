@@ -11,16 +11,22 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
-// Manual submissions and auto-completions both credit the wallet through the
-// exact same primitive ClearAffiliateHoldsJob already uses — a relation-scoped
-// ->create(['type' => 'credit', ...]) on WalletTransaction — never a second
-// money path. Approval and auto-completion both re-check state under a row
-// lock before crediting, so a double-click or an overlapping job run can
-// never double-credit the same submission.
+// Manual submissions and auto-completions both credit PLUG POINTS, never the
+// wallet: tasks and commissions are separate economies, and the only bridge
+// from points to spendable cash is an explicit affiliate-initiated conversion
+// (PointConversionService), which is where the wallet credit primitive is
+// reused. Approval and auto-completion both re-check state under a row lock
+// before crediting, and PlugPointService::creditForSubmission is itself
+// idempotent per (submission, source), so a double-click or an overlapping job
+// run can never double-credit the same submission.
 class AffiliateTaskService
 {
     public function submit(AffiliateTask $task, Affiliate $affiliate, ?string $notes = null): AffiliateTaskSubmission
     {
+        if ($task->task_type === DailySocialShareService::TASK_TYPE) {
+            throw new RuntimeException('Daily social shares are submitted through the share form, which captures reach and proof.');
+        }
+
         if ($task->verification_type !== 'manual') {
             throw new RuntimeException('Only manual tasks accept a direct submission — auto tasks complete themselves.');
         }
@@ -63,12 +69,12 @@ class AffiliateTaskService
                 'level_progress_value'  => $task->counts_toward_level ? $task->level_progress_value : null,
             ]);
 
-            $locked->walletTransactions()->create([
-                'affiliate_id' => $locked->affiliate_id,
-                'type'         => 'credit',
-                'amount'       => $task->reward_amount,
-                'description'  => "Task reward — {$task->name} (submission #{$locked->id}).",
-            ]);
+            app(PlugPointService::class)->creditForSubmission(
+                $locked,
+                (int) $task->points_reward,
+                'task',
+                "Task reward — {$task->name} (submission #{$locked->id}).",
+            );
 
             if ($task->counts_toward_level) {
                 app(AffiliateLevelProgressionService::class)->recompute($locked->affiliate);
@@ -144,12 +150,12 @@ class AffiliateTaskService
                     'level_progress_value'  => $task->counts_toward_level ? $task->level_progress_value : null,
                 ]);
 
-                $submission->walletTransactions()->create([
-                    'affiliate_id' => $lockedAffiliate->id,
-                    'type'         => 'credit',
-                    'amount'       => $task->reward_amount,
-                    'description'  => "Task reward — {$task->name} (auto-completed, submission #{$submission->id}).",
-                ]);
+                app(PlugPointService::class)->creditForSubmission(
+                    $submission,
+                    (int) $task->points_reward,
+                    'task',
+                    "Task reward — {$task->name} (auto-completed, submission #{$submission->id}).",
+                );
 
                 if ($task->counts_toward_level) {
                     app(AffiliateLevelProgressionService::class)->recompute($lockedAffiliate);

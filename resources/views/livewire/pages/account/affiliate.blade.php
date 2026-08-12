@@ -3,15 +3,24 @@
 use Livewire\Volt\Component;
 use Livewire\WithFileUploads;
 use Livewire\WithPagination;
+use Illuminate\Support\Str;
 use App\Models\Affiliate;
 use App\Models\AffiliateClick;
 use App\Models\AffiliateCommission;
 use App\Models\AffiliateLevel;
+use App\Models\AffiliateReachBand;
+use App\Models\AffiliateSetting;
 use App\Models\AffiliateTask;
+use App\Models\AffiliateTaskSubmission;
+use App\Models\PlugPointTransaction;
 use App\Models\Product;
 use App\Models\WalletTransaction;
 use App\Services\Affiliate\AffiliateLevelProgressionService;
 use App\Services\Affiliate\AffiliateTaskService;
+use App\Services\Affiliate\DailySocialShareService;
+use App\Services\Affiliate\MarketingMaterialService;
+use App\Services\Affiliate\PlugPointService;
+use App\Services\Affiliate\PointConversionService;
 use App\Services\Affiliate\QrCodeService;
 use App\Services\Affiliate\WalletService;
 
@@ -30,9 +39,17 @@ new class extends Component {
     public string $accountNumber = '';
     public string $accountName = '';
 
+    public string $pointsToConvert = '';
+    public string $conversionNonce = '';
+
+    public string $shareReach = '';
+    public string $shareNotes = '';
+    public $shareProof = null;
+
     public function mount(): void
     {
         $this->affiliate = auth()->user()->affiliate;
+        $this->conversionNonce = (string) Str::uuid();
 
         if ($this->affiliate) {
             $this->bankName = $this->affiliate->bank_name ?? '';
@@ -134,6 +151,127 @@ new class extends Component {
         return $this->affiliate
             ? WalletTransaction::where('affiliate_id', $this->affiliate->id)->latest()->paginate(8, ['*'], 'walletPage')
             : null;
+    }
+
+    // ─── Plug Points ────────────────────────────────────────────────────
+
+    public function getPointsBalanceProperty(): int
+    {
+        return $this->affiliate ? app(PlugPointService::class)->balance($this->affiliate->id) : 0;
+    }
+
+    public function getPointsHistoryProperty()
+    {
+        return $this->affiliate
+            ? PlugPointTransaction::where('affiliate_id', $this->affiliate->id)->latest()->paginate(6, ['*'], 'pointsPage')
+            : null;
+    }
+
+    public function getConversionQuoteProperty(): float
+    {
+        return app(PointConversionService::class)->quote(max((int) $this->pointsToConvert, 0));
+    }
+
+    public function getMinConversionProperty(): int
+    {
+        return (int) AffiliateSetting::current()->min_points_conversion;
+    }
+
+    public function convertPoints(): void
+    {
+        $this->validate(['pointsToConvert' => 'required|integer|min:1']);
+
+        try {
+            // One nonce per conversion intent. Two requests that fire before
+            // the first commits — a double-click, a retried request — carry the
+            // same nonce and collapse into one conversion. A deliberate second
+            // conversion happens after the nonce is rotated below, so it goes
+            // through normally.
+            $conversion = app(PointConversionService::class)
+                ->convert($this->affiliate, (int) $this->pointsToConvert, $this->conversionNonce);
+
+            $this->conversionNonce = (string) Str::uuid();
+            $this->pointsToConvert = '';
+            session()->flash('pointsConverted', 'Converted to ₦' . number_format((float) $conversion->amount, 2) . ' — it is in your available balance now.');
+        } catch (\RuntimeException $e) {
+            $this->addError('pointsToConvert', $e->getMessage());
+        }
+    }
+
+    // ─── Daily social share ─────────────────────────────────────────────
+
+    public function getShareTaskProperty(): ?AffiliateTask
+    {
+        return AffiliateTask::dailyShare()->where('is_active', true)->first();
+    }
+
+    public function getShareWindowOpenProperty(): bool
+    {
+        return app(DailySocialShareService::class)->windowIsOpen();
+    }
+
+    public function getShareWindowLabelProperty(): string
+    {
+        return app(DailySocialShareService::class)->windowDescription();
+    }
+
+    public function getCurrentStreakProperty(): int
+    {
+        return $this->affiliate ? app(DailySocialShareService::class)->currentStreak($this->affiliate->id) : 0;
+    }
+
+    public function getTodaysShareProperty(): ?AffiliateTaskSubmission
+    {
+        if (! $this->affiliate || ! $this->shareTask) {
+            return null;
+        }
+
+        $today = app(DailySocialShareService::class)->shareDateFor()->toDateString();
+
+        return AffiliateTaskSubmission::where('affiliate_id', $this->affiliate->id)
+            ->where('affiliate_task_id', $this->shareTask->id)
+            ->whereDate('share_date', $today)
+            ->latest()
+            ->first();
+    }
+
+    public function getReachBandsProperty()
+    {
+        return AffiliateReachBand::active()->orderBy('min_reach')->get();
+    }
+
+    public function submitShare(): void
+    {
+        $this->validate([
+            'shareReach' => 'required|integer|min:0',
+            'shareProof' => 'required|image|max:5120',
+        ], [], ['shareReach' => 'reach', 'shareProof' => 'screenshot']);
+
+        try {
+            $submission = app(DailySocialShareService::class)
+                ->submit($this->shareTask, $this->affiliate, (int) $this->shareReach, $this->shareNotes ?: null);
+
+            $submission->addMedia($this->shareProof->getRealPath())
+                ->usingFileName($this->shareProof->getClientOriginalName())
+                ->toMediaCollection('proof');
+
+            $this->shareReach = '';
+            $this->shareNotes = '';
+            $this->shareProof = null;
+
+            session()->flash('shareSubmitted', 'Share submitted — an admin will review it and your points will land shortly.');
+        } catch (\RuntimeException $e) {
+            $this->addError('shareProof', $e->getMessage());
+        }
+    }
+
+    // ─── Marketing material ─────────────────────────────────────────────
+
+    public function getMaterialsProperty()
+    {
+        return $this->affiliate
+            ? app(MarketingMaterialService::class)->forAffiliate($this->affiliate)
+            : collect();
     }
 
     // ─── Traffic ────────────────────────────────────────────────────────
@@ -321,6 +459,175 @@ new class extends Component {
                     @endif
                 </div>
             </div>
+
+            {{-- Plug Points --}}
+            <div class="bg-white dark:bg-[#162016] border border-brand-border dark:border-[#2a3a2a] rounded-2xl p-5 md:p-6">
+                <div class="flex items-start justify-between gap-3 mb-4">
+                    <div>
+                        <h2 class="font-montserrat font-bold text-[15px] text-brand-dark dark:text-[#e8f5e9]">Plug Points</h2>
+                        <p class="text-[11px] text-brand-muted mt-0.5">Earned from tasks and daily shares. Points aren't cash until you convert them.</p>
+                    </div>
+                    @if ($this->currentStreak > 0)
+                        <span class="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[12px] font-bold bg-[#fff4e5] dark:bg-[#2a2416] text-[#b45309]">
+                            🔥 {{ $this->currentStreak }}-day streak
+                        </span>
+                    @endif
+                </div>
+
+                @if (session('pointsConverted'))
+                <div class="bg-[#e8f5e9] dark:bg-[#1a2a1a] border border-[#c0e8c0] dark:border-[#2a3a2a] text-brand rounded-xl px-4 py-3 text-[12px] font-semibold mb-4">
+                    {{ session('pointsConverted') }}
+                </div>
+                @endif
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div>
+                        <div class="text-[11px] text-brand-muted mb-1">Points balance</div>
+                        <div class="font-montserrat font-black text-[28px] text-brand">{{ number_format($this->pointsBalance) }}</div>
+                        <p class="text-[11px] text-brand-muted mt-1">
+                            Worth ₦{{ number_format($this->pointsBalance * (float) \App\Models\AffiliateSetting::current()->naira_per_point, 2) }} at today's rate.
+                        </p>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] text-brand-muted mb-1">Convert to cash (min {{ number_format($this->minConversion) }} points)</label>
+                        <div class="flex gap-2">
+                            <input type="number" min="1" wire:model.live="pointsToConvert"
+                                   class="w-full border border-brand-border dark:border-[#2a3a2a] dark:bg-[#0d1a0d] dark:text-[#e8f5e9] rounded-lg px-3 py-2 text-[13px]"
+                                   placeholder="Points">
+                            <button wire:click="convertPoints" wire:loading.attr="disabled"
+                                    class="shrink-0 bg-brand text-white rounded-lg px-4 py-2 text-[13px] font-bold disabled:opacity-50">
+                                Convert
+                            </button>
+                        </div>
+                        @if ((int) $this->pointsToConvert > 0)
+                            <p class="text-[11px] text-brand-muted mt-1">You'd get ₦{{ number_format($this->conversionQuote, 2) }}.</p>
+                        @endif
+                        @error('pointsToConvert')
+                            <p class="text-[11px] text-red-600 mt-1">{{ $message }}</p>
+                        @enderror
+                    </div>
+                </div>
+
+                @if ($this->pointsHistory && $this->pointsHistory->count())
+                <div class="mt-5 border-t border-brand-border dark:border-[#2a3a2a] pt-4 space-y-2">
+                    @foreach ($this->pointsHistory as $row)
+                        <div class="flex items-center justify-between gap-3 text-[12px]">
+                            <span class="text-brand-muted truncate">{{ $row->description }}</span>
+                            <span class="shrink-0 font-bold {{ $row->points >= 0 ? 'text-brand' : 'text-red-600' }}">
+                                {{ $row->points >= 0 ? '+' : '' }}{{ number_format($row->points) }}
+                            </span>
+                        </div>
+                    @endforeach
+                    <div class="pt-2">{{ $this->pointsHistory->links() }}</div>
+                </div>
+                @endif
+            </div>
+
+            {{-- Daily social share --}}
+            @if ($this->shareTask)
+            <div class="bg-white dark:bg-[#162016] border border-brand-border dark:border-[#2a3a2a] rounded-2xl p-5 md:p-6">
+                <h2 class="font-montserrat font-bold text-[15px] text-brand-dark dark:text-[#e8f5e9] mb-1">{{ $this->shareTask->name }}</h2>
+                <p class="text-[12px] text-brand-muted mb-4">
+                    {{ $this->shareTask->description ?: 'Post today\'s material with your code visible, then send the screenshot.' }}
+                    <span class="block mt-1">Window: <strong>{{ $this->shareWindowLabel }}</strong></span>
+                </p>
+
+                @if (session('shareSubmitted'))
+                <div class="bg-[#e8f5e9] dark:bg-[#1a2a1a] border border-[#c0e8c0] dark:border-[#2a3a2a] text-brand rounded-xl px-4 py-3 text-[12px] font-semibold mb-4">
+                    {{ session('shareSubmitted') }}
+                </div>
+                @endif
+
+                {{-- The ladder, shown up front so the reward is never a surprise --}}
+                <div class="flex flex-wrap gap-2 mb-4">
+                    @foreach ($this->reachBands as $band)
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-brand-bg dark:bg-[#0d1a0d] text-brand-dark dark:text-[#e8f5e9]">
+                            {{ $band->name }} · {{ $band->points }} pts
+                        </span>
+                    @endforeach
+                </div>
+
+                @if ($this->todaysShare)
+                    <div class="rounded-xl border border-brand-border dark:border-[#2a3a2a] px-4 py-3 text-[12px]">
+                        @if ($this->todaysShare->status === 'submitted')
+                            <span class="font-semibold text-[#b45309]">Awaiting review</span> — you've sent today's share.
+                        @elseif ($this->todaysShare->status === 'approved')
+                            <span class="font-semibold text-brand">Approved</span> — {{ $this->todaysShare->points_awarded }} points credited
+                            @if ($this->todaysShare->streak_bonus_points)
+                                (plus a {{ $this->todaysShare->streak_bonus_points }}-point streak bonus)
+                            @endif.
+                        @else
+                            <span class="font-semibold text-red-600">Rejected</span> — {{ $this->todaysShare->rejected_reason }}
+                        @endif
+                    </div>
+                @elseif (! $this->shareWindowOpen)
+                    <div class="rounded-xl border border-brand-border dark:border-[#2a3a2a] px-4 py-3 text-[12px] text-brand-muted">
+                        The window is closed right now. Come back between {{ $this->shareWindowLabel }}.
+                    </div>
+                @else
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-[11px] text-brand-muted mb-1">Views / reach on your post</label>
+                            <input type="number" min="0" wire:model="shareReach"
+                                   class="w-full border border-brand-border dark:border-[#2a3a2a] dark:bg-[#0d1a0d] dark:text-[#e8f5e9] rounded-lg px-3 py-2 text-[13px]"
+                                   placeholder="e.g. 640">
+                            @error('shareReach') <p class="text-[11px] text-red-600 mt-1">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] text-brand-muted mb-1">Screenshot (must show your code)</label>
+                            <input type="file" wire:model="shareProof" accept="image/*"
+                                   class="w-full text-[12px] text-brand-muted">
+                            @error('shareProof') <p class="text-[11px] text-red-600 mt-1">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div class="md:col-span-2">
+                            <textarea wire:model="shareNotes" rows="2" placeholder="Anything the reviewer should know (optional)"
+                                      class="w-full border border-brand-border dark:border-[#2a3a2a] dark:bg-[#0d1a0d] dark:text-[#e8f5e9] rounded-lg px-3 py-2 text-[13px]"></textarea>
+                        </div>
+
+                        <div class="md:col-span-2">
+                            <button wire:click="submitShare" wire:loading.attr="disabled"
+                                    class="bg-brand text-white rounded-lg px-5 py-2.5 text-[13px] font-bold disabled:opacity-50">
+                                Submit today's share
+                            </button>
+                        </div>
+                    </div>
+                @endif
+            </div>
+            @endif
+
+            {{-- Marketing material --}}
+            @if ($this->materials->count())
+            <div class="bg-white dark:bg-[#162016] border border-brand-border dark:border-[#2a3a2a] rounded-2xl p-5 md:p-6">
+                <h2 class="font-montserrat font-bold text-[15px] text-brand-dark dark:text-[#e8f5e9] mb-1">Material to Share</h2>
+                <p class="text-[12px] text-brand-muted mb-4">Download the image and post it with the caption below — the caption carries your code, which is what makes the share count.</p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    @foreach ($this->materials as $item)
+                        <div class="border border-brand-border dark:border-[#2a3a2a] rounded-xl overflow-hidden">
+                            @if ($item['thumb_url'])
+                                <img src="{{ $item['thumb_url'] }}" alt="{{ $item['material']->name }}" class="w-full h-40 object-contain bg-brand-bg dark:bg-[#0d1a0d]">
+                            @endif
+                            <div class="p-3">
+                                <div class="font-montserrat font-bold text-[13px] text-brand-dark dark:text-[#e8f5e9]">{{ $item['material']->name }}</div>
+                                @if ($item['material']->description)
+                                    <p class="text-[11px] text-brand-muted mt-0.5">{{ $item['material']->description }}</p>
+                                @endif
+                                <div class="mt-2 bg-brand-bg dark:bg-[#0d1a0d] rounded-lg px-3 py-2 text-[11px] text-brand-dark dark:text-[#e8f5e9] break-words">
+                                    {{ $item['caption'] }}
+                                </div>
+                                @if ($item['image_url'])
+                                    <a href="{{ $item['image_url'] }}" download
+                                       class="inline-block mt-2 text-[12px] font-bold text-brand">Download image ↓</a>
+                                @endif
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+            @endif
 
             {{-- Traffic --}}
             <div class="bg-white dark:bg-[#162016] border border-brand-border dark:border-[#2a3a2a] rounded-2xl p-5 md:p-6">

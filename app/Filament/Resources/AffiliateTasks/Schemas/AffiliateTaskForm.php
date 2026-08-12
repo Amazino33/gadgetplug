@@ -2,12 +2,15 @@
 
 namespace App\Filament\Resources\AffiliateTasks\Schemas;
 
+use Filament\Forms\Components\Hidden;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 
 class AffiliateTaskForm
@@ -27,11 +30,27 @@ class AffiliateTaskForm
                         ->helperText('Shown to the affiliate — explain what to do.')
                         ->columnSpanFull(),
 
-                    Select::make('verification_type')
-                        ->options(['auto' => 'Auto (system-verified)', 'manual' => 'Manual (affiliate submits proof)'])
+                    Select::make('task_type')
+                        ->label('Task Type')
+                        ->options([
+                            'auto'                => 'Auto (system-verified)',
+                            'manual'              => 'Manual (affiliate submits proof)',
+                            'daily_social_share'  => 'Daily social share (proof + reach)',
+                        ])
                         ->required()
                         ->live()
-                        ->helperText('Auto tasks are checked automatically whenever a sale clears. Manual tasks need an admin to approve or reject each submission.'),
+                        ->default('manual')
+                        // verification_type predates task_type and still drives
+                        // the auto-evaluator's query; kept in lockstep here so
+                        // the two can never disagree. A daily share is reviewed
+                        // by a human, so it is 'manual' underneath.
+                        ->afterStateUpdated(fn ($state, Set $set) => $set(
+                            'verification_type',
+                            $state === 'auto' ? 'auto' : 'manual',
+                        ))
+                        ->helperText('Auto tasks are checked automatically whenever a sale clears. Manual tasks need an admin to approve each submission. Daily social shares additionally capture reach and pay by band, with a daily cap and streak bonus configured in Affiliate Settings.'),
+
+                    Hidden::make('verification_type')->default('manual'),
 
                     Toggle::make('is_active')
                         ->default(true)
@@ -56,17 +75,26 @@ class AffiliateTaskForm
                         ->helperText('The metric must reach this value for the task to auto-complete.'),
                 ])
                 ->columns(2)
-                ->visible(fn (Get $get) => $get('verification_type') === 'auto'),
+                ->visible(fn (Get $get) => $get('task_type') === 'auto'),
 
             Section::make('Reward & Repeatability')
                 ->schema([
-                    TextInput::make('reward_amount')
-                        ->label('Wallet Reward (₦)')
+                    TextInput::make('points_reward')
+                        ->label('Plug Points Reward')
                         ->numeric()
+                        ->integer()
                         ->minValue(0)
-                        ->prefix('₦')
                         ->required()
-                        ->helperText('Credited to the affiliate\'s available balance immediately on approval/completion — no hold.'),
+                        ->default(0)
+                        // Not shown for a daily share: its reward comes from the
+                        // reach band it lands in, not a flat per-task number.
+                        ->visible(fn (Get $get) => $get('task_type') !== 'daily_social_share')
+                        ->helperText('Credited to the affiliate\'s Plug Points balance on approval. Points are not cash — the affiliate converts them to wallet cash themselves, at the rate set in Affiliate Settings.'),
+
+                    Placeholder::make('band_note')
+                        ->label('Reward')
+                        ->visible(fn (Get $get) => $get('task_type') === 'daily_social_share')
+                        ->content('Paid by reach band, not a flat amount. Bands, the daily points cap, the submission window and the streak bonus are all configured under Affiliates → Reach Bands and Affiliates → Settings.'),
 
                     TextInput::make('max_completions_per_affiliate')
                         ->label('Max Completions per Affiliate')
