@@ -721,6 +721,9 @@ class BlindCount extends Page
 
                 $line = AuditSession::create([
                     'vendor_id'        => $session->vendor_id,
+                    // Which count produced this line — without it the sessions
+                    // list has no way to group its own lines.
+                    'blind_count_session_id' => $session->id,
                     'product_id'       => $productId,
                     // The baseline this count is measured against, frozen now.
                     // Read live afterwards it would drift with every sale.
@@ -799,6 +802,9 @@ class BlindCount extends Page
 
                 $line = AuditSession::create([
                     'vendor_id'        => $session->vendor_id,
+                    // Which count produced this line — without it the sessions
+                    // list has no way to group its own lines.
+                    'blind_count_session_id' => $session->id,
                     'product_id'       => $productId,
                     // Frozen baseline — see the solo path above.
                     'system_quantity'  => (int) $product->stock_quantity,

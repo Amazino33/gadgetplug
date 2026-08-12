@@ -31,6 +31,66 @@ class BlindCountSession extends Model
         'b_submitted_at'  => 'datetime',
     ];
 
+    /**
+     * The counted lines this session produced, one per product.
+     *
+     * Only populated for sessions counted after audit_sessions gained the link
+     * (2026_08_12_100000). Older sessions return nothing rather than a guessed
+     * match on vendor and timestamp.
+     */
+    public function auditLines(): HasMany
+    {
+        return $this->hasMany(AuditSession::class, 'blind_count_session_id');
+    }
+
+    /** Lines where what was counted differs from what the system expected. */
+    public function varianceLines(): \Illuminate\Support\Collection
+    {
+        return $this->auditLines
+            ->filter(fn (AuditSession $line) => ($line->countedVariance() ?? 0) !== 0)
+            ->values();
+    }
+
+    /** Lines still waiting on someone: a disputed count, or an undecided case. */
+    public function unresolvedCount(): int
+    {
+        return $this->auditLines
+            ->filter(function (AuditSession $line) {
+                if ($line->status === 'discrepancy') {
+                    return true;
+                }
+
+                return $line->shortageCase?->awaitsDisposition() === true;
+            })
+            ->count();
+    }
+
+    /**
+     * What the variance is worth at cost. COST-SENSITIVE — gate any display
+     * behind view_cost_price.
+     *
+     * Uses each line's frozen case snapshot where one exists, so the figure does
+     * not drift when a product is repriced. Falls back to the product's current
+     * cost only for lines that never opened a case.
+     */
+    public function shortageValueAtCost(): float
+    {
+        return round($this->auditLines->sum(function (AuditSession $line) {
+            if ($line->shortageCase) {
+                return (float) $line->shortageCase->cost_component;
+            }
+
+            $variance = $line->countedVariance() ?? 0;
+
+            return abs($variance) * (float) ($line->product?->cost_price ?? 0);
+        }), 2);
+    }
+
+    public function hasShortfall(): bool
+    {
+        return $this->auditLines->contains(fn (AuditSession $line) => ($line->countedVariance() ?? 0) < 0);
+    }
+
     public function vendor(): BelongsTo
     {
         return $this->belongsTo(Vendor::class);

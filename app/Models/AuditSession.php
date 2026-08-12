@@ -9,6 +9,7 @@ class AuditSession extends Model
 {
     protected $fillable = [
         'vendor_id',
+        'blind_count_session_id',
         'product_id',
         'system_quantity',
         'storekeeper_a_id',
@@ -30,6 +31,16 @@ class AuditSession extends Model
     public function vendor(): BelongsTo
     {
         return $this->belongsTo(Vendor::class);
+    }
+
+    public function countSession(): BelongsTo
+    {
+        return $this->belongsTo(BlindCountSession::class, 'blind_count_session_id');
+    }
+
+    public function shortageCase(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(InventoryShortageCase::class, 'count_line_id');
     }
 
     public function product(): BelongsTo
