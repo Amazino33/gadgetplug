@@ -31,6 +31,12 @@ class CountSessionResource extends Resource
     protected static ?string                 $navigationLabel = 'Audit Sessions';
     protected static ?int                    $navigationSort  = 4;
 
+    // Without these, Filament titles the page from the model name and it reads
+    // "Blind Count Sessions" — internal wording nobody outside the code uses.
+    protected static ?string $modelLabel = 'Audit Session';
+
+    protected static ?string $pluralModelLabel = 'Audit Sessions';
+
     public static function canAccess(): bool
     {
         $user   = auth()->user();
