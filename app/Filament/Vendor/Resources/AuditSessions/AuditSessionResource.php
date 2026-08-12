@@ -36,8 +36,17 @@ class AuditSessionResource extends Resource
 
     protected static string|null|BackedEnum $navigationIcon  = 'heroicon-o-clipboard-document-list';
     protected static string|null|UnitEnum   $navigationGroup = 'Inventory';
-    protected static ?string                $navigationLabel = 'Audit Sessions';
-    protected static ?int                   $navigationSort  = 4;
+    protected static ?string                $navigationLabel = 'All Counted Lines';
+    protected static ?int                   $navigationSort  = 5;
+
+    // Off the menu. Auditing now starts from a count and drills into its lines,
+    // so a flat list of every line ever counted is not where anyone should
+    // begin. The page still works and its actions are shared with that
+    // drill-in — it is simply no longer a front door.
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
 
     public static function canAccess(): bool
     {
@@ -267,7 +276,39 @@ class AuditSessionResource extends Resource
                     ),
 
             ])
-            ->recordActions([
+            // Shared with the Count Sessions drill-in so both surfaces offer
+            // exactly the same actions from a single definition.
+            ->recordActions(static::lineActions())
+            ->defaultSort('created_at', 'desc')
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    DeleteBulkAction::make()
+                        ->visible(fn () => auth()->user()->isSuperAdmin() || filament()->getTenant()?->isOwner(auth()->user())),
+                ]),
+            ]);
+    }
+
+    // Deciding that a named person owes money is an owner's call, not a
+    // delegable inventory permission — so this is not wired to a Spatie
+    // permission that could be handed to a manager from the Roles screen.
+    /** The shortage case opened for this count line, if the variance was non-zero. */
+    public static function caseFor(AuditSession $record): ?InventoryShortageCase
+    {
+        return InventoryShortageCase::where('count_line_id', $record->id)->first();
+    }
+
+    /**
+     * Every action available on one counted line.
+     *
+     * Extracted so the Count Sessions drill-in and this screen share one
+     * definition. Two copies would be two places for the authorization
+     * checks to drift apart.
+     *
+     * @return array<int, Action>
+     */
+    public static function lineActions(): array
+    {
+        return [
 
                 // ── Storekeeper B submits their count ────────────────────────────
                 Action::make('verify_count')
@@ -632,23 +673,7 @@ class AuditSessionResource extends Resource
                         }
                     }),
 
-            ])
-            ->defaultSort('created_at', 'desc')
-            ->toolbarActions([
-                BulkActionGroup::make([
-                    DeleteBulkAction::make()
-                        ->visible(fn () => auth()->user()->isSuperAdmin() || filament()->getTenant()?->isOwner(auth()->user())),
-                ]),
-            ]);
-    }
-
-    // Deciding that a named person owes money is an owner's call, not a
-    // delegable inventory permission — so this is not wired to a Spatie
-    // permission that could be handed to a manager from the Roles screen.
-    /** The shortage case opened for this count line, if the variance was non-zero. */
-    public static function caseFor(AuditSession $record): ?InventoryShortageCase
-    {
-        return InventoryShortageCase::where('count_line_id', $record->id)->first();
+        ];
     }
 
     public static function getPages(): array

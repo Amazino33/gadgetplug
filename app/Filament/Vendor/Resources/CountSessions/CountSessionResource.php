@@ -25,8 +25,11 @@ class CountSessionResource extends Resource
 
     protected static string|null|\BackedEnum $navigationIcon  = 'heroicon-o-clipboard-document-check';
     protected static string|null|UnitEnum    $navigationGroup = 'Inventory';
-    protected static ?string                 $navigationLabel = 'Count Sessions';
-    protected static ?int                    $navigationSort  = 2;
+    // "Audit Sessions" is what this is called in the business. It replaces the
+    // old screen of that name, which listed every counted line flat with
+    // nothing grouping them — you audit a count, not a wall of product rows.
+    protected static ?string                 $navigationLabel = 'Audit Sessions';
+    protected static ?int                    $navigationSort  = 4;
 
     public static function canAccess(): bool
     {
@@ -151,6 +154,13 @@ class CountSessionResource extends Resource
             // The row itself opens the session — this list exists to be drilled
             // into, so a separate View button would just be noise.
             ->recordUrl(fn (BlindCountSession $record): string => Pages\ViewCountSession::getUrl(['record' => $record]));
+    }
+
+    public static function getRelations(): array
+    {
+        return [
+            RelationManagers\LinesRelationManager::class,
+        ];
     }
 
     public static function getPages(): array

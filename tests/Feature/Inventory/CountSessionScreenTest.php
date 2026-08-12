@@ -221,3 +221,51 @@ it('says so plainly when a session predates the line link', function () {
         ->assertOk()
         ->assertSee('No lines are linked to this count');
 });
+
+// ── The drill-in carries the actions ─────────────────────────────────────────
+
+it('lets the owner resolve a disputed line from inside the count', function () {
+    $c = countSessionContext();
+    $session = runSoloCount($c, 7);
+    $line = $session->auditLines()->firstOrFail();
+
+    expect($line->status)->toBe('discrepancy');
+
+    $this->actingAs($c['owner']);
+    enterPanel($c['vendor']);
+
+    Livewire::test(
+        \App\Filament\Vendor\Resources\CountSessions\RelationManagers\LinesRelationManager::class,
+        ['ownerRecord' => $session, 'pageClass' => ViewCountSession::class],
+    )
+        ->assertOk()
+        ->assertCanSeeTableRecords([$line])
+        // The same actions as the old flat screen, from one shared definition.
+        ->assertTableActionExists('manager_override');
+});
+
+it('applies the correction to stock when resolved from the drill-in', function () {
+    $c = countSessionContext();
+    $session = runSoloCount($c, 7);
+    $line = $session->auditLines()->firstOrFail();
+
+    $this->actingAs($c['owner']);
+    enterPanel($c['vendor']);
+
+    Livewire::test(
+        \App\Filament\Vendor\Resources\CountSessions\RelationManagers\LinesRelationManager::class,
+        ['ownerRecord' => $session, 'pageClass' => ViewCountSession::class],
+    )->callTableAction('manager_override', $line, [
+        'manager_override_count' => 7,
+        'reason_code'            => 'Suspected Theft',
+    ]);
+
+    // Stock corrected, line settled, and a case opened for the decision.
+    expect($c['product']->fresh()->stock_quantity)->toBe(7)
+        ->and($line->fresh()->status)->toBe('resolved_by_override')
+        ->and(InventoryShortageCase::where('count_line_id', $line->id)->exists())->toBeTrue();
+});
+
+it('keeps the old flat line list off the menu', function () {
+    expect(\App\Filament\Vendor\Resources\AuditSessions\AuditSessionResource::shouldRegisterNavigation())->toBeFalse();
+});
