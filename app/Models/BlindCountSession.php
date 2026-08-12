@@ -51,6 +51,34 @@ class BlindCountSession extends Model
             ->values();
     }
 
+    /**
+     * Lines whose variance cannot be worked out, because no system figure was
+     * recorded when they were counted.
+     *
+     * These are not "no variance" — they are "unknown", and the two must not be
+     * shown as the same thing. A count that ran before baselines were captured
+     * reports zero variances while still flagging lines as needing attention,
+     * which reads as a contradiction unless the difference is stated.
+     */
+    public function unmeasurableLines(): \Illuminate\Support\Collection
+    {
+        return $this->auditLines
+            ->filter(fn (AuditSession $line) => $line->countedVariance() === null)
+            ->values();
+    }
+
+    public function hasUnmeasurableLines(): bool
+    {
+        return $this->unmeasurableLines()->isNotEmpty();
+    }
+
+    /** Every line is unmeasurable — the whole count predates baseline capture. */
+    public function isEntirelyUnmeasurable(): bool
+    {
+        return $this->auditLines->isNotEmpty()
+            && $this->unmeasurableLines()->count() === $this->auditLines->count();
+    }
+
     /** Lines still waiting on someone: a disputed count, or an undecided case. */
     public function unresolvedCount(): int
     {

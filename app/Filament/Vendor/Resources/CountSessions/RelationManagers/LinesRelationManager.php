@@ -92,25 +92,34 @@ class LinesRelationManager extends RelationManager
                         default                => 'gray',
                     }),
 
+                // A line can be flagged as differing yet carry no case — when no
+                // system figure was recorded there is no variance to open one
+                // for. Calling that "Balanced" states the opposite of the truth,
+                // so fall through to what is actually known about the line.
                 TextColumn::make('case_status')
                     ->label('Case')
                     ->badge()
-                    ->getStateUsing(fn (AuditSession $r): string => match ($r->shortageCase?->status) {
-                        'pending_disposition' => 'Awaiting decision',
-                        'investigating'       => 'Investigating',
-                        'charged'             => 'Charged',
-                        'recovered'           => 'Recovered',
-                        'written_off'         => 'Written off',
-                        default               => 'Balanced',
+                    ->getStateUsing(fn (AuditSession $r): string => match (true) {
+                        $r->shortageCase?->status === 'pending_disposition' => 'Awaiting decision',
+                        $r->shortageCase?->status === 'investigating'       => 'Investigating',
+                        $r->shortageCase?->status === 'charged'             => 'Charged',
+                        $r->shortageCase?->status === 'recovered'           => 'Recovered',
+                        $r->shortageCase?->status === 'written_off'         => 'Written off',
+                        $r->countedVariance() === null                      => 'No baseline',
+                        default                                             => 'Balanced',
                     })
-                    ->color(fn (AuditSession $r): string => match ($r->shortageCase?->status) {
-                        'pending_disposition' => 'warning',
-                        'investigating'       => 'info',
-                        'charged'             => 'danger',
-                        'recovered'           => 'success',
-                        'written_off'         => 'gray',
-                        default               => 'success',
-                    }),
+                    ->color(fn (AuditSession $r): string => match (true) {
+                        $r->shortageCase?->status === 'pending_disposition' => 'warning',
+                        $r->shortageCase?->status === 'investigating'       => 'info',
+                        $r->shortageCase?->status === 'charged'             => 'danger',
+                        $r->shortageCase?->status === 'recovered'           => 'success',
+                        $r->shortageCase?->status === 'written_off'         => 'gray',
+                        $r->countedVariance() === null                      => 'gray',
+                        default                                             => 'success',
+                    })
+                    ->tooltip(fn (AuditSession $r): ?string => $r->shortageCase === null && $r->countedVariance() === null
+                        ? 'No system figure was recorded for this line, so no shortage can be valued or charged. Resolving it still corrects stock.'
+                        : null),
 
                 // Cost-derived, so behind the same gate as every other cost surface.
                 TextColumn::make('cost_component')

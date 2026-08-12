@@ -54,9 +54,15 @@ class ViewCountSession extends ViewRecord
                     ->content((string) count($session->product_order ?? [])),
             ])->columns(2),
 
+            // A count with no recorded baseline used to report "0 variances" and
+            // "₦0.00" beside a non-zero "still needing a decision", which reads
+            // as a contradiction. Unknown and zero are not the same answer, so
+            // this says which one it is.
             Section::make('What it found')->schema([
                 Placeholder::make('variances')->label('Lines with a variance')
-                    ->content((string) $session->varianceLines()->count()),
+                    ->content(fn (): string => $session->isEntirelyUnmeasurable()
+                        ? 'Not measurable'
+                        : (string) $session->varianceLines()->count()),
 
                 Placeholder::make('unresolved')->label('Still needing a decision')
                     ->content((string) $session->unresolvedCount()),
@@ -64,7 +70,14 @@ class ViewCountSession extends ViewRecord
                 Placeholder::make('shortage_value')->label('Variance at cost')
                     // Cost-derived — same gate as everywhere else.
                     ->visible(fn (): bool => ProductForm::canSeeCostPrice())
-                    ->content('₦'.number_format($session->shortageValueAtCost(), 2)),
+                    ->content(fn (): string => $session->isEntirelyUnmeasurable()
+                        ? 'Not measurable'
+                        : '₦'.number_format($session->shortageValueAtCost(), 2)),
+
+                Placeholder::make('unmeasurable_note')->label('')
+                    ->visible(fn (): bool => $session->hasUnmeasurableLines())
+                    ->columnSpanFull()
+                    ->content(fn (): HtmlString => new HtmlString($this->unmeasurableNote($session))),
             ])->columns(3),
 
             Section::make('Lines')->schema([
@@ -74,12 +87,35 @@ class ViewCountSession extends ViewRecord
         ]);
     }
 
+    /**
+     * Says plainly why a count reports no variance while still holding lines
+     * open, so nobody reads "₦0.00" as "nothing was missing".
+     */
+    private function unmeasurableNote(BlindCountSession $session): string
+    {
+        $unmeasurable = $session->unmeasurableLines()->count();
+        $total        = $session->auditLines->count();
+
+        $scope = $session->isEntirelyUnmeasurable()
+            ? 'This count has no recorded system figure for any line'
+            : $unmeasurable.' of '.$total.' lines have no recorded system figure';
+
+        return '<div class="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 '
+            .'dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">'
+            .'<strong>Variance cannot be worked out.</strong> '
+            .e($scope).', so there is nothing to compare the count against — this is '
+            .'"we cannot tell", not "nothing was missing". Resolving each line still corrects stock to '
+            .'the counted figure, but no shortage can be valued or charged to anyone. '
+            .'Counts taken from now on record the system figure and will show real variances.'
+            .'</div>';
+    }
+
     private function linesTable(BlindCountSession $session): string
     {
         if ($session->auditLines->isEmpty()) {
             return '<p class="text-sm text-gray-500 dark:text-gray-400">'
-                .'No lines are linked to this count. Counts taken before sessions and lines were linked '
-                .'show their results on the Audit Sessions screen instead.</p>';
+                .'No lines are linked to this count, so there is nothing to audit here. Either the count '
+                .'was never submitted, or its lines were deleted afterwards.</p>';
         }
 
         $showCost = ProductForm::canSeeCostPrice();
@@ -101,13 +137,18 @@ class ViewCountSession extends ViewRecord
                 default            => 'text-green-600 dark:text-green-400',
             };
 
-            $caseLabel = match ($case?->status) {
-                'pending_disposition' => 'Awaiting decision',
-                'investigating'       => 'Investigating',
-                'charged'             => 'Charged',
-                'recovered'           => 'Recovered',
-                'written_off'         => 'Written off',
-                default               => 'Balanced',
+            // "Balanced" on a line the counter flagged as differing is simply
+            // untrue — it only means no case could be opened for it.
+            $caseLabel = match (true) {
+                $case?->status === 'pending_disposition' => 'Awaiting decision',
+                $case?->status === 'investigating'       => 'Investigating',
+                $case?->status === 'charged'             => 'Charged',
+                $case?->status === 'recovered'           => 'Recovered',
+                $case?->status === 'written_off'         => 'Written off',
+                $variance === null                       => 'No baseline',
+                $line->status === 'discrepancy'          => 'Review needed',
+                $line->status === 'resolved_by_override' => 'Resolved',
+                default                                  => 'Balanced',
             };
 
             $costCell = $showCost && $case
@@ -138,6 +179,7 @@ class ViewCountSession extends ViewRecord
             .'<th class="px-3 py-2 text-left font-medium">Case</th>'
             .'</tr></thead><tbody>'.$rows.'</tbody></table></div>'
             .'<p class="mt-3 text-xs text-gray-500 dark:text-gray-400">'
-            .'Resolve disputes and decide cases on the Audit Sessions screen — the actions live there so there is only one place they can be done.</p>';
+            .'This is the summary. Resolve disputes and decide cases in <strong>Counted lines</strong> below, '
+            .'where every action lives.</p>';
     }
 }

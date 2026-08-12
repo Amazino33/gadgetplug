@@ -116,12 +116,28 @@ class CountSessionResource extends Resource
                     ->alignCenter()
                     ->getStateUsing(fn (BlindCountSession $r): int => count($r->product_order ?? [])),
 
+                // "0 variances" on a count whose baselines were never recorded is
+                // a lie by omission — it means "we cannot tell", not "nothing was
+                // missing". Say which.
                 TextColumn::make('variances')
                     ->label('Variances')
                     ->alignCenter()
                     ->badge()
-                    ->getStateUsing(fn (BlindCountSession $r): int => $r->varianceLines()->count())
-                    ->color(fn (BlindCountSession $r): string => $r->varianceLines()->count() > 0 ? 'danger' : 'success'),
+                    ->getStateUsing(function (BlindCountSession $r): string {
+                        if ($r->isEntirelyUnmeasurable()) {
+                            return 'Not measurable';
+                        }
+
+                        return (string) $r->varianceLines()->count();
+                    })
+                    ->color(fn (BlindCountSession $r): string => match (true) {
+                        $r->isEntirelyUnmeasurable()    => 'gray',
+                        $r->varianceLines()->count() > 0 => 'danger',
+                        default                          => 'success',
+                    })
+                    ->tooltip(fn (BlindCountSession $r): ?string => $r->hasUnmeasurableLines()
+                        ? $r->unmeasurableLines()->count().' line(s) have no recorded system figure, so their variance cannot be worked out.'
+                        : null),
 
                 TextColumn::make('shortfall')
                     ->label('Shortfall?')
@@ -135,18 +151,29 @@ class CountSessionResource extends Resource
                     ->alignRight()
                     ->visible(fn (): bool => ProductForm::canSeeCostPrice())
                     ->getStateUsing(function (BlindCountSession $r): string {
+                        if ($r->isEntirelyUnmeasurable()) {
+                            return '—';
+                        }
+
                         $value = $r->shortageValueAtCost();
 
                         return $value > 0 ? '₦'.number_format($value, 2) : '—';
                     })
-                    ->color(fn (BlindCountSession $r): string => $r->shortageValueAtCost() > 0 ? 'danger' : 'gray'),
+                    ->color(fn (BlindCountSession $r): string => ! $r->isEntirelyUnmeasurable() && $r->shortageValueAtCost() > 0
+                        ? 'danger'
+                        : 'gray'),
 
                 TextColumn::make('unresolved')
                     ->label('Unresolved')
                     ->alignCenter()
                     ->badge()
                     ->getStateUsing(fn (BlindCountSession $r): int => $r->unresolvedCount())
-                    ->color(fn (BlindCountSession $r): string => $r->unresolvedCount() > 0 ? 'warning' : 'success'),
+                    ->color(fn (BlindCountSession $r): string => $r->unresolvedCount() > 0 ? 'warning' : 'success')
+                    // Explains the pairing that reads as a contradiction: no
+                    // measurable variance, yet lines still awaiting someone.
+                    ->tooltip(fn (BlindCountSession $r): ?string => $r->unresolvedCount() > 0 && $r->isEntirelyUnmeasurable()
+                        ? 'Flagged as differing when counted, but with no recorded system figure the difference cannot be quantified. Resolving each line corrects stock; no shortage can be charged.'
+                        : null),
             ])
             ->defaultSort('created_at', 'desc')
             ->filters([
