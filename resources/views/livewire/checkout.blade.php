@@ -9,11 +9,21 @@ use App\Services\CartService;
 use App\Services\Messaging\PhoneNumber;
 use App\Services\Meta\MetaConversionsService;
 use App\Actions\Inventory\ReserveStockAction;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
 
 new class extends Component {
+    /**
+     * How long two identical submissions are treated as the same checkout.
+     *
+     * Long enough to cover a double-tap, a retried request on a dropped mobile
+     * connection, and a second tab; short enough that a customer who genuinely
+     * wants the same cart again a few minutes later is not blocked.
+     */
+    private const DUPLICATE_WINDOW_SECONDS = 120;
+
     public string $name          = '';
     public string $email         = '';
     public string $phone         = '';
@@ -278,25 +288,50 @@ new class extends Component {
             return;
         }
 
+        // ── One checkout, one order ──────────────────────────────────────────
+        //
+        // Two layers, because either alone leaves a hole. The disabled button
+        // stops the ordinary double-tap but not a retried request or a second
+        // tab; the pre-check below stops those but races with a genuinely
+        // concurrent pair, which is what the unique index is for.
+        $fingerprint = $this->checkoutFingerprint();
+
+        if ($existing = $this->recentOrderFor($fingerprint)) {
+            $this->resumeExistingOrder($existing);
+            return;
+        }
+
         $reference = 'GP-' . strtoupper(Str::random(10));
 
-        $order = Order::create([
-            'user_id'          => auth()->id(),
-            'reference'        => $reference,
-            'customer_name'    => $this->name,
-            'customer_email'   => $this->email,
-            'customer_phone'   => $this->phone,
-            'shipping_address' => $this->lga . ', Akwa Ibom State — ' . $this->address,
-            'local_government' => $this->lga,
-            'total_amount'     => $this->total,
-            'status'           => 'pending',
-            'payment_method'   => $this->paymentMethod,
-            // Captured here (shared by both payment paths) so the server-side
-            // Purchase CAPI event — fired later from OrderObserver, possibly
-            // disconnected from this request — can still include them.
-            'fbp'              => request()->cookie('_fbp'),
-            'fbc'              => request()->cookie('_fbc'),
-        ]);
+        try {
+            $order = Order::create([
+                'user_id'          => auth()->id(),
+                'reference'        => $reference,
+                'idempotency_key'  => $this->idempotencyKey($fingerprint),
+                'customer_name'    => $this->name,
+                'customer_email'   => $this->email,
+                'customer_phone'   => $this->phone,
+                'shipping_address' => $this->lga . ', Akwa Ibom State — ' . $this->address,
+                'local_government' => $this->lga,
+                'total_amount'     => $this->total,
+                'status'           => 'pending',
+                'payment_method'   => $this->paymentMethod,
+                // Captured here (shared by both payment paths) so the server-side
+                // Purchase CAPI event — fired later from OrderObserver, possibly
+                // disconnected from this request — can still include them.
+                'fbp'              => request()->cookie('_fbp'),
+                'fbc'              => request()->cookie('_fbc'),
+            ]);
+        } catch (QueryException $e) {
+            // The other request won the race and took the key. Nothing is wrong
+            // — the customer's order exists, it just isn't this one.
+            if ($existing = $this->recentOrderFor($fingerprint)) {
+                $this->resumeExistingOrder($existing);
+                return;
+            }
+
+            throw $e;
+        }
 
         foreach ($this->cartItems as $item) {
             OrderItem::create([
@@ -350,7 +385,13 @@ new class extends Component {
             return;
         }
 
-        // Paystack path
+        $this->startPaystack($reference);
+    }
+
+    // Extracted so a duplicate submission can be sent back to the same Paystack
+    // transaction rather than opening a second one.
+    private function startPaystack(string $reference): void
+    {
         try {
             $paystackKey = config('services.paystack.secret_key');
 
@@ -382,6 +423,88 @@ new class extends Component {
             \Log::error('Paystack exception: ' . $e->getMessage());
             session()->flash('error', 'Payment system error. Please try again later.');
         }
+    }
+
+    // ── Duplicate-submission guard ───────────────────────────────────────────
+
+    /**
+     * What makes two submissions "the same checkout": the same browser session,
+     * the same customer number, the same money, and the same basket.
+     *
+     * Deliberately excludes the reference (random per attempt) and the time —
+     * the window is applied separately, so the boundary between two windows
+     * cannot split a pair of near-simultaneous taps.
+     */
+    private function checkoutFingerprint(): string
+    {
+        $basket = collect($this->cartItems)
+            ->map(fn (array $item) => $item['product']->id . 'x' . (int) $item['quantity'])
+            ->sort()
+            ->implode('|');
+
+        return hash('sha256', implode('~', [
+            Session::getId(),
+            (string) PhoneNumber::toNigerianInternational($this->phone),
+            number_format($this->total, 2, '.', ''),
+            $this->paymentMethod,
+            $basket,
+        ]));
+    }
+
+    /**
+     * The stored key for a fingerprint in a given window.
+     *
+     * The window number is folded in so the same cart can legitimately be
+     * ordered again later — without it, a unique index would block a repeat
+     * customer forever.
+     */
+    private function idempotencyKey(string $fingerprint, int $windowsAgo = 0): string
+    {
+        // now() rather than time() so the window moves with Carbon's clock —
+        // otherwise this and the created_at check below could disagree.
+        $window = intdiv(now()->getTimestamp(), self::DUPLICATE_WINDOW_SECONDS) - $windowsAgo;
+
+        return hash('sha256', $fingerprint . '~' . $window);
+    }
+
+    /**
+     * The order an identical submission already created, if there is one.
+     *
+     * Checks the previous window as well as the current one: two taps a second
+     * apart can still land either side of a window boundary, and that pair is
+     * exactly what this exists to catch.
+     */
+    private function recentOrderFor(string $fingerprint): ?Order
+    {
+        return Order::query()
+            ->whereIn('idempotency_key', [
+                $this->idempotencyKey($fingerprint),
+                $this->idempotencyKey($fingerprint, 1),
+            ])
+            ->where('created_at', '>=', now()->subSeconds(self::DUPLICATE_WINDOW_SECONDS))
+            ->latest('id')
+            ->first();
+    }
+
+    /**
+     * Send a duplicate submission to the order that already exists instead of
+     * creating a second one. No new items, no second stock reservation, no
+     * second affiliate attribution.
+     */
+    private function resumeExistingOrder(Order $order): void
+    {
+        if ($order->payment_method === 'pay_on_delivery') {
+            Session::forget('cart');
+            $this->dispatch('cart-updated');
+            session()->put('payment_success', $order->reference);
+            $this->redirectRoute('checkout');
+
+            return;
+        }
+
+        // Paystack treats a repeated reference as the same transaction, so this
+        // returns the customer to the payment page they already had.
+        $this->startPaystack($order->reference);
     }
 }; ?>
 
@@ -967,24 +1090,44 @@ new class extends Component {
 
             {{-- PAY BUTTON --}}
             @if ($paymentMethod === 'pay_on_delivery')
+            {{-- Disabled the moment it is pressed. Without this a customer on a
+                 slow connection taps again, and two orders are created. --}}
             <button type="submit"
-                class="w-full flex items-center justify-center gap-2 bg-brand-orange hover:bg-[#e06610] text-white font-montserrat font-bold text-[15px] py-4 rounded-xl border-0 cursor-pointer transition-all hover:-translate-y-px shadow-lg">
-                <svg class="w-5 h-5 fill-none" style="stroke:#fff;stroke-width:2" viewBox="0 0 24 24">
+                wire:loading.attr="disabled"
+                wire:target="processCheckout"
+                class="w-full flex items-center justify-center gap-2 bg-brand-orange hover:bg-[#e06610] disabled:opacity-60 disabled:cursor-wait disabled:hover:translate-y-0 text-white font-montserrat font-bold text-[15px] py-4 rounded-xl border-0 cursor-pointer transition-all hover:-translate-y-px shadow-lg">
+                <svg class="w-5 h-5 fill-none" style="stroke:#fff;stroke-width:2" viewBox="0 0 24 24"
+                     wire:loading.remove wire:target="processCheckout">
                     <rect x="1" y="3" width="15" height="13" rx="1"/>
                     <path d="M16 8h4l3 3v5h-7V8z"/>
                     <circle cx="5.5" cy="18.5" r="2.5"/>
                     <circle cx="18.5" cy="18.5" r="2.5"/>
                 </svg>
-                Place Order — Pay on Delivery
+                <svg class="w-5 h-5 animate-spin fill-none" style="stroke:#fff;stroke-width:2" viewBox="0 0 24 24"
+                     wire:loading wire:target="processCheckout">
+                    <circle cx="12" cy="12" r="9" style="opacity:.3"/>
+                    <path d="M21 12a9 9 0 0 0-9-9" stroke-linecap="round"/>
+                </svg>
+                <span wire:loading.remove wire:target="processCheckout">Place Order — Pay on Delivery</span>
+                <span wire:loading wire:target="processCheckout">Placing your order…</span>
             </button>
             @else
             <button type="submit"
-                class="w-full flex items-center justify-center gap-2 bg-brand-orange hover:bg-[#e06610] text-white font-montserrat font-bold text-[15px] py-4 rounded-xl border-0 cursor-pointer transition-all hover:-translate-y-px shadow-lg">
-                <svg class="w-5 h-5 fill-none" style="stroke:currentColor;stroke-width:2" viewBox="0 0 24 24">
+                wire:loading.attr="disabled"
+                wire:target="processCheckout"
+                class="w-full flex items-center justify-center gap-2 bg-brand-orange hover:bg-[#e06610] disabled:opacity-60 disabled:cursor-wait disabled:hover:translate-y-0 text-white font-montserrat font-bold text-[15px] py-4 rounded-xl border-0 cursor-pointer transition-all hover:-translate-y-px shadow-lg">
+                <svg class="w-5 h-5 fill-none" style="stroke:currentColor;stroke-width:2" viewBox="0 0 24 24"
+                     wire:loading.remove wire:target="processCheckout">
                     <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/>
                     <line x1="1" y1="10" x2="23" y2="10"/>
                 </svg>
-                Pay ₦{{ number_format($total) }} with Paystack
+                <svg class="w-5 h-5 animate-spin fill-none" style="stroke:currentColor;stroke-width:2" viewBox="0 0 24 24"
+                     wire:loading wire:target="processCheckout">
+                    <circle cx="12" cy="12" r="9" style="opacity:.3"/>
+                    <path d="M21 12a9 9 0 0 0-9-9" stroke-linecap="round"/>
+                </svg>
+                <span wire:loading.remove wire:target="processCheckout">Pay ₦{{ number_format($total) }} with Paystack</span>
+                <span wire:loading wire:target="processCheckout">Taking you to Paystack…</span>
             </button>
             @endif
 
