@@ -75,9 +75,25 @@ new class extends Component {
             default      => $query->latest(),
         };
 
+        $categories = Category::withCount('products')
+            ->with('media')
+            ->orderByDesc('products_count')
+            ->get();
+
+        // Only the trending band's first 5 cards ever render an image, so
+        // the fallback lookup only runs for those — a curated category photo
+        // wins if one's been uploaded, otherwise the tile borrows a photo
+        // from one of its own products rather than showing nothing.
+        $categories->take(5)->each(function (Category $category) {
+            $category->trendingImageUrl = $category->getFirstMediaUrl('category-image', 'thumb')
+                ?: optional(
+                    Product::visibleOnline()->where('category_id', $category->id)->with('media')->first()
+                )?->getFirstMediaUrl('product-images', 'thumb');
+        });
+
         return [
             'products'   => $query->paginate(9),
-            'categories' => Category::withCount('products')->orderByDesc('products_count')->get(),
+            'categories' => $categories,
         ];
     }
 
@@ -544,18 +560,37 @@ $cardBgs = [
         @endphp
 
         @foreach ($trendCards as $i => $card)
-        @php $tone = $trendPalette[$i % count($trendPalette)]; $wide = $i === 0; @endphp
+        @php $tone = $trendPalette[$i % count($trendPalette)]; $wide = $i === 0; $image = $card->trendingImageUrl ?? null; @endphp
         <a href="{{ route('home', ['category' => $card->slug]) }}#products"
             class="block rounded-2xl overflow-hidden relative transition-all hover:scale-[1.02] hover:shadow-lg
             {{ $wide ? 'col-span-2 h-[240px]' : 'h-[200px]' }}"
-            :style="`background: ${dark ? '{{ $tone['bg'] }}' : '{{ $tone['lightBg'] }}'}`">
-            <div class="absolute inset-0 flex items-end justify-start p-4">
+            @if (! $image) :style="`background: ${dark ? '{{ $tone['bg'] }}' : '{{ $tone['lightBg'] }}'}`" @endif>
+            @if ($image)
+                <img src="{{ $image }}" alt="{{ $card->name }}" class="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+                {{-- Scrim so the label stays readable over whatever the photo looks like --}}
+                <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent"></div>
+            @else
                 <x-gp-icon :name="\App\Support\CategoryIcon::for($card->name)"
                     class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-20 text-brand dark:text-brand-lime {{ $wide ? 'w-24 h-24' : 'w-16 h-16' }}" />
+            @endif
+            <div class="absolute inset-0 flex items-end justify-start p-4">
                 <div class="relative z-10">
-                    <div class="text-[9px] text-brand dark:text-brand-lime font-bold font-montserrat tracking-[1px] uppercase mb-1">Category</div>
-                    <div class="font-montserrat font-black {{ $wide ? 'text-[20px]' : 'text-[15px]' }} text-[#111] dark:text-white leading-[1.2]">{{ $card->name }}</div>
-                    <div class="text-[10px] text-[#5a7a5c] dark:text-white/50 mt-0.5">
+                    <div @class([
+                        'text-[9px] font-bold font-montserrat tracking-[1px] uppercase mb-1',
+                        'text-white/80' => $image,
+                        'text-brand dark:text-brand-lime' => ! $image,
+                    ])>Category</div>
+                    <div @class([
+                        'font-montserrat font-black leading-[1.2]',
+                        $wide ? 'text-[20px]' : 'text-[15px]',
+                        'text-white' => $image,
+                        'text-[#111] dark:text-white' => ! $image,
+                    ])>{{ $card->name }}</div>
+                    <div @class([
+                        'text-[10px] mt-0.5',
+                        'text-white/70' => $image,
+                        'text-[#5a7a5c] dark:text-white/50' => ! $image,
+                    ])>
                         {{ number_format($card->products_count) }} {{ Str::plural('product', $card->products_count) }}
                     </div>
                 </div>

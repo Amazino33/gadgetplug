@@ -8,6 +8,7 @@ use Filament\Actions\EditAction;
 use Filament\Tables\Table;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\IconColumn;
+use Filament\Tables\Columns\SpatieMediaLibraryImageColumn;
 
 class CategoriesTable
 {
@@ -15,6 +16,11 @@ class CategoriesTable
     {
         return $table
             ->columns([
+                SpatieMediaLibraryImageColumn::make('image')
+                    ->collection('category-image')
+                    ->conversion('thumb')
+                    ->label('')
+                    ->circular(),
                 TextColumn::make('name')->searchable(),
                 TextColumn::make('slug'),
                 TextColumn::make('commission_rate')

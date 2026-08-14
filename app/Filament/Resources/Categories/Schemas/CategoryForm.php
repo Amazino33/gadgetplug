@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Categories\Schemas;
 
 use Filament\Schemas\Schema;
+use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Toggle;
@@ -15,6 +16,13 @@ class CategoryForm
             TextInput::make('name')
                 ->required(),
             Textarea::make('description')
+                ->columnSpanFull(),
+            SpatieMediaLibraryFileUpload::make('image')
+                ->collection('category-image')
+                ->image()
+                ->imageEditor()
+                ->panelLayout('compact')
+                ->helperText('Shown on the storefront\'s category tiles. Leave blank and a photo from a product in this category is used instead.')
                 ->columnSpanFull(),
             Toggle::make('is_active')
                 ->default(true),
