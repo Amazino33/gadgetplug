@@ -5,6 +5,8 @@ use App\Models\Expense;
 use App\Models\FinancialAccount;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\PosSale;
+use App\Models\PosSaleItem;
 use App\Models\Procurement;
 use App\Models\Product;
 use App\Models\Supplier;
@@ -45,6 +47,26 @@ function reportOrder(array $data, array $overrides = []): Order
     ]);
 
     return $order;
+}
+
+function reportPosSale(array $data, array $overrides = []): PosSale
+{
+    $sale = PosSale::create(array_merge([
+        'reference' => 'POS-RPT-' . uniqid(),
+        'vendor_id' => $data['vendor']->id,
+        'cashier_id' => $data['owner']->id,
+        'subtotal' => 5000, 'discount_amount' => 0, 'vat_amount' => 0, 'total' => 5000,
+        'payment_method' => 'cash', 'amount_tendered' => 5000, 'change_given' => 0,
+        'status' => 'completed', 'completed_at' => now(),
+    ], $overrides));
+
+    PosSaleItem::create([
+        'pos_sale_id' => $sale->id, 'product_id' => $data['product']->id,
+        'product_name' => $data['product']->name, 'unit_price' => 5000, 'unit_cost' => 3000,
+        'quantity' => 1, 'discount_amount' => 0, 'total' => 5000,
+    ]);
+
+    return $sale;
 }
 
 test('a cancelled order never counts as revenue, even with items on it', function () {
@@ -207,4 +229,56 @@ test('each vendor\'s report only reflects its own data', function () {
 
     expect($reportA['revenue'])->toBe(5000.0)
         ->and($reportB['revenue'])->toBe(10000.0);
+});
+
+// ─── POS sales count as revenue too ──────────────────────────────────
+
+test('POS sales count as revenue alongside online orders', function () {
+    $data = reportVendor();
+    reportOrder($data);
+    reportPosSale($data);
+
+    $report = app(FinancialReportService::class)->report($data['vendor']->id, now()->subDay(), now()->addDay());
+
+    expect($report['revenue'])->toBe(10000.0)
+        ->and($report['product_cost'])->toBe(6000.0);
+});
+
+test('a voided POS sale never counts as revenue', function () {
+    $data = reportVendor();
+    reportPosSale($data, ['status' => 'voided']);
+
+    $report = app(FinancialReportService::class)->report($data['vendor']->id, now()->subDay(), now()->addDay());
+
+    expect($report['revenue'])->toBe(0.0);
+});
+
+test('a refunded POS sale still counts its original total as revenue — the return is a separate outflow, not an erasure of the sale', function () {
+    $data = reportVendor();
+    reportPosSale($data, ['status' => 'refunded']);
+
+    $report = app(FinancialReportService::class)->report($data['vendor']->id, now()->subDay(), now()->addDay());
+
+    expect($report['revenue'])->toBe(5000.0);
+});
+
+test('a POS sale outside the range is excluded, filtered by completed_at', function () {
+    $data = reportVendor();
+    reportPosSale($data, ['completed_at' => now()->subDays(5)]);
+
+    $report = app(FinancialReportService::class)->report($data['vendor']->id, now()->subDay(), now()->addDay());
+
+    expect($report['revenue'])->toBe(0.0);
+});
+
+test('POS product cost falls back to current cost_price and flags the figure when unit_cost is missing', function () {
+    $data = reportVendor();
+    $sale = reportPosSale($data);
+    $sale->items()->update(['unit_cost' => null]);
+    $data['product']->update(['cost_price' => 3500]);
+
+    $report = app(FinancialReportService::class)->report($data['vendor']->id, now()->subDay(), now()->addDay());
+
+    expect($report['product_cost'])->toBe(3500.0)
+        ->and($report['cost_is_estimated'])->toBeTrue();
 });

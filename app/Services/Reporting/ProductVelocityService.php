@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Services\Reporting;
 
 use App\Models\InventoryLedger;
-use App\Models\PosSaleItem;
 use App\Models\Product;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -66,11 +65,7 @@ class ProductVelocityService
             ->get()
             ->keyBy('product_id');
 
-        $posRows = PosSaleItem::query()
-            ->join('pos_sales', 'pos_sales.id', '=', 'pos_sale_items.pos_sale_id')
-            ->where('pos_sales.vendor_id', $vendorId)
-            ->where('pos_sales.status', '!=', 'voided')
-            ->whereBetween('pos_sales.completed_at', [$from, $to])
+        $posRows = FinancialReportService::recognizedPosSaleItemsQuery($vendorId, $from, $to)
             ->groupBy('pos_sale_items.product_id')
             ->selectRaw('pos_sale_items.product_id, SUM(pos_sale_items.quantity) as units, SUM(pos_sale_items.quantity * pos_sale_items.unit_price) as revenue')
             ->get()
@@ -252,12 +247,8 @@ class ProductVelocityService
      */
     private function posUnitsDelivered(int $vendorId, array $productIds, CarbonImmutable $from, CarbonImmutable $to): array
     {
-        return PosSaleItem::query()
-            ->join('pos_sales', 'pos_sales.id', '=', 'pos_sale_items.pos_sale_id')
-            ->where('pos_sales.vendor_id', $vendorId)
-            ->where('pos_sales.status', '!=', 'voided')
+        return FinancialReportService::recognizedPosSaleItemsQuery($vendorId, $from, $to)
             ->whereIn('pos_sale_items.product_id', $productIds)
-            ->whereBetween('pos_sales.completed_at', [$from, $to])
             ->groupBy('pos_sale_items.product_id')
             ->selectRaw('pos_sale_items.product_id, SUM(pos_sale_items.quantity) as units')
             ->pluck('units', 'product_id')

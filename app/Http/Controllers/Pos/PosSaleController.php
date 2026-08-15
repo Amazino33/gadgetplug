@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Pos;
 
+use App\Actions\Finance\RecognizePosSaleRevenueAction;
 use App\Actions\Inventory\AdjustStockAction;
 use App\Http\Controllers\Controller;
 use App\Models\PosCustomer;
@@ -22,7 +23,7 @@ use Illuminate\Validation\ValidationException;
 
 class PosSaleController extends Controller
 {
-    public function store(Request $request, AdjustStockAction $adjustStock, PosPriceFloor $priceFloor): JsonResponse
+    public function store(Request $request, AdjustStockAction $adjustStock, PosPriceFloor $priceFloor, RecognizePosSaleRevenueAction $revenue): JsonResponse
     {
         $request->validate([
             'vendor_id'                  => 'required|integer',
@@ -57,7 +58,7 @@ class PosSaleController extends Controller
         $vendor = Vendor::findOrFail($request->vendor_id);
 
         try {
-            $sale = DB::transaction(function () use ($request, $adjustStock, $priceFloor, $vendor) {
+            $sale = DB::transaction(function () use ($request, $adjustStock, $priceFloor, $vendor, $revenue) {
             $subtotal = collect($request->items)->sum(function ($item) {
                 $lineTotal = $item['unit_price'] * $item['quantity'];
                 return $lineTotal - ($item['discount_amount'] ?? 0);
@@ -164,6 +165,8 @@ class PosSaleController extends Controller
                 PosCustomer::where('id', $sale->customer_id)->increment('total_transactions');
             }
 
+            $revenue->execute($sale);
+
             return $sale;
             });
         } catch (ValidationException $e) {
@@ -184,7 +187,7 @@ class PosSaleController extends Controller
         return response()->json($sale->load(['items', 'payments']), 201);
     }
 
-    public function void(Request $request, PosSale $sale, AdjustStockAction $adjustStock): JsonResponse
+    public function void(Request $request, PosSale $sale, AdjustStockAction $adjustStock, RecognizePosSaleRevenueAction $revenue): JsonResponse
     {
         $user   = $request->user();
         $vendor = \App\Models\Vendor::find($sale->vendor_id);
@@ -197,7 +200,7 @@ class PosSaleController extends Controller
             return response()->json(['message' => 'Only completed sales can be voided.'], 422);
         }
 
-        DB::transaction(function () use ($sale, $adjustStock, $request) {
+        DB::transaction(function () use ($sale, $adjustStock, $request, $revenue) {
             foreach ($sale->items as $item) {
                 $adjustStock->execute(
                     productId: $item->product_id,
@@ -210,6 +213,8 @@ class PosSaleController extends Controller
             }
 
             $sale->update(['status' => 'voided']);
+
+            $revenue->reverseForVoid($sale);
 
             activity()->causedBy($request->user())
                 ->performedOn($sale)
@@ -225,7 +230,7 @@ class PosSaleController extends Controller
         return response()->json(['message' => 'Sale voided.']);
     }
 
-    public function processReturn(Request $request, PosSale $sale, AdjustStockAction $adjustStock): JsonResponse
+    public function processReturn(Request $request, PosSale $sale, AdjustStockAction $adjustStock, RecognizePosSaleRevenueAction $revenue): JsonResponse
     {
         $user   = $request->user();
         $vendor = \App\Models\Vendor::find($sale->vendor_id);
@@ -274,7 +279,7 @@ class PosSaleController extends Controller
             }
         }
 
-        $return = DB::transaction(function () use ($request, $sale, $adjustStock, $alreadyReturned) {
+        $return = DB::transaction(function () use ($request, $sale, $adjustStock, $alreadyReturned, $revenue) {
             $returnItems  = [];
             $refundAmount = 0;
 
@@ -323,6 +328,8 @@ class PosSaleController extends Controller
             );
 
             $sale->update(['status' => $fullyReturned ? 'refunded' : 'partial_refund']);
+
+            $revenue->reverseForReturn($sale, $posReturn);
 
             activity()->causedBy($request->user())
                 ->performedOn($sale)

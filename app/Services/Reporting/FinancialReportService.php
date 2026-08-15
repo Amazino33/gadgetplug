@@ -8,6 +8,7 @@ use App\Models\Expense;
 use App\Models\FinancialAccount;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\PosSaleItem;
 use App\Models\ProcurementLogisticsLeg;
 use App\Models\Product;
 use App\Models\Vendor;
@@ -28,6 +29,13 @@ use Illuminate\Support\Facades\DB;
 // exactly once per order, on the transition that actually means money is in
 // hand (delivered for POD, paid for prepaid). cancelled/paid_but_failed_stock
 // never get that marker at all, so excluding them needs no separate check.
+//
+// Revenue also includes POS sales — a till sale is money in hand the moment
+// it completes, no delivery step to wait for, so recognizedPosSaleItemsQuery()
+// below filters on pos_sales.completed_at directly rather than a separate
+// recognition marker. "Not voided" (completed/refunded/partial_refund all
+// count) matches ProductVelocityService's own definition of a sold unit, so
+// revenue and velocity never disagree about a POS sale either.
 class FinancialReportService
 {
     public function report(int $vendorId, CarbonInterface $from, CarbonInterface $to): array
@@ -87,19 +95,41 @@ class FinancialReportService
             ->whereBetween('orders.revenue_recognized_at', [$from, $to]);
     }
 
+    // The single source of truth for "which pos_sale_items count as sold" —
+    // ProductVelocityService reuses this exact join/filter for restock
+    // velocity and top sellers, so revenue and velocity can never disagree
+    // about a POS sale. Public and static for the same reason
+    // recognizedOrderItemsQuery() is: callable without instantiating the
+    // whole report service.
+    public static function recognizedPosSaleItemsQuery(int $vendorId, CarbonInterface $from, CarbonInterface $to)
+    {
+        return PosSaleItem::query()
+            ->join('pos_sales', 'pos_sales.id', '=', 'pos_sale_items.pos_sale_id')
+            ->where('pos_sales.vendor_id', $vendorId)
+            ->where('pos_sales.status', '!=', 'voided')
+            ->whereBetween('pos_sales.completed_at', [$from, $to]);
+    }
+
     private function recognizedSales(int $vendorId, CarbonInterface $from, CarbonInterface $to): array
     {
-        $row = self::recognizedOrderItemsQuery($vendorId, $from, $to)
+        $online = self::recognizedOrderItemsQuery($vendorId, $from, $to)
             ->join('products', 'products.id', '=', 'order_items.product_id')
             ->selectRaw('COALESCE(SUM(order_items.quantity * order_items.unit_price), 0) as revenue')
             ->selectRaw('COALESCE(SUM(order_items.quantity * COALESCE(order_items.unit_cost, products.cost_price)), 0) as product_cost')
             ->selectRaw('SUM(CASE WHEN order_items.unit_cost IS NULL THEN 1 ELSE 0 END) as estimated_lines')
             ->first();
 
+        $pos = self::recognizedPosSaleItemsQuery($vendorId, $from, $to)
+            ->join('products', 'products.id', '=', 'pos_sale_items.product_id')
+            ->selectRaw('COALESCE(SUM(pos_sale_items.total), 0) as revenue')
+            ->selectRaw('COALESCE(SUM(pos_sale_items.quantity * COALESCE(pos_sale_items.unit_cost, products.cost_price)), 0) as product_cost')
+            ->selectRaw('SUM(CASE WHEN pos_sale_items.unit_cost IS NULL THEN 1 ELSE 0 END) as estimated_lines')
+            ->first();
+
         return [
-            'revenue'      => (float) $row->revenue,
-            'product_cost' => (float) $row->product_cost,
-            'estimated'    => ((int) $row->estimated_lines) > 0,
+            'revenue'      => (float) $online->revenue + (float) $pos->revenue,
+            'product_cost' => (float) $online->product_cost + (float) $pos->product_cost,
+            'estimated'    => ((int) $online->estimated_lines) > 0 || ((int) $pos->estimated_lines) > 0,
         ];
     }
 
