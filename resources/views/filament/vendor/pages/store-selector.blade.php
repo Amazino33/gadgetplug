@@ -78,6 +78,15 @@
                             <div>
                                 <dt class="text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Value (cost)</dt>
                                 <dd class="mt-0.5 font-montserrat text-base font-bold text-gray-900 dark:text-white">₦{{ number_format($m->cost_value, 2) }}</dd>
+                                {{-- Products held here with no cost price are left out of the
+                                     figure above rather than valued at zero, so the total is
+                                     understated. Saying so is the difference between a number
+                                     that is incomplete and one that is quietly wrong. --}}
+                                @if ($m->missing_cost_count > 0)
+                                    <dd class="mt-0.5 text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                                        Excludes {{ $m->missing_cost_count }} {{ Str::plural('product', $m->missing_cost_count) }} with no cost price
+                                    </dd>
+                                @endif
                             </div>
                         @endif
                     </dl>
