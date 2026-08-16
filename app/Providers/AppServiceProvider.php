@@ -6,8 +6,12 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use App\Models\Order;
+use App\Models\Product;
+use App\Models\ProductStoreStock;
 use App\Models\Vendor;
 use App\Observers\OrderObserver;
+use App\Observers\ProductObserver;
+use App\Observers\ProductStoreStockObserver;
 use App\Observers\VendorObserver;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
@@ -33,6 +37,8 @@ class AppServiceProvider extends ServiceProvider
         $this->configureDefaults();
         Order::observe(OrderObserver::class);
         Vendor::observe(VendorObserver::class);
+        Product::observe(ProductObserver::class);
+        ProductStoreStock::observe(ProductStoreStockObserver::class);
         // Your existing HTTPS force code
         if (config('app.env') === 'production') {
             URL::forceScheme('https');

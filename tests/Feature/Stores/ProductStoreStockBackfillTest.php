@@ -132,18 +132,19 @@ test('the three integrity totals match after backfill', function () {
         ->and((int) ProductStoreStock::sum('reserved'))->toBe((int) Product::sum('reserved_stock'));
 });
 
+// The store row is corrupted rather than the product column, because the
+// column can no longer be corrupted: ProductStoreStockObserver recomputes it
+// from the rows, so a bad value written there heals itself before anything can
+// observe it. The rows are the truth, so a disagreement has to start there.
+// Query-builder updates throughout — going through the model would fire that
+// same observer and drag the mirror along with the corruption.
 test('the backfill aborts loudly when a quantity does not match', function () {
     $vendor = makeStockVendor();
     $product = makeStockProduct($vendor, 10);
 
-    // A row already present with the wrong number — the count check would pass
-    // and only the sum check can catch it.
-    ProductStoreStock::create([
-        'product_id' => $product->id,
-        'store_id'   => $vendor->fresh()->defaultStore->id,
-        'quantity'   => 999,
-        'reserved'   => 0,
-    ]);
+    DB::table('product_store_stock')
+        ->where('product_id', $product->id)
+        ->update(['quantity' => 999]);
 
     expect(fn () => runStockBackfill())
         ->toThrow(RuntimeException::class, 'does not match products total');
@@ -153,12 +154,9 @@ test('the backfill aborts loudly when a reserved total does not match', function
     $vendor = makeStockVendor();
     $product = makeStockProduct($vendor, 10, 5);
 
-    ProductStoreStock::create([
-        'product_id' => $product->id,
-        'store_id'   => $vendor->fresh()->defaultStore->id,
-        'quantity'   => 10,
-        'reserved'   => 99,
-    ]);
+    DB::table('product_store_stock')
+        ->where('product_id', $product->id)
+        ->update(['reserved' => 99]);
 
     expect(fn () => runStockBackfill())
         ->toThrow(RuntimeException::class, 'reserved total');

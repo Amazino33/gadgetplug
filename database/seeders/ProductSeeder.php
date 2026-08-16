@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\ProductStoreStock;
 use App\Models\Vendor;
 use Illuminate\Database\Seeder;
 
@@ -330,7 +331,7 @@ class ProductSeeder extends Seeder
                 continue;
             }
 
-            Product::create([
+            $product = Product::create([
                 'vendor_id'      => $vendor->id,
                 'category_id'    => $cat($data['category']),
                 'name'           => $data['name'],
@@ -346,6 +347,17 @@ class ProductSeeder extends Seeder
                 'status'         => 'published',
                 'published_at'   => now(),
             ]);
+
+            // Stock lives on the per-store row now; the columns above are a
+            // mirror of it. Seeding the row keeps `migrate:fresh --seed`
+            // reconciling — without it stock:verify-mirror reports every
+            // seeded product as drifted. Written through the model so
+            // ProductStoreStockObserver recomputes the mirror, which is the
+            // same path the app itself uses.
+            ProductStoreStock::updateOrCreate(
+                ['product_id' => $product->id, 'store_id' => $vendor->defaultStore->id],
+                ['quantity' => $data['stock'], 'reserved' => 0],
+            );
         }
     }
 }
