@@ -9,7 +9,9 @@ use App\Filament\Vendor\Resources\Products\Schemas\ProductForm;
 use App\Models\Store;
 use App\Services\ActiveStore;
 use App\Services\Inventory\StoreStockMetrics;
+use App\Services\Reporting\StoreSalesQuery;
 use BackedEnum;
+use Carbon\CarbonImmutable;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Collection;
@@ -47,6 +49,24 @@ class StoreSelector extends Page
     public function metrics(): Collection
     {
         return StoreStockMetrics::forStores($this->stores()->pluck('id'));
+    }
+
+    /**
+     * Today's takings per branch, from the Phase 4 union — online orders this
+     * branch supplied plus its counter sales. Deferred in Phase 3 because
+     * neither half existed yet; both do now.
+     *
+     * @return Collection<int, array{revenue: float, units: int, orders: int}>
+     */
+    public function salesToday(): Collection
+    {
+        $vendorId = filament()->getTenant()->id;
+        $start = CarbonImmutable::now()->startOfDay();
+        $end = CarbonImmutable::now()->endOfDay();
+
+        return $this->stores()->mapWithKeys(fn (Store $store) => [
+            $store->id => StoreSalesQuery::totals($vendorId, $store->id, $start, $end),
+        ]);
     }
 
     public function activeStoreId(): ?int

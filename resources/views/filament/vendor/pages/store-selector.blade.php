@@ -2,6 +2,7 @@
     @php
         $stores = $this->stores();
         $metrics = $this->metrics();
+        $sales = $this->salesToday();
         $activeId = $this->activeStoreId();
         $showCost = $this->canSeeCostValue();
     @endphp
@@ -19,6 +20,7 @@
             @foreach ($stores as $store)
                 @php
                     $m = $metrics[$store->id] ?? \App\Services\Inventory\StoreStockMetrics::empty();
+                    $s = $sales[$store->id] ?? ['revenue' => 0.0, 'units' => 0, 'orders' => 0];
                     $isActive = $activeId === $store->id;
                 @endphp
 
@@ -53,7 +55,22 @@
                         </div>
                     </div>
 
-                    <dl class="mt-4 grid grid-cols-2 gap-3 border-t border-gray-100 dark:border-white/10 pt-4">
+                    {{-- Today's takings sit above the stock figures because it is the
+                         question an owner opens this page asking. Counter sales and
+                         online orders this branch supplied, together — a branch that
+                         trades over the till would otherwise read as idle. --}}
+                    <div class="mt-4 rounded-lg bg-gray-50 dark:bg-white/5 px-3 py-2">
+                        <p class="text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Sold today</p>
+                        <p class="mt-0.5 font-montserrat text-lg font-bold text-gray-900 dark:text-white">
+                            ₦{{ number_format($s['revenue'], 2) }}
+                        </p>
+                        <p class="text-[11px] text-gray-500 dark:text-gray-400">
+                            {{ $s['units'] }} {{ Str::plural('unit', $s['units']) }} ·
+                            {{ $s['orders'] }} {{ Str::plural('sale', $s['orders']) }}
+                        </p>
+                    </div>
+
+                    <dl class="mt-3 grid grid-cols-2 gap-3 border-t border-gray-100 dark:border-white/10 pt-4">
                         <div>
                             <dt class="text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Products</dt>
                             <dd class="mt-0.5 font-montserrat text-lg font-bold text-gray-900 dark:text-white">{{ number_format($m->product_count) }}</dd>
