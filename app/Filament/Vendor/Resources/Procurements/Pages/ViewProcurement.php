@@ -7,6 +7,7 @@ use App\Filament\Vendor\Resources\Procurements\ProcurementResource;
 use App\Models\FinancialAccount;
 use App\Models\Procurement;
 use App\Models\ProcurementLogisticsLeg;
+use App\Services\ActiveStore;
 use App\Services\FinancialLedger;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Placeholder;
@@ -112,7 +113,9 @@ class ViewProcurement extends ViewRecord
                     ->visible(fn () => $this->record->isPending() && $user->hasVendorPermission($vendor->id, 'approve_procurement') && ($this->record->created_by !== auth()->id() || !$vendor->hasOtherApprovers($this->record->created_by)))
                     ->action(function (ApproveProcurementAction $approveAction) {
                         try {
-                            $approveAction->execute($this->record);
+                            // Received into the store the approver is working
+                            // in, not blindly into the vendor's default one.
+                            $approveAction->execute($this->record, ActiveStore::currentId());
                             Notification::make()->title('Procurement Approved, Inventory Updated.')->success()->send();
                             $this->refreshFormData(['status', 'approved_by', 'approved_at']);
                         } catch (\Throwable $e) {

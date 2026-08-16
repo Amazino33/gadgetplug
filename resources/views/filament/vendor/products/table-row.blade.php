@@ -1,20 +1,20 @@
 @php
     $imgUrl = $product->getFirstMediaUrl('product-images', 'thumb');
-    $available = $product->available_stock;
+    $available = $product->storeAvailable();
 
     $stockDot = match (true) {
         $available === 0        => 'bg-red-500',
-        $product->is_low_stock   => 'bg-amber-500',
+        $product->isStoreLowStock()   => 'bg-amber-500',
         default                  => 'bg-emerald-500',
     };
     $stockLabel = match (true) {
         $available === 0        => 'Out of stock',
-        $product->is_low_stock   => "Low stock ({$available})",
+        $product->isStoreLowStock()   => "Low stock ({$available})",
         default                  => "{$available} available",
     };
     $stockTextClass = match (true) {
         $available === 0        => 'text-red-600 dark:text-red-400',
-        $product->is_low_stock   => 'text-amber-600 dark:text-amber-400',
+        $product->isStoreLowStock()   => 'text-amber-600 dark:text-amber-400',
         default                  => 'text-gray-700 dark:text-gray-300',
     };
 

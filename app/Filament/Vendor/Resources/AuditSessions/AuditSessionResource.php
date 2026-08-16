@@ -10,6 +10,7 @@ use App\Models\AuditSession;
 use App\Models\User;
 use App\Actions\Inventory\ProcessAuditCountAction;
 use App\Actions\Inventory\AdjustStockAction;
+use App\Services\ActiveStore;
 use App\Models\InventoryShortageCase;
 use App\Services\ShortageCaseService;
 use Filament\Forms\Components\Textarea;
@@ -417,6 +418,8 @@ class AuditSessionResource extends Resource
                                 description:     "Manager override forced stock to {$finalCount}. Reason: {$reasonCode}.",
                                 auditSessionId:  $record->id,
                                 reasonCode:      $reasonCode,
+                                // Corrects the store the manager is working in.
+                                store:           ActiveStore::currentId(),
                             );
                         }
 

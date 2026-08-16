@@ -9,6 +9,8 @@ use App\Filament\Vendor\Resources\Products\Pages\ViewProduct;
 use App\Filament\Vendor\Resources\Products\Schemas\ProductForm;
 use App\Filament\Vendor\Resources\Products\Tables\ProductsTable;
 use App\Models\Product;
+use App\Models\ProductStoreStock;
+use App\Services\ActiveStore;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -51,9 +53,41 @@ class ProductResource extends Resource
         ];
     }
 
+    // The store is a filter layered on top of Filament's vendor tenancy, never
+    // a tenant of its own: parent::getEloquentQuery() still applies the vendor
+    // scope through $tenantOwnershipRelationshipName, and this narrows that
+    // result to the store the user is currently working in.
+    //
+    // Only products that actually hold a row at this store appear, which is
+    // what makes two stores show different catalogues. The three selected
+    // columns come from that store's row rather than the products mirror, so
+    // the numbers on screen are this store's, not the vendor's total.
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()->with('media');
+        $query = parent::getEloquentQuery()->with('media');
+
+        $storeId = ActiveStore::currentId();
+
+        if ($storeId === null) {
+            return $query;
+        }
+
+        return $query
+            ->whereHas('storeStocks', fn ($q) => $q->where('store_id', $storeId))
+            // products.* explicitly: addSelect() on a query with no select list
+            // yet REPLACES it with just these subqueries, which would strip the
+            // model down to two columns and leave the table with no id or name.
+            ->select('products.*')
+            ->addSelect([
+                'store_quantity' => ProductStoreStock::select('quantity')
+                    ->whereColumn('product_id', 'products.id')
+                    ->where('store_id', $storeId)
+                    ->limit(1),
+                'store_reserved' => ProductStoreStock::select('reserved')
+                    ->whereColumn('product_id', 'products.id')
+                    ->where('store_id', $storeId)
+                    ->limit(1),
+            ]);
     }
 
     public static function canAccess(): bool

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Vendor\Pages;
 
 use App\Actions\Inventory\AdjustStockAction;
+use App\Services\ActiveStore;
 use App\Models\AuditSession;
 use App\Models\BlindCountAuthorization;
 use App\Models\BlindCountEntry;
@@ -824,7 +825,11 @@ class BlindCount extends Page
                             transactionType: 'audit_correction',
                             userId:          $session->storekeeper_b_id,
                             reference:       "Inventory Count #{$session->id}",
-                            description:     "Verified count. System had {$product->stock_quantity}, found {$countB}."
+                            description:     "Verified count. System had {$product->stock_quantity}, found {$countB}.",
+                            // The count was taken on one store's shelf, so the
+                            // correction belongs to that store rather than to
+                            // whichever one happens to be the vendor's default.
+                            store:           ActiveStore::currentId(),
                         );
                     }
                 } else {

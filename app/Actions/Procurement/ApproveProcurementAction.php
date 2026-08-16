@@ -5,18 +5,24 @@ namespace App\Actions\Procurement;
 use App\Models\InventoryLedger;
 use App\Models\Procurement;
 use App\Models\Product;
+use App\Models\Store;
 use App\Services\Inventory\StoreStock;
 use Illuminate\Support\Facades\DB;
 
 class ApproveProcurementAction
 {
-    public function execute(Procurement $procurement): void
+    /**
+     * $store is the store the goods are being received into. Null keeps the
+     * Phase 2 behaviour — the vendor's default store — which is what the
+     * non-panel callers still rely on.
+     */
+    public function execute(Procurement $procurement, Store|int|null $store = null): void
     {
         if (! $procurement->isPending()) {
             throw new \RuntimeException('Only pending procurements can be approved.');
         }
 
-        DB::transaction(function () use ($procurement) {
+        DB::transaction(function () use ($procurement, $store) {
             $approverId = auth()->id();
 
             foreach ($procurement->items()->with('product')->get() as $item) {
@@ -30,7 +36,7 @@ class ApproveProcurementAction
                 // product column. Procurement has no store of its own yet, so
                 // this resolves to the vendor's default store — where this
                 // stock has always implicitly landed.
-                $row = StoreStock::lockedRow($product);
+                $row = StoreStock::lockedRow($product, $store);
                 $row->quantity += $item->quantity;
                 $row->save();
 

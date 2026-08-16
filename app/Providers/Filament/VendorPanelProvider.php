@@ -91,6 +91,13 @@ class VendorPanelProvider extends PanelProvider
             ])
             ->databaseNotifications()
             ->databaseNotificationsPolling('30s')
+            // Panel-level context control, so the store the user is operating
+            // in is visible and changeable from every screen — not only from
+            // the selector grid.
+            ->renderHook(
+                PanelsRenderHook::TOPBAR_END,
+                fn() => Blade::render('@livewire(\App\Livewire\ActiveStoreSwitcher::class)'),
+            )
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
                 fn() => Blade::render("@include('partials.meta-pixel')"),

@@ -89,6 +89,41 @@ class Product extends Model implements HasMedia
         return max(0, $this->stock_quantity - $this->reserved_stock);
     }
 
+    // Store-scoped counterparts of the three above, for screens that operate
+    // inside one store rather than across the whole vendor.
+    //
+    // They read store_quantity / store_reserved, which ProductResource's
+    // store-scoped query selects onto the model from that store's
+    // product_store_stock row. When those are absent — every other caller, the
+    // POS feed and storefront included — these fall back to the vendor-wide
+    // mirror and behave exactly as available_stock always has. Deliberately
+    // separate from available_stock so no existing reader changes meaning.
+    public function storeQuantity(): int
+    {
+        return array_key_exists('store_quantity', $this->attributes)
+            ? (int) $this->attributes['store_quantity']
+            : (int) $this->stock_quantity;
+    }
+
+    public function storeReserved(): int
+    {
+        return array_key_exists('store_reserved', $this->attributes)
+            ? (int) $this->attributes['store_reserved']
+            : (int) $this->reserved_stock;
+    }
+
+    public function storeAvailable(): int
+    {
+        return max(0, $this->storeQuantity() - $this->storeReserved());
+    }
+
+    public function isStoreLowStock(): bool
+    {
+        $available = $this->storeAvailable();
+
+        return $available > 0 && $available < (int) $this->low_stock_threshold;
+    }
+
     // Single source of truth for the "low stock" boundary — every stock badge
     // across the admin panel and POS reads this instead of a hardcoded number.
     public function getIsLowStockAttribute(): bool

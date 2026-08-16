@@ -87,27 +87,39 @@ class ProductsTable
                     ->sortable()
                     ->hidden($isGrid),
 
-                TextColumn::make('stock_quantity')
+                // These three read the active store's product_store_stock row,
+                // selected into store_quantity / store_reserved by
+                // ProductResource::getEloquentQuery(). They deliberately do NOT
+                // read products.stock_quantity: that column is the vendor-wide
+                // mirror, and showing it here would report every store's stock
+                // as the sum of all of them.
+                TextColumn::make('store_quantity')
                     ->label('On Shelf')
                     ->numeric()
                     ->sortable()
+                    ->state(fn (Product $record): int => (int) ($record->store_quantity ?? 0))
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->hidden($isGrid),
 
-                TextColumn::make('reserved_stock')
+                TextColumn::make('store_reserved')
                     ->label('Reserved')
                     ->numeric()
                     ->sortable()
+                    ->state(fn (Product $record): int => (int) ($record->store_reserved ?? 0))
                     ->badge()
                     ->color(fn (int $state): string => $state > 0 ? 'warning' : 'gray')
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->hidden($isGrid),
 
-                TextColumn::make('available_stock')
+                TextColumn::make('store_available')
                     ->label('Available')
                     ->numeric()
+                    ->state(fn (Product $record): int => max(
+                        0,
+                        (int) ($record->store_quantity ?? 0) - (int) ($record->store_reserved ?? 0),
+                    ))
                     ->sortable(query: fn ($query, $direction) =>
-                        $query->orderByRaw("CAST(stock_quantity AS SIGNED) - CAST(reserved_stock AS SIGNED) {$direction}")
+                        $query->orderByRaw("COALESCE(store_quantity, 0) - COALESCE(store_reserved, 0) {$direction}")
                     )
                     ->badge()
                     ->color(fn (int $state): string => match (true) {

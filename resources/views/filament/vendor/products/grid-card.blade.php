@@ -2,11 +2,11 @@
     // $record is passed in directly — no longer rendered via a Filament
     // ViewColumn, so there's no $getRecord() closure to call.
     $imgUrl = $record->getFirstMediaUrl('product-images', 'thumb');
-    $available = $record->available_stock;
+    $available = $record->storeAvailable();
 
     $badge = match (true) {
         $available === 0        => ['Out of stock', 'bg-red-500 text-white'],
-        $record->is_low_stock    => ["{$available} left", 'bg-amber-500 text-white'],
+        $record->isStoreLowStock()    => ["{$available} left", 'bg-amber-500 text-white'],
         default                  => ["{$available} in stock", 'bg-emerald-500 text-white'],
     };
 
