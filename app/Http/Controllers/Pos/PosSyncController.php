@@ -10,6 +10,7 @@ use App\Models\PosSaleItem;
 use App\Models\PosSalePayment;
 use App\Models\Product;
 use App\Models\Vendor;
+use App\Services\Inventory\TillStore;
 use App\Services\Pos\PosPriceFloor;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -74,6 +75,7 @@ class PosSyncController extends Controller
                     $sale = PosSale::create([
                         'reference'               => $existingRef,
                         'vendor_id'               => $request->vendor_id,
+                        'store_id'                => TillStore::resolve($request->user(), (int) $request->vendor_id),
                         'pos_session_id'          => null,
                         'cashier_id'              => $request->user()->id,
                         'customer_id'             => $payload['customer_id'] ?? null,
@@ -129,6 +131,7 @@ class PosSyncController extends Controller
                             userId: $request->user()->id,
                             reference: $sale->reference,
                             description: "Offline POS sync — {$item['product_name']} x{$item['quantity']}",
+                            store: $sale->store_id,
                         );
                     }
 

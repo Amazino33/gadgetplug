@@ -100,7 +100,7 @@ it('one failing card does not blank the whole page', function () {
     $data = setUpReportsHubStore();
 
     app()->bind(RestockCardProvider::class, fn () => new class implements ReportCardProvider {
-        public function summarize(int $vendorId): CardSummary
+        public function summarize(int $vendorId, ?int $storeId = null): CardSummary
         {
             throw new \RuntimeException('simulated failure');
         }

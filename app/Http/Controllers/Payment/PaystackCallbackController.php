@@ -50,6 +50,7 @@ class PaystackCallbackController extends Controller
                     quantity:    $item->quantity,
                     reference:   $order->reference,
                     description: 'Reserved on Paystack payment confirmation.',
+                    orderItemId: $item->id,
                 );
             }
 

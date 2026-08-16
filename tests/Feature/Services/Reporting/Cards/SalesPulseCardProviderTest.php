@@ -50,16 +50,44 @@ test('headline shows placed and delivered counts for today', function () {
     expect($summary->headline)->toContain('2 placed, 1 delivered today');
 });
 
-test('delivered revenue matches FinancialReportService exactly, not a separate definition', function () {
+// Rewritten in Phase 4. Sales Pulse used to be online-only and could be
+// checked against FinancialReportService directly. It now counts counter sales
+// too, because a card that ignores the till reads as a dead day at a branch
+// that traded all morning. The online half must still agree with the Financial
+// Report exactly — that shared definition of "recognised" is what the original
+// test was protecting, and it still holds.
+test('delivered revenue is the online recognised figure plus counter sales', function () {
     $data = salesPulseVendor();
     placeOrder($data, ['status' => 'delivered', 'revenue_recognized_at' => now()]);
 
-    $expectedRevenue = app(FinancialReportService::class)
+    $onlineRevenue = app(FinancialReportService::class)
         ->report($data['vendor']->id, now()->startOfDay(), now()->endOfDay())['revenue'];
 
-    $summary = (new SalesPulseCardProvider())->summarize($data['vendor']->id);
+    expect($onlineRevenue)->toBeGreaterThan(0);
 
-    expect($summary->headline)->toContain('₦' . number_format($expectedRevenue, 2));
+    // Online only, no till activity: the two must still match to the naira.
+    expect((new SalesPulseCardProvider())->summarize($data['vendor']->id)->headline)
+        ->toContain('₦' . number_format($onlineRevenue, 2));
+
+    $sale = App\Models\PosSale::create([
+        'reference'       => 'POS-'.strtoupper(uniqid()),
+        'vendor_id'       => $data['vendor']->id,
+        'store_id'        => $data['vendor']->defaultStore->id,
+        'cashier_id'      => $data['vendor']->user_id,
+        'subtotal'        => 1500,
+        'discount_amount' => 0,
+        'vat_amount'      => 0,
+        'total'           => 1500,
+        'payment_method'  => 'cash',
+        'status'          => 'completed',
+        'completed_at'    => now(),
+    ]);
+
+    expect((new SalesPulseCardProvider())->summarize($data['vendor']->id)->headline)
+        ->toContain('₦' . number_format($onlineRevenue + 1500, 2))
+        // Which is deliberately NOT what the Financial Report shows: that
+        // stays online-only in this phase. See the Phase 4 report.
+        ->and($sale->store_id)->not->toBeNull();
 });
 
 test('cancelled orders today are the actionable count', function () {

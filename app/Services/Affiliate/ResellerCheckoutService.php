@@ -94,7 +94,7 @@ class ResellerCheckoutService
             ]);
 
             foreach ($preparedLines as $line) {
-                OrderItem::create([
+                $orderItem = OrderItem::create([
                     'order_id'   => $order->id,
                     'product_id' => $line['product']->id,
                     'vendor_id'  => $line['product']->vendor_id,
@@ -108,6 +108,7 @@ class ResellerCheckoutService
                     quantity: $line['quantity'],
                     reference: $order->reference,
                     description: "Reserved for reseller order #{$order->reference} (affiliate #{$lockedAffiliate->id}).",
+                    orderItemId: $orderItem->id,
                 );
             }
 

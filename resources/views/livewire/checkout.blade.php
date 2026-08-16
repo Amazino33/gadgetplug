@@ -333,8 +333,13 @@ new class extends Component {
             throw $e;
         }
 
+        // Keyed by product so the reservation loop below can tell each
+        // reservation which line it belongs to — the allocation rows hang off
+        // the line, not the product.
+        $orderItemsByProduct = [];
+
         foreach ($this->cartItems as $item) {
-            OrderItem::create([
+            $orderItemsByProduct[$item['product']->id] = OrderItem::create([
                 'order_id'   => $order->id,
                 'product_id' => $item['product']->id,
                 'vendor_id'  => $item['product']->vendor_id,
@@ -369,6 +374,7 @@ new class extends Component {
                         quantity:    $item['quantity'],
                         reference:   $reference,
                         description: 'Reserved on pay-on-delivery order placed.',
+                        orderItemId: $orderItemsByProduct[$item['product']->id]->id,
                     );
                 }
             } catch (\Exception $e) {

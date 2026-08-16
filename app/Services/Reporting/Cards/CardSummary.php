@@ -24,7 +24,19 @@ readonly class CardSummary
         public string $urgency = self::URGENCY_CALM,
         public ?string $link = null,
         public ?string $note = null,
+        // True when a store filter is active but this figure is still the
+        // whole business. Money and advertising spend have no store dimension
+        // in this schema, and showing a vendor-wide number under a store's
+        // name would be a lie the reader cannot detect. Defaults off, so
+        // nothing changes while no store filter is applied.
+        public bool $vendorWideOnly = false,
     ) {}
+
+    // What the UI renders beside a figure that ignores the active store filter.
+    public function scopeLabel(): ?string
+    {
+        return $this->vendorWideOnly ? 'Whole business — not this store' : null;
+    }
 
     public function color(): string
     {

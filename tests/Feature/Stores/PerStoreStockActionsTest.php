@@ -133,18 +133,29 @@ test('reserve raises reserved on the store row only', function () {
         ->and($product->fresh()->reserved_stock)->toBe(4);
 });
 
-test('reserve checks availability against the store, not the vendor total', function () {
+// Rewritten in Phase 4, deliberately. Phase 2b scoped this guard to a single
+// store, which meant a vendor holding 2 in one branch and 500 in another was
+// refused an order for 5 — goods the storefront was advertising and the
+// business demonstrably had. The owner's decision was that the combined number
+// must be buyable, so the guard now spans the vendor's active stores. Naming
+// a store explicitly still scopes to that store alone.
+test('reserve measures availability across the vendor stores, and against one store when named', function () {
     $vendor = stockVendor();
     $product = stockProduct($vendor, 2);
 
-    // Plenty in another store — must not make this one reservable.
     $second = Store::create(['vendor_id' => $vendor->id, 'name' => 'Warehouse']);
     ProductStoreStock::create(['product_id' => $product->id, 'store_id' => $second->id, 'quantity' => 500]);
 
     expect($product->fresh()->stock_quantity)->toBe(502);
 
-    expect(fn () => app(ReserveStockAction::class)->execute(productId: $product->id, quantity: 5))
-        ->toThrow(Exception::class, 'Insufficient available stock');
+    // Combined: 5 is comfortably available across the two branches.
+    app(ReserveStockAction::class)->execute(productId: $product->id, quantity: 5);
+    expect($product->fresh()->reserved_stock)->toBe(5);
+
+    // Named store: only that branch's 2 units count, so 5 is refused there.
+    expect(fn () => app(ReserveStockAction::class)->execute(
+        productId: $product->id, quantity: 5, store: $vendor->defaultStore->id,
+    ))->toThrow(Exception::class, 'Insufficient available stock');
 });
 
 test('reserve counts existing reservations in availability', function () {

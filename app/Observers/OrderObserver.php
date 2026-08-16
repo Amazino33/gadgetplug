@@ -277,6 +277,9 @@ class OrderObserver
                         userId:      $userId,
                         reference:   $order->reference,
                         description: 'Physical deduction — order handed to rider.',
+                        // Dispatches out of whichever store(s) reserved these
+                        // units, rather than re-deriving a store now.
+                        orderItemId: $item->id,
                     );
                 } catch (\Exception $e) {
                     Log::error("Dispatch stock failed for order {$order->id}: " . $e->getMessage());
@@ -294,6 +297,7 @@ class OrderObserver
                         userId:      $userId,
                         reference:   $order->reference,
                         description: 'Reservation released — order cancelled.',
+                        orderItemId: $item->id,
                     );
                 } catch (\Exception $e) {
                     Log::error("Release reservation failed for order {$order->id}: " . $e->getMessage());

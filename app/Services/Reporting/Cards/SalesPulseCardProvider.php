@@ -7,7 +7,7 @@ namespace App\Services\Reporting\Cards;
 use App\Filament\Vendor\Pages\SalesReport;
 use App\Models\Order;
 use App\Models\Vendor;
-use App\Services\Reporting\FinancialReportService;
+use App\Services\Reporting\StoreSalesQuery;
 use Carbon\CarbonImmutable;
 
 // "Delivered today" and its revenue read FinancialReportService's shared
@@ -28,29 +28,35 @@ class SalesPulseCardProvider implements ReportCardProvider
     private const CANCEL_RATE_URGENT = 20.0;
     private const CANCEL_RATE_ATTENTION = 10.0;
 
-    public function summarize(int $vendorId): CardSummary
+    public function summarize(int $vendorId, ?int $storeId = null): CardSummary
     {
         $vendor = Vendor::findOrFail($vendorId);
         $today = CarbonImmutable::now();
         $todayStart = $today->startOfDay();
         $todayEnd = $today->endOfDay();
 
-        $placedToday = Order::whereHas('items', fn ($q) => $q->where('vendor_id', $vendorId))
+        // Placed and cancelled stay order-level: an order is placed and
+        // cancelled as a whole, not per branch. Narrowed to orders that this
+        // store had a hand in supplying, so a branch's pulse is about its own
+        // trade rather than the whole vendor's.
+        $placedToday = Order::whereHas('items', fn ($q) => $q->where('vendor_id', $vendorId)
+                ->when($storeId, fn ($iq) => $iq->whereHas('storeAllocations', fn ($a) => $a->where('store_id', $storeId))))
             ->whereBetween('created_at', [$todayStart, $todayEnd])
             ->count();
 
-        $cancelledToday = Order::whereHas('items', fn ($q) => $q->where('vendor_id', $vendorId))
+        $cancelledToday = Order::whereHas('items', fn ($q) => $q->where('vendor_id', $vendorId)
+                ->when($storeId, fn ($iq) => $iq->whereHas('storeAllocations', fn ($a) => $a->where('store_id', $storeId))))
             ->where('status', 'cancelled')
             ->whereBetween('updated_at', [$todayStart, $todayEnd])
             ->count();
 
-        $deliveredRevenue = (float) FinancialReportService::recognizedOrderItemsQuery($vendorId, $todayStart, $todayEnd)
-            ->selectRaw('COALESCE(SUM(order_items.quantity * order_items.unit_price), 0) as revenue')
-            ->value('revenue');
+        // Revenue and delivered count come from the shared per-store path, so
+        // they include counter sales. A branch that sells mostly over the
+        // counter would otherwise read as having delivered nothing all day.
+        $sales = StoreSalesQuery::totals($vendorId, $storeId, $todayStart, $todayEnd);
 
-        $deliveredCount = (int) FinancialReportService::recognizedOrderItemsQuery($vendorId, $todayStart, $todayEnd)
-            ->distinct('order_items.order_id')
-            ->count('order_items.order_id');
+        $deliveredRevenue = $sales['revenue'];
+        $deliveredCount = $sales['orders'];
 
         $cancelRate = $placedToday > 0 ? ($cancelledToday / $placedToday) * 100 : 0.0;
         $gap = max(0, $placedToday - $deliveredCount);

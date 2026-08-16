@@ -13,6 +13,10 @@ class BlindCountSession extends Model
 {
     protected $fillable = [
         'vendor_id',
+        // Which branch was counted. Without it here, create() drops it
+        // silently and the session reconciles against the vendor-wide mirror
+        // instead of the shelf that was actually walked.
+        'store_id',
         'status',
         'frequency',
         'custom_days',

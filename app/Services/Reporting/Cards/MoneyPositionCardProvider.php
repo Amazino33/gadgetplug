@@ -18,7 +18,7 @@ use Carbon\CarbonImmutable;
 // every day" bar by being noisy rather than meaningful.
 class MoneyPositionCardProvider implements ReportCardProvider
 {
-    public function summarize(int $vendorId): CardSummary
+    public function summarize(int $vendorId, ?int $storeId = null): CardSummary
     {
         $vendor = Vendor::findOrFail($vendorId);
         $reports = app(FinancialReportService::class);
@@ -48,6 +48,11 @@ class MoneyPositionCardProvider implements ReportCardProvider
                 default => CardSummary::URGENCY_CALM,
             },
             link: FinancialReport::getUrl(panel: 'vendor', tenant: $vendor),
+            // Bank and cash balances, expenses, procurement legs and delivery
+            // costs are all vendor-level — there is no store dimension to
+            // filter on. Rather than fabricate a split or silently ignore the
+            // filter, the card says which scope it is actually reporting.
+            vendorWideOnly: $storeId !== null,
         );
     }
 

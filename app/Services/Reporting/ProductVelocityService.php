@@ -36,10 +36,25 @@ class ProductVelocityService
         int $targetCoverDays = 30,
         ?int $safetyBufferDays = null,
         bool $withStockoutGuard = true,
+        // Null keeps the vendor-wide behaviour every existing caller relies on.
+        ?int $storeId = null,
     ): Collection {
-        $products = Product::where('vendor_id', $vendorId)
+        // With a store named, "stock on hand" means that branch's shelf, and
+        // the catalogue narrows to what the branch actually carries. The store
+        // row's quantity is aliased over stock_quantity so everything
+        // downstream — days of cover, reorder quantity, dead-stock detection —
+        // keeps working unchanged on a number that now means one branch.
+        $products = Product::where('products.vendor_id', $vendorId)
             ->when($categoryId, fn ($q) => $q->where('category_id', $categoryId))
-            ->get(['id', 'vendor_id', 'stock_quantity', 'created_at']);
+            ->when(
+                $storeId,
+                fn ($q) => $q->join('product_store_stock as pss', function ($join) use ($storeId) {
+                    $join->on('pss.product_id', '=', 'products.id')->where('pss.store_id', '=', $storeId);
+                })->select(['products.id', 'products.vendor_id', 'products.created_at'])
+                  ->selectRaw('pss.quantity as stock_quantity'),
+                fn ($q) => $q->select(['products.id', 'products.vendor_id', 'products.stock_quantity', 'products.created_at']),
+            )
+            ->get();
 
         return $this->analyze($products, $windowDays, $leadTimeDays, $targetCoverDays, $safetyBufferDays, $withStockoutGuard);
     }

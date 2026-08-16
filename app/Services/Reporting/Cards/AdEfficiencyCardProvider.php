@@ -17,7 +17,7 @@ class AdEfficiencyCardProvider implements ReportCardProvider
     private const RATIO_URGENT = 25.0;
     private const RATIO_ATTENTION = 15.0;
 
-    public function summarize(int $vendorId): CardSummary
+    public function summarize(int $vendorId, ?int $storeId = null): CardSummary
     {
         $vendor = Vendor::findOrFail($vendorId);
         $now = CarbonImmutable::now();
@@ -53,6 +53,10 @@ class AdEfficiencyCardProvider implements ReportCardProvider
             comparison: $comparison,
             urgency: $urgency,
             link: ExpenseResource::getUrl('index', panel: 'vendor', tenant: $vendor),
+            // Advertising spend is booked against the business, not a branch:
+            // expenses carry no store. Splitting it per store would be an
+            // invention, so the card reports vendor-wide and says so.
+            vendorWideOnly: $storeId !== null,
         );
     }
 }

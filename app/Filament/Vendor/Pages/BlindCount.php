@@ -189,7 +189,9 @@ class BlindCount extends Page
             return;
         }
 
-        $productIds = $this->buildProductOrder($vendor->id);
+        // A count is taken at one branch, so it walks that branch's shelves.
+        $storeId = ActiveStore::currentId();
+        $productIds = $this->buildProductOrder($vendor->id, $storeId);
 
         if (empty($productIds)) {
             Notification::make()->title('No published products found to count.')->warning()->send();
@@ -201,6 +203,7 @@ class BlindCount extends Page
 
         $session = BlindCountSession::create([
             'vendor_id'        => $vendor->id,
+            'store_id'         => $storeId,
             'storekeeper_a_id' => auth()->id(),
             'status'           => 'a_counting',
             'frequency'        => $vendor->pos_blind_count_frequency ?? 'daily',
@@ -304,10 +307,33 @@ class BlindCount extends Page
             ->send();
     }
 
-    private function buildProductOrder(int $vendorId): array
+    // What the system believes is on this branch's shelf — the figure the
+    // count is measured against. For a store-scoped session that is the
+    // store's own row; comparing against products.stock_quantity would measure
+    // one branch's count against every branch's stock and report the rest of
+    // the business as missing. Sessions from before stores fall back to the
+    // vendor-wide mirror, which is what they were counted against.
+    private function systemQuantityFor(BlindCountSession $session, Product $product): int
+    {
+        if ($session->store_id === null) {
+            return (int) $product->stock_quantity;
+        }
+
+        return (int) (ProductStoreStock::where('product_id', $product->id)
+            ->where('store_id', $session->store_id)
+            ->value('quantity') ?? 0);
+    }
+
+    private function buildProductOrder(int $vendorId, ?int $storeId = null): array
     {
         $products = Product::published()
             ->where('vendor_id', $vendorId)
+            // Only what this branch actually holds a row for. Without this a
+            // storekeeper at a three-product branch would be walked through the
+            // vendor's entire catalogue, counting zero over and over — and a
+            // count of zero against another branch's stock would then be
+            // reconciled as a shortage.
+            ->when($storeId, fn ($q) => $q->whereHas('storeStocks', fn ($s) => $s->where('store_id', $storeId)))
             ->get(['id', 'category_id']);
 
         if ($this->byCategory) {
@@ -717,7 +743,7 @@ class BlindCount extends Page
             foreach ($session->product_order as $productId) {
                 $count      = (int) ($entries[$productId]?->count ?? 0);
                 $product    = Product::find($productId);
-                $difference = $count - (int) $product->stock_quantity;
+                $difference = $count - $this->systemQuantityFor($session, $product);
                 $matched    = $difference === 0;
 
                 $line = AuditSession::create([
@@ -728,7 +754,7 @@ class BlindCount extends Page
                     'product_id'       => $productId,
                     // The baseline this count is measured against, frozen now.
                     // Read live afterwards it would drift with every sale.
-                    'system_quantity'  => (int) $product->stock_quantity,
+                    'system_quantity'  => $this->systemQuantityFor($session, $product),
                     'storekeeper_a_id' => $session->storekeeper_a_id,
                     'storekeeper_b_id' => null,
                     'count_a'          => $count,
@@ -808,7 +834,7 @@ class BlindCount extends Page
                     'blind_count_session_id' => $session->id,
                     'product_id'       => $productId,
                     // Frozen baseline — see the solo path above.
-                    'system_quantity'  => (int) $product->stock_quantity,
+                    'system_quantity'  => $this->systemQuantityFor($session, $product),
                     'storekeeper_a_id' => $session->storekeeper_a_id,
                     'storekeeper_b_id' => $session->storekeeper_b_id,
                     'count_a'          => $countA,
@@ -817,7 +843,9 @@ class BlindCount extends Page
                 ]);
 
                 if ($matched) {
-                    $difference = $countB - (int) $product->stock_quantity;
+                    $systemQuantity = $this->systemQuantityFor($session, $product);
+                    $difference = $countB - $systemQuantity;
+
                     if ($difference !== 0) {
                         $adjustStock->execute(
                             productId:       $productId,
@@ -825,11 +853,11 @@ class BlindCount extends Page
                             transactionType: 'audit_correction',
                             userId:          $session->storekeeper_b_id,
                             reference:       "Inventory Count #{$session->id}",
-                            description:     "Verified count. System had {$product->stock_quantity}, found {$countB}.",
-                            // The count was taken on one store's shelf, so the
-                            // correction belongs to that store rather than to
-                            // whichever one happens to be the vendor's default.
-                            store:           ActiveStore::currentId(),
+                            description:     "Verified count. System had {$systemQuantity}, found {$countB}.",
+                            // The branch this session counted, read from the
+                            // session itself rather than from whoever happens
+                            // to be looking at the page when it reconciles.
+                            store:           $session->store_id,
                         );
                     }
                 } else {

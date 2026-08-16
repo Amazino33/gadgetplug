@@ -17,6 +17,13 @@ class OrderItem extends Model
         return $this->belongsTo(Product::class);
     }
 
+    // Which store(s) supplied this line. Written at reservation, read by
+    // dispatch, release and per-store sales.
+    public function storeAllocations()
+    {
+        return $this->hasMany(OrderItemStoreAllocation::class);
+    }
+
     public function vendor()
     {
         return $this->belongsTo(Vendor::class);

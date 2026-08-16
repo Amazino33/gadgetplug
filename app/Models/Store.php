@@ -58,6 +58,11 @@ class Store extends Model
         return $this->hasMany(ProductStoreStock::class);
     }
 
+    public function orderItemAllocations(): HasMany
+    {
+        return $this->hasMany(OrderItemStoreAllocation::class);
+    }
+
     public function scopeForVendor(Builder $query, int $vendorId): Builder
     {
         return $query->where('vendor_id', $vendorId);

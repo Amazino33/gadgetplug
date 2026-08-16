@@ -18,7 +18,7 @@ class RestockCardProvider implements ReportCardProvider
 {
     private const MAX_NAMES_SHOWN = 2;
 
-    public function summarize(int $vendorId): CardSummary
+    public function summarize(int $vendorId, ?int $storeId = null): CardSummary
     {
         $vendor = Vendor::findOrFail($vendorId);
         $settings = $vendor->restockSettings();
@@ -29,6 +29,9 @@ class RestockCardProvider implements ReportCardProvider
             leadTimeDays: $settings['leadTimeDays'],
             targetCoverDays: $settings['targetCoverDays'],
             safetyBufferDays: $settings['safetyBufferDays'],
+            // With a store active, "what needs restocking" means that branch's
+            // shelves — a branch can be empty while the vendor has plenty.
+            storeId: $storeId,
         );
 
         $needsRestock = $results->filter(fn (RestockAnalysisResult $r) => $r->needsRestock());

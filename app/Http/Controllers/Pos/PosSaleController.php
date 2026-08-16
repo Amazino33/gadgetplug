@@ -13,6 +13,7 @@ use App\Models\PosSalePayment;
 use App\Models\Product;
 use App\Models\User;
 use App\Models\Vendor;
+use App\Services\Inventory\TillStore;
 use App\Services\Pos\PosPriceFloor;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -94,6 +95,9 @@ class PosSaleController extends Controller
             $sale = PosSale::create([
                 'reference'               => 'POS-' . strtoupper(Str::random(8)),
                 'vendor_id'               => $request->vendor_id,
+                // The branch this till stands in, derived from the cashier's
+                // assignment — the POS has no panel session to read.
+                'store_id'                => TillStore::resolve($request->user(), (int) $request->vendor_id),
                 'pos_session_id'          => $request->pos_session_id,
                 'cashier_id'              => $request->user()->id,
                 'customer_id'             => $request->customer_id,
@@ -156,6 +160,9 @@ class PosSaleController extends Controller
                     userId: $request->user()->id,
                     reference: $sale->reference,
                     description: "POS sale — {$item['product_name']} x{$item['quantity']}",
+                    // Off the shelf the customer is standing at, not the
+                    // vendor's default branch.
+                    store: $sale->store_id,
                 );
             }
 

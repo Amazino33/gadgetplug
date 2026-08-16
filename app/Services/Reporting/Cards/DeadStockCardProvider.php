@@ -21,7 +21,7 @@ use App\Services\Reporting\RestockAnalysisResult;
 // rather than invent a route that doesn't exist.
 class DeadStockCardProvider implements ReportCardProvider
 {
-    public function summarize(int $vendorId): CardSummary
+    public function summarize(int $vendorId, ?int $storeId = null): CardSummary
     {
         $vendor = Vendor::findOrFail($vendorId);
         $settings = $vendor->restockSettings();
@@ -32,6 +32,9 @@ class DeadStockCardProvider implements ReportCardProvider
             leadTimeDays: $settings['leadTimeDays'],
             targetCoverDays: $settings['targetCoverDays'],
             safetyBufferDays: $settings['safetyBufferDays'],
+            // Dead stock is branch-specific: the same product can be shifting
+            // at one counter and gathering dust at another.
+            storeId: $storeId,
         );
 
         $deadStock = $results->filter(fn (RestockAnalysisResult $r) => $r->isDeadStockCandidate());
