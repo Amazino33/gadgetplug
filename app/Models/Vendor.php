@@ -81,6 +81,20 @@ class Vendor extends Model
         return $this->hasMany(Product::class);
     }
 
+    public function stores()
+    {
+        return $this->hasMany(Store::class);
+    }
+
+    // The one store a vendor falls back to when nothing else has been chosen —
+    // every vendor has exactly one, guaranteed by the backfill's assertion.
+    // A hasOne rather than a lookup method so it can be eager-loaded alongside
+    // the other vendor relations instead of firing a query per vendor.
+    public function defaultStore()
+    {
+        return $this->hasOne(Store::class)->where('is_default', true);
+    }
+
     public function logisticsCompanies()
     {
         return $this->hasMany(LogisticsCompany::class);

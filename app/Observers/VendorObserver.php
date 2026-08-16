@@ -3,6 +3,7 @@
 namespace App\Observers;
 
 use App\Models\Vendor;
+use App\Services\DefaultStore;
 use App\Services\FinancialAccounts;
 use App\Services\VendorRoles;
 
@@ -12,6 +13,10 @@ class VendorObserver
     {
         VendorRoles::seedFor($vendor);
         FinancialAccounts::seedFor($vendor);
+        // Deliberately no store_user rows for the owner — owner access runs
+        // through vendors.user_id today and stays that way until Phase 3
+        // decides what store membership means for an owner.
+        DefaultStore::seedFor($vendor);
     }
 
     // Covers every path that flips the flag — the admin edit form's Toggle

@@ -12,6 +12,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
 use Filament\Models\Contracts\HasTenants;
 use Filament\Panel;
 use Illuminate\Support\Collection;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Spatie\Permission\Traits\HasRoles;
 use Filament\Models\Contracts\FilamentUser;
@@ -108,6 +109,22 @@ class User extends Authenticatable implements HasTenants, FilamentUser
         $owned = $this->ownedVendors()->get();
         $member = $this->memberVendors()->get();
         return $owned->merge($member)->unique('id');
+    }
+
+    // Stores this user has been granted, across every vendor.
+    public function stores()
+    {
+        return $this->belongsToMany(Store::class, 'store_user')
+            ->withTimestamps();
+    }
+
+    // The user's stores within one vendor. Filtered on stores.vendor_id
+    // explicitly — the same manual scoping every vendor-owned query in this
+    // codebase uses, and the qualified column name matters here because the
+    // pivot join puts two tables in play.
+    public function storesForVendor(int $vendorId): EloquentCollection
+    {
+        return $this->stores()->where('stores.vendor_id', $vendorId)->get();
     }
 
     public function getTenants(Panel $panel): Collection

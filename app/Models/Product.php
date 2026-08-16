@@ -129,6 +129,13 @@ class Product extends Model implements HasMedia
         return $this->belongsTo(Category::class);
     }
 
+    // Per-store stock rows. Not yet read by anything — stock_quantity and
+    // reserved_stock on this table are still the live numbers.
+    public function storeStocks()
+    {
+        return $this->hasMany(ProductStoreStock::class);
+    }
+
     public function tags(): BelongsToMany
     {
         return $this->belongsToMany(Tag::class);

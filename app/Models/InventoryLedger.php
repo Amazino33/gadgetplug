@@ -18,6 +18,13 @@ class InventoryLedger extends Model
         return $this->belongsTo(Vendor::class);
     }
 
+    // Nullable until the stock mutators are made store-aware — see the
+    // add_store_id_to_inventory_ledgers migration.
+    public function store()
+    {
+        return $this->belongsTo(Store::class);
+    }
+
     public function user()
     {
         return $this->belongsTo(User::class);
