@@ -15,6 +15,11 @@ class CreateProduct extends CreateRecord
         $data = ProductForm::stripTransientAiFields($data);
         $data['vendor_id'] = filament()->getTenant()->id;
 
+        // The home-store field is only shown to the owner. For anyone else the
+        // product is homed in the branch they are working in — never left
+        // without one, since ProductObserver opens its stock row there.
+        $data['store_id'] ??= \App\Services\ActiveStore::currentId();
+
         return $data;
     }
 

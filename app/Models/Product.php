@@ -57,6 +57,9 @@ class Product extends Model implements HasMedia
         'specifications'  => 'array',
         'stock_quantity'  => 'integer',
         'reserved_stock'  => 'integer',
+        'is_service'      => 'boolean',
+        'reorder_point'      => 'integer',
+        'preferred_quantity' => 'integer',
         'published_at'    => 'datetime',
         'unpublish_at'    => 'datetime',
     ];
@@ -164,8 +167,22 @@ class Product extends Model implements HasMedia
         return $this->belongsTo(Category::class);
     }
 
-    // Per-store stock rows. Not yet read by anything — stock_quantity and
-    // reserved_stock on this table are still the live numbers.
+    // Who this is bought from. Set on import from the vendor's own file, and
+    // nulled rather than cascaded if the supplier record is ever removed.
+    public function supplier()
+    {
+        return $this->belongsTo(Supplier::class);
+    }
+
+    // The one branch this product belongs to. A product lives in exactly one
+    // store: it never appears in another store's catalogue, inventory or till.
+    public function store()
+    {
+        return $this->belongsTo(Store::class);
+    }
+
+    // Per-store stock rows. With a home store this is a single row, held at
+    // that store — the quantity, where store() is the identity.
     public function storeStocks()
     {
         return $this->hasMany(ProductStoreStock::class);

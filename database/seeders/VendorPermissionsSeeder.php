@@ -17,6 +17,11 @@ class VendorPermissionsSeeder extends Seeder
             'edit_products',
             'delete_products',
             'view_cost_price',
+            // Bulk catalogue movement. Separate from edit_products because one
+            // import can rewrite every product a vendor has, which is a bigger
+            // act of trust than editing them one at a time.
+            'import_products',
+            'export_products',
 
             // Order Items
             'view_order_items',

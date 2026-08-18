@@ -20,6 +20,7 @@
         "livewire/blaze": "^1.0",
         "livewire/livewire": "^4.0",
         "livewire/volt": "^1.10",
+        "openspout/openspout": "^4.32",
         "spatie/laravel-activitylog": "^4.12",
         "spatie/laravel-medialibrary": "^11.22",
         "spatie/laravel-sluggable": "^4.0"

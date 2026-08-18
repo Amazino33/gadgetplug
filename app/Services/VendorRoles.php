@@ -26,6 +26,7 @@ class VendorRoles
         ],
         'product_manager' => [
             'view_products', 'view_any_products', 'create_products', 'edit_products', 'delete_products',
+            'import_products', 'export_products',
             'view_order_items', 'view_any_order_items', 
             'manage_inventory',
         ],
@@ -36,6 +37,7 @@ class VendorRoles
         ],
         'inventory_manager' => [
             'view_products', 'view_any_products', 'create_products', 'edit_products', 'delete_products',
+            'import_products', 'export_products',
             'view_order_items', 'view_any_order_items', 'edit_order_items',
             'view_vendor',
             'view_team_members', 'invite_team_members', 'edit_team_members',

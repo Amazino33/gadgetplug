@@ -2,7 +2,9 @@
 
 namespace App\Filament\Vendor\Resources\Products\Schemas;
 
+use App\Models\Store;
 use App\Models\Tag;
+use App\Services\ActiveStore;
 use App\Services\ImageProcessing\ProductImagePipeline;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DateTimePicker;
@@ -71,6 +73,28 @@ class ProductForm
                                                 ->required()
                                                 ->searchable()
                                                 ->preload(),
+
+                                            // A product lives in exactly one
+                                            // branch: it never shows in another
+                                            // store's inventory or till. Only
+                                            // the owner decides where — the
+                                            // same gate that governs opening
+                                            // and closing branches. For anyone
+                                            // else the field is absent and
+                                            // CreateProduct fills the store
+                                            // they are working in.
+                                            Select::make('store_id')
+                                                ->label('Home store')
+                                                ->options(fn () => Store::query()
+                                                    ->where('vendor_id', filament()->getTenant()->id)
+                                                    ->orderByDesc('is_default')
+                                                    ->orderBy('name')
+                                                    ->pluck('name', 'id'))
+                                                ->default(fn () => ActiveStore::currentId())
+                                                ->required()
+                                                ->native(false)
+                                                ->helperText('Which branch stocks this product. Moving it later moves its stock too.')
+                                                ->visible(fn () => auth()->user()?->can('create', Store::class) ?? false),
 
                                             TextInput::make('brand')
                                                 ->placeholder('e.g., Apple, Samsung'),

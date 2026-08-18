@@ -35,15 +35,20 @@ class ProductObserver
             return;
         }
 
-        // seedFor rather than a bare lookup: a vendor with no default store
-        // would otherwise make product creation throw, and refusing to create
-        // a product because of a missing store is a worse failure than simply
-        // creating the store it should already have had.
-        $store = DefaultStore::seedFor($product->vendor);
+        // The opening stock belongs at the product's home store. Falling back
+        // to the vendor default only when no home was named — otherwise a
+        // product homed at one branch would have its stock created at another,
+        // and identity and quantity would disagree from the first moment.
+        //
+        // seedFor rather than a bare lookup for that fallback: a vendor with no
+        // default store would otherwise make product creation throw, and
+        // refusing to create a product because of a missing store is a worse
+        // failure than simply creating the store it should already have had.
+        $storeId = $product->store_id ?? DefaultStore::seedFor($product->vendor)->id;
 
         ProductStoreStock::create([
             'product_id' => $product->id,
-            'store_id'   => $store->id,
+            'store_id'   => $storeId,
             'quantity'   => $quantity,
             'reserved'   => $reserved,
         ]);
