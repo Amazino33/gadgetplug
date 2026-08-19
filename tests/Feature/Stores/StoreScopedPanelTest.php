@@ -36,8 +36,13 @@ function actAsInPanel(Vendor $vendor, User $user): void
 
 function panelProduct(Vendor $vendor, string $name, Store $store, int $quantity): Product
 {
+    // Homed at the branch the test names. Phase 8 scopes a store's catalogue by
+    // home store rather than "holds a row here", so moving only the stock row
+    // no longer moves the product between branches — the home store is what
+    // decides, and ProductObserver opens the stock row there.
     $product = Product::create([
         'vendor_id'      => $vendor->id,
+        'store_id'       => $store->id,
         'category_id'    => Category::create(['name' => 'Cat '.uniqid()])->id,
         'name'           => $name,
         'price'          => 1000,
@@ -46,18 +51,10 @@ function panelProduct(Vendor $vendor, string $name, Store $store, int $quantity)
         'status'         => 'published',
     ]);
 
-    // ProductObserver opened a row at the default store; put this product's
-    // stock where the test wants it.
-    if ($store->id === $vendor->defaultStore->id) {
-        ProductStoreStock::where('product_id', $product->id)->first()->update(['quantity' => $quantity]);
-    } else {
-        ProductStoreStock::where('product_id', $product->id)->delete();
-        ProductStoreStock::create([
-            'product_id' => $product->id,
-            'store_id'   => $store->id,
-            'quantity'   => $quantity,
-        ]);
-    }
+    ProductStoreStock::where('product_id', $product->id)
+        ->where('store_id', $store->id)
+        ->first()
+        ->update(['quantity' => $quantity]);
 
     return $product->fresh();
 }
@@ -80,26 +77,35 @@ test('the product list shows only products held at the active store', function (
     expect(ProductResource::getEloquentQuery()->pluck('id')->all())->toBe([$atBranch->id]);
 });
 
+// Rewritten for Phase 8. This used to give ONE product stock in two branches
+// and switch between them — a shape the one-home-store model no longer allows.
+// The property worth keeping is that the columns read the active store's own
+// row rather than the vendor mirror, which two separately homed products show
+// just as well.
 test('the stock columns read the active store row, not the vendor mirror', function () {
     $vendor = panelVendor();
     $branch = Store::create(['vendor_id' => $vendor->id, 'name' => 'Branch']);
 
-    $product = panelProduct($vendor, 'Shared', $vendor->defaultStore, 10);
-    ProductStoreStock::create(['product_id' => $product->id, 'store_id' => $branch->id, 'quantity' => 3, 'reserved' => 1]);
+    $atMain = panelProduct($vendor, 'Main Homed', $vendor->defaultStore, 10);
+    $atBranch = panelProduct($vendor, 'Branch Homed', $branch, 3);
+    ProductStoreStock::where('product_id', $atBranch->id)->update(['reserved' => 1]);
 
-    // The vendor-wide mirror is the sum of both.
-    expect($product->fresh()->stock_quantity)->toBe(13);
+    // Each product's mirror is its own single row, not a vendor-wide sum.
+    expect($atMain->fresh()->stock_quantity)->toBe(10)
+        ->and($atBranch->fresh()->stock_quantity)->toBe(3);
 
     actAsInPanel($vendor, $vendor->user);
 
     ActiveStore::set($vendor, $vendor->user, $branch->id);
-    $row = ProductResource::getEloquentQuery()->find($product->id);
+    $row = ProductResource::getEloquentQuery()->find($atBranch->id);
 
     expect((int) $row->store_quantity)->toBe(3)
-        ->and((int) $row->store_reserved)->toBe(1);
+        ->and((int) $row->store_reserved)->toBe(1)
+        // The other branch's product is not in this catalogue at all.
+        ->and(ProductResource::getEloquentQuery()->find($atMain->id))->toBeNull();
 
     ActiveStore::set($vendor, $vendor->user, $vendor->defaultStore->id);
-    $row = ProductResource::getEloquentQuery()->find($product->id);
+    $row = ProductResource::getEloquentQuery()->find($atMain->id);
 
     expect((int) $row->store_quantity)->toBe(10)
         ->and((int) $row->store_reserved)->toBe(0);
@@ -124,23 +130,24 @@ test('the products list page renders only the active store products, with that s
         ->assertSee('9 available');
 });
 
-test('the same product reports each store own numbers on the list', function () {
+// Also rewritten for Phase 8: "the same product in two stores" is no longer a
+// state that can exist. Each branch's list showing its own products and their
+// own numbers is what the screen actually has to get right.
+test('each store list reports its own products and their own numbers', function () {
     $vendor = panelVendor();
     $branch = Store::create(['vendor_id' => $vendor->id, 'name' => 'Branch']);
     // Both well clear of the low-stock threshold, so the label is the plain
     // "N available" form and the assertion is about the number, not the badge.
-    $product = panelProduct($vendor, 'Shared Widget', $vendor->defaultStore, 12);
-    ProductStoreStock::create(['product_id' => $product->id, 'store_id' => $branch->id, 'quantity' => 30]);
-
-    expect($product->fresh()->stock_quantity)->toBe(42);
+    panelProduct($vendor, 'Main Widget', $vendor->defaultStore, 12);
+    panelProduct($vendor, 'Branch Widget', $branch, 30);
 
     actAsInPanel($vendor, $vendor->user);
 
     ActiveStore::set($vendor, $vendor->user, $vendor->defaultStore->id);
-    Livewire::test(ListProducts::class)->assertSee('12 available');
+    Livewire::test(ListProducts::class)->assertSee('12 available')->assertDontSee('Branch Widget');
 
     ActiveStore::set($vendor, $vendor->user, $branch->id);
-    Livewire::test(ListProducts::class)->assertSee('30 available');
+    Livewire::test(ListProducts::class)->assertSee('30 available')->assertDontSee('Main Widget');
 });
 
 // ─── The selector grid ──────────────────────────────────────────────

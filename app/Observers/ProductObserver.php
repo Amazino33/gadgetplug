@@ -4,6 +4,8 @@ namespace App\Observers;
 
 use App\Models\Product;
 use App\Models\ProductStoreStock;
+use App\Models\Store;
+use App\Services\ActiveStore;
 use App\Services\DefaultStore;
 
 // Gives a newly created product its opening stock row.
@@ -20,6 +22,37 @@ use App\Services\DefaultStore;
 // directly does nothing.
 class ProductObserver
 {
+    /**
+     * Every product gets a home store before it is ever written.
+     *
+     * Home store decides which branch's inventory, count sheet and till a
+     * product appears in, so a product without one is invisible everywhere —
+     * not an edge case but a product nobody can sell. Only the panel form sets
+     * it explicitly, and it is far from the only way a product gets created:
+     * seeders, imports, factories and tests all call Product::create()
+     * directly. Filling it here rather than in the form means the invariant
+     * holds for all of them.
+     *
+     * The branch being worked in wins, but only if it belongs to this
+     * product's own vendor — an active store from another tenant would
+     * otherwise home the product in someone else's business.
+     */
+    public function creating(Product $product): void
+    {
+        if ($product->store_id !== null) {
+            return;
+        }
+
+        $active = ActiveStore::currentId();
+
+        $product->store_id = ($active !== null && Store::query()
+            ->whereKey($active)
+            ->where('vendor_id', $product->vendor_id)
+            ->exists())
+                ? $active
+                : DefaultStore::seedFor($product->vendor)->id;
+    }
+
     public function created(Product $product): void
     {
         $quantity = (int) ($product->stock_quantity ?? 0);

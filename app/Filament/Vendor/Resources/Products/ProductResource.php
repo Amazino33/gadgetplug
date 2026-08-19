@@ -58,10 +58,12 @@ class ProductResource extends Resource
     // scope through $tenantOwnershipRelationshipName, and this narrows that
     // result to the store the user is currently working in.
     //
-    // Only products that actually hold a row at this store appear, which is
-    // what makes two stores show different catalogues. The three selected
-    // columns come from that store's row rather than the products mirror, so
-    // the numbers on screen are this store's, not the vendor's total.
+    // Only products HOMED at this store appear, which is what makes two stores
+    // show different catalogues. Home store rather than "holds a row here": a
+    // product belongs to one branch, and it must stay in that branch's list
+    // even when it has sold out — a line at zero is precisely the one someone
+    // needs to see and reorder. The two selected columns still come from that
+    // store's stock row, so the numbers on screen are this store's.
     public static function getEloquentQuery(): Builder
     {
         $query = parent::getEloquentQuery()->with('media');
@@ -73,7 +75,7 @@ class ProductResource extends Resource
         }
 
         return $query
-            ->whereHas('storeStocks', fn ($q) => $q->where('store_id', $storeId))
+            ->where('products.store_id', $storeId)
             // products.* explicitly: addSelect() on a query with no select list
             // yet REPLACES it with just these subqueries, which would strip the
             // model down to two columns and leave the table with no id or name.

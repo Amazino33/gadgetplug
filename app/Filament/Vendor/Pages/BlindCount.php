@@ -328,12 +328,17 @@ class BlindCount extends Page
     {
         $products = Product::published()
             ->where('vendor_id', $vendorId)
-            // Only what this branch actually holds a row for. Without this a
+            // Only the products homed at this branch. Without this a
             // storekeeper at a three-product branch would be walked through the
             // vendor's entire catalogue, counting zero over and over — and a
             // count of zero against another branch's stock would then be
             // reconciled as a shortage.
-            ->when($storeId, fn ($q) => $q->whereHas('storeStocks', fn ($s) => $s->where('store_id', $storeId)))
+            //
+            // Home store rather than "holds a row here": a product that has
+            // sold out still belongs on this branch's count sheet. Counting it
+            // and finding nothing is a real answer; skipping it hides whether
+            // the shelf is genuinely empty or the stock walked.
+            ->when($storeId, fn ($q) => $q->where('store_id', $storeId))
             ->get(['id', 'category_id']);
 
         if ($this->byCategory) {
