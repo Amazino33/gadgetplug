@@ -226,3 +226,32 @@ it('offers a blank template to a vendor with nothing to export', function () {
         ->assertOk()
         ->assertHasNoErrors();
 });
+
+// ── Home store ───────────────────────────────────────────────────────────────
+
+it('homes imported products in a branch, so they are visible in the products list', function () {
+    $c = importScreenContext();
+    Storage::fake('local');
+
+    enterVendorPanelAs($c['owner'], $c['vendor']);
+
+    Livewire::test(ImportProducts::class)
+        ->set('upload', uploadedCsv(SAMPLE_CSV))
+        ->call('loadFile')
+        ->call('buildPreview')
+        ->call('commit');
+
+    $product = Product::where('sku', 'ANK-20W')->firstOrFail();
+
+    // ProductResource filters on products.store_id, so a product without a home
+    // store exists in the database and appears nowhere in the panel. Asserting
+    // through the resource's own query rather than on the model is the point:
+    // the model was never the thing at risk.
+    expect($product->store_id)->not->toBeNull()
+        ->and($product->storeStocks()->count())->toBe(1)
+        ->and(
+            \App\Filament\Vendor\Resources\Products\ProductResource::getEloquentQuery()
+                ->whereKey($product->id)
+                ->exists()
+        )->toBeTrue();
+});
