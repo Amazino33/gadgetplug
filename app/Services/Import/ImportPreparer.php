@@ -90,6 +90,28 @@ class ImportPreparer
                 $matchedId = $byBarcode[$barcode];
             }
 
+            // A row can name two identifiers that belong to two different
+            // products: its SKU matches one, its barcode another. Applying it
+            // would move an identifier off the product that holds it, which the
+            // unique index refuses - and a database error mid-run aborts the
+            // whole import with nothing explaining why. Refuse the one row here
+            // instead, and say which products are in the way.
+            foreach ([[ProductField::Sku, $sku, $bySku], [ProductField::Barcode, $barcode, $byBarcode]] as [$field, $identifier, $index]) {
+                if ($identifier === '' || ! isset($index[$identifier])) {
+                    continue;
+                }
+
+                if ($matchedId !== null && $index[$identifier] !== $matchedId) {
+                    $errors[] = sprintf(
+                        '%s "%s" already belongs to a different product (#%d), while this row matches product #%d. Correct one of them and import again.',
+                        $field->label(),
+                        $identifier,
+                        $index[$identifier],
+                        $matchedId,
+                    );
+                }
+            }
+
             if ($matchedId !== null && ($values[ProductField::Status->value] ?? null) === 'archived') {
                 $warnings[] = 'This will archive a product you already sell.';
             }

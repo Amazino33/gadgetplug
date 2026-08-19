@@ -2,11 +2,16 @@
 
 namespace App\Filament\Vendor\Resources\Products\Pages;
 
+use App\Filament\Vendor\Pages\ImportProducts;
 use App\Filament\Vendor\Resources\Products\ProductResource;
 use App\Filament\Vendor\Resources\Products\Schemas\ProductForm;
+use App\Models\Category;
 use App\Models\Product;
+use App\Services\Export\ProductExporter;
 use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -133,7 +138,78 @@ class ListProducts extends ListRecords
                 ->color(fn (): string => $this->displayMode === 'grid' ? 'primary' : 'gray')
                 ->url(fn (): string => static::getUrl(parameters: ['display' => 'grid'])),
 
+            // Export sits before Import in the bar: taking a copy of what you
+            // have is the safe first move before any bulk change.
+            Action::make('export')
+                ->label('Export')
+                ->icon('heroicon-o-arrow-down-tray')
+                ->color('gray')
+                ->visible(fn (): bool => static::canBulkMove('export_products'))
+                ->modalHeading('Export your products')
+                ->modalDescription('Edit the file offline and import it back. Every field it carries comes back in, except stock.')
+                ->modalSubmitActionLabel('Download')
+                ->schema([
+                    Select::make('format')
+                        ->label('File type')
+                        ->options(['csv' => 'CSV', 'xlsx' => 'Excel (.xlsx)'])
+                        ->default('csv')
+                        ->required(),
+
+                    Select::make('category_id')
+                        ->label('Only this category')
+                        ->options(fn (): array => Category::orderBy('name')->pluck('name', 'id')->all())
+                        ->searchable()
+                        ->placeholder('All categories'),
+
+                    Select::make('status')
+                        ->label('Only this status')
+                        ->options(['published' => 'Published', 'draft' => 'Draft', 'archived' => 'Archived'])
+                        ->placeholder('Any status'),
+
+                    Toggle::make('low_stock_only')
+                        ->label('Only products running low'),
+                ])
+                ->action(function (array $data) {
+                    $path = app(ProductExporter::class)->export(
+                        filament()->getTenant(),
+                        $data['format'] ?? 'csv',
+                        [
+                            'category_id'    => $data['category_id'] ?? null,
+                            'status'         => $data['status'] ?? null,
+                            'low_stock_only' => (bool) ($data['low_stock_only'] ?? false),
+                        ],
+                    );
+
+                    return response()->download($path)->deleteFileAfterSend();
+                }),
+
+            Action::make('import')
+                ->label('Import')
+                ->icon('heroicon-o-arrow-up-tray')
+                ->color('gray')
+                ->visible(fn (): bool => static::canBulkMove('import_products'))
+                ->url(fn (): string => ImportProducts::getUrl()),
+
             CreateAction::make(),
         ];
+    }
+
+    /**
+     * Bulk catalogue movement is gated separately from editing products one at
+     * a time. One import can rewrite every product a vendor has, which is a
+     * larger act of trust than editing them individually.
+     */
+    protected static function canBulkMove(string $permission): bool
+    {
+        $vendor = filament()->getTenant();
+        $user   = auth()->user();
+
+        if ($vendor === null || $user === null) {
+            return false;
+        }
+
+        return $user->isSuperAdmin()
+            || $vendor->isOwner($user)
+            || $user->hasVendorPermission($vendor->id, $permission);
     }
 }

@@ -133,8 +133,11 @@ enum ProductField: string
             self::Supplier        => ['supplier', 'distributor', 'wholesaler'],
             self::ReorderPoint    => ['reorderpoint', 'reorder point', 'reorder level', 'reorder', 'min stock', 'minimum stock', 'min qty'],
             self::PreferredQuantity => ['preferredquantity', 'preferred quantity', 'preferred qty', 'order quantity', 'max stock'],
-            // Aronium splits this into a flag and a number; only the number maps.
-            self::LowStockThreshold => ['warningquantity', 'warning quantity', 'low stock', 'low stock warning', 'lowstockwarning', 'low stock threshold', 'lowstockthreshold', 'alert quantity'],
+            // Aronium splits this into a flag (LowStockWarning) and a number
+            // (WarningQuantity). Only the number maps. Listing the flag here
+            // let it claim this field in the exact pass, which then rejected
+            // "True" as an invalid whole number and skipped every single row.
+            self::LowStockThreshold => ['warningquantity', 'warning quantity', 'low stock', 'low stock threshold', 'lowstockthreshold', 'alert quantity'],
             self::IsService         => ['isservice', 'is service', 'service', 'service item', 'non stock', 'nonstock'],
             self::Status            => ['status', 'isenabled', 'is enabled', 'enabled', 'active', 'is active', 'published', 'visible'],
             self::ShowOnline        => ['show online', 'showonline', 'online', 'web', 'ecommerce', 'sell online'],

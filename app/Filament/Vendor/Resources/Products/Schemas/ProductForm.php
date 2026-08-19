@@ -99,6 +99,33 @@ class ProductForm
                                             TextInput::make('brand')
                                                 ->placeholder('e.g., Apple, Samsung'),
 
+                                            TextInput::make('measurement_unit')
+                                                ->label('Unit')
+                                                ->placeholder('e.g., pcs, pair, carton')
+                                                ->maxLength(32)
+                                                ->helperText('How this is counted and sold.'),
+
+                                            // Vendor-scoped, and creatable inline
+                                            // so a supplier arriving via import
+                                            // does not have to be pre-registered.
+                                            Select::make('supplier_id')
+                                                ->label('Supplier')
+                                                ->relationship(
+                                                    'supplier',
+                                                    'name',
+                                                    fn ($query) => $query->where('vendor_id', filament()->getTenant()->id),
+                                                )
+                                                ->searchable()
+                                                ->preload()
+                                                ->createOptionForm([
+                                                    TextInput::make('name')->required()->maxLength(255),
+                                                    TextInput::make('phone')->tel()->maxLength(30),
+                                                ])
+                                                ->createOptionUsing(fn (array $data) => \App\Models\Supplier::create([
+                                                    ...$data,
+                                                    'vendor_id' => filament()->getTenant()->id,
+                                                ])->getKey()),
+
                                             TextInput::make('name')
                                                 ->required()
                                                 ->columnSpanFull(),
@@ -336,6 +363,27 @@ class ProductForm
                                         ->default(5)
                                         ->minValue(0)
                                         ->required(),
+
+                                    // Filled by the product importer from a
+                                    // vendor's existing POS export. Editable
+                                    // here too, or an imported value would be
+                                    // visible nowhere and impossible to correct.
+                                    TextInput::make('reorder_point')
+                                        ->label('Reorder Point')
+                                        ->helperText('The level at which you intend to reorder. Distinct from the alert above, which only warns.')
+                                        ->numeric()
+                                        ->minValue(0),
+
+                                    TextInput::make('preferred_quantity')
+                                        ->label('Preferred Order Quantity')
+                                        ->helperText('How much you usually buy when restocking this.')
+                                        ->numeric()
+                                        ->minValue(0),
+
+                                    Toggle::make('is_service')
+                                        ->label('This is a service, not a physical item')
+                                        ->helperText('Services hold no stock and are left out of inventory counts.')
+                                        ->default(false),
                                 ]),
 
                             Section::make('Sales Channels')
