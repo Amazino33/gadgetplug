@@ -49,10 +49,35 @@ class VerifyStockMirrorCommand extends Command
             $this->line("{$storeless->count()} have no store row at all.");
         }
 
-        if ($drifted->isEmpty()) {
+        $misplaced = $this->stockAwayFromHomeStore();
+
+        if ($drifted->isEmpty() && $misplaced->isEmpty()) {
             $this->info('Mirror is exact: every product matches the sum of its store rows.');
+            $this->info('Every product stock sits at its home store.');
 
             return self::SUCCESS;
+        }
+
+        if ($misplaced->isNotEmpty()) {
+            $this->error("{$misplaced->count()} product(s) hold stock away from their home store:");
+
+            $this->table(
+                ['Product', 'Home store', 'Stock sitting at'],
+                $misplaced->map(fn ($row) => [
+                    "#{$row->id} {$row->name}",
+                    $row->home_store_id ?? 'none',
+                    $row->stray_store_id,
+                ])->all(),
+            );
+
+            $this->newLine();
+            $this->line('A product belongs to one branch. Stock at any other store is unreachable from');
+            $this->line('that branch inventory and till — re-home the product, or move the stock.');
+            $this->newLine();
+        }
+
+        if ($drifted->isEmpty()) {
+            return self::FAILURE;
         }
 
         $this->error("{$drifted->count()} product(s) drifted from their store rows:");
@@ -73,5 +98,35 @@ class VerifyStockMirrorCommand extends Command
         $this->line('The per-store rows are authoritative. Investigate what wrote the product columns directly.');
 
         return self::FAILURE;
+    }
+
+    /**
+     * Products holding stock at a store that is not their home.
+     *
+     * Home store and the stock row are two records of "which branch", written
+     * by different code paths — the product form and the stock actions. This
+     * is what makes a divergence between them visible instead of silent: stock
+     * parked outside the home store is unreachable from that branch's
+     * inventory, count sheet and till, so it is invisible rather than merely
+     * misfiled.
+     */
+    private function stockAwayFromHomeStore()
+    {
+        return DB::table('products as p')
+            ->join('product_store_stock as pss', 'pss.product_id', '=', 'p.id')
+            ->when($this->option('vendor'), fn ($q, $vendorId) => $q->where('p.vendor_id', $vendorId))
+            // A null home is caught explicitly: SQL comparisons against NULL
+            // are neither true nor false, so `pss.store_id != p.store_id`
+            // alone would let a product with no home store through silently —
+            // and that product is invisible in every branch's inventory, which
+            // is exactly the condition worth shouting about.
+            ->where(fn ($q) => $q
+                ->whereNull('p.store_id')
+                ->orWhereColumn('pss.store_id', '!=', 'p.store_id'))
+            ->select('p.id', 'p.name')
+            ->selectRaw('p.store_id as home_store_id')
+            ->selectRaw('pss.store_id as stray_store_id')
+            ->orderBy('p.id')
+            ->get();
     }
 }

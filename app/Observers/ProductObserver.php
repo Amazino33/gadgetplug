@@ -2,11 +2,14 @@
 
 namespace App\Observers;
 
+use App\Models\InventoryLedger;
 use App\Models\Product;
 use App\Models\ProductStoreStock;
 use App\Models\Store;
 use App\Services\ActiveStore;
 use App\Services\DefaultStore;
+use Illuminate\Support\Facades\DB;
+use LogicException;
 
 // Gives a newly created product its opening stock row.
 //
@@ -51,6 +54,117 @@ class ProductObserver
             ->exists())
                 ? $active
                 : DefaultStore::seedFor($product->vendor)->id;
+    }
+
+    /**
+     * Refuse to re-home a product while its stock is spoken for.
+     *
+     * Reservations live on the store row and are released or dispatched
+     * against that same row. Moving the product mid-flight would carry those
+     * units to another branch while the order that reserved them still points
+     * at the first — the same class of split the Phase 6 default-store guard
+     * exists to prevent, so it uses the same authority: reserved > 0.
+     *
+     * Thrown rather than silently skipped, and thrown from updating() so the
+     * change never reaches the database. LogicException matches how Order,
+     * Expense and ProductStoreStock already refuse edits to settled records.
+     */
+    public function updating(Product $product): void
+    {
+        if (! $product->isDirty('store_id')) {
+            return;
+        }
+
+        $from = $product->getOriginal('store_id');
+
+        if ($from === null) {
+            return;
+        }
+
+        $reserved = (int) ProductStoreStock::query()
+            ->where('product_id', $product->id)
+            ->where('store_id', $from)
+            ->value('reserved');
+
+        if ($reserved > 0) {
+            throw new LogicException(
+                "Cannot change this product's store while {$reserved} unit(s) are reserved for orders at its current one. Dispatch or cancel those orders first."
+            );
+        }
+    }
+
+    /**
+     * Carry the stock with the product.
+     *
+     * A product's home store decides which branch's inventory, count sheet and
+     * till it appears in; leaving its units behind would show it in the new
+     * branch at zero while the stock sat unreachable in the old one. Both
+     * records of "which branch" move together or neither does.
+     *
+     * The old row is removed rather than zeroed, so a product keeps exactly one
+     * stock row — the invariant stock:verify-mirror now asserts. Both writes go
+     * through the model so ProductStoreStockObserver recomputes the mirror;
+     * the total is unchanged by a move, so the mirror simply stays correct.
+     */
+    public function updated(Product $product): void
+    {
+        if (! $product->wasChanged('store_id')) {
+            return;
+        }
+
+        $from = $product->getOriginal('store_id');
+        $to = $product->store_id;
+
+        if ($from === null || $to === null || $from === $to) {
+            return;
+        }
+
+        DB::transaction(function () use ($product, $from, $to) {
+            $source = ProductStoreStock::query()
+                ->where('product_id', $product->id)
+                ->where('store_id', $from)
+                ->lockForUpdate()
+                ->first();
+
+            $quantity = (int) ($source->quantity ?? 0);
+            $reserved = (int) ($source->reserved ?? 0);
+
+            $destination = ProductStoreStock::firstOrNew([
+                'product_id' => $product->id,
+                'store_id'   => $to,
+            ]);
+
+            $destination->quantity = (int) ($destination->quantity ?? 0) + $quantity;
+            $destination->reserved = (int) ($destination->reserved ?? 0) + $reserved;
+            $destination->save();
+
+            $source?->delete();
+
+            // Nothing to record when an empty product moves: a ledger of zeroes
+            // is noise in the one log people read to find where goods went.
+            if ($quantity === 0) {
+                return;
+            }
+
+            $names = Store::whereIn('id', [$from, $to])->pluck('name', 'id');
+            $description = "Home store changed — {$quantity} unit(s) moved from "
+                .($names[$from] ?? "store {$from}").' to '.($names[$to] ?? "store {$to}").'.';
+
+            // Two entries, one per branch, so each branch's movement log tells
+            // the truth on its own: units left here, units arrived there.
+            foreach ([[$from, -$quantity], [$to, $quantity]] as [$storeId, $change]) {
+                InventoryLedger::create([
+                    'vendor_id'        => $product->vendor_id,
+                    'store_id'         => $storeId,
+                    'product_id'       => $product->id,
+                    'user_id'          => auth()->id(),
+                    'transaction_type' => 'store_transfer',
+                    'quantity_change'  => $change,
+                    'reference'        => "product-{$product->id}-home-store",
+                    'description'      => $description,
+                ]);
+            }
+        });
     }
 
     public function created(Product $product): void

@@ -345,5 +345,16 @@ test('the stock mirror stays exact across a split reserve, dispatch and release'
     app(ReserveStockAction::class)->execute(productId: $product->id, quantity: 2, orderItemId: $b->id);
     app(ReleaseReservationAction::class)->execute(productId: $product->id, quantity: 2, orderItemId: $b->id);
 
-    $this->artisan('stock:verify-mirror')->expectsOutputToContain('Mirror is exact')->assertSuccessful();
+    // Asserted directly rather than through stock:verify-mirror. This scenario
+    // deliberately puts ONE product's stock in two branches to exercise the
+    // splitting path, and Phase 8 made that shape invalid: a product now
+    // belongs to exactly one home store, and the command flags stock sitting
+    // anywhere else. The property this test was written for — that the mirror
+    // equals the sum of the rows through a split reserve, dispatch and release
+    // — is unchanged, so it is checked here on its own terms.
+    $sumQuantity = (int) ProductStoreStock::where('product_id', $product->id)->sum('quantity');
+    $sumReserved = (int) ProductStoreStock::where('product_id', $product->id)->sum('reserved');
+
+    expect($product->fresh()->stock_quantity)->toBe($sumQuantity)
+        ->and($product->fresh()->reserved_stock)->toBe($sumReserved);
 });
