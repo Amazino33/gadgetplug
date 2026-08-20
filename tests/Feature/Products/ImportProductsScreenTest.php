@@ -419,3 +419,47 @@ it('says on the check screen whether any import has ever been recorded', functio
         ->assertSee('Last import recorded:')
         ->assertSee('completed');
 });
+
+// ── Stale round-trip state must not block the run ────────────────────────────
+
+it('imports even when the summary comes back from the browser empty', function () {
+    $c = importScreenContext();
+    Storage::fake('local');
+
+    enterVendorPanelAs($c['owner'], $c['vendor']);
+
+    $page = Livewire::test(ImportProducts::class)
+        ->set('upload', uploadedCsv(SAMPLE_CSV))
+        ->call('loadFile')
+        ->call('buildPreview');
+
+    // Exactly the failure seen on production: the page renders the right
+    // counts, but the property arrives back without its keys. The old guard
+    // read $summary['create'], got null, and returned silently - no exception,
+    // no database row, no message. The counts now come from the file instead.
+    $page->set('summary', [])
+        ->call('commit')
+        ->assertSet('step', ImportProducts::STEP_IMPORTING)
+        ->call('processBatch');
+
+    expect(Product::count())->toBe(2);
+});
+
+it('says so on the page when a file genuinely has nothing importable', function () {
+    $c = importScreenContext();
+    Storage::fake('local');
+
+    enterVendorPanelAs($c['owner'], $c['vendor']);
+
+    // Both rows lack a name, so neither can be imported. Previously this was a
+    // toast in the corner and a screen that did not change.
+    Livewire::test(ImportProducts::class)
+        ->set('upload', uploadedCsv("Name,SKU,Price\n,SKU-1,100\n,SKU-2,200\n"))
+        ->call('loadFile')
+        ->call('buildPreview')
+        ->call('commit')
+        ->assertSet('step', ImportProducts::STEP_PREVIEW)
+        ->assertSee('Nothing in this file can be imported');
+
+    expect(Product::count())->toBe(0);
+});

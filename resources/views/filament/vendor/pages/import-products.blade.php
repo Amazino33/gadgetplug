@@ -180,10 +180,10 @@
         <x-filament::section heading="What this will do">
             <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
                 @foreach ([
-                    ['New products', $summary['create'], 'text-green-600 dark:text-green-400'],
-                    ['Updated', $summary['update'], 'text-amber-600 dark:text-amber-400'],
-                    ['Skipped', $summary['skip'], 'text-red-600 dark:text-red-400'],
-                    ['Rows in file', $summary['total'], 'text-gray-900 dark:text-white'],
+                    ['New products', $summary['create'] ?? 0, 'text-green-600 dark:text-green-400'],
+                    ['Updated', $summary['update'] ?? 0, 'text-amber-600 dark:text-amber-400'],
+                    ['Skipped', $summary['skip'] ?? 0, 'text-red-600 dark:text-red-400'],
+                    ['Rows in file', $summary['total'] ?? 0, 'text-gray-900 dark:text-white'],
                 ] as [$label, $value, $colour])
                     <div class="rounded-lg border border-gray-200 px-4 py-3 dark:border-white/10">
                         <div class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ $label }}</div>
@@ -257,7 +257,7 @@
                 </table>
             </div>
 
-            @if ($summary['update'] > 0)
+            @if (($summary['update'] ?? 0) > 0)
                 <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">
                     A copy of your current catalogue is saved before anything changes, so this can be undone.
                 </p>
@@ -276,7 +276,7 @@
             <div class="mt-5 flex flex-wrap gap-3">
                 <x-filament::button color="success" wire:click="commit" wire:loading.attr="disabled" wire:target="commit">
                     <span wire:loading.remove wire:target="commit">
-                        Import {{ number_format($summary['create'] + $summary['update']) }} product(s)
+                        Import {{ number_format(($summary['create'] ?? 0) + ($summary['update'] ?? 0)) }} product(s)
                     </span>
                     <span wire:loading wire:target="commit">Starting…</span>
                 </x-filament::button>
@@ -289,7 +289,11 @@
                  else on this page can: did the run reach the database at all? --}}
             @php $last = $this->lastLog(); @endphp
 
-            <p class="mt-4 text-xs text-gray-500 dark:text-gray-400">
+            @if ($trace)
+                <p class="mt-4 font-mono text-xs text-gray-500 dark:text-gray-400">Last click: {{ $trace }}</p>
+            @endif
+
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 @if ($last)
                     Last import recorded: <strong>#{{ $last->id }}</strong> —
                     {{ $last->status }}, {{ $last->summary() }},

@@ -111,6 +111,17 @@ class ImportProducts extends Page
      */
     public ?string $fatalError = null;
 
+    /**
+     * A breadcrumb of how far the last click got.
+     *
+     * Written at the top of each step and after each milestone, so a run that
+     * ends without an exception, without a database row and without changing
+     * the screen still says where it stopped. Diagnosing this from the outside
+     * otherwise needs shell access to the server, which the person pressing the
+     * button does not have.
+     */
+    public ?string $trace = null;
+
     public static function canAccess(): bool
     {
         $vendor = filament()->getTenant();
@@ -303,17 +314,8 @@ class ImportProducts extends Page
      */
     public function commit(): void
     {
-        if ($this->summary['create'] + $this->summary['update'] === 0) {
-            Notification::make()
-                ->title('Nothing to import.')
-                ->body('Every row in this file has an error. Fix them and upload it again.')
-                ->warning()
-                ->send();
-
-            return;
-        }
-
         $this->fatalError = null;
+        $this->trace      = 'commit entered '.now()->format('H:i:s');
 
         // Everything is inside the try, not just the parse. An exception from
         // the log insert or the snapshot would otherwise escape as a bare 500
@@ -322,6 +324,24 @@ class ImportProducts extends Page
             $rows = $this->preparedRows();
 
             $skipped = $rows->reject(fn (ParsedRow $row) => $row->isImportable());
+
+            // Counted from the file just read, never from $summary. That
+            // property is display state that has survived a Livewire round
+            // trip, and if it comes back without its keys - which is what
+            // happened here - then null + null === 0 is true, and the method
+            // returns having done nothing, thrown nothing and written nothing.
+            // The page still shows 602 because the view read the property
+            // before the trip, so the screen and the guard disagreed with no
+            // way to see it.
+            $this->trace = "commit parsed {$rows->count()} row(s), {$skipped->count()} unusable";
+
+            if ($rows->count() === $skipped->count()) {
+                $this->fatalError = $rows->isEmpty()
+                    ? 'That file has no rows to import.'
+                    : 'Nothing in this file can be imported - every row has an error. The list above says why.';
+
+                return;
+            }
 
             $log = ImportLog::create([
                 'vendor_id'     => filament()->getTenant()->id,
@@ -348,6 +368,7 @@ class ImportProducts extends Page
             $this->processed = 0;
             $this->toProcess = $rows->count() - $skipped->count();
             $this->step      = self::STEP_IMPORTING;
+            $this->trace     = "commit ok: log #{$log->id}, {$this->toProcess} row(s) to write";
         } catch (Throwable $e) {
             $this->failed($e);
         }
@@ -365,8 +386,12 @@ class ImportProducts extends Page
     public function processBatch(): void
     {
         if ($this->step !== self::STEP_IMPORTING) {
+            $this->trace = 'processBatch skipped: step is '.$this->step;
+
             return;
         }
+
+        $this->trace = 'processBatch from row '.$this->processed;
 
         try {
             $batch = $this->preparedRows()
@@ -489,7 +514,7 @@ class ImportProducts extends Page
 
     public function startOver(): void
     {
-        $this->reset(['step', 'upload', 'storedPath', 'originalName', 'headers', 'columnMap', 'summary', 'previewRows', 'problems', 'resultLogId', 'templateId', 'processed', 'toProcess', 'fatalError']);
+        $this->reset(['step', 'upload', 'storedPath', 'originalName', 'headers', 'columnMap', 'summary', 'previewRows', 'problems', 'resultLogId', 'templateId', 'processed', 'toProcess', 'fatalError', 'trace']);
     }
 
     public function downloadTemplate(string $format = 'csv'): BinaryFileResponse
