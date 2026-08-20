@@ -100,6 +100,17 @@ class ImportProducts extends Page
 
     public int $toProcess = 0;
 
+    /**
+     * The last failure, shown on the page itself.
+     *
+     * A toast is not enough here: failing sends the vendor back to the step
+     * they were already on, so a missed notification is indistinguishable from
+     * the button doing nothing at all. That is exactly how a real failure went
+     * undiagnosed - three requests returning 200, a screen that never changed,
+     * and no way to tell the difference from the outside.
+     */
+    public ?string $fatalError = null;
+
     public static function canAccess(): bool
     {
         $vendor = filament()->getTenant();
@@ -230,6 +241,8 @@ class ImportProducts extends Page
 
     public function buildPreview(): void
     {
+        $this->fatalError = null;
+
         $mapping = $this->headerMapping();
 
         if (! in_array(ProductField::Name->value, $mapping, true)) {
@@ -300,40 +313,44 @@ class ImportProducts extends Page
             return;
         }
 
+        $this->fatalError = null;
+
+        // Everything is inside the try, not just the parse. An exception from
+        // the log insert or the snapshot would otherwise escape as a bare 500
+        // with nothing on screen explaining it.
         try {
             $rows = $this->preparedRows();
+
+            $skipped = $rows->reject(fn (ParsedRow $row) => $row->isImportable());
+
+            $log = ImportLog::create([
+                'vendor_id'     => filament()->getTenant()->id,
+                'user_id'       => auth()->id(),
+                'file_name'     => $this->originalName ?? 'import.csv',
+                'total_rows'    => $rows->count(),
+                'skipped_count' => $skipped->count(),
+                'status'        => 'running',
+                'errors'        => $skipped->take(200)->map(fn (ParsedRow $row) => [
+                    'line'   => $row->line,
+                    'name'   => $row->name(),
+                    'errors' => $row->errors,
+                ])->values()->all(),
+            ]);
+
+            $this->resultLogId = $log->id;
+
+            // Only when something existing is about to change: a first import
+            // has nothing to restore to.
+            if ($rows->contains(fn (ParsedRow $row) => $row->action() === ParsedRow::ACTION_UPDATE)) {
+                $log->update(['snapshot_path' => app(ProductImporter::class)->snapshotFor(filament()->getTenant())]);
+            }
+
+            $this->processed = 0;
+            $this->toProcess = $rows->count() - $skipped->count();
+            $this->step      = self::STEP_IMPORTING;
         } catch (Throwable $e) {
             $this->failed($e);
-
-            return;
         }
-
-        $skipped = $rows->reject(fn (ParsedRow $row) => $row->isImportable());
-
-        $log = ImportLog::create([
-            'vendor_id'     => filament()->getTenant()->id,
-            'user_id'       => auth()->id(),
-            'file_name'     => $this->originalName ?? 'import.csv',
-            'total_rows'    => $rows->count(),
-            'skipped_count' => $skipped->count(),
-            'status'        => 'running',
-            'errors'        => $skipped->take(200)->map(fn (ParsedRow $row) => [
-                'line'   => $row->line,
-                'name'   => $row->name(),
-                'errors' => $row->errors,
-            ])->values()->all(),
-        ]);
-
-        // Only when something existing is about to change: a first import has
-        // nothing to restore to.
-        if ($rows->contains(fn (ParsedRow $row) => $row->action() === ParsedRow::ACTION_UPDATE)) {
-            $log->update(['snapshot_path' => app(ProductImporter::class)->snapshotFor(filament()->getTenant())]);
-        }
-
-        $this->resultLogId = $log->id;
-        $this->processed   = 0;
-        $this->toProcess   = $rows->count() - $skipped->count();
-        $this->step        = self::STEP_IMPORTING;
     }
 
     /**
@@ -406,6 +423,18 @@ class ImportProducts extends Page
         $this->result()?->update(['status' => 'failed']);
         $this->step = self::STEP_PREVIEW;
 
+        // Class and location as well as the message: on shared hosting the
+        // person hitting this has no access to the log, and "could not open
+        // file" without a path or a line number is not something they can act
+        // on or report back.
+        $this->fatalError = sprintf(
+            '%s: %s (%s line %d)',
+            class_basename($e),
+            $e->getMessage(),
+            str_replace(base_path().DIRECTORY_SEPARATOR, '', $e->getFile()),
+            $e->getLine(),
+        );
+
         Notification::make()
             ->title('The import stopped.')
             ->body($e->getMessage())
@@ -444,7 +473,7 @@ class ImportProducts extends Page
 
     public function startOver(): void
     {
-        $this->reset(['step', 'upload', 'storedPath', 'originalName', 'headers', 'columnMap', 'summary', 'previewRows', 'problems', 'resultLogId', 'templateId', 'processed', 'toProcess']);
+        $this->reset(['step', 'upload', 'storedPath', 'originalName', 'headers', 'columnMap', 'summary', 'previewRows', 'problems', 'resultLogId', 'templateId', 'processed', 'toProcess', 'fatalError']);
     }
 
     public function downloadTemplate(string $format = 'csv'): BinaryFileResponse

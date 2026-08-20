@@ -335,3 +335,44 @@ it('re-running an interrupted import updates rather than duplicates', function (
 
     expect(Product::count())->toBe(60);
 });
+
+// ── Failure visibility ───────────────────────────────────────────────────────
+
+it('shows the reason on the page when the import cannot start', function () {
+    $c = importScreenContext();
+    Storage::fake('local');
+
+    enterVendorPanelAs($c['owner'], $c['vendor']);
+
+    $page = Livewire::test(ImportProducts::class)
+        ->set('upload', uploadedCsv(SAMPLE_CSV))
+        ->call('loadFile')
+        ->call('buildPreview');
+
+    // The uploaded file disappears between checking and confirming - a cleanup
+    // job, a full disk, a wrong path. Whatever the cause, failing puts the
+    // vendor back on the step they were already on, so without a message on the
+    // page it is indistinguishable from the button doing nothing.
+    Storage::disk('local')->deleteDirectory('imports');
+
+    $page->call('commit')
+        ->assertSet('step', ImportProducts::STEP_PREVIEW)
+        ->assertSee('The import stopped and nothing was changed.');
+
+    expect($page->get('fatalError'))->toContain('RuntimeException')
+        ->and(Product::count())->toBe(0);
+});
+
+it('clears a previous failure when the file is checked again', function () {
+    $c = importScreenContext();
+    Storage::fake('local');
+
+    enterVendorPanelAs($c['owner'], $c['vendor']);
+
+    Livewire::test(ImportProducts::class)
+        ->set('upload', uploadedCsv(SAMPLE_CSV))
+        ->call('loadFile')
+        ->set('fatalError', 'something from before')
+        ->call('buildPreview')
+        ->assertSet('fatalError', null);
+});

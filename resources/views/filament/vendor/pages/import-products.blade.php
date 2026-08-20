@@ -35,6 +35,20 @@
         @endforeach
     </ol>
 
+    {{-- A failure returns the vendor to the step they were already on, so
+         without this the screen looks identical to nothing having happened.
+         Shown on the page, not only as a toast, because a toast in the corner
+         is exactly what gets missed. --}}
+    @if ($fatalError)
+        <div class="rounded-lg border border-red-300 bg-red-50 px-4 py-3 dark:border-red-500/30 dark:bg-red-500/10">
+            <p class="text-sm font-semibold text-red-900 dark:text-red-200">The import stopped and nothing was changed.</p>
+            <p class="mt-1 font-mono text-xs break-all text-red-800 dark:text-red-300">{{ $fatalError }}</p>
+            <p class="mt-2 text-xs text-red-800 dark:text-red-300">
+                Send this line on if it is not obvious — it names the exact file and line that failed.
+            </p>
+        </div>
+    @endif
+
     {{-- ── Step 1: upload ──────────────────────────────────────────────── --}}
     @if ($step === \App\Filament\Vendor\Pages\ImportProducts::STEP_UPLOAD)
         <x-filament::section heading="Choose your file">
