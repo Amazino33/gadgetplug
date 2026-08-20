@@ -51,7 +51,12 @@
 
     {{-- ── Step 1: upload ──────────────────────────────────────────────── --}}
     @if ($step === \App\Filament\Vendor\Pages\ImportProducts::STEP_UPLOAD)
-        <x-filament::section heading="Choose your file">
+        {{-- Keyed per step: without this, Livewire's DOM diffing across the
+             upload/map/preview/importing/done transitions has no explicit
+             signal that these are five distinct blocks, not one block whose
+             content changed — and can misattribute an event binding to a
+             leftover node from an earlier step after enough round-trips. --}}
+        <x-filament::section wire:key="import-step-upload" heading="Choose your file">
             <p class="text-sm text-gray-600 dark:text-gray-400">
                 A CSV or Excel (.xlsx) export from your current POS, or a spreadsheet you filled in
                 yourself. The first row must be the column headings.
@@ -97,7 +102,7 @@
 
     {{-- ── Step 2: mapping ─────────────────────────────────────────────── --}}
     @if ($step === \App\Filament\Vendor\Pages\ImportProducts::STEP_MAP)
-        <x-filament::section heading="Match your columns">
+        <x-filament::section wire:key="import-step-map" heading="Match your columns">
             <p class="text-sm text-gray-600 dark:text-gray-400">
                 {{ count($headers) }} column(s) found in <strong>{{ $originalName }}</strong>.
                 We have guessed the obvious ones — check them, and set anything left to "Ignore".
@@ -177,7 +182,7 @@
 
     {{-- ── Step 3: preview ─────────────────────────────────────────────── --}}
     @if ($step === \App\Filament\Vendor\Pages\ImportProducts::STEP_PREVIEW)
-        <x-filament::section heading="What this will do">
+        <x-filament::section wire:key="import-step-preview" heading="What this will do">
             <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
                 @foreach ([
                     ['New products', $summary['create'] ?? 0, 'text-green-600 dark:text-green-400'],
@@ -311,7 +316,7 @@
         {{-- Polled rather than done in one request: a large catalogue is several
              thousand queries, and shared hosting kills a request long before
              that finishes — silently, which is why the button appeared dead. --}}
-        <div wire:poll.750ms="processBatch">
+        <div wire:key="import-step-importing" wire:poll.750ms="processBatch">
             <x-filament::section heading="Importing your products">
                 <p class="text-sm text-gray-600 dark:text-gray-400">
                     {{ number_format($processed) }} of {{ number_format($toProcess) }} done.
@@ -339,7 +344,7 @@
     @if ($step === \App\Filament\Vendor\Pages\ImportProducts::STEP_DONE)
         @php $log = $this->result(); @endphp
 
-        <x-filament::section heading="Import finished">
+        <x-filament::section wire:key="import-step-done" heading="Import finished">
             @if ($log)
                 <p class="text-lg font-semibold text-gray-900 dark:text-white">{{ $log->summary() }}</p>
                 <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
