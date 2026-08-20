@@ -279,7 +279,11 @@
             @endif
 
             <div class="mt-5 flex flex-wrap gap-3">
-                <x-filament::button color="success" wire:click="commit" wire:loading.attr="disabled" wire:target="commit">
+                {{-- TEMPORARY diagnostic — x-on:click fires in plain JS, before
+                     Livewire is involved at all. If the popup never appears,
+                     nothing about Livewire or the server matters: the click
+                     itself is not reaching this element. Remove once found. --}}
+                <x-filament::button color="success" wire:click="commit" x-on:click="alert('Button click registered — Livewire request follows.')" wire:loading.attr="disabled" wire:target="commit">
                     <span wire:loading.remove wire:target="commit">
                         Import {{ number_format(($summary['create'] ?? 0) + ($summary['update'] ?? 0)) }} product(s)
                     </span>
