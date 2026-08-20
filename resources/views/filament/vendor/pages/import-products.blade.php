@@ -279,16 +279,17 @@
             @endif
 
             <div class="mt-5 flex flex-wrap gap-3">
-                {{-- TEMPORARY diagnostic — non-blocking this time. alert()
-                     pauses the whole JS thread until dismissed, which could
-                     itself have delayed or broken whatever wire:click needed
-                     to run in the same tick. This just paints the button
-                     immediately, with nothing to dismiss and nothing blocked. --}}
-                <x-filament::button color="success" wire:click="commit" x-on:click="$el.style.outline = '6px solid magenta'" wire:loading.attr="disabled" wire:target="commit">
-                    <span wire:loading.remove wire:target="commit">
+                {{-- Named runImport, not commit — Livewire's own JS runtime
+                     uses "commit" as its internal vocabulary for a
+                     request/response cycle. A method sharing that word risked
+                     silently colliding with it: the click registered (proven
+                     with two separate diagnostics) but no request ever
+                     followed, with no error anywhere to explain why. --}}
+                <x-filament::button color="success" wire:click="runImport" wire:loading.attr="disabled" wire:target="runImport">
+                    <span wire:loading.remove wire:target="runImport">
                         Import {{ number_format(($summary['create'] ?? 0) + ($summary['update'] ?? 0)) }} product(s)
                     </span>
-                    <span wire:loading wire:target="commit">Starting…</span>
+                    <span wire:loading wire:target="runImport">Starting…</span>
                 </x-filament::button>
 
                 <x-filament::button color="gray" outlined wire:click="$set('step', 'map')">Back to columns</x-filament::button>

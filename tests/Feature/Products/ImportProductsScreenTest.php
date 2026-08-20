@@ -101,7 +101,7 @@ it('walks upload, mapping, preview and commit', function () {
     expect(Product::count())->toBe(0);
 
     // commit() opens the run; the page then polls processBatch until done.
-    $page->call('commit')->assertSet('step', ImportProducts::STEP_IMPORTING);
+    $page->call('runImport')->assertSet('step', ImportProducts::STEP_IMPORTING);
 
     $page->call('processBatch')->assertSet('step', ImportProducts::STEP_DONE);
 
@@ -142,7 +142,7 @@ it('shows the bad rows without blocking the good ones', function () {
 
     expect($page->get('problems'))->toHaveCount(2);
 
-    $page->call('commit')->call('processBatch');
+    $page->call('runImport')->call('processBatch');
 
     expect(Product::count())->toBe(1);
 });
@@ -242,7 +242,7 @@ it('homes imported products in a branch, so they are visible in the products lis
         ->set('upload', uploadedCsv(SAMPLE_CSV))
         ->call('loadFile')
         ->call('buildPreview')
-        ->call('commit')
+        ->call('runImport')
         ->call('processBatch');
 
     $product = Product::where('sku', 'ANK-20W')->firstOrFail();
@@ -278,7 +278,7 @@ it('imports a catalogue too large for one request, a batch at a time', function 
         ->set('upload', uploadedCsv("Name,SKU,Price\n".implode("\n", $rows)."\n", 'big.csv'))
         ->call('loadFile')
         ->call('buildPreview')
-        ->call('commit')
+        ->call('runImport')
         ->assertSet('step', ImportProducts::STEP_IMPORTING)
         ->assertSet('toProcess', 130);
 
@@ -318,7 +318,7 @@ it('re-running an interrupted import updates rather than duplicates', function (
         ->set('upload', uploadedCsv($csv, 'big.csv'))
         ->call('loadFile')
         ->call('buildPreview')
-        ->call('commit')
+        ->call('runImport')
         ->call('processBatch');
 
     expect(Product::count())->toBe(50);
@@ -329,7 +329,7 @@ it('re-running an interrupted import updates rather than duplicates', function (
         ->set('upload', uploadedCsv($csv, 'big.csv'))
         ->call('loadFile')
         ->call('buildPreview')
-        ->call('commit')
+        ->call('runImport')
         ->call('processBatch')
         ->call('processBatch');
 
@@ -355,7 +355,7 @@ it('shows the reason on the page when the import cannot start', function () {
     // page it is indistinguishable from the button doing nothing.
     Storage::disk('local')->deleteDirectory('imports');
 
-    $page->call('commit')
+    $page->call('runImport')
         ->assertSet('step', ImportProducts::STEP_PREVIEW)
         ->assertSee('The import stopped and nothing was changed.');
 
@@ -393,7 +393,7 @@ it('renders an Import button bound to commit', function () {
         ->set('upload', uploadedCsv(SAMPLE_CSV))
         ->call('loadFile')
         ->call('buildPreview')
-        ->assertSeeHtml('wire:click="commit"');
+        ->assertSeeHtml('wire:click="runImport"');
 });
 
 it('says on the check screen whether any import has ever been recorded', function () {
@@ -410,7 +410,7 @@ it('says on the check screen whether any import has ever been recorded', functio
 
     // Once a run reaches the database there is a row to point at, which is what
     // separates "it failed" from "it never started".
-    $page->call('commit')->call('processBatch');
+    $page->call('runImport')->call('processBatch');
 
     Livewire::test(ImportProducts::class)
         ->set('upload', uploadedCsv(SAMPLE_CSV))
@@ -438,7 +438,7 @@ it('imports even when the summary comes back from the browser empty', function (
     // read $summary['create'], got null, and returned silently - no exception,
     // no database row, no message. The counts now come from the file instead.
     $page->set('summary', [])
-        ->call('commit')
+        ->call('runImport')
         ->assertSet('step', ImportProducts::STEP_IMPORTING)
         ->call('processBatch');
 
@@ -457,7 +457,7 @@ it('says so on the page when a file genuinely has nothing importable', function 
         ->set('upload', uploadedCsv("Name,SKU,Price\n,SKU-1,100\n,SKU-2,200\n"))
         ->call('loadFile')
         ->call('buildPreview')
-        ->call('commit')
+        ->call('runImport')
         ->assertSet('step', ImportProducts::STEP_PREVIEW)
         ->assertSee('Nothing in this file can be imported');
 

@@ -312,10 +312,15 @@ class ImportProducts extends Page
      * Opens the run: writes the log and the safety snapshot, then hands over to
      * processBatch(), which the page polls until it is done.
      */
-    public function commit(): void
+    // Named runImport rather than commit — Livewire's own JS runtime uses
+    // "commit" as core internal vocabulary (Livewire.hook('commit', ...),
+    // $wire.$commit() for pending model updates, an internal event channel of
+    // that exact name). A user method sharing that word is a collision risk
+    // that will not surface as a clean, debuggable error.
+    public function runImport(): void
     {
         $this->fatalError = null;
-        $this->trace      = 'commit entered '.now()->format('H:i:s');
+        $this->trace      = 'runImport entered '.now()->format('H:i:s');
 
         // Everything is inside the try, not just the parse. An exception from
         // the log insert or the snapshot would otherwise escape as a bare 500
@@ -333,7 +338,7 @@ class ImportProducts extends Page
             // The page still shows 602 because the view read the property
             // before the trip, so the screen and the guard disagreed with no
             // way to see it.
-            $this->trace = "commit parsed {$rows->count()} row(s), {$skipped->count()} unusable";
+            $this->trace = "runImport parsed {$rows->count()} row(s), {$skipped->count()} unusable";
 
             if ($rows->count() === $skipped->count()) {
                 $this->fatalError = $rows->isEmpty()
@@ -368,7 +373,7 @@ class ImportProducts extends Page
             $this->processed = 0;
             $this->toProcess = $rows->count() - $skipped->count();
             $this->step      = self::STEP_IMPORTING;
-            $this->trace     = "commit ok: log #{$log->id}, {$this->toProcess} row(s) to write";
+            $this->trace     = "runImport ok: log #{$log->id}, {$this->toProcess} row(s) to write";
         } catch (Throwable $e) {
             $this->failed($e);
         }
