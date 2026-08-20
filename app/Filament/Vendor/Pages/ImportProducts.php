@@ -458,6 +458,22 @@ class ImportProducts extends Page
         return $this->resultLogId === null ? null : ImportLog::find($this->resultLogId);
     }
 
+    /**
+     * The most recent import recorded for this store, whatever became of it.
+     *
+     * Shown on the check screen because it answers the question a silent
+     * failure raises and nothing else can: did the run start at all? A row
+     * means commit() reached the database; no row means it never got that far.
+     * Without this the only way to tell those apart is shell access to the
+     * server, which the person hitting the button does not have.
+     */
+    public function lastLog(): ?ImportLog
+    {
+        return ImportLog::where('vendor_id', filament()->getTenant()?->id)
+            ->latest('id')
+            ->first();
+    }
+
     public function downloadSnapshot(): ?BinaryFileResponse
     {
         $log = $this->result();

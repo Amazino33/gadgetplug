@@ -376,3 +376,46 @@ it('clears a previous failure when the file is checked again', function () {
         ->call('buildPreview')
         ->assertSet('fatalError', null);
 });
+
+// ── The button is actually wired ─────────────────────────────────────────────
+
+it('renders an Import button bound to commit', function () {
+    $c = importScreenContext();
+    Storage::fake('local');
+
+    enterVendorPanelAs($c['owner'], $c['vendor']);
+
+    // Every other test calls commit() directly, which proves the method works
+    // and proves nothing about whether the button reaches it. If the component
+    // wrapping the button stops forwarding wire:click, those tests all stay
+    // green while the page does nothing at all.
+    Livewire::test(ImportProducts::class)
+        ->set('upload', uploadedCsv(SAMPLE_CSV))
+        ->call('loadFile')
+        ->call('buildPreview')
+        ->assertSeeHtml('wire:click="commit"');
+});
+
+it('says on the check screen whether any import has ever been recorded', function () {
+    $c = importScreenContext();
+    Storage::fake('local');
+
+    enterVendorPanelAs($c['owner'], $c['vendor']);
+
+    $page = Livewire::test(ImportProducts::class)
+        ->set('upload', uploadedCsv(SAMPLE_CSV))
+        ->call('loadFile')
+        ->call('buildPreview')
+        ->assertSee('No import has ever been recorded for this store');
+
+    // Once a run reaches the database there is a row to point at, which is what
+    // separates "it failed" from "it never started".
+    $page->call('commit')->call('processBatch');
+
+    Livewire::test(ImportProducts::class)
+        ->set('upload', uploadedCsv(SAMPLE_CSV))
+        ->call('loadFile')
+        ->call('buildPreview')
+        ->assertSee('Last import recorded:')
+        ->assertSee('completed');
+});

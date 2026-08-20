@@ -263,6 +263,16 @@
                 </p>
             @endif
 
+            {{-- Repeated here, next to the button, because a failure returns to
+                 this screen and a panel at the top of a long preview table is
+                 off-screen from where the click happened. --}}
+            @if ($fatalError)
+                <div class="mt-5 rounded-lg border border-red-300 bg-red-50 px-4 py-3 dark:border-red-500/30 dark:bg-red-500/10">
+                    <p class="text-sm font-semibold text-red-900 dark:text-red-200">The import stopped and nothing was changed.</p>
+                    <p class="mt-1 font-mono text-xs break-all text-red-800 dark:text-red-300">{{ $fatalError }}</p>
+                </div>
+            @endif
+
             <div class="mt-5 flex flex-wrap gap-3">
                 <x-filament::button color="success" wire:click="commit" wire:loading.attr="disabled" wire:target="commit">
                     <span wire:loading.remove wire:target="commit">
@@ -274,6 +284,21 @@
                 <x-filament::button color="gray" outlined wire:click="$set('step', 'map')">Back to columns</x-filament::button>
                 <x-filament::button color="gray" outlined wire:click="startOver">Start over</x-filament::button>
             </div>
+
+            {{-- Answers the one question a silent failure raises and nothing
+                 else on this page can: did the run reach the database at all? --}}
+            @php $last = $this->lastLog(); @endphp
+
+            <p class="mt-4 text-xs text-gray-500 dark:text-gray-400">
+                @if ($last)
+                    Last import recorded: <strong>#{{ $last->id }}</strong> —
+                    {{ $last->status }}, {{ $last->summary() }},
+                    {{ $last->created_at->diffForHumans() }} ({{ $last->file_name }}).
+                @else
+                    No import has ever been recorded for this store. If you press Import and this line
+                    still says that, the run is not reaching the database and the message above will say why.
+                @endif
+            </p>
         </x-filament::section>
     @endif
 
