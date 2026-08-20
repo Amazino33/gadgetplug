@@ -47,10 +47,23 @@ class ImportProducts extends Page
 
     protected string $view = 'filament.vendor.pages.import-products';
 
-    public const STEP_UPLOAD  = 'upload';
-    public const STEP_MAP     = 'map';
-    public const STEP_PREVIEW = 'preview';
-    public const STEP_DONE    = 'done';
+    public const STEP_UPLOAD    = 'upload';
+    public const STEP_MAP       = 'map';
+    public const STEP_PREVIEW   = 'preview';
+    public const STEP_IMPORTING = 'importing';
+    public const STEP_DONE      = 'done';
+
+    /**
+     * Rows written per request.
+     *
+     * Every product costs an insert, a slug uniqueness check, a store stock row,
+     * a mirror recompute and an activity log entry. Six hundred products in one
+     * request is several thousand queries, which shared hosting kills - usually
+     * with set_time_limit disabled, so PHP dies mid-request and the vendor sees
+     * the button do nothing at all. Small enough to always finish; large enough
+     * that a big catalogue does not take all day.
+     */
+    private const BATCH = 50;
 
     public string $step = self::STEP_UPLOAD;
 
@@ -81,6 +94,11 @@ class ImportProducts extends Page
     public array $problems = [];
 
     public ?int $resultLogId = null;
+
+    /** How far through the importable rows the batches have got. */
+    public int $processed = 0;
+
+    public int $toProcess = 0;
 
     public static function canAccess(): bool
     {
@@ -266,6 +284,10 @@ class ImportProducts extends Page
 
     // ── Step 4: commit ───────────────────────────────────────────────────────
 
+    /**
+     * Opens the run: writes the log and the safety snapshot, then hands over to
+     * processBatch(), which the page polls until it is done.
+     */
     public function commit(): void
     {
         if ($this->summary['create'] + $this->summary['update'] === 0) {
@@ -278,42 +300,128 @@ class ImportProducts extends Page
             return;
         }
 
-        // Chunked inserts keep memory flat, but the run is still synchronous —
-        // this host has no queue worker, so a background job would simply never
-        // start. A few thousand rows is seconds; the cap in SpreadsheetReader is
-        // what stops anything pathological reaching here.
-        @set_time_limit(300);
-
         try {
-            $rows = app(ImportPreparer::class)->prepare(
-                $this->absolutePath(),
-                $this->headerMapping(),
-                filament()->getTenant(),
-            );
-
-            $log = app(ProductImporter::class)->commit(
-                $rows,
-                filament()->getTenant(),
-                auth()->id(),
-                $this->originalName ?? 'import.csv',
-            );
+            $rows = $this->preparedRows();
         } catch (Throwable $e) {
-            report($e);
-
-            Notification::make()
-                ->title('The import failed and nothing was changed.')
-                ->body($e->getMessage())
-                ->danger()
-                ->persistent()
-                ->send();
+            $this->failed($e);
 
             return;
         }
 
-        $this->resultLogId = $log->id;
-        $this->step        = self::STEP_DONE;
+        $skipped = $rows->reject(fn (ParsedRow $row) => $row->isImportable());
 
-        Notification::make()->title($log->summary())->success()->send();
+        $log = ImportLog::create([
+            'vendor_id'     => filament()->getTenant()->id,
+            'user_id'       => auth()->id(),
+            'file_name'     => $this->originalName ?? 'import.csv',
+            'total_rows'    => $rows->count(),
+            'skipped_count' => $skipped->count(),
+            'status'        => 'running',
+            'errors'        => $skipped->take(200)->map(fn (ParsedRow $row) => [
+                'line'   => $row->line,
+                'name'   => $row->name(),
+                'errors' => $row->errors,
+            ])->values()->all(),
+        ]);
+
+        // Only when something existing is about to change: a first import has
+        // nothing to restore to.
+        if ($rows->contains(fn (ParsedRow $row) => $row->action() === ParsedRow::ACTION_UPDATE)) {
+            $log->update(['snapshot_path' => app(ProductImporter::class)->snapshotFor(filament()->getTenant())]);
+        }
+
+        $this->resultLogId = $log->id;
+        $this->processed   = 0;
+        $this->toProcess   = $rows->count() - $skipped->count();
+        $this->step        = self::STEP_IMPORTING;
+    }
+
+    /**
+     * One batch per request, polled by the page until finished.
+     *
+     * The rows are re-prepared each time rather than held in component state:
+     * six hundred ParsedRow objects would be serialised into every Livewire
+     * payload, and parsing the file again costs far less than shipping them
+     * back and forth. Rows already written are skipped by offset, so a batch
+     * that re-reads them cannot apply them twice.
+     */
+    public function processBatch(): void
+    {
+        if ($this->step !== self::STEP_IMPORTING) {
+            return;
+        }
+
+        try {
+            $batch = $this->preparedRows()
+                ->filter(fn (ParsedRow $row) => $row->isImportable())
+                ->values()
+                ->slice($this->processed, self::BATCH);
+
+            if ($batch->isEmpty()) {
+                $this->finish();
+
+                return;
+            }
+
+            $counts = app(ProductImporter::class)->applyChunk($batch, filament()->getTenant());
+        } catch (Throwable $e) {
+            $this->failed($e);
+
+            return;
+        }
+
+        $log = $this->result();
+
+        $log?->update([
+            'created_count' => $log->created_count + $counts['created'],
+            'updated_count' => $log->updated_count + $counts['updated'],
+        ]);
+
+        $this->processed += $batch->count();
+
+        if ($this->processed >= $this->toProcess) {
+            $this->finish();
+        }
+    }
+
+    public function progressPercent(): int
+    {
+        return $this->toProcess === 0 ? 0 : (int) round($this->processed / $this->toProcess * 100);
+    }
+
+    private function finish(): void
+    {
+        $log = $this->result();
+        $log?->update(['status' => 'completed']);
+
+        $this->step = self::STEP_DONE;
+
+        Notification::make()->title($log?->summary() ?? 'Import finished.')->success()->send();
+    }
+
+    private function failed(Throwable $e): void
+    {
+        report($e);
+
+        $this->result()?->update(['status' => 'failed']);
+        $this->step = self::STEP_PREVIEW;
+
+        Notification::make()
+            ->title('The import stopped.')
+            ->body($e->getMessage())
+            ->danger()
+            ->persistent()
+            ->send();
+    }
+
+    /** @return \Illuminate\Support\Collection<int, ParsedRow> */
+    private function preparedRows(): Collection
+    {
+        return app(ImportPreparer::class)->prepare(
+            $this->absolutePath(),
+            $this->headerMapping(),
+            filament()->getTenant(),
+        );
     }
 
     public function result(): ?ImportLog
@@ -336,7 +444,7 @@ class ImportProducts extends Page
 
     public function startOver(): void
     {
-        $this->reset(['step', 'upload', 'storedPath', 'originalName', 'headers', 'columnMap', 'summary', 'previewRows', 'problems', 'resultLogId', 'templateId']);
+        $this->reset(['step', 'upload', 'storedPath', 'originalName', 'headers', 'columnMap', 'summary', 'previewRows', 'problems', 'resultLogId', 'templateId', 'processed', 'toProcess']);
     }
 
     public function downloadTemplate(string $format = 'csv'): BinaryFileResponse

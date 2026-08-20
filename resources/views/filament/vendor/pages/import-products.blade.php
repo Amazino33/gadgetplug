@@ -4,10 +4,11 @@
 
     @php
         $steps = [
-            \App\Filament\Vendor\Pages\ImportProducts::STEP_UPLOAD  => 'Upload',
-            \App\Filament\Vendor\Pages\ImportProducts::STEP_MAP     => 'Match columns',
-            \App\Filament\Vendor\Pages\ImportProducts::STEP_PREVIEW => 'Check',
-            \App\Filament\Vendor\Pages\ImportProducts::STEP_DONE    => 'Done',
+            \App\Filament\Vendor\Pages\ImportProducts::STEP_UPLOAD    => 'Upload',
+            \App\Filament\Vendor\Pages\ImportProducts::STEP_MAP       => 'Match columns',
+            \App\Filament\Vendor\Pages\ImportProducts::STEP_PREVIEW   => 'Check',
+            \App\Filament\Vendor\Pages\ImportProducts::STEP_IMPORTING => 'Importing',
+            \App\Filament\Vendor\Pages\ImportProducts::STEP_DONE      => 'Done',
         ];
         $order   = array_keys($steps);
         $current = array_search($step, $order, true);
@@ -253,7 +254,7 @@
                     <span wire:loading.remove wire:target="commit">
                         Import {{ number_format($summary['create'] + $summary['update']) }} product(s)
                     </span>
-                    <span wire:loading wire:target="commit">Importing — do not close this page…</span>
+                    <span wire:loading wire:target="commit">Starting…</span>
                 </x-filament::button>
 
                 <x-filament::button color="gray" outlined wire:click="$set('step', 'map')">Back to columns</x-filament::button>
@@ -262,7 +263,36 @@
         </x-filament::section>
     @endif
 
-    {{-- ── Step 4: results ─────────────────────────────────────────────── --}}
+    {{-- ── Step 4: importing ───────────────────────────────────────────── --}}
+    @if ($step === \App\Filament\Vendor\Pages\ImportProducts::STEP_IMPORTING)
+        {{-- Polled rather than done in one request: a large catalogue is several
+             thousand queries, and shared hosting kills a request long before
+             that finishes — silently, which is why the button appeared dead. --}}
+        <div wire:poll.750ms="processBatch">
+            <x-filament::section heading="Importing your products">
+                <p class="text-sm text-gray-600 dark:text-gray-400">
+                    {{ number_format($processed) }} of {{ number_format($toProcess) }} done.
+                    Leave this page open until it finishes — closing it stops the import partway.
+                </p>
+
+                <div class="mt-4 h-3 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-white/10">
+                    <div class="h-full rounded-full bg-primary-600 transition-all duration-300"
+                         style="width: {{ $this->progressPercent() }}%"></div>
+                </div>
+
+                <p class="mt-2 text-right text-xs font-semibold text-gray-500 dark:text-gray-400">
+                    {{ $this->progressPercent() }}%
+                </p>
+
+                <p class="mt-4 text-xs text-gray-500 dark:text-gray-400">
+                    Products already written are safe. If this stops, importing the same file again
+                    updates what came through rather than duplicating it.
+                </p>
+            </x-filament::section>
+        </div>
+    @endif
+
+    {{-- ── Step 5: results ─────────────────────────────────────────────── --}}
     @if ($step === \App\Filament\Vendor\Pages\ImportProducts::STEP_DONE)
         @php $log = $this->result(); @endphp
 

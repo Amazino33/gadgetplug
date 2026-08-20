@@ -77,45 +77,12 @@ class ProductImporter
 
         try {
             DB::transaction(function () use ($importable, $vendor, &$created, &$updated, &$done, $onProgress) {
-                // Resolved once for the whole run: a file with 500 rows across
-                // 12 categories should create 12 categories, not ask 500 times.
-                $categories = new NameResolver(
-                    fn (string $name) => $this->resolveCategory($name),
-                );
-
-                $suppliers = new NameResolver(
-                    fn (string $name) => $this->resolveSupplier($name, $vendor),
-                );
-
                 foreach ($importable->chunk(self::CHUNK) as $chunk) {
-                    foreach ($chunk as $row) {
-                        $attributes = $this->attributesFor($row, $categories, $suppliers);
+                    $counts = $this->applyChunk($chunk, $vendor);
 
-                        if ($row->action() === ParsedRow::ACTION_UPDATE) {
-                            $product = Product::where('vendor_id', $vendor->id)
-                                ->whereKey($row->matchedProductId)
-                                ->first();
-
-                            // Vanished between preview and confirm. Creating it
-                            // instead would be a reasonable guess, but the
-                            // vendor was shown "update" and is owed that.
-                            if ($product === null) {
-                                continue;
-                            }
-
-                            $product->fill($attributes)->save();
-                            $updated++;
-                        } else {
-                            Product::create([
-                                'vendor_id' => $vendor->id,
-                                ...$this->defaultsForNewProduct(),
-                                ...$attributes,
-                            ]);
-                            $created++;
-                        }
-
-                        $done++;
-                    }
+                    $created += $counts['created'];
+                    $updated += $counts['updated'];
+                    $done    += $chunk->count();
 
                     if ($onProgress !== null) {
                         $onProgress($done, $importable->count());
@@ -141,6 +108,73 @@ class ProductImporter
         ]);
 
         return $log->refresh();
+    }
+
+    /**
+     * Write one batch of rows, in its own transaction.
+     *
+     * Public because a large file cannot be committed in a single web request:
+     * every product costs an insert, a slug uniqueness check, a store stock row,
+     * a mirror recompute and an activity log entry, so six hundred products is
+     * several thousand queries. Shared hosting kills that long before it
+     * finishes, and typically with set_time_limit disabled, so the request dies
+     * silently and the vendor sees nothing happen at all. The page drives this
+     * a batch per request instead.
+     *
+     * Nested inside commit()'s transaction this becomes a savepoint, so the
+     * whole-file guarantee still holds for callers that can afford one request.
+     *
+     * @param  Collection<int, ParsedRow>  $rows
+     * @return array{created: int, updated: int}
+     */
+    public function applyChunk(Collection $rows, Vendor $vendor): array
+    {
+        return DB::transaction(function () use ($rows, $vendor) {
+            $created = 0;
+            $updated = 0;
+
+            // Resolved once per batch: a file naming 12 categories should ask
+            // about 12, not once per row.
+            $categories = new NameResolver(fn (string $name) => $this->resolveCategory($name));
+            $suppliers  = new NameResolver(fn (string $name) => $this->resolveSupplier($name, $vendor));
+
+            foreach ($rows as $row) {
+                $attributes = $this->attributesFor($row, $categories, $suppliers);
+
+                if ($row->action() === ParsedRow::ACTION_UPDATE) {
+                    $product = Product::where('vendor_id', $vendor->id)
+                        ->whereKey($row->matchedProductId)
+                        ->first();
+
+                    // Vanished between preview and confirm. Creating it instead
+                    // would be a reasonable guess, but the vendor was shown
+                    // "update" and is owed that.
+                    if ($product === null) {
+                        continue;
+                    }
+
+                    $product->fill($attributes)->save();
+                    $updated++;
+
+                    continue;
+                }
+
+                Product::create([
+                    'vendor_id' => $vendor->id,
+                    ...$this->defaultsForNewProduct(),
+                    ...$attributes,
+                ]);
+                $created++;
+            }
+
+            return ['created' => $created, 'updated' => $updated];
+        });
+    }
+
+    /** The pre-import safety copy, for callers driving the run themselves. */
+    public function snapshotFor(Vendor $vendor): ?string
+    {
+        return $this->snapshot($vendor);
     }
 
     /**

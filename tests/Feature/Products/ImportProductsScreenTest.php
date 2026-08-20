@@ -100,7 +100,10 @@ it('walks upload, mapping, preview and commit', function () {
     // Still nothing written - that is the whole point of the preview.
     expect(Product::count())->toBe(0);
 
-    $page->call('commit')->assertSet('step', ImportProducts::STEP_DONE);
+    // commit() opens the run; the page then polls processBatch until done.
+    $page->call('commit')->assertSet('step', ImportProducts::STEP_IMPORTING);
+
+    $page->call('processBatch')->assertSet('step', ImportProducts::STEP_DONE);
 
     expect(Product::count())->toBe(2)
         ->and(Product::where('sku', 'ANK-20W')->firstOrFail()->reorder_point)->toBe(10);
@@ -139,7 +142,7 @@ it('shows the bad rows without blocking the good ones', function () {
 
     expect($page->get('problems'))->toHaveCount(2);
 
-    $page->call('commit');
+    $page->call('commit')->call('processBatch');
 
     expect(Product::count())->toBe(1);
 });
@@ -239,7 +242,8 @@ it('homes imported products in a branch, so they are visible in the products lis
         ->set('upload', uploadedCsv(SAMPLE_CSV))
         ->call('loadFile')
         ->call('buildPreview')
-        ->call('commit');
+        ->call('commit')
+        ->call('processBatch');
 
     $product = Product::where('sku', 'ANK-20W')->firstOrFail();
 
@@ -254,4 +258,80 @@ it('homes imported products in a branch, so they are visible in the products lis
                 ->whereKey($product->id)
                 ->exists()
         )->toBeTrue();
+});
+
+// ── Batching ─────────────────────────────────────────────────────────────────
+
+it('imports a catalogue too large for one request, a batch at a time', function () {
+    $c = importScreenContext();
+    Storage::fake('local');
+
+    enterVendorPanelAs($c['owner'], $c['vendor']);
+
+    $rows = [];
+
+    for ($i = 1; $i <= 130; $i++) {
+        $rows[] = "Product {$i},SKU-{$i},".(1000 + $i);
+    }
+
+    $page = Livewire::test(ImportProducts::class)
+        ->set('upload', uploadedCsv("Name,SKU,Price\n".implode("\n", $rows)."\n", 'big.csv'))
+        ->call('loadFile')
+        ->call('buildPreview')
+        ->call('commit')
+        ->assertSet('step', ImportProducts::STEP_IMPORTING)
+        ->assertSet('toProcess', 130);
+
+    // 130 rows at 50 per request: three batches, then done. Nothing is written
+    // in one go, which is what stops shared hosting killing the request.
+    $page->call('processBatch')->assertSet('processed', 50);
+    expect(Product::count())->toBe(50);
+
+    $page->call('processBatch')->assertSet('processed', 100);
+    $page->call('processBatch')->assertSet('step', ImportProducts::STEP_DONE);
+
+    expect(Product::count())->toBe(130);
+
+    $log = \App\Models\ImportLog::latest('id')->firstOrFail();
+
+    expect($log->status)->toBe('completed')
+        ->and($log->created_count)->toBe(130)
+        ->and($log->skipped_count)->toBe(0);
+});
+
+it('re-running an interrupted import updates rather than duplicates', function () {
+    $c = importScreenContext();
+    Storage::fake('local');
+
+    enterVendorPanelAs($c['owner'], $c['vendor']);
+
+    $rows = [];
+
+    for ($i = 1; $i <= 60; $i++) {
+        $rows[] = "Product {$i},SKU-{$i},".(1000 + $i);
+    }
+
+    $csv = "Name,SKU,Price\n".implode("\n", $rows)."\n";
+
+    // Stop after the first batch, as a closed tab would.
+    Livewire::test(ImportProducts::class)
+        ->set('upload', uploadedCsv($csv, 'big.csv'))
+        ->call('loadFile')
+        ->call('buildPreview')
+        ->call('commit')
+        ->call('processBatch');
+
+    expect(Product::count())->toBe(50);
+
+    // The same file again. The 50 already written match on SKU and are updated;
+    // only the remaining 10 are new.
+    Livewire::test(ImportProducts::class)
+        ->set('upload', uploadedCsv($csv, 'big.csv'))
+        ->call('loadFile')
+        ->call('buildPreview')
+        ->call('commit')
+        ->call('processBatch')
+        ->call('processBatch');
+
+    expect(Product::count())->toBe(60);
 });
