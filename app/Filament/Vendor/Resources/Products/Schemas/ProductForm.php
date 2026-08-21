@@ -16,8 +16,10 @@ use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\ToggleButtons;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Actions;
+use Filament\Schemas\Components\Fieldset;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
@@ -66,13 +68,79 @@ class ProductForm
                         Group::make([
                             Section::make('Basic Information')
                                 ->schema([
-                                    Grid::make(2)
+                                    // Leads the form: the one thing every other
+                                    // field here is describing.
+                                    TextInput::make('name')
+                                        ->required()
+                                        ->columnSpanFull(),
+
+                                    // Each fieldset's label names exactly the
+                                    // fields inside it — no field sits in a
+                                    // group its own heading doesn't explain.
+                                    Fieldset::make('Category & Brand')
                                         ->schema([
                                             Select::make('category_id')
                                                 ->relationship('category', 'name')
                                                 ->required()
                                                 ->searchable()
                                                 ->preload(),
+
+                                            TextInput::make('brand')
+                                                ->placeholder('e.g., Apple, Samsung'),
+                                        ]),
+
+                                    Fieldset::make('Identifiers')
+                                        ->schema([
+                                            TextInput::make('sku')
+                                                ->label('SKU')
+                                                ->placeholder('e.g., APL-IP15-128-BLK')
+                                                ->maxLength(100),
+
+                                            // Camera scan reuses the barcode-scanner component already
+                                            // mounted globally on this panel (see VendorPanelProvider) —
+                                            // same one used by Inventory Count's scan button. Full width
+                                            // within the fieldset: the scan action needs the room, and it
+                                            // reads better as its own row than squeezed beside SKU.
+                                            TextInput::make('barcode')
+                                                ->label('Barcode')
+                                                ->placeholder('e.g., 0123456789012')
+                                                ->maxLength(100)
+                                                ->columnSpanFull()
+                                                ->extraFieldWrapperAttributes([
+                                                    'x-on:barcode-scanned.window' => "\$wire.set('data.barcode', \$event.detail.barcode)",
+                                                ])
+                                                ->suffixAction(
+                                                    Action::make('scanBarcode')
+                                                        ->icon('heroicon-o-qr-code')
+                                                        ->tooltip('Scan barcode with camera')
+                                                        ->alpineClickHandler(
+                                                            "window.dispatchEvent(new CustomEvent('open-barcode-scanner'))"
+                                                        ),
+                                                ),
+                                        ]),
+
+                                    Fieldset::make('Supplier & Store')
+                                        ->schema([
+                                            // Vendor-scoped, and creatable inline
+                                            // so a supplier arriving via import
+                                            // does not have to be pre-registered.
+                                            Select::make('supplier_id')
+                                                ->label('Supplier')
+                                                ->relationship(
+                                                    'supplier',
+                                                    'name',
+                                                    fn ($query) => $query->where('vendor_id', filament()->getTenant()->id),
+                                                )
+                                                ->searchable()
+                                                ->preload()
+                                                ->createOptionForm([
+                                                    TextInput::make('name')->required()->maxLength(255),
+                                                    TextInput::make('phone')->tel()->maxLength(30),
+                                                ])
+                                                ->createOptionUsing(fn (array $data) => \App\Models\Supplier::create([
+                                                    ...$data,
+                                                    'vendor_id' => filament()->getTenant()->id,
+                                                ])->getKey()),
 
                                             // A product lives in exactly one
                                             // branch: it never shows in another
@@ -95,69 +163,11 @@ class ProductForm
                                                 ->native(false)
                                                 ->helperText('Which branch stocks this product. Moving it later moves its stock too.')
                                                 ->visible(fn () => auth()->user()?->can('create', Store::class) ?? false),
-
-                                            TextInput::make('brand')
-                                                ->placeholder('e.g., Apple, Samsung'),
-
-                                            TextInput::make('measurement_unit')
-                                                ->label('Unit')
-                                                ->placeholder('e.g., pcs, pair, carton')
-                                                ->maxLength(32)
-                                                ->helperText('How this is counted and sold.'),
-
-                                            // Vendor-scoped, and creatable inline
-                                            // so a supplier arriving via import
-                                            // does not have to be pre-registered.
-                                            Select::make('supplier_id')
-                                                ->label('Supplier')
-                                                ->relationship(
-                                                    'supplier',
-                                                    'name',
-                                                    fn ($query) => $query->where('vendor_id', filament()->getTenant()->id),
-                                                )
-                                                ->searchable()
-                                                ->preload()
-                                                ->createOptionForm([
-                                                    TextInput::make('name')->required()->maxLength(255),
-                                                    TextInput::make('phone')->tel()->maxLength(30),
-                                                ])
-                                                ->createOptionUsing(fn (array $data) => \App\Models\Supplier::create([
-                                                    ...$data,
-                                                    'vendor_id' => filament()->getTenant()->id,
-                                                ])->getKey()),
-
-                                            TextInput::make('name')
-                                                ->required()
-                                                ->columnSpanFull(),
-
-                                            TextInput::make('sku')
-                                                ->label('SKU')
-                                                ->placeholder('e.g., APL-IP15-128-BLK')
-                                                ->maxLength(100),
-
-                                            // Camera scan reuses the barcode-scanner component already
-                                            // mounted globally on this panel (see VendorPanelProvider) —
-                                            // same one used by Inventory Count's scan button.
-                                            TextInput::make('barcode')
-                                                ->label('Barcode')
-                                                ->placeholder('e.g., 0123456789012')
-                                                ->maxLength(100)
-                                                ->extraFieldWrapperAttributes([
-                                                    'x-on:barcode-scanned.window' => "\$wire.set('data.barcode', \$event.detail.barcode)",
-                                                ])
-                                                ->suffixAction(
-                                                    Action::make('scanBarcode')
-                                                        ->icon('heroicon-o-qr-code')
-                                                        ->tooltip('Scan barcode with camera')
-                                                        ->alpineClickHandler(
-                                                            "window.dispatchEvent(new CustomEvent('open-barcode-scanner'))"
-                                                        ),
-                                                ),
-
-                                            Textarea::make('description')
-                                                ->rows(4)
-                                                ->columnSpanFull(),
                                         ]),
+
+                                    Textarea::make('description')
+                                        ->rows(4)
+                                        ->columnSpanFull(),
                                 ]),
 
                             Section::make('Media')
@@ -282,6 +292,45 @@ class ProductForm
                         ])->columnSpan(['lg' => 2]),
 
                         Group::make([
+                            // Leads the sidebar — draft vs. published is the
+                            // first decision an owner makes about a product,
+                            // and the one most likely to change after saving.
+                            Section::make('Status')
+                                ->schema([
+                                    ToggleButtons::make('status')
+                                        ->label('')
+                                        ->options([
+                                            'draft' => 'Draft',
+                                            'published' => 'Published',
+                                            'archived' => 'Archived',
+                                        ])
+                                        ->colors([
+                                            'draft' => 'gray',
+                                            'published' => 'success',
+                                            'archived' => 'danger',
+                                        ])
+                                        ->icons([
+                                            'draft' => 'heroicon-o-pencil-square',
+                                            'published' => 'heroicon-o-check-circle',
+                                            'archived' => 'heroicon-o-archive-box',
+                                        ])
+                                        ->grouped()
+                                        ->default('draft')
+                                        ->required()
+                                        ->live(),
+
+                                    DateTimePicker::make('published_at')
+                                        ->label('Publish Date')
+                                        ->placeholder('Publish immediately')
+                                        ->hidden(fn ($get) => $get('status') !== 'published'),
+
+                                    DateTimePicker::make('unpublish_at')
+                                        ->label('Unpublish Date')
+                                        ->placeholder('Never (stays live)')
+                                        ->after('published_at')
+                                        ->hidden(fn ($get) => $get('status') !== 'published'),
+                                ]),
+
                             Section::make('Pricing')
                                 ->schema([
                                     TextInput::make('cost_price')
@@ -356,6 +405,16 @@ class ProductForm
 
                             Section::make('Inventory')
                                 ->schema([
+                                    // Leads the section: every quantity below
+                                    // (threshold, reorder point, order size) is
+                                    // a count of this unit — reading it first
+                                    // is what makes "5" mean "5 cartons."
+                                    TextInput::make('measurement_unit')
+                                        ->label('Unit')
+                                        ->placeholder('e.g., pcs, pair, carton')
+                                        ->maxLength(32)
+                                        ->helperText('How this is counted and sold.'),
+
                                     TextInput::make('low_stock_threshold')
                                         ->label('Low Stock Alert Threshold')
                                         ->helperText('Flagged as "low stock" once available units fall below this.')
@@ -417,30 +476,6 @@ class ProductForm
                                                 'name' => $data['name'],
                                             ])->getKey();
                                         }),
-                                ]),
-
-                            Section::make('Visibility')
-                                ->schema([
-                                    Select::make('status')
-                                        ->options([
-                                            'draft' => 'Draft',
-                                            'published' => 'Published',
-                                            'archived' => 'Archived',
-                                        ])
-                                        ->default('draft')
-                                        ->required()
-                                        ->live(),
-
-                                    DateTimePicker::make('published_at')
-                                        ->label('Publish Date')
-                                        ->placeholder('Publish immediately')
-                                        ->hidden(fn ($get) => $get('status') !== 'published'),
-
-                                    DateTimePicker::make('unpublish_at')
-                                        ->label('Unpublish Date')
-                                        ->placeholder('Never (stays live)')
-                                        ->after('published_at')
-                                        ->hidden(fn ($get) => $get('status') !== 'published'),
                                 ]),
                         ])->columnSpan(['lg' => 1]),
                     ]),
