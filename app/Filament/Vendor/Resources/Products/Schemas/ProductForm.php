@@ -62,7 +62,14 @@ class ProductForm
     {
         return $schema
             ->components([
+                // columnSpanFull() is load-bearing, not decoration. Filament wraps
+                // a resource form in its own two-column grid, so without this the
+                // whole main/sidebar layout below is nested inside ONE of those
+                // two columns and renders at half the page width — measured at
+                // 479px of an available 982px, giving three 143px columns that
+                // wrapped every label and select inside them.
                 Grid::make(['default' => 1, 'lg' => 3])
+                    ->columnSpanFull()
                     ->schema([
                         Group::make([
                             // Grouping is carried by the row pairings rather than
@@ -159,7 +166,7 @@ class ProductForm
                                                 ->default(fn () => ActiveStore::currentId())
                                                 ->required()
                                                 ->native(false)
-                                                ->helperText('Which branch stocks this product.')
+                                                ->helperText('Which branch stocks this product. Moving it later moves its stock too.')
                                                 ->visible(fn () => auth()->user()?->can('create', Store::class) ?? false),
 
                                             Textarea::make('description')
@@ -341,33 +348,31 @@ class ProductForm
                                             .'</p>'
                                         )),
 
-                                    // Side by side: neither carries helper text, so
-                                    // pairing them costs no extra height and saves a
-                                    // whole field row.
-                                    Grid::make(2)
-                                        ->schema([
-                                            DateTimePicker::make('published_at')
-                                                ->label('Publish Date')
-                                                ->placeholder('Publish immediately')
-                                                ->hidden(fn ($get) => $get('status') !== 'published'),
+                                    DateTimePicker::make('published_at')
+                                        ->label('Publish Date')
+                                        ->placeholder('Publish immediately')
+                                        ->hidden(fn ($get) => $get('status') !== 'published'),
 
-                                            DateTimePicker::make('unpublish_at')
-                                                ->label('Unpublish Date')
-                                                ->placeholder('Never (stays live)')
-                                                ->after('published_at')
-                                                ->hidden(fn ($get) => $get('status') !== 'published'),
-                                        ]),
+                                    DateTimePicker::make('unpublish_at')
+                                        ->label('Unpublish Date')
+                                        ->placeholder('Never (stays live)')
+                                        ->after('published_at')
+                                        ->hidden(fn ($get) => $get('status') !== 'published'),
                                 ]),
 
+                            // Single column throughout this sidebar. It is one
+                            // third of the page, so two columns here leave about
+                            // 170px per field — enough for the input, not enough
+                            // for the label and helper text beside it, which then
+                            // wrap to four or five lines each and make the section
+                            // TALLER than the single-column version it replaced.
                             Section::make('Pricing')
                                 ->schema([
-                                    Grid::make(2)
-                                        ->schema([
                                     TextInput::make('cost_price')
                                         ->numeric()
                                         ->prefix('₦')
-                                        ->placeholder('Optional')
-                                        ->helperText('Shown as "—" in reports until set.')
+                                        ->placeholder('Leave blank if unknown')
+                                        ->helperText('Optional — shown as "—" in reports until set.')
                                         ->live()
                                         ->hidden(fn () => ! self::canSeeCostPrice()),
 
@@ -389,7 +394,6 @@ class ProductForm
                                             fn (Get $get): bool => filled($get('cost_price')),
                                         )
                                         ->live(),
-                                        ]),
 
                                     Placeholder::make('margin_preview')
                                         ->label('')
@@ -436,42 +440,38 @@ class ProductForm
 
                             Section::make('Inventory')
                                 ->schema([
-                                    Grid::make(2)
-                                        ->schema([
-                                            // Leads the section: every quantity
-                                            // beside and below it is a count of
-                                            // this unit — reading it first is
-                                            // what makes "5" mean "5 cartons."
-                                            TextInput::make('measurement_unit')
-                                                ->label('Unit')
-                                                ->placeholder('pcs, carton…')
-                                                ->maxLength(32)
-                                                ->helperText('How this is counted and sold.'),
+                                    // Leads the section: every quantity below it
+                                    // is a count of this unit — reading it first
+                                    // is what makes "5" mean "5 cartons."
+                                    TextInput::make('measurement_unit')
+                                        ->label('Unit')
+                                        ->placeholder('e.g., pcs, pair, carton')
+                                        ->maxLength(32)
+                                        ->helperText('How this is counted and sold.'),
 
-                                            TextInput::make('low_stock_threshold')
-                                                ->label('Low Stock Alert')
-                                                ->helperText('Warns once available units fall below this.')
-                                                ->numeric()
-                                                ->default(5)
-                                                ->minValue(0)
-                                                ->required(),
+                                    TextInput::make('low_stock_threshold')
+                                        ->label('Low Stock Alert Threshold')
+                                        ->helperText('Flagged as "low stock" once available units fall below this.')
+                                        ->numeric()
+                                        ->default(5)
+                                        ->minValue(0)
+                                        ->required(),
 
-                                            // Filled by the product importer from a
-                                            // vendor's existing POS export. Editable
-                                            // here too, or an imported value would be
-                                            // visible nowhere and impossible to correct.
-                                            TextInput::make('reorder_point')
-                                                ->label('Reorder Point')
-                                                ->helperText('When you intend to reorder — the alert only warns.')
-                                                ->numeric()
-                                                ->minValue(0),
+                                    // Filled by the product importer from a
+                                    // vendor's existing POS export. Editable
+                                    // here too, or an imported value would be
+                                    // visible nowhere and impossible to correct.
+                                    TextInput::make('reorder_point')
+                                        ->label('Reorder Point')
+                                        ->helperText('The level at which you intend to reorder. Distinct from the alert above, which only warns.')
+                                        ->numeric()
+                                        ->minValue(0),
 
-                                            TextInput::make('preferred_quantity')
-                                                ->label('Preferred Order Qty')
-                                                ->helperText('How much you usually buy when restocking.')
-                                                ->numeric()
-                                                ->minValue(0),
-                                        ]),
+                                    TextInput::make('preferred_quantity')
+                                        ->label('Preferred Order Quantity')
+                                        ->helperText('How much you usually buy when restocking this.')
+                                        ->numeric()
+                                        ->minValue(0),
 
                                     Toggle::make('is_service')
                                         ->label('This is a service, not a physical item')
@@ -481,18 +481,15 @@ class ProductForm
 
                             Section::make('Sales Channels')
                                 ->schema([
-                                    Grid::make(2)
-                                        ->schema([
-                                            Toggle::make('show_online')
-                                                ->label('Online Store')
-                                                ->helperText('Show on the public storefront')
-                                                ->default(true),
+                                    Toggle::make('show_online')
+                                        ->label('Online Store')
+                                        ->helperText('Show on the public storefront')
+                                        ->default(true),
 
-                                            Toggle::make('show_in_pos')
-                                                ->label('Offline Store (POS)')
-                                                ->helperText('Available for in-person POS sales')
-                                                ->default(true),
-                                        ]),
+                                    Toggle::make('show_in_pos')
+                                        ->label('Offline Store (POS)')
+                                        ->helperText('Available for in-person POS sales')
+                                        ->default(true),
                                 ]),
 
                             Section::make('Tags')
