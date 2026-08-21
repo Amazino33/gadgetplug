@@ -19,7 +19,6 @@ use Filament\Forms\Components\Toggle;
 use Filament\Forms\Components\ToggleButtons;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Actions;
-use Filament\Schemas\Components\Fieldset;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
@@ -66,19 +65,23 @@ class ProductForm
                 Grid::make(['default' => 1, 'lg' => 3])
                     ->schema([
                         Group::make([
+                            // Grouping is carried by the row pairings rather than
+                            // bordered fieldsets: each row holds two fields that
+                            // answer the same question (what is it / what do we
+                            // call it / where does it come from), which reads the
+                            // same but costs none of the ~40px of border-and-label
+                            // chrome per group that pushed this form off-screen.
                             Section::make('Basic Information')
                                 ->schema([
-                                    // Leads the form: the one thing every other
-                                    // field here is describing.
-                                    TextInput::make('name')
-                                        ->required()
-                                        ->columnSpanFull(),
-
-                                    // Each fieldset's label names exactly the
-                                    // fields inside it — no field sits in a
-                                    // group its own heading doesn't explain.
-                                    Fieldset::make('Category & Brand')
+                                    Grid::make(2)
                                         ->schema([
+                                            // Leads the form: the one thing every
+                                            // other field here is describing.
+                                            TextInput::make('name')
+                                                ->required()
+                                                ->columnSpanFull(),
+
+                                            // What it is.
                                             Select::make('category_id')
                                                 ->relationship('category', 'name')
                                                 ->required()
@@ -87,10 +90,9 @@ class ProductForm
 
                                             TextInput::make('brand')
                                                 ->placeholder('e.g., Apple, Samsung'),
-                                        ]),
 
-                                    Fieldset::make('Identifiers')
-                                        ->schema([
+                                            // What we call it — both are lookup
+                                            // codes for the same item.
                                             TextInput::make('sku')
                                                 ->label('SKU')
                                                 ->placeholder('e.g., APL-IP15-128-BLK')
@@ -98,14 +100,11 @@ class ProductForm
 
                                             // Camera scan reuses the barcode-scanner component already
                                             // mounted globally on this panel (see VendorPanelProvider) —
-                                            // same one used by Inventory Count's scan button. Full width
-                                            // within the fieldset: the scan action needs the room, and it
-                                            // reads better as its own row than squeezed beside SKU.
+                                            // same one used by Inventory Count's scan button.
                                             TextInput::make('barcode')
                                                 ->label('Barcode')
                                                 ->placeholder('e.g., 0123456789012')
                                                 ->maxLength(100)
-                                                ->columnSpanFull()
                                                 ->extraFieldWrapperAttributes([
                                                     'x-on:barcode-scanned.window' => "\$wire.set('data.barcode', \$event.detail.barcode)",
                                                 ])
@@ -117,10 +116,9 @@ class ProductForm
                                                             "window.dispatchEvent(new CustomEvent('open-barcode-scanner'))"
                                                         ),
                                                 ),
-                                        ]),
 
-                                    Fieldset::make('Supplier & Store')
-                                        ->schema([
+                                            // Where it comes from, where it sits.
+                                            //
                                             // Vendor-scoped, and creatable inline
                                             // so a supplier arriving via import
                                             // does not have to be pre-registered.
@@ -161,13 +159,13 @@ class ProductForm
                                                 ->default(fn () => ActiveStore::currentId())
                                                 ->required()
                                                 ->native(false)
-                                                ->helperText('Which branch stocks this product. Moving it later moves its stock too.')
+                                                ->helperText('Which branch stocks this product.')
                                                 ->visible(fn () => auth()->user()?->can('create', Store::class) ?? false),
-                                        ]),
 
-                                    Textarea::make('description')
-                                        ->rows(4)
-                                        ->columnSpanFull(),
+                                            Textarea::make('description')
+                                                ->rows(3)
+                                                ->columnSpanFull(),
+                                        ]),
                                 ]),
 
                             Section::make('Media')
@@ -297,47 +295,79 @@ class ProductForm
                             // and the one most likely to change after saving.
                             Section::make('Status')
                                 ->schema([
+                                    // Two states only. Archiving is a deliberate,
+                                    // confirmed header action on the edit page
+                                    // (see EditProduct::getHeaderActions) rather
+                                    // than a third button here — it is not the
+                                    // same kind of decision as draft-vs-live, and
+                                    // it is meaningless on a product being created.
                                     ToggleButtons::make('status')
                                         ->label('')
                                         ->options([
                                             'draft' => 'Draft',
                                             'published' => 'Published',
-                                            'archived' => 'Archived',
                                         ])
                                         ->colors([
                                             'draft' => 'gray',
                                             'published' => 'success',
-                                            'archived' => 'danger',
                                         ])
                                         ->icons([
                                             'draft' => 'heroicon-o-pencil-square',
                                             'published' => 'heroicon-o-check-circle',
-                                            'archived' => 'heroicon-o-archive-box',
                                         ])
                                         ->grouped()
                                         ->default('draft')
                                         ->required()
-                                        ->live(),
+                                        ->live()
+                                        // An archived product is neither draft nor
+                                        // published, so it gets no toggle at all —
+                                        // the note below states the real state
+                                        // instead. Hidden rather than disabled:
+                                        // disabled() only stops the field being
+                                        // saved, it still validates, and 'archived'
+                                        // fails this field's own in:draft,published
+                                        // rule — which blocked saving any edit to an
+                                        // archived product (covered by
+                                        // ProductArchiveTest).
+                                        ->hidden(fn ($record) => $record?->status === 'archived'),
 
-                                    DateTimePicker::make('published_at')
-                                        ->label('Publish Date')
-                                        ->placeholder('Publish immediately')
-                                        ->hidden(fn ($get) => $get('status') !== 'published'),
+                                    Placeholder::make('archived_note')
+                                        ->label('')
+                                        ->visible(fn ($record) => $record?->status === 'archived')
+                                        ->content(new HtmlString(
+                                            '<p class="text-xs text-gray-500 dark:text-gray-400">'
+                                            .'This product is archived — hidden from the storefront and the till. '
+                                            .'Use <span class="font-semibold">Restore</span> at the top of the page to bring it back.'
+                                            .'</p>'
+                                        )),
 
-                                    DateTimePicker::make('unpublish_at')
-                                        ->label('Unpublish Date')
-                                        ->placeholder('Never (stays live)')
-                                        ->after('published_at')
-                                        ->hidden(fn ($get) => $get('status') !== 'published'),
+                                    // Side by side: neither carries helper text, so
+                                    // pairing them costs no extra height and saves a
+                                    // whole field row.
+                                    Grid::make(2)
+                                        ->schema([
+                                            DateTimePicker::make('published_at')
+                                                ->label('Publish Date')
+                                                ->placeholder('Publish immediately')
+                                                ->hidden(fn ($get) => $get('status') !== 'published'),
+
+                                            DateTimePicker::make('unpublish_at')
+                                                ->label('Unpublish Date')
+                                                ->placeholder('Never (stays live)')
+                                                ->after('published_at')
+                                                ->hidden(fn ($get) => $get('status') !== 'published'),
+                                        ]),
                                 ]),
 
                             Section::make('Pricing')
                                 ->schema([
+                                    Grid::make(2)
+                                        ->schema([
                                     TextInput::make('cost_price')
                                         ->numeric()
                                         ->prefix('₦')
-                                        ->placeholder('Leave blank if unknown')
-                                        ->helperText('Optional — shown as "—" in reports until set.')
+                                        ->placeholder('Optional')
+                                        ->helperText('Shown as "—" in reports until set.')
                                         ->live()
                                         ->hidden(fn () => ! self::canSeeCostPrice()),
 
@@ -359,6 +389,7 @@ class ProductForm
                                             fn (Get $get): bool => filled($get('cost_price')),
                                         )
                                         ->live(),
+                                        ]),
 
                                     Placeholder::make('margin_preview')
                                         ->label('')
@@ -405,39 +436,42 @@ class ProductForm
 
                             Section::make('Inventory')
                                 ->schema([
-                                    // Leads the section: every quantity below
-                                    // (threshold, reorder point, order size) is
-                                    // a count of this unit — reading it first
-                                    // is what makes "5" mean "5 cartons."
-                                    TextInput::make('measurement_unit')
-                                        ->label('Unit')
-                                        ->placeholder('e.g., pcs, pair, carton')
-                                        ->maxLength(32)
-                                        ->helperText('How this is counted and sold.'),
+                                    Grid::make(2)
+                                        ->schema([
+                                            // Leads the section: every quantity
+                                            // beside and below it is a count of
+                                            // this unit — reading it first is
+                                            // what makes "5" mean "5 cartons."
+                                            TextInput::make('measurement_unit')
+                                                ->label('Unit')
+                                                ->placeholder('pcs, carton…')
+                                                ->maxLength(32)
+                                                ->helperText('How this is counted and sold.'),
 
-                                    TextInput::make('low_stock_threshold')
-                                        ->label('Low Stock Alert Threshold')
-                                        ->helperText('Flagged as "low stock" once available units fall below this.')
-                                        ->numeric()
-                                        ->default(5)
-                                        ->minValue(0)
-                                        ->required(),
+                                            TextInput::make('low_stock_threshold')
+                                                ->label('Low Stock Alert')
+                                                ->helperText('Warns once available units fall below this.')
+                                                ->numeric()
+                                                ->default(5)
+                                                ->minValue(0)
+                                                ->required(),
 
-                                    // Filled by the product importer from a
-                                    // vendor's existing POS export. Editable
-                                    // here too, or an imported value would be
-                                    // visible nowhere and impossible to correct.
-                                    TextInput::make('reorder_point')
-                                        ->label('Reorder Point')
-                                        ->helperText('The level at which you intend to reorder. Distinct from the alert above, which only warns.')
-                                        ->numeric()
-                                        ->minValue(0),
+                                            // Filled by the product importer from a
+                                            // vendor's existing POS export. Editable
+                                            // here too, or an imported value would be
+                                            // visible nowhere and impossible to correct.
+                                            TextInput::make('reorder_point')
+                                                ->label('Reorder Point')
+                                                ->helperText('When you intend to reorder — the alert only warns.')
+                                                ->numeric()
+                                                ->minValue(0),
 
-                                    TextInput::make('preferred_quantity')
-                                        ->label('Preferred Order Quantity')
-                                        ->helperText('How much you usually buy when restocking this.')
-                                        ->numeric()
-                                        ->minValue(0),
+                                            TextInput::make('preferred_quantity')
+                                                ->label('Preferred Order Qty')
+                                                ->helperText('How much you usually buy when restocking.')
+                                                ->numeric()
+                                                ->minValue(0),
+                                        ]),
 
                                     Toggle::make('is_service')
                                         ->label('This is a service, not a physical item')
@@ -447,15 +481,18 @@ class ProductForm
 
                             Section::make('Sales Channels')
                                 ->schema([
-                                    Toggle::make('show_online')
-                                        ->label('Online Store')
-                                        ->helperText('Show on the public storefront')
-                                        ->default(true),
+                                    Grid::make(2)
+                                        ->schema([
+                                            Toggle::make('show_online')
+                                                ->label('Online Store')
+                                                ->helperText('Show on the public storefront')
+                                                ->default(true),
 
-                                    Toggle::make('show_in_pos')
-                                        ->label('Offline Store (POS)')
-                                        ->helperText('Available for in-person POS sales')
-                                        ->default(true),
+                                            Toggle::make('show_in_pos')
+                                                ->label('Offline Store (POS)')
+                                                ->helperText('Available for in-person POS sales')
+                                                ->default(true),
+                                        ]),
                                 ]),
 
                             Section::make('Tags')
