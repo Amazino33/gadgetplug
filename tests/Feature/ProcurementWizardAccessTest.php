@@ -18,9 +18,17 @@ test('a user with no vendor at all is refused instead of falling back to an arbi
 
     $stranger = User::factory()->create();
 
+    // Denial now redirects instead of dead-ending on a 403 page (see the
+    // handler in bootstrap/app.php). What matters is unchanged: they are sent
+    // away and never see the wizard.
+    $response = $this->actingAs($stranger)->get(route('procurement.create'));
+
+    $response->assertRedirect(route('account.profile'));
+
     $this->actingAs($stranger)
+        ->followingRedirects()
         ->get(route('procurement.create'))
-        ->assertForbidden();
+        ->assertDontSee('Procurement');
 });
 
 test('a vendor member without manage_procurement cannot open the procurement wizard', function () {
@@ -35,9 +43,11 @@ test('a vendor member without manage_procurement cannot open the procurement wiz
     setPermissionsTeamId($vendor->id);
     $storekeeper->assignRole('storekeeper');
 
+    // Same denial, redirected rather than 403'd — the storekeeper is turned
+    // away from the wizard and lands somewhere they can actually use.
     $this->actingAs($storekeeper)
         ->get(route('procurement.create'))
-        ->assertForbidden();
+        ->assertRedirect(route('account.profile'));
 });
 
 test('the vendor owner can open the procurement wizard', function () {

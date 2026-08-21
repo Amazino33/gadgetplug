@@ -12,6 +12,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Session\TokenMismatchException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -48,11 +49,49 @@ return Application::configure(basePath: dirname(__DIR__))
             ->withoutOverlapping();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        // A forbidden page inside a Filament panel sends the user back to that
-        // panel's dashboard with an explanation, instead of a dead-end 403 —
-        // easy to hit now that page access is permission-driven, since a stale
-        // link or bookmark may point somewhere the role no longer covers.
-        $exceptions->render(function (Throwable $e, Request $request): ?RedirectResponse {
+        // Both handlers below exist for the same reason: an error page the user
+        // cannot act on is worse than useless. A 403 and a 419 are each a dead
+        // end that tells someone what went wrong but not what to do about it,
+        // and both land most often on people who simply need to sign in.
+
+        // Sends someone to the sign-in form, remembering where they were headed
+        // so they arrive there once they are in — a 403 on /plug becomes "log
+        // in, then land on /plug" rather than a wall.
+        $toLogin = function (Request $request, string $message): ?RedirectResponse {
+            $login = rescue(fn () => route('login'), null, false);
+
+            if (blank($login)) {
+                return null;
+            }
+
+            // Only for page loads. Remembering a POST url would replay the
+            // submission after login, which is not what anyone wants.
+            if ($request->isMethod('GET') && rtrim($request->url(), '/') !== rtrim($login, '/')) {
+                session()->put('url.intended', $request->fullUrl());
+            }
+
+            session()->flash('status', $message);
+
+            return new RedirectResponse($login);
+        };
+
+        // 419: the session died between opening a form and submitting it. The
+        // default "Page Expired" page is at its worst on the login form itself,
+        // where it strands someone who was already trying to sign in.
+        $exceptions->render(function (Throwable $e, Request $request) use ($toLogin): ?RedirectResponse {
+            $isExpired = $e instanceof TokenMismatchException
+                || ($e instanceof HttpExceptionInterface && $e->getStatusCode() === 419);
+
+            if (! $isExpired || $request->expectsJson()) {
+                return null;
+            }
+
+            return $toLogin($request, 'Your session timed out before that went through — please sign in again.');
+        });
+
+        // 403: never a dead end. Where the user goes depends on what they can
+        // actually reach from here.
+        $exceptions->render(function (Throwable $e, Request $request) use ($toLogin): ?RedirectResponse {
             $isForbidden = $e instanceof AuthorizationException
                 || ($e instanceof HttpExceptionInterface && $e->getStatusCode() === 403);
 
@@ -67,26 +106,42 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             $panel = Filament::getCurrentPanel();
+            $signedIn = $panel ? $panel->auth()->check() : auth()->check();
 
-            if (! $panel || ! $panel->auth()->check()) {
-                return null;
+            // Nobody is signed in. This is the common case behind a bare 403 on
+            // /plug: the vendor panel has no login route of its own, so Filament
+            // has nowhere to bounce an anonymous visitor and throws instead.
+            if (! $signedIn) {
+                return $toLogin($request, 'Please sign in to continue.');
             }
 
-            $home = rescue(fn () => $panel->getUrl(Filament::getTenant()), null, false);
+            $home = $panel ? rescue(fn () => $panel->getUrl(Filament::getTenant()), null, false) : null;
 
-            // Nowhere to send them, or the dashboard itself is what was refused —
-            // let the 403 stand rather than bounce in a loop.
-            if (blank($home) || rtrim($request->url(), '/') === rtrim($home, '/')) {
-                return null;
+            // Signed in, and the panel has somewhere better to put them — a
+            // stale link or bookmark pointing at a page their role no longer
+            // covers goes back to the panel dashboard.
+            if (filled($home) && rtrim($request->url(), '/') !== rtrim($home, '/')) {
+                Notification::make()
+                    ->title('You do not have access to that page')
+                    ->warning()
+                    ->send();
+
+                // Built directly rather than via redirect(), whose helper resolves to
+                // Livewire's fluent redirector and doesn't return a RedirectResponse.
+                return new RedirectResponse($home);
             }
 
-            Notification::make()
-                ->title('You do not have access to that page')
-                ->warning()
-                ->send();
+            // Signed in, but this panel itself is what was refused — a customer
+            // opening /plug, say. Redirecting into the panel would loop, so land
+            // them on their account instead.
+            $account = rescue(fn () => route('account.profile'), null, false);
 
-            // Built directly rather than via redirect(), whose helper resolves to
-            // Livewire's fluent redirector and doesn't return a RedirectResponse.
-            return new RedirectResponse($home);
+            if (filled($account) && rtrim($request->url(), '/') !== rtrim($account, '/')) {
+                session()->flash('status', 'That area is for store owners. Here is your account instead.');
+
+                return new RedirectResponse($account);
+            }
+
+            return null;
         });
     })->create();
