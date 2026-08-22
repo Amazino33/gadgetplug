@@ -19,7 +19,10 @@ use Filament\Tables\Table;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Actions\Action;
+use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
+use Illuminate\Support\Collection;
+use App\Models\ProductStoreStock;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -282,6 +285,69 @@ class AuditSessionResource extends Resource
             ->recordActions(static::lineActions())
             ->defaultSort('created_at', 'desc')
             ->toolbarActions([
+                // Accepting what was counted, in one pass.
+                //
+                // The first count of a branch that was never stocked produces a
+                // variance on every line - a hundred and fifty of them at Itel
+                // Home - and resolving those one at a time is not review, it is
+                // typing. This does exactly what pressing Resolve Discrepancy on
+                // each row would do, through the same code path, with the
+                // counted figure as the final one.
+                BulkAction::make('accept_counted')
+                    ->label('Accept counted figures')
+                    ->icon('heroicon-o-check-circle')
+                    ->color('success')
+                    ->requiresConfirmation()
+                    ->modalHeading('Set stock to what was counted')
+                    ->modalDescription('Each selected line has its stock corrected to the counted figure and is marked resolved. This writes a ledger entry per line and cannot be undone from here.')
+                    ->schema([
+                        Select::make('reason_code')
+                            ->label('Reason for these corrections')
+                            ->options([
+                                'Opening Stock Count'     => 'Opening Stock Count - first count of this branch',
+                                'Data Entry Error'        => 'Data Entry Error',
+                                'Damaged in Store'        => 'Damaged in Store',
+                                'Suspected Theft'         => 'Suspected Theft',
+                                'Waybill Shortage'        => 'Waybill Shortage',
+                                'Supplier Short Delivery' => 'Supplier Short Delivery',
+                                'Other'                   => 'Other',
+                            ])
+                            ->default('Opening Stock Count')
+                            ->required()
+                            ->helperText('Recorded against every line in this batch, and read later by the shrinkage reports.'),
+                    ])
+                    ->visible(fn (): bool => filament()->getTenant()
+                        && auth()->user()->hasVendorPermission(filament()->getTenant()->id, 'edit_order_items'))
+                    ->action(function (Collection $records, array $data, AdjustStockAction $adjustStock): void {
+                        $applied = 0;
+
+                        foreach ($records as $record) {
+                            // Only what is genuinely awaiting a decision. A line
+                            // already resolved would otherwise be corrected a
+                            // second time against its own new baseline.
+                            if ($record->status !== 'discrepancy') {
+                                continue;
+                            }
+
+                            self::applyOverride(
+                                $record,
+                                $record->countedQuantity(),
+                                $data['reason_code'],
+                                $adjustStock,
+                            );
+
+                            $applied++;
+                        }
+
+                        Notification::make()
+                            ->title($applied === 1
+                                ? '1 line set to its counted figure.'
+                                : "{$applied} lines set to their counted figures.")
+                            ->success()
+                            ->send();
+                    })
+                    ->deselectRecordsAfterCompletion(),
+
                 BulkActionGroup::make([
                     DeleteBulkAction::make()
                         ->visible(fn () => auth()->user()->isSuperAdmin() || filament()->getTenant()?->isOwner(auth()->user())),
@@ -400,36 +466,12 @@ class AuditSessionResource extends Resource
                         auth()->user()->hasVendorPermission($record->vendor_id, 'edit_order_items')
                     )
                     ->action(function (AuditSession $record, array $data, AdjustStockAction $adjustStock): void {
-                        $finalCount         = (int) $data['manager_override_count'];
-                        $reasonCode         = $data['reason_code'];
-                        $currentSystemStock = (int) $record->product->stock_quantity;
-                        $difference         = $finalCount - $currentSystemStock;
-                        $lossValue          = $difference < 0
-                            ? abs($difference) * (float) ($record->product->cost_price ?? 0)
-                            : 0;
-
-                        if ($difference !== 0) {
-                            $adjustStock->execute(
-                                productId:       $record->product_id,
-                                quantityChanged: $difference,
-                                transactionType: 'audit_correction',
-                                userId:          auth()->id(),
-                                reference:       "Audit Override #{$record->id}",
-                                description:     "Manager override forced stock to {$finalCount}. Reason: {$reasonCode}.",
-                                auditSessionId:  $record->id,
-                                reasonCode:      $reasonCode,
-                                // Corrects the store the manager is working in.
-                                store:           ActiveStore::currentId(),
-                            );
-                        }
-
-                        $record->update([
-                            'manager_id'             => auth()->id(),
-                            'manager_override_count' => $finalCount,
-                            'status'                 => 'resolved_by_override',
-                            'reason_code'            => $reasonCode,
-                            'loss_value'             => $lossValue,
-                        ]);
+                        self::applyOverride(
+                            $record,
+                            (int) $data['manager_override_count'],
+                            $data['reason_code'],
+                            $adjustStock,
+                        );
                     })
                     ->successNotificationTitle('Discrepancy resolved.'),
 
@@ -685,4 +727,66 @@ class AuditSessionResource extends Resource
             'index' => Pages\ManageAuditSessions::route('/'),
         ];
     }
+
+    /**
+     * Force one count line's stock to a final figure, and record the decision.
+     *
+     * Shared by the single Resolve Discrepancy action and the bulk one so the
+     * two can never drift into meaning different things - a bulk action that
+     * quietly did less than the button it replaces would be worse than no bulk
+     * action at all.
+     *
+     * The correction lands in the branch that was COUNTED, read from the count
+     * session, not the branch the manager happens to be viewing. Those are the
+     * same store most of the time, which is exactly why the difference is easy
+     * to miss: resolve a count while another branch is active and the stock
+     * moves in the wrong shop. At a hundred and fifty lines in one press, that
+     * would be a hundred and fifty wrong corrections.
+     */
+    private static function applyOverride(
+        AuditSession $record,
+        int $finalCount,
+        string $reasonCode,
+        AdjustStockAction $adjustStock,
+    ): void {
+        $storeId = $record->countSession?->store_id ?? ActiveStore::currentId();
+
+        // The baseline is that branch's shelf, not the vendor-wide mirror.
+        $currentSystemStock = $storeId === null
+            ? (int) $record->product->stock_quantity
+            : (int) (ProductStoreStock::where('product_id', $record->product_id)
+                ->where('store_id', $storeId)
+                ->value('quantity') ?? 0);
+
+        $difference = $finalCount - $currentSystemStock;
+
+        // Only a shortfall is a loss. Finding more than expected is not a gain
+        // to be booked here.
+        $lossValue = $difference < 0
+            ? abs($difference) * (float) ($record->product->cost_price ?? 0)
+            : 0;
+
+        if ($difference !== 0) {
+            $adjustStock->execute(
+                productId:       $record->product_id,
+                quantityChanged: $difference,
+                transactionType: 'audit_correction',
+                userId:          auth()->id(),
+                reference:       "Audit Override #{$record->id}",
+                description:     "Stock set to {$finalCount} from a counted {$record->countedQuantity()}. Reason: {$reasonCode}.",
+                auditSessionId:  $record->id,
+                reasonCode:      $reasonCode,
+                store:           $storeId,
+            );
+        }
+
+        $record->update([
+            'manager_id'             => auth()->id(),
+            'manager_override_count' => $finalCount,
+            'status'                 => 'resolved_by_override',
+            'reason_code'            => $reasonCode,
+            'loss_value'             => $lossValue,
+        ]);
+    }
+
 }
