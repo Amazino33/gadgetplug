@@ -6,13 +6,18 @@ use App\Support\Accountability\FrozenLossSnapshot;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 // A shortage awaiting the owner's decision. Mutable, unlike the ledger — a case
 // is a workflow record that legitimately changes status, whereas a ledger entry
 // is a statement of fact that must not. The frozen snapshot columns are the
 // exception: they are copied in at open and nothing here ever rewrites them.
+
 class InventoryShortageCase extends Model
 {
+    use LogsActivity;
+
     protected $guarded = [];
 
     protected $casts = [
@@ -96,5 +101,14 @@ class InventoryShortageCase extends Model
     public function scopeAwaitingDisposition(Builder $query): Builder
     {
         return $query->whereIn('status', ['pending_disposition', 'investigating']);
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['status', 'shortage_qty', 'charge_amount', 'charged_storekeeper_id', 'disposed_by', 'disposed_at', 'disposition_reason'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->setDescriptionForEvent(fn (string $event) => 'Shortage case ' . $event);
     }
 }

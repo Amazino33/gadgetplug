@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Sluggable\HasSlug;
 use Spatie\Sluggable\SlugOptions;
 
@@ -19,9 +21,10 @@ use Spatie\Sluggable\SlugOptions;
 // filter, applied deliberately at every call site. No global scope — the
 // codebase has none, and adding one here would make this the only model in the
 // app whose queries silently mean something different from what they say.
+
 class Store extends Model
 {
-    use HasSlug;
+    use HasSlug, LogsActivity;
 
     protected $guarded = [];
 
@@ -105,5 +108,14 @@ class Store extends Model
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('is_active', true);
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['name', 'is_default', 'is_active', 'address', 'phone'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->setDescriptionForEvent(fn (string $event) => 'Store ' . $event);
     }
 }

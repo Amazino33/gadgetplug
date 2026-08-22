@@ -5,9 +5,13 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class PosSale extends Model
 {
+    use LogsActivity;
+
     protected $guarded = [];
 
     protected $casts = [
@@ -60,5 +64,14 @@ class PosSale extends Model
     public function isSplit(): bool
     {
         return $this->payment_method === 'split';
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['reference', 'status', 'total', 'discount_amount', 'discount_type', 'discount_approved_by', 'payment_method', 'cashier_id', 'customer_id'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->setDescriptionForEvent(fn (string $event) => 'Sale ' . $event);
     }
 }

@@ -4,9 +4,13 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class PosZReport extends Model
 {
+    use LogsActivity;
+
     protected $guarded = [];
 
     protected $casts = [
@@ -38,5 +42,14 @@ class PosZReport extends Model
     public function cashier(): BelongsTo
     {
         return $this->belongsTo(User::class, 'cashier_id');
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['report_date', 'total_sales', 'cash_expected', 'cash_counted', 'cash_variance', 'generated_at'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->setDescriptionForEvent(fn (string $event) => 'Z report ' . $event);
     }
 }

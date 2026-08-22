@@ -8,6 +8,8 @@ use App\Models\VendorActivity;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Forms\Components\DatePicker;
+use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -33,7 +35,14 @@ class ActivityLogResource extends Resource
         $user   = auth()->user();
         $vendor = filament()->getTenant();
 
-        return $vendor && ($user->isSuperAdmin() || $vendor->isOwner($user));
+        // Owner and super admin keep blanket access; everyone else needs the
+        // permission, so oversight can be delegated to a store admin without
+        // handing over the store itself.
+        return $vendor && (
+            $user->isSuperAdmin()
+            || $vendor->isOwner($user)
+            || $user->can('view_activity_log')
+        );
     }
 
     public static function canCreate(): bool { return false; }
@@ -45,9 +54,27 @@ class ActivityLogResource extends Resource
     {
         $vendorId = filament()->getTenant()?->id;
 
-        return parent::getEloquentQuery()
+        $query = parent::getEloquentQuery()
             ->where('vendor_id', $vendorId)
+            ->with(['causer', 'store'])
             ->latest();
+
+        /** @var User $user */
+        $user = auth()->user();
+
+        // A member assigned to specific stores sees only those stores, plus the
+        // vendor-wide entries that belong to no single branch. The owner and
+        // anyone unassigned sees everything — being in no store means "not
+        // restricted to one", not "restricted to none".
+        if ($vendorId && ! $user->isSuperAdmin() && ! filament()->getTenant()->isOwner($user)) {
+            $storeIds = $user->storesForVendor((int) $vendorId)->pluck('id');
+
+            if ($storeIds->isNotEmpty()) {
+                $query->where(fn ($q) => $q->whereIn('store_id', $storeIds)->orWhereNull('store_id'));
+            }
+        }
+
+        return $query;
     }
 
     public static function table(Table $table): Table
@@ -77,6 +104,11 @@ class ActivityLogResource extends Resource
                         : '—'
                     )
                     ->description(fn (VendorActivity $r) => $r->subject_id ? "#{$r->subject_id}" : null),
+
+                TextColumn::make('store.name')
+                    ->label('Store')
+                    ->placeholder('All stores')
+                    ->toggleable(),
 
                 TextColumn::make('properties')
                     ->label('Details')
@@ -112,6 +144,56 @@ class ActivityLogResource extends Resource
                         'deleted' => 'Deleted',
                     ])
                     ->placeholder('All events'),
+
+                // "Who did this?" is the question this page exists to answer,
+                // so the people who actually appear in the feed are the options
+                // — not every user on the platform.
+                SelectFilter::make('causer_id')
+                    ->label('Person')
+                    ->options(fn () => VendorActivity::query()
+                        ->where('vendor_id', filament()->getTenant()?->id)
+                        ->whereNotNull('causer_id')
+                        ->with('causer')
+                        ->get()
+                        ->pluck('causer.name', 'causer_id')
+                        ->filter()
+                        ->unique()
+                        ->sort()
+                        ->toArray())
+                    ->searchable()
+                    ->placeholder('Anyone'),
+
+                SelectFilter::make('subject_type')
+                    ->label('What')
+                    ->options(fn () => VendorActivity::query()
+                        ->where('vendor_id', filament()->getTenant()?->id)
+                        ->whereNotNull('subject_type')
+                        ->distinct()
+                        ->pluck('subject_type', 'subject_type')
+                        ->map(fn (string $t) => class_basename($t))
+                        ->sort()
+                        ->toArray())
+                    ->placeholder('Everything'),
+
+                SelectFilter::make('store_id')
+                    ->label('Store')
+                    ->relationship('store', 'name', fn ($query) => $query->where('vendor_id', filament()->getTenant()?->id))
+                    ->placeholder('All stores'),
+
+                Filter::make('when')
+                    ->schema([
+                        DatePicker::make('from')->label('From'),
+                        DatePicker::make('until')->label('Until'),
+                    ])
+                    ->query(fn (Builder $query, array $data) => $query
+                        ->when($data['from'] ?? null, fn ($q, $d) => $q->whereDate('created_at', '>=', $d))
+                        ->when($data['until'] ?? null, fn ($q, $d) => $q->whereDate('created_at', '<=', $d)))
+                    ->indicateUsing(function (array $data): array {
+                        $out = [];
+                        if ($data['from'] ?? null)  { $out[] = 'From ' . $data['from']; }
+                        if ($data['until'] ?? null) { $out[] = 'Until ' . $data['until']; }
+                        return $out;
+                    }),
             ])
             ->defaultSort('created_at', 'desc')
             ->paginated([25, 50, 100]);

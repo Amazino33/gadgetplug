@@ -173,6 +173,17 @@ class CleanupDuplicateVendorsCommand extends Command
         }
     }
 
+    /**
+     * Tables that carry a vendor_id but are a record ABOUT a vendor rather than
+     * data belonging to it. A duplicate whose only trace is its own audit trail
+     * is still empty, and those rows are cleaned up with the vendor anyway — so
+     * counting them would keep every vendor alive forever and make this command
+     * a no-op the moment activity logging was switched on.
+     *
+     * @var array<int, string>
+     */
+    private const NEVER_COUNTS_AS_DATA = ['activity_log'];
+
     /** @return array<int, string> */
     private function tablesReferencingVendors(): array
     {
@@ -181,7 +192,7 @@ class CleanupDuplicateVendorsCommand extends Command
         foreach (Schema::getTableListing() as $table) {
             $table = str_contains($table, '.') ? substr($table, strrpos($table, '.') + 1) : $table;
 
-            if ($table === 'vendors') {
+            if ($table === 'vendors' || in_array($table, self::NEVER_COUNTS_AS_DATA, true)) {
                 continue;
             }
 

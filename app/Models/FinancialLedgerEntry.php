@@ -42,6 +42,17 @@ class FinancialLedgerEntry extends Model
         });
     }
 
+    /**
+     * The entry is account-scoped by design, but every account belongs to a
+     * vendor — so this exposes the owning vendor for anything that scopes by
+     * it, the activity log included. Without it a posted ledger entry logged
+     * with a null vendor_id and never appeared in that vendor's feed.
+     */
+    public function getVendorIdAttribute(): ?int
+    {
+        return $this->account?->vendor_id;
+    }
+
     public function account(): BelongsTo
     {
         return $this->belongsTo(FinancialAccount::class, 'financial_account_id');

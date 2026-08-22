@@ -4,9 +4,13 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class PosReturn extends Model
 {
+    use LogsActivity;
+
     protected $guarded = [];
 
     protected $casts = [
@@ -32,5 +36,14 @@ class PosReturn extends Model
     public function customer(): BelongsTo
     {
         return $this->belongsTo(PosCustomer::class, 'customer_id');
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['reference', 'refund_amount', 'refund_method', 'reason', 'original_sale_id', 'cashier_id'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->setDescriptionForEvent(fn (string $event) => 'Return ' . $event);
     }
 }

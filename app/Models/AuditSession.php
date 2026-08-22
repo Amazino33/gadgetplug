@@ -4,9 +4,13 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class AuditSession extends Model
 {
+    use LogsActivity;
+
     protected $fillable = [
         'vendor_id',
         'blind_count_session_id',
@@ -107,5 +111,14 @@ class AuditSession extends Model
     public function isSettled(): bool
     {
         return in_array($this->status, ['verified', 'resolved_by_override'], true);
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly(['status', 'product_id', 'count_a', 'count_b', 'manager_override_count', 'storekeeper_a_id', 'storekeeper_b_id', 'manager_id'])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->setDescriptionForEvent(fn (string $event) => 'Stock count ' . $event);
     }
 }
