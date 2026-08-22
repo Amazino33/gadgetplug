@@ -8,9 +8,14 @@ use App\Models\InventoryLedger;
 use Filament\Facades\Filament;
 use Filament\Widgets\ChartWidget;
 use Illuminate\Support\Carbon;
+use Livewire\Attributes\Reactive;
 
 class StockMovementChart extends ChartWidget
 {
+    /** The branch InventoryPage is reporting on, null for the whole business. */
+    #[Reactive]
+    public ?int $storeFilter = null;
+
     protected ?string $heading = 'Stock Movement — Last 14 Days';
     protected int|string|array $columnSpan = 'full';
 
@@ -25,7 +30,10 @@ class StockMovementChart extends ChartWidget
         $start    = Carbon::today()->subDays(13)->startOfDay();
 
         // Single query — filter by vendor and date range
+        // The ledger carries the branch each movement happened in, so this
+        // filters on the movement itself rather than on the product.
         $entries = InventoryLedger::where('vendor_id', $vendorId)
+            ->when($this->storeFilter, fn ($q) => $q->where('store_id', $this->storeFilter))
             ->where('created_at', '>=', $start)
             ->get(['transaction_type', 'quantity_change', 'created_at']);
 

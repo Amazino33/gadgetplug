@@ -17,9 +17,14 @@ use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseWidget;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\HtmlString;
+use Livewire\Attributes\Reactive;
 
 class InventoryTableWidget extends BaseWidget
 {
+    /** The branch InventoryPage is reporting on, null for the whole business. */
+    #[Reactive]
+    public ?int $storeFilter = null;
+
     protected static ?string $heading = 'Inventory Analysis — All Products';
     protected int|string|array $columnSpan = 'full';
 
@@ -38,6 +43,10 @@ class InventoryTableWidget extends BaseWidget
         return $table
             ->query(
                 Product::query()
+                    // Home store, not "holds stock here": a branch's sold-out
+                    // lines belong in its own inventory, and they are the ones
+                    // worth reordering.
+                    ->when($this->storeFilter, fn ($q) => $q->where('products.store_id', $this->storeFilter))
                     ->where('vendor_id', $vendorId)
                     ->with('category')
             )

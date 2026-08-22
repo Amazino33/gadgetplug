@@ -7,6 +7,7 @@ namespace App\Filament\Vendor\Widgets;
 use App\Models\Product;
 use Filament\Facades\Filament;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
+use Livewire\Attributes\Reactive;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Support\Facades\DB;
 
@@ -15,11 +16,27 @@ class InventoryOverviewWidget extends BaseWidget
     protected static ?int $sort = 3;
     protected null|string $pollingInterval = '30s';
 
+    /**
+     * The branch InventoryPage is reporting on, null for the whole business.
+     *
+     * #[Reactive] matters here: Filament re-renders the widget with new mount
+     * data when the page's selector changes, but Livewire keeps a child's
+     * mounted value unless the property is declared reactive — the numbers
+     * would sit on the branch this widget first loaded with.
+     */
+    #[Reactive]
+    public ?int $storeFilter = null;
+
     protected function getStats(): array
     {
         $vendorId = Filament::getTenant()?->id;
 
-        $base = Product::where('vendor_id', $vendorId);
+        // Scoping the product set is enough to scope every figure below. Since
+        // a product lives in exactly one branch, its stock_quantity mirror IS
+        // that branch's quantity — so no join to product_store_stock is needed
+        // to answer "what is this branch holding".
+        $base = Product::where('vendor_id', $vendorId)
+            ->when($this->storeFilter, fn ($q) => $q->where('store_id', $this->storeFilter));
 
         $totalSKUs   = (clone $base)->count();
         $totalUnits  = (int)   (clone $base)->sum('stock_quantity');
