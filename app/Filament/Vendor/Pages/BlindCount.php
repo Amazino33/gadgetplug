@@ -11,6 +11,7 @@ use App\Models\BlindCountAuthorization;
 use App\Models\BlindCountEntry;
 use App\Models\BlindCountSession;
 use App\Models\Product;
+use App\Models\ProductStoreStock;
 use App\Models\User;
 use App\Services\ShortageCaseService;
 use Filament\Notifications\Notification;
