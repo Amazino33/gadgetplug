@@ -6,6 +6,8 @@ namespace App\Filament\Vendor\Pages;
 
 use App\Models\ImportLog;
 use App\Models\ImportMappingTemplate;
+use App\Models\Store;
+use App\Services\ActiveStore;
 use App\Services\Export\ProductExporter;
 use App\Services\Import\ColumnMapper;
 use App\Services\Import\ImportPreparer;
@@ -128,6 +130,28 @@ class ImportProducts extends Page
 
         return $vendor !== null
             && auth()->user()?->hasVendorPermission($vendor->id, 'import_products') === true;
+    }
+
+    /**
+     * The store every new product from this import will be homed in.
+     *
+     * Decided entirely by which store is active in the panel when the import
+     * runs — nothing in the uploaded file (brand, category, name) has any say
+     * in it. A vendor importing an Oraimo catalogue while "Itel Home" happens
+     * to be active gets every row homed there with no warning, which is
+     * exactly what happened once already. Shown up front so a wrong store is
+     * caught before the import runs, not discovered in the results after.
+     */
+    public function activeStore(): ?Store
+    {
+        $vendor = filament()->getTenant();
+        $user   = auth()->user();
+
+        if ($vendor === null || $user === null) {
+            return null;
+        }
+
+        return ActiveStore::get($vendor, $user);
     }
 
     // ── Step 1: the file ─────────────────────────────────────────────────────

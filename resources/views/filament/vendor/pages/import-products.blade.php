@@ -35,6 +35,27 @@
         @endforeach
     </ol>
 
+    {{-- Which store this import lands in is decided entirely by whichever
+         store is active in the panel, not by anything in the file — brand,
+         category, none of it has any say. A vendor importing an Oraimo
+         catalogue while "Itel Home" happened to be active once got all of it
+         homed there with nothing telling them until after the fact. This is
+         shown on every step so a wrong store is caught before running the
+         import, not discovered in the results afterward. --}}
+    @php $activeStore = $this->activeStore(); @endphp
+    @if ($activeStore)
+        <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-blue-300 bg-blue-50 px-4 py-3 text-sm dark:border-blue-500/30 dark:bg-blue-500/10">
+            <span class="text-blue-900 dark:text-blue-200">
+                New products from this import will be created in
+                <strong>{{ $activeStore->name }}</strong>.
+            </span>
+            <a href="{{ \App\Filament\Vendor\Pages\StoreSelector::getUrl() }}"
+               class="whitespace-nowrap font-medium text-blue-700 underline hover:text-blue-900 dark:text-blue-300 dark:hover:text-blue-100">
+                Switch store
+            </a>
+        </div>
+    @endif
+
     {{-- A failure returns the vendor to the step they were already on, so
          without this the screen looks identical to nothing having happened.
          Shown on the page, not only as a toast, because a toast in the corner

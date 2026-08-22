@@ -463,3 +463,31 @@ it('says so on the page when a file genuinely has nothing importable', function 
 
     expect(Product::count())->toBe(0);
 });
+
+// ── The active-store banner ──────────────────────────────────────────────────
+
+it('shows which store new products will land in, on every step', function () {
+    $c = importScreenContext();
+    Storage::fake('local');
+
+    enterVendorPanelAs($c['owner'], $c['vendor']);
+
+    $defaultStore = \App\Services\ActiveStore::get($c['vendor'], $c['owner']);
+
+    Livewire::test(ImportProducts::class)
+        ->assertSee($defaultStore->name)
+        ->assertSee('New products from this import will be created in');
+});
+
+it('reflects a switched store immediately, without leaving the page', function () {
+    $c = importScreenContext();
+    Storage::fake('local');
+
+    $second = \App\Models\Store::create(['vendor_id' => $c['vendor']->id, 'name' => 'Second Branch']);
+
+    enterVendorPanelAs($c['owner'], $c['vendor']);
+
+    \App\Services\ActiveStore::set($c['vendor'], $c['owner'], $second->id);
+
+    Livewire::test(ImportProducts::class)->assertSee('Second Branch');
+});
