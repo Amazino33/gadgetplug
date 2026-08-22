@@ -21,6 +21,15 @@ class CreateProduct extends CreateRecord
         return Width::Full;
     }
 
+    // The form runs close to three screens tall, so unpinned Save buttons mean
+    // scrolling to the bottom every time — including after a correction made at
+    // the top. Overridden per page rather than set on the panel: this is a
+    // property of a long form, not of every form in the panel.
+    public function areFormActionsSticky(): bool
+    {
+        return true;
+    }
+
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         $data = ProductForm::stripTransientAiFields($data);

@@ -21,6 +21,12 @@ class EditProduct extends EditRecord
         return Width::Full;
     }
 
+    // Matches CreateProduct — same long form, same reason.
+    public function areFormActionsSticky(): bool
+    {
+        return true;
+    }
+
     // Archiving lives here rather than as a third button in the form's status
     // control: it is a different kind of decision from draft-vs-live (it pulls
     // the product out of every channel and report at once), it deserves a
