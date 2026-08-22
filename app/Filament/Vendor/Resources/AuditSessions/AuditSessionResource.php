@@ -284,75 +284,7 @@ class AuditSessionResource extends Resource
             // exactly the same actions from a single definition.
             ->recordActions(static::lineActions())
             ->defaultSort('created_at', 'desc')
-            ->toolbarActions([
-                // Accepting what was counted, in one pass.
-                //
-                // The first count of a branch that was never stocked produces a
-                // variance on every line - a hundred and fifty of them at Itel
-                // Home - and resolving those one at a time is not review, it is
-                // typing. This does exactly what pressing Resolve Discrepancy on
-                // each row would do, through the same code path, with the
-                // counted figure as the final one.
-                BulkAction::make('accept_counted')
-                    ->label('Accept counted figures')
-                    ->icon('heroicon-o-check-circle')
-                    ->color('success')
-                    ->requiresConfirmation()
-                    ->modalHeading('Set stock to what was counted')
-                    ->modalDescription('Each selected line has its stock corrected to the counted figure and is marked resolved. This writes a ledger entry per line and cannot be undone from here.')
-                    ->schema([
-                        Select::make('reason_code')
-                            ->label('Reason for these corrections')
-                            ->options([
-                                'Opening Stock Count'     => 'Opening Stock Count - first count of this branch',
-                                'Data Entry Error'        => 'Data Entry Error',
-                                'Damaged in Store'        => 'Damaged in Store',
-                                'Suspected Theft'         => 'Suspected Theft',
-                                'Waybill Shortage'        => 'Waybill Shortage',
-                                'Supplier Short Delivery' => 'Supplier Short Delivery',
-                                'Other'                   => 'Other',
-                            ])
-                            ->default('Opening Stock Count')
-                            ->required()
-                            ->helperText('Recorded against every line in this batch, and read later by the shrinkage reports.'),
-                    ])
-                    ->visible(fn (): bool => filament()->getTenant()
-                        && auth()->user()->hasVendorPermission(filament()->getTenant()->id, 'edit_order_items'))
-                    ->action(function (Collection $records, array $data, AdjustStockAction $adjustStock): void {
-                        $applied = 0;
-
-                        foreach ($records as $record) {
-                            // Only what is genuinely awaiting a decision. A line
-                            // already resolved would otherwise be corrected a
-                            // second time against its own new baseline.
-                            if ($record->status !== 'discrepancy') {
-                                continue;
-                            }
-
-                            self::applyOverride(
-                                $record,
-                                $record->countedQuantity(),
-                                $data['reason_code'],
-                                $adjustStock,
-                            );
-
-                            $applied++;
-                        }
-
-                        Notification::make()
-                            ->title($applied === 1
-                                ? '1 line set to its counted figure.'
-                                : "{$applied} lines set to their counted figures.")
-                            ->success()
-                            ->send();
-                    })
-                    ->deselectRecordsAfterCompletion(),
-
-                BulkActionGroup::make([
-                    DeleteBulkAction::make()
-                        ->visible(fn () => auth()->user()->isSuperAdmin() || filament()->getTenant()?->isOwner(auth()->user())),
-                ]),
-            ]);
+            ->toolbarActions(static::lineBulkActions());
     }
 
     // Deciding that a named person owes money is an owner's call, not a
@@ -373,6 +305,164 @@ class AuditSessionResource extends Resource
      *
      * @return array<int, Action>
      */
+
+    /**
+     * Bulk equivalents of the row buttons, shared by the Audit Sessions list and
+     * the lines table on a count session.
+     *
+     * Shared for the same reason lineActions() is: a manager works through a
+     * count on the session page, not the global list, and a bulk action that
+     * only existed on one of them would send them to the wrong screen to do the
+     * obvious thing.
+     */
+    public static function lineBulkActions(): array
+    {
+        return [
+            // Accepting what was counted, in one pass.
+            //
+            // The first count of a branch that was never stocked reports a
+            // variance on every line - a hundred and fifty of them at Itel Home
+            // - and resolving those one at a time is not review, it is typing.
+            // This does what pressing Resolve Discrepancy on each row would do,
+            // through the same code path, with the counted figure as the final
+            // one.
+            BulkAction::make('accept_counted')
+                ->label('Accept counted figures')
+                ->icon('heroicon-o-check-circle')
+                ->color('success')
+                ->requiresConfirmation()
+                ->modalHeading('Set stock to what was counted')
+                ->modalDescription('Each selected line has its stock corrected to the counted figure and is marked resolved. This writes a ledger entry per line and cannot be undone from here.')
+                ->schema([
+                    Select::make('reason_code')
+                        ->label('Reason for these corrections')
+                        ->options([
+                            'Opening Stock Count'     => 'Opening Stock Count - first count of this branch',
+                            'Data Entry Error'        => 'Data Entry Error',
+                            'Damaged in Store'        => 'Damaged in Store',
+                            'Suspected Theft'         => 'Suspected Theft',
+                            'Waybill Shortage'        => 'Waybill Shortage',
+                            'Supplier Short Delivery' => 'Supplier Short Delivery',
+                            'Other'                   => 'Other',
+                        ])
+                        ->default('Opening Stock Count')
+                        ->required()
+                        ->helperText('Recorded against every line in this batch, and read later by the shrinkage reports.'),
+                ])
+                ->visible(fn (): bool => filament()->getTenant()
+                    && auth()->user()->hasVendorPermission(filament()->getTenant()->id, 'edit_order_items'))
+                ->action(function (Collection $records, array $data, AdjustStockAction $adjustStock): void {
+                    $applied = 0;
+
+                    foreach ($records as $record) {
+                        // Only what is genuinely awaiting a decision. A resolved
+                        // line would otherwise be corrected a second time
+                        // against its own new baseline.
+                        if ($record->status !== 'discrepancy') {
+                            continue;
+                        }
+
+                        self::applyOverride($record, $record->countedQuantity(), $data['reason_code'], $adjustStock);
+                        $applied++;
+                    }
+
+                    Notification::make()
+                        ->title($applied === 1 ? '1 line set to its counted figure.' : "{$applied} lines set to their counted figures.")
+                        ->success()
+                        ->send();
+                })
+                ->deselectRecordsAfterCompletion(),
+
+            // Closing the cases those variances opened.
+            //
+            // A count that finds MORE than the system expected still opens a
+            // case per line, and on a first count that is every line. Nobody
+            // owes money for stock that was found, but the cases are real rows
+            // that sit in the accountability screens until somebody decides
+            // them - so they have to be closable in one pass too, not only one
+            // at a time.
+            BulkAction::make('dispose_cases')
+                ->label('Decide cases')
+                ->icon('heroicon-o-scale')
+                ->color('warning')
+                ->requiresConfirmation()
+                ->modalHeading('Decide what happens to these cases')
+                ->modalDescription('Applies one decision to every selected line that still has a case awaiting one. Charging posts to the accountability ledger, so it is refused unless each case already names someone.')
+                ->schema([
+                    Select::make('disposition')
+                        ->label('Decision')
+                        ->options([
+                            'investigate' => 'Investigate - park them, decide later',
+                            'write_off'   => 'Write off - the company absorbs it',
+                            'charge'      => 'Charge the assigned staff member',
+                        ])
+                        ->default('investigate')
+                        ->required()
+                        ->live()
+                        ->helperText(fn ($state): string => match ($state) {
+                            'charge'      => 'Posts a charge per case at its frozen retail figure. Only cases already assigned to someone can be charged.',
+                            'write_off'   => 'No staff debt. Only the cost is a real loss - the margin was never earned.',
+                            default       => 'No money moves. They can be charged or written off later.',
+                        }),
+
+                    Textarea::make('reason')
+                        ->label('Reason')
+                        ->rows(2)
+                        ->required(fn ($get): bool => in_array($get('disposition'), ['write_off', 'charge'], true))
+                        ->helperText('Recorded against every case in this batch.'),
+                ])
+                ->visible(fn (): bool => filament()->getTenant()
+                    && filament()->getTenant()->isOwner(auth()->user()))
+                ->action(function (Collection $records, array $data, ShortageCaseService $cases): void {
+                    $done = 0;
+                    $skipped = 0;
+                    $failed = [];
+
+                    foreach ($records as $record) {
+                        $case = static::caseFor($record);
+
+                        // Silently skipping a case the user may not touch would
+                        // read as success; counted and reported instead.
+                        if (! $case || ! $case->awaitsDisposition() || auth()->user()->cannot('dispose', $case)) {
+                            $skipped++;
+                            continue;
+                        }
+
+                        try {
+                            match ($data['disposition']) {
+                                'write_off'   => $cases->writeOff($case, (int) auth()->id(), $data['reason']),
+                                'charge'      => $cases->charge($case, (int) auth()->id(), $data['reason']),
+                                'investigate' => $cases->investigate($case, (int) auth()->id(), $data['reason'] ?? null),
+                            };
+
+                            $done++;
+                        } catch (\Throwable $e) {
+                            // One case that cannot be charged must not abandon
+                            // the rest of the batch half done.
+                            $failed[] = $e->getMessage();
+                        }
+                    }
+
+                    $body = [];
+
+                    if ($skipped > 0) {
+                        $body[] = "{$skipped} skipped - no open case, or not yours to decide.";
+                    }
+
+                    if ($failed !== []) {
+                        $body[] = count($failed).' could not be decided: '.collect($failed)->unique()->take(2)->implode(' ');
+                    }
+
+                    Notification::make()
+                        ->title($done === 1 ? '1 case decided.' : "{$done} cases decided.")
+                        ->body($body === [] ? null : implode(' ', $body))
+                        ->{$failed === [] ? 'success' : 'warning'}()
+                        ->send();
+                })
+                ->deselectRecordsAfterCompletion(),
+        ];
+    }
+
     public static function lineActions(): array
     {
         return [

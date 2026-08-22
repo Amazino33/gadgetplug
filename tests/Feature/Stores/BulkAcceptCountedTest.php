@@ -210,3 +210,25 @@ test('a member without the permission cannot reach the bulk action', function ()
 
     expect(ProductStoreStock::where('product_id', $product->id)->value('quantity'))->toBe(0);
 });
+
+// ---- the same buttons on the count session page -------------------------
+
+test('the count session lines table carries the same bulk actions', function () {
+    $vendor = bulkVendor();
+    $branch = Store::create(['vendor_id' => $vendor->id, 'name' => 'Counted Branch']);
+
+    $product = bulkProduct($vendor, $branch, onShelf: 0);
+    $line = bulkLine($vendor, $branch, $product, counted: 25, system: 0);
+
+    actAsManager($vendor);
+
+    // Driven through the relation manager on the count session page, which is
+    // where a manager actually works through a count.
+    Livewire::test(
+        App\Filament\Vendor\Resources\CountSessions\RelationManagers\LinesRelationManager::class,
+        ['ownerRecord' => $line->countSession, 'pageClass' => App\Filament\Vendor\Resources\CountSessions\Pages\ViewCountSession::class],
+    )->callTableBulkAction('accept_counted', [$line], ['reason_code' => 'Opening Stock Count']);
+
+    expect(ProductStoreStock::where('product_id', $product->id)->where('store_id', $branch->id)->value('quantity'))->toBe(25)
+        ->and($line->fresh()->status)->toBe('resolved_by_override');
+});

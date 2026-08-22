@@ -152,6 +152,10 @@ class LinesRelationManager extends RelationManager
                     ]),
             ])
             ->recordActions(AuditSessionResource::lineActions())
+            // The same bulk buttons as the Audit Sessions list. A manager works
+            // through a count on this page, so this is where resolving a
+            // hundred and fifty lines at once has to be possible.
+            ->toolbarActions(AuditSessionResource::lineBulkActions())
             ->defaultSort('id')
             ->emptyStateHeading('Nothing to audit here')
             ->emptyStateDescription('Every line in this count balanced, or none is linked to it.');
