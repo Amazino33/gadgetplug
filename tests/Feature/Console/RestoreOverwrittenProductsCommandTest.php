@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\AuditSession;
+use App\Models\BlindCountSession;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\Store;
@@ -161,6 +163,75 @@ it('only restores fields the overwrite actually changed', function () {
         // already reads -- restoring an untouched field would be a second,
         // unrelated edit, not a repair of the collision.
         ->and($product->name)->toBe('Original Name');
+});
+
+// ── Stock from a specific count, not whatever the product currently carries ──
+
+it('sets stock to a named count session\'s figure, not whatever followed the product', function () {
+    $c = restoreContext();
+
+    $product = Product::create([
+        'vendor_id' => $c['vendor']->id, 'category_id' => $c['category']->id,
+        'name' => 'AIRFRYER-5L Regular', 'sku' => '2', 'brand' => 'Itel',
+        'price' => 60300, 'store_id' => $c['itelHome']->id, 'stock_quantity' => 40,
+    ]);
+
+    // The real morning count, at Itel Home, found 6 units — before the
+    // afternoon collision ever touched this product.
+    $morningCount = BlindCountSession::create([
+        'vendor_id' => $c['vendor']->id, 'storekeeper_a_id' => $c['vendor']->user_id,
+        'status' => 'completed', 'frequency' => 'daily', 'product_order' => [$product->id],
+    ]);
+    AuditSession::create([
+        'vendor_id' => $c['vendor']->id, 'blind_count_session_id' => $morningCount->id,
+        'product_id' => $product->id, 'storekeeper_a_id' => $c['vendor']->user_id,
+        'count_a' => 6, 'system_quantity' => 0, 'status' => 'resolved_by_override',
+    ]);
+
+    // The collision, then a completely unrelated evening count at a different
+    // physical store finds 31 units of whatever is sitting there.
+    test()->travelTo(\Illuminate\Support\Carbon::parse(BAD_IMPORT_TIME)->addSeconds(4));
+    $product->update(['name' => 'P204 20000MAH', 'store_id' => $c['oraimoStore']->id]);
+    test()->travelBack();
+    $product->update(['stock_quantity' => 31]);
+
+    $this->artisan('products:restore-overwritten', [
+        'vendor' => $c['vendor']->id, 'around' => BAD_IMPORT_TIME,
+        '--store' => $c['oraimoStore']->id,
+        '--to-store' => $c['itelHome']->id,
+        '--stock-from-count' => $morningCount->id,
+        '--force' => true,
+    ])->expectsOutputToContain('1 product(s) had their stock set to the count\'s figure');
+
+    $product->refresh();
+
+    expect($product->name)->toBe('AIRFRYER-5L Regular')
+        // Not 31 (the unrelated evening count at the wrong shop) and not 40
+        // (whatever it happened to carry beforehand) -- the morning count's
+        // own figure for this exact product, at the store it actually belongs to.
+        ->and($product->stock_quantity)->toBe(6);
+});
+
+it('leaves stock alone when the named count has no line for this product', function () {
+    $c = restoreContext();
+    $product = overwrittenProduct($c);
+
+    $emptyCount = BlindCountSession::create([
+        'vendor_id' => $c['vendor']->id, 'storekeeper_a_id' => $c['vendor']->user_id,
+        'status' => 'completed', 'frequency' => 'daily', 'product_order' => [],
+    ]);
+
+    $this->artisan('products:restore-overwritten', [
+        'vendor' => $c['vendor']->id, 'around' => BAD_IMPORT_TIME,
+        '--store' => $c['oraimoStore']->id,
+        '--to-store' => $c['itelHome']->id,
+        '--stock-from-count' => $emptyCount->id,
+        '--force' => true,
+    ])->expectsOutputToContain('had no line in count');
+
+    // Identity still restored; stock untouched since this count says nothing
+    // about this specific product.
+    expect($product->fresh()->name)->toBe('A1481');
 });
 
 it('never touches another vendor\'s products', function () {

@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Actions\Inventory\AdjustStockAction;
+use App\Models\AuditSession;
 use App\Models\Product;
+use App\Models\ProductStoreStock;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use LogicException;
@@ -40,6 +43,7 @@ class RestoreOverwrittenProductsCommand extends Command
                             {--brand= : Only products currently carrying this (corrupted) brand}
                             {--to-store= : Store id to move the restored products into}
                             {--to-brand= : Brand to set on the restored products}
+                            {--stock-from-count= : A count session id — apply that session\'s counted figure at the destination store, in place of whatever stock currently follows the product}
                             {--force : Actually restore them. Without this, only reports what would change.}';
 
     protected $description = 'Restore products whose name/price/cost were overwritten by a later import matching on SKU';
@@ -51,6 +55,7 @@ class RestoreOverwrittenProductsCommand extends Command
         $brand    = $this->option('brand');
         $toStore  = $this->option('to-store');
         $toBrand  = $this->option('to-brand');
+        $countId  = $this->option('stock-from-count');
 
         $around = \Illuminate\Support\Carbon::parse($this->argument('around'));
         $within = (int) $this->option('within');
@@ -131,15 +136,17 @@ class RestoreOverwrittenProductsCommand extends Command
             return self::SUCCESS;
         }
 
-        $restored = 0;
-        $failed   = [];
+        $restored   = 0;
+        $stockFixed = 0;
+        $noLine     = 0;
+        $failed     = [];
 
         foreach ($plan as $p) {
             /** @var Product $product */
             $product = $p['product'];
 
             try {
-                DB::transaction(function () use ($product, $p, $toStore, $toBrand) {
+                DB::transaction(function () use ($product, $p, $toStore, $toBrand, $countId, &$stockFixed, &$noLine) {
                     $attributes = $p['restore'];
 
                     if ($toBrand) {
@@ -155,6 +162,12 @@ class RestoreOverwrittenProductsCommand extends Command
                     if ($toStore) {
                         $product->update(['store_id' => (int) $toStore]);
                     }
+
+                    if ($countId) {
+                        $applied = $this->applyCountedStock($product, (int) $countId, (int) $toStore);
+
+                        $applied ? $stockFixed++ : $noLine++;
+                    }
                 });
 
                 $restored++;
@@ -167,6 +180,14 @@ class RestoreOverwrittenProductsCommand extends Command
 
         $this->info("{$restored} product(s) restored.");
 
+        if ($countId) {
+            $this->line("{$stockFixed} product(s) had their stock set to the count's figure.");
+
+            if ($noLine > 0) {
+                $this->warn("{$noLine} product(s) had no line in count #{$countId} — their stock was left as it was.");
+            }
+        }
+
         if ($failed !== []) {
             $this->newLine();
             $this->warn(count($failed).' product(s) could not be fully restored:');
@@ -177,6 +198,54 @@ class RestoreOverwrittenProductsCommand extends Command
         }
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Sets this product's stock at the given store to whatever a specific
+     * count session found, via the same ledgered path every other stock
+     * change in this app takes — never a raw column write.
+     *
+     * Exists because the count that actually applies to a restored product is
+     * not necessarily whatever it currently carries. A product wrongly homed
+     * at Store B for a day may have been counted there, at a real physical
+     * location that has nothing to do with what is actually on Store A's real
+     * shelf — carrying that number back to Store A would be as wrong as the
+     * mislabeling this command exists to fix. The session id is passed in
+     * explicitly rather than assumed, because only the caller knows which
+     * count was taken at the store this product is actually being restored to.
+     *
+     * @return bool  whether a line existed in that count for this product
+     */
+    private function applyCountedStock(Product $product, int $countSessionId, int $storeId): bool
+    {
+        $line = AuditSession::where('blind_count_session_id', $countSessionId)
+            ->where('product_id', $product->id)
+            ->first();
+
+        if ($line === null) {
+            return false;
+        }
+
+        $target  = $line->countedQuantity();
+        $current = (int) (ProductStoreStock::where('product_id', $product->id)
+            ->where('store_id', $storeId)
+            ->value('quantity') ?? 0);
+
+        $delta = $target - $current;
+
+        if ($delta !== 0) {
+            app(AdjustStockAction::class)->execute(
+                productId: $product->id,
+                quantityChanged: $delta,
+                transactionType: 'audit_correction',
+                reference: "Restore from overwrite — count #{$countSessionId}",
+                description: "Corrected to the count taken at this store, after the product's identity was restored.",
+                auditSessionId: $line->id,
+                store: $storeId,
+            );
+        }
+
+        return true;
     }
 
     /**
