@@ -46,7 +46,15 @@ class MessageTemplateResource extends Resource
                     ->helperText('A unique identifier, e.g. "customer_dispatched".'),
 
                 Select::make('recipient_type')
-                    ->options(['customer' => 'Customer', 'rider' => 'Rider'])
+                    // storekeeper and owner were missing here, so the templates
+                    // behind those alerts could not be edited without the form
+                    // silently rewriting their recipient to customer or rider.
+                    ->options([
+                        'customer'    => 'Customer',
+                        'rider'       => 'Rider',
+                        'storekeeper' => 'Storekeeper',
+                        'owner'       => 'Owner (daily summary)',
+                    ])
                     ->required(),
 
                 Select::make('channel')
@@ -75,7 +83,12 @@ class MessageTemplateResource extends Resource
                 IconColumn::make('is_active')->label('Active')->boolean(),
             ])
             ->filters([
-                SelectFilter::make('recipient_type')->options(['customer' => 'Customer', 'rider' => 'Rider']),
+                SelectFilter::make('recipient_type')->options([
+                    'customer'    => 'Customer',
+                    'rider'       => 'Rider',
+                    'storekeeper' => 'Storekeeper',
+                    'owner'       => 'Owner (daily summary)',
+                ]),
                 SelectFilter::make('channel')->options(['whatsapp' => 'WhatsApp', 'sms' => 'SMS']),
             ])
             ->recordActions([EditAction::make(), DeleteAction::make()])

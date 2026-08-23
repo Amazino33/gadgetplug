@@ -18,10 +18,12 @@ class VendorNotificationSetting extends Model
         'notify_undispatched'      => 'boolean',
         'notify_low_stock'         => 'boolean',
         'notify_cancelled'         => 'boolean',
+        'notify_daily_summary'     => 'boolean',
         'quiet_hours_enabled'      => 'boolean',
         'undispatched_after_hours' => 'integer',
         'last_reminder_sent_at'    => 'datetime',
         'remind_orders_from'       => 'datetime',
+        'last_daily_summary_for'   => 'date',
     ];
 
     public const FREQUENCIES = [
@@ -59,6 +61,43 @@ class VendorNotificationSetting extends Model
         // brand-new store would silently send no alerts despite the defaults
         // saying otherwise, and the settings form would fail its own validation.
         return $settings->wasRecentlyCreated ? $settings->refresh() : $settings;
+    }
+
+    public function hasOwnerNumber(): bool
+    {
+        return filled($this->owner_whatsapp);
+    }
+
+    // Which business date, if any, the daily summary should cover right now.
+    //
+    // Returns the date to summarise, or null when nothing is due. The report
+    // covers YESTERDAY, so the send time is a morning briefing about a day that
+    // has definitely finished — a figure for a day still being traded would be
+    // wrong the moment it was read.
+    //
+    // Deliberately "at or past the configured hour, and not yet sent for that
+    // date" rather than "exactly this hour": the scheduler can miss a tick
+    // (deploy, host hiccup, withoutOverlapping), and an exact match would then
+    // silently skip the day entirely rather than sending an hour late.
+    public function dailySummaryDueFor(CarbonInterface $now): ?CarbonInterface
+    {
+        if (! $this->notify_daily_summary || ! $this->hasOwnerNumber()) {
+            return null;
+        }
+
+        $minutesNow = ($now->hour * 60) + $now->minute;
+
+        if ($minutesNow < $this->minutesOf($this->daily_summary_time)) {
+            return null;
+        }
+
+        $covers = $now->copy()->subDay()->startOfDay();
+
+        if ($this->last_daily_summary_for?->isSameDay($covers)) {
+            return null;
+        }
+
+        return $covers;
     }
 
     public function hasStorekeeperNumber(): bool

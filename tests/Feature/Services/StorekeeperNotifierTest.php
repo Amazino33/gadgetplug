@@ -387,6 +387,11 @@ test('a run with nothing to report leaves the cadence clock untouched', function
 });
 
 test('the command respects quiet hours', function () {
+    // Frozen before setup, not just before the order: forVendor() stamps
+    // remind_orders_from with now(), and a watermark on the real calendar would
+    // filter out an order dated on the frozen one.
+    Carbon::setTestNow(Carbon::parse('2026-08-06 03:00'));
+
     $data = setUpStorekeeperVendor([
         'quiet_hours_enabled' => true,
         'quiet_from' => '08:00:00',
@@ -396,7 +401,6 @@ test('the command respects quiet hours', function () {
     Order::whereKey($order->id)->update(['updated_at' => now()->subDays(1)]);
 
     DeliveryMessage::truncate();
-    Carbon::setTestNow(Carbon::parse('2026-08-06 03:00'));
 
     $this->artisan('storekeeper:remind')->assertSuccessful();
 
@@ -406,6 +410,8 @@ test('the command respects quiet hours', function () {
 });
 
 test('force ignores cadence and quiet hours', function () {
+    Carbon::setTestNow(Carbon::parse('2026-08-06 03:00'));
+
     $data = setUpStorekeeperVendor([
         'quiet_hours_enabled' => true,
         'quiet_from' => '08:00:00',
@@ -415,7 +421,6 @@ test('force ignores cadence and quiet hours', function () {
     Order::whereKey($order->id)->update(['updated_at' => now()->subDays(1)]);
 
     DeliveryMessage::truncate();
-    Carbon::setTestNow(Carbon::parse('2026-08-06 03:00'));
 
     $this->artisan('storekeeper:remind --force')->assertSuccessful();
 

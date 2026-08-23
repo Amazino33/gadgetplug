@@ -3,6 +3,7 @@
 namespace App\Filament\Vendor\Pages;
 
 use App\Models\VendorNotificationSetting;
+use App\Services\Messaging\DailySummaryNotifier;
 use App\Services\Messaging\StorekeeperNotifier;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
@@ -50,6 +51,9 @@ class NotificationSettings extends Page
 
         $this->form->fill([
             'storekeeper_whatsapp'     => $settings->storekeeper_whatsapp,
+            'owner_whatsapp'           => $settings->owner_whatsapp,
+            'notify_daily_summary'     => $settings->notify_daily_summary,
+            'daily_summary_time'       => $settings->daily_summary_time,
             'notify_new_order'         => $settings->notify_new_order,
             'notify_undispatched'      => $settings->notify_undispatched,
             'notify_low_stock'         => $settings->notify_low_stock,
@@ -75,6 +79,26 @@ class NotificationSettings extends Page
                             ->placeholder('08012345678')
                             ->maxLength(20)
                             ->helperText('Leave blank to switch all storekeeper alerts off. This is separate from your store\'s public WhatsApp number on the Store Profile page.'),
+                    ]),
+
+                Section::make('Owner daily summary')
+                    ->description('A morning WhatsApp covering yesterday: what each store sold, what should be in the till versus the bank, expenses and procurement. Sent only to the number below.')
+                    ->schema([
+                        TextInput::make('owner_whatsapp')
+                            ->label('Owner WhatsApp Number')
+                            ->tel()
+                            ->placeholder('08012345678')
+                            ->maxLength(20)
+                            ->helperText('This message contains takings, cost of goods and profit. Keep it off any shared or shop-floor phone. Leave blank to switch the summary off.'),
+
+                        Toggle::make('notify_daily_summary')
+                            ->label('Send the daily summary'),
+
+                        TimePicker::make('daily_summary_time')
+                            ->label('Send at')
+                            ->seconds(false)
+                            ->required()
+                            ->helperText('The summary always covers the previous day, so a morning time reports a day that has definitely finished.'),
                     ]),
 
                 Section::make('Which alerts to send')
@@ -140,6 +164,64 @@ class NotificationSettings extends Page
     protected function getHeaderActions(): array
     {
         return [
+            // Sends yesterday's real figures, not a mock-up, so the owner can
+            // check the numbers against the Reports page before trusting the
+            // message. --force semantics: sends even on a day with no trading,
+            // which is what makes it usable as a "does my number work" test.
+            Action::make('sendTestSummary')
+                ->label('Send test summary')
+                ->icon('heroicon-o-chart-bar')
+                ->color('gray')
+                ->requiresConfirmation()
+                ->modalHeading('Send yesterday\'s summary now?')
+                ->modalDescription('Sends the daily summary for yesterday to the saved owner number, ignoring the scheduled time. Save your changes first.')
+                ->action(function (): void {
+                    $vendor = filament()->getTenant();
+                    $settings = VendorNotificationSetting::forVendor($vendor);
+
+                    if (! $settings->hasOwnerNumber()) {
+                        Notification::make()
+                            ->title('No owner number saved yet')
+                            ->body('Enter an owner WhatsApp number and save before sending a test.')
+                            ->warning()
+                            ->send();
+
+                        return;
+                    }
+
+                    $message = app(DailySummaryNotifier::class)
+                        ->send($vendor, now()->subDay()->startOfDay(), force: true);
+
+                    if ($message === null) {
+                        Notification::make()
+                            ->title('Nothing sent')
+                            ->body('The daily summary is switched off, or its message template is missing or inactive.')
+                            ->warning()
+                            ->send();
+
+                        return;
+                    }
+
+                    match ($message->status) {
+                        'sent' => Notification::make()
+                            ->title('Test summary sent')
+                            ->body('Sent to '.$message->to_number.'.')
+                            ->success()
+                            ->send(),
+
+                        'failed' => Notification::make()
+                            ->title('Test summary failed')
+                            ->body($message->provider_response['error'] ?? 'Unknown error')
+                            ->danger()
+                            ->send(),
+
+                        default => Notification::make()
+                            ->title('Summary queued as '.$message->status)
+                            ->warning()
+                            ->send(),
+                    };
+                }),
+
             // Proves the number is reachable before anyone relies on these alerts.
             // Bypasses cadence and quiet hours, but still respects the toggles so
             // it exercises the same path a real reminder takes.
@@ -204,6 +286,9 @@ class NotificationSettings extends Page
 
         VendorNotificationSetting::forVendor(filament()->getTenant())->update([
             'storekeeper_whatsapp'     => $data['storekeeper_whatsapp'] ?: null,
+            'owner_whatsapp'           => $data['owner_whatsapp'] ?: null,
+            'notify_daily_summary'     => (bool) ($data['notify_daily_summary'] ?? false),
+            'daily_summary_time'       => $data['daily_summary_time'] ?? '07:00',
             'notify_new_order'         => (bool) ($data['notify_new_order'] ?? false),
             'notify_undispatched'      => (bool) ($data['notify_undispatched'] ?? false),
             'notify_low_stock'         => (bool) ($data['notify_low_stock'] ?? false),

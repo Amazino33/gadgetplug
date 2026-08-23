@@ -49,6 +49,14 @@ return Application::configure(basePath: dirname(__DIR__))
             ->hourly()
             ->withoutOverlapping();
 
+        // Also hourly, for the same reason: each vendor's daily_summary_time
+        // decides whether its summary is due. An hourly tick that mostly does
+        // nothing is the cost of letting every store pick its own hour without
+        // a schedule entry per store.
+        $schedule->command('vendor:daily-summary')
+            ->hourly()
+            ->withoutOverlapping();
+
         // Hourly for the same reason as the affiliate hold above: the 24h
         // staleness window doesn't need finer granularity, but a reservation
         // sitting stuck for up to a day longer than that window blocks real

@@ -75,6 +75,14 @@ class MessageTemplateSeeder extends Seeder
                 'channel'        => 'whatsapp',
                 'body'           => "❌ *Order cancelled — {{order_number}}*\n\n*Items ({{item_count}})*\n{{order_items}}\n\nThis order was cancelled after payment. If it was already packed, please unpack it and return the items to the shelf.\n— {{store_name}}",
             ],
+            // Owner-facing, not staff-facing: this carries takings, cost of
+            // goods and margin, so it goes to owner_whatsapp and nowhere else.
+            [
+                'key'            => 'vendor_daily_summary',
+                'recipient_type' => 'owner',
+                'channel'        => 'whatsapp',
+                'body'           => "📊 *Daily Summary — {{summary_date}}*\n{{store_name}}\n\n*Sales by store*\n{{store_lines}}\n\n*Money taken (incl. VAT)*\n• Cash: {{cash_taken}}\n• Card: {{card_taken}}\n• Transfer: {{transfer_taken}}\n• POS total: {{pos_taken}}\n\n*Profit*\n• Revenue (excl. VAT): {{revenue}}\n• Cost of goods: {{product_cost}}\n• Net profit: {{net_profit}}{{profit_note}}\n\n*Expenses recorded*\n{{expense_lines}}\n• Total: {{expenses_total}}\n\n*Procurement recorded*\n• {{procurement_count}} purchase(s), {{procurement_total}}\n• Paid: {{procurement_paid}} · Outstanding: {{procurement_owing}}\n\n— GadgetPlug",
+            ],
             [
                 'key'            => 'rider_assignment',
                 'recipient_type' => 'rider',
