@@ -198,7 +198,9 @@ test('financial ledger entries for the deleted sales go with them', function () 
 
     DB::table('financial_ledger_entries')->insert([
         'financial_account_id' => $accountId, 'direction' => 'in', 'amount' => 1000,
-        'source_type' => 'pos_sale', 'source_id' => $sale->id,
+        // Written the way FinancialLedger actually writes it. Hardcoding a
+        // guessed string here is what let the command silently match nothing.
+        'source_type' => $sale->getMorphClass(), 'source_id' => $sale->id,
         'description' => 'Test', 'occurred_at' => now(),
         'created_at' => now(), 'updated_at' => now(),
     ]);
@@ -241,4 +243,31 @@ test('an unknown store is refused rather than guessed at', function () {
     $vendor = purgeVendor('Unknown Store');
 
     $this->artisan("store:purge {$vendor->id} not-a-real-store --force")->assertFailed();
+});
+
+test('the ledger lookup uses the same source_type the app writes, not a guess', function () {
+    $vendor = purgeVendor('Morph Store');
+    $main   = Store::where('vendor_id', $vendor->id)->where('is_default', true)->first();
+    $sale   = purgeSale($vendor, $main, 'POS-MORPH', '2026-08-10 10:00');
+
+    $accountId = DB::table('financial_accounts')->insertGetId([
+        'vendor_id' => $vendor->id, 'name' => 'Cash', 'type' => 'cash',
+        'opening_balance' => 0, 'is_active' => true,
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+
+    DB::table('financial_ledger_entries')->insert([
+        'financial_account_id' => $accountId, 'direction' => 'in', 'amount' => 5000,
+        'source_type' => $sale->getMorphClass(), 'source_id' => $sale->id,
+        'description' => 'Revenue', 'occurred_at' => now(),
+        'created_at' => now(), 'updated_at' => now(),
+    ]);
+
+    // The dry run must SEE the entry — reporting zero here is how a purge
+    // deletes the sale and leaves its revenue behind.
+    $this->artisan("store:purge {$vendor->id} {$main->id} --pos-before=2026-08-14")
+        ->expectsOutputToContain('5,000.00')
+        ->assertSuccessful();
+
+    expect(DB::table('financial_ledger_entries')->count())->toBe(1);
 });

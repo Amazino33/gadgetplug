@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Models\PosSale;
 use App\Models\Store;
 use App\Models\Vendor;
 use Illuminate\Console\Command;
@@ -128,8 +129,13 @@ class PurgeStoreDataCommand extends Command
         $orderIds = $orderItemIds === [] ? [] : DB::table('order_items')
             ->whereIn('id', $orderItemIds)->distinct()->pluck('order_id')->all();
 
+        // Asked of the model rather than hardcoded: FinancialLedger stores
+        // whatever getMorphClass() returns, which with no morph map registered
+        // is the fully qualified class name. A guessed string silently matched
+        // nothing and reported zero ledger entries for sales that had them —
+        // which would have deleted the sales and left their revenue on the books.
         $ledgerIds = $posSaleIds === [] ? [] : DB::table('financial_ledger_entries')
-            ->where('source_type', 'pos_sale')
+            ->where('source_type', (new PosSale())->getMorphClass())
             ->whereIn('source_id', $posSaleIds)
             ->pluck('id')->all();
 
