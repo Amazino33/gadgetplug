@@ -76,6 +76,11 @@ class Vendor extends Model
             ->withTimestamps();
     }
 
+    public function receiptSetting()
+    {
+        return $this->hasOne(VendorReceiptSetting::class);
+    }
+
     public function products()
     {
         return $this->hasMany(Product::class);

@@ -17,7 +17,33 @@ export default function ReceiptModal({ sale, onNewSale, isReprint = false }) {
         setTimeout(() => newSaleRef.current?.focus(), 100);
     }, []);
 
-    const print = () => window.print();
+    // Prints the server-rendered 80mm document rather than this modal.
+    //
+    // Printing the modal meant hiding the whole app with `visibility: hidden`
+    // and pinning the receipt with `position: fixed`, which cannot paginate —
+    // a long sale was silently cut off at one page and the modal's own padding
+    // leaked onto the paper. The standalone page also carries the vendor's
+    // receipt settings, the cashier's name and the store address, none of which
+    // exist in the browser here.
+    //
+    // A sale queued offline has no server id yet, so that case still falls back
+    // to printing this modal.
+    const print = () => {
+        if (!sale?.id) {
+            window.print();
+            return;
+        }
+
+        const existing = document.getElementById('receipt-print-frame');
+        if (existing) existing.remove();
+
+        const frame = document.createElement('iframe');
+        frame.id = 'receipt-print-frame';
+        frame.setAttribute('aria-hidden', 'true');
+        frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+        frame.src = `/pos/receipt/${sale.id}?print=1`;
+        document.body.appendChild(frame);
+    };
 
     const now = new Date();
     const dateStr = now.toLocaleDateString('en-NG', { day: '2-digit', month: 'short', year: 'numeric' });

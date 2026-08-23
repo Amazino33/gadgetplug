@@ -53,6 +53,13 @@ Route::get('/pos/{vendor:slug}', function (\App\Models\Vendor $vendor) {
     ]);
 })->name('pos.vendor');
 
+// A sale rendered as an 80mm receipt document, printed from its own page rather
+// than out of the POS modal. Session-authenticated and vendor-scoped: it names
+// the cashier and customer, so it is not the customer-facing copy.
+Route::get('/pos/receipt/{sale}', [App\Http\Controllers\Pos\PosReceiptController::class, 'show'])
+    ->middleware('auth')
+    ->name('pos.receipt');
+
 // Fallback — bare /pos with no vendor context
 Route::get('/pos', fn () => view('pos.index', [
     'vendorId'   => null,

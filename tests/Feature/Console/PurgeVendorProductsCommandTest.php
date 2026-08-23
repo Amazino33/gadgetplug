@@ -10,14 +10,14 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
-function purgeVendor(): Vendor
+function purgeProductsVendor(): Vendor
 {
     $owner = User::factory()->create();
 
     return Vendor::create(['user_id' => $owner->id, 'name' => 'Purge Store', 'slug' => 'purge-store']);
 }
 
-function purgeProduct(Vendor $vendor, string $name): Product
+function purgeProductsProduct(Vendor $vendor, string $name): Product
 {
     return Product::create([
         'vendor_id'      => $vendor->id,
@@ -30,9 +30,9 @@ function purgeProduct(Vendor $vendor, string $name): Product
 }
 
 test('a dry run reports but deletes nothing', function () {
-    $vendor = purgeVendor();
-    purgeProduct($vendor, 'A');
-    purgeProduct($vendor, 'B');
+    $vendor = purgeProductsVendor();
+    purgeProductsProduct($vendor, 'A');
+    purgeProductsProduct($vendor, 'B');
 
     $this->artisan('products:purge', ['vendor' => $vendor->slug])
         ->assertSuccessful();
@@ -41,9 +41,9 @@ test('a dry run reports but deletes nothing', function () {
 });
 
 test('force deletes a clean catalogue', function () {
-    $vendor = purgeVendor();
-    purgeProduct($vendor, 'A');
-    purgeProduct($vendor, 'B');
+    $vendor = purgeProductsVendor();
+    purgeProductsProduct($vendor, 'A');
+    purgeProductsProduct($vendor, 'B');
 
     $this->artisan('products:purge', ['vendor' => $vendor->slug, '--force' => true])
         ->assertSuccessful();
@@ -52,10 +52,10 @@ test('force deletes a clean catalogue', function () {
 });
 
 test('it never touches another vendor', function () {
-    $mine  = purgeVendor();
+    $mine  = purgeProductsVendor();
     $other = Vendor::create(['user_id' => User::factory()->create()->id, 'name' => 'Other', 'slug' => 'other']);
-    purgeProduct($mine, 'A');
-    purgeProduct($other, 'Theirs');
+    purgeProductsProduct($mine, 'A');
+    purgeProductsProduct($other, 'Theirs');
 
     $this->artisan('products:purge', ['vendor' => $mine->slug, '--force' => true])->assertSuccessful();
 
@@ -66,9 +66,9 @@ test('it never touches another vendor', function () {
 // The important guard: order_items cascades, so deleting a sold product would
 // silently destroy the order line it belongs to.
 test('a product with order history is kept back by default', function () {
-    $vendor = purgeVendor();
-    $clean  = purgeProduct($vendor, 'Clean');
-    $sold   = purgeProduct($vendor, 'Sold');
+    $vendor = purgeProductsVendor();
+    $clean  = purgeProductsProduct($vendor, 'Clean');
+    $sold   = purgeProductsProduct($vendor, 'Sold');
 
     $order = Order::create([
         'reference' => 'GP-PURGE1', 'customer_name' => 'A', 'customer_email' => 'a@b.c',
@@ -88,8 +88,8 @@ test('a product with order history is kept back by default', function () {
 });
 
 test('with-history removes them too', function () {
-    $vendor = purgeVendor();
-    $sold   = purgeProduct($vendor, 'Sold');
+    $vendor = purgeProductsVendor();
+    $sold   = purgeProductsProduct($vendor, 'Sold');
 
     $order = Order::create([
         'reference' => 'GP-PURGE2', 'customer_name' => 'A', 'customer_email' => 'a@b.c',
@@ -118,7 +118,7 @@ test('a vendor can be found by name fragment', function () {
         'name'    => 'Chip Gadget',
         'slug'    => 'chip-gadget',
     ]);
-    purgeProduct($vendor, 'A');
+    purgeProductsProduct($vendor, 'A');
 
     $this->artisan('products:purge', ['vendor' => 'chip gadget', '--force' => true])
         ->assertSuccessful();
@@ -130,8 +130,8 @@ test('a vendor can be found by name fragment', function () {
 test('an ambiguous name refuses to delete anything', function () {
     $a = Vendor::create(['user_id' => User::factory()->create()->id, 'name' => 'Chip Gadget', 'slug' => 'chip-gadget']);
     $b = Vendor::create(['user_id' => User::factory()->create()->id, 'name' => 'Chip Gadget Ikeja', 'slug' => 'chip-gadget-ikeja']);
-    purgeProduct($a, 'A');
-    purgeProduct($b, 'B');
+    purgeProductsProduct($a, 'A');
+    purgeProductsProduct($b, 'B');
 
     $this->artisan('products:purge', ['vendor' => 'Chip Gadget', '--force' => true])
         ->assertFailed();
@@ -143,8 +143,8 @@ test('an ambiguous name refuses to delete anything', function () {
 // Product implements HasMedia; Spatie cleans images from the model's deleting
 // event, which a mass whereIn()->delete() would skip entirely.
 test('deleting a product also removes its media rows', function () {
-    $vendor  = purgeVendor();
-    $product = purgeProduct($vendor, 'With Image');
+    $vendor  = purgeProductsVendor();
+    $product = purgeProductsProduct($vendor, 'With Image');
 
     // A real 1x1 PNG: Spatie generates conversions on add, so fake bytes fail.
     $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==');
