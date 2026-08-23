@@ -58,6 +58,14 @@ return [
         'whatsapp_driver' => env('MESSAGING_WHATSAPP_DRIVER'),
         'sms_driver'      => env('MESSAGING_SMS_DRIVER'),
 
+        // The clock the vendor-facing schedule times are read in — quiet hours and
+        // the daily summary send time. app.timezone is UTC, so without this a
+        // Lagos shopkeeper setting "07:00" would be sent at 08:00 local. Kept
+        // separate from app.timezone deliberately: changing that would move every
+        // stored timestamp and report boundary in the app, which is a far larger
+        // decision than what hour a WhatsApp goes out.
+        'timezone' => env('MESSAGING_TIMEZONE', 'Africa/Lagos'),
+
         // Test-mode safety valve. When set, EVERY delivery message is diverted to
         // this number instead of the real recipient. Leave blank in normal
         // operation — while it is set, no customer receives anything.

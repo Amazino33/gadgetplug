@@ -85,19 +85,32 @@ class VendorNotificationSetting extends Model
             return null;
         }
 
-        $minutesNow = ($now->hour * 60) + $now->minute;
+        // Read on the shop's clock, not the server's. app.timezone is UTC, so
+        // comparing the configured hour against a UTC now() would send a Lagos
+        // vendor's 07:00 summary at 08:00 local.
+        $local = self::inBusinessTimezone($now);
+
+        $minutesNow = ($local->hour * 60) + $local->minute;
 
         if ($minutesNow < $this->minutesOf($this->daily_summary_time)) {
             return null;
         }
 
-        $covers = $now->copy()->subDay()->startOfDay();
+        // Yesterday on the shop's calendar too — near midnight the server's date
+        // and the shop's date are different days, and summarising the server's
+        // "yesterday" would skip or repeat a day of trading.
+        $covers = $local->copy()->subDay()->startOfDay();
 
         if ($this->last_daily_summary_for?->isSameDay($covers)) {
             return null;
         }
 
         return $covers;
+    }
+
+    public static function inBusinessTimezone(CarbonInterface $moment): CarbonInterface
+    {
+        return $moment->copy()->setTimezone(config('services.messaging.timezone', 'Africa/Lagos'));
     }
 
     public function hasStorekeeperNumber(): bool
@@ -142,7 +155,10 @@ class VendorNotificationSetting extends Model
             return false;
         }
 
-        $minutes = ($now->hour * 60) + $now->minute;
+        // Same reason as dailySummaryDueFor: quiet hours are the shop's hours.
+        $local = self::inBusinessTimezone($now);
+
+        $minutes = ($local->hour * 60) + $local->minute;
         $from    = $this->minutesOf($this->quiet_from);
         $until   = $this->minutesOf($this->quiet_until);
 

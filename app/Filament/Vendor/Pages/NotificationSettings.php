@@ -98,7 +98,7 @@ class NotificationSettings extends Page
                             ->label('Send at')
                             ->seconds(false)
                             ->required()
-                            ->helperText('The summary always covers the previous day, so a morning time reports a day that has definitely finished.'),
+                            ->helperText('Nigerian time (WAT). The summary always covers the previous day, so a morning time reports a day that has definitely finished. It is checked every 15 minutes, so it can arrive a few minutes after the time you set.'),
                     ]),
 
                 Section::make('Which alerts to send')
@@ -142,7 +142,7 @@ class NotificationSettings extends Page
 
                         Toggle::make('quiet_hours_enabled')
                             ->label('Respect quiet hours')
-                            ->helperText('Reminders are held back outside the hours below, so a stalled order never wakes anyone. Instant alerts are unaffected.')
+                            ->helperText('Nigerian time (WAT). Reminders are held back outside the hours below, so a stalled order never wakes anyone. Instant alerts are unaffected.')
                             ->live(),
 
                         TimePicker::make('quiet_from')

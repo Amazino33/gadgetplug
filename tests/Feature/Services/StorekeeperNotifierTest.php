@@ -323,11 +323,12 @@ test('quiet hours hold reminders back outside the waking window', function () {
 
     $settings = VendorNotificationSetting::forVendor($data['vendor'])->fresh();
 
-    expect($settings->isQuietAt(Carbon::parse('2026-08-06 03:00')))->toBeTrue()
-        ->and($settings->isQuietAt(Carbon::parse('2026-08-06 07:59')))->toBeTrue()
-        ->and($settings->isQuietAt(Carbon::parse('2026-08-06 08:00')))->toBeFalse()
-        ->and($settings->isQuietAt(Carbon::parse('2026-08-06 19:59')))->toBeFalse()
-        ->and($settings->isQuietAt(Carbon::parse('2026-08-06 20:00')))->toBeTrue();
+    // Quiet hours are the shop's hours, so the boundaries are stated in its clock.
+    expect($settings->isQuietAt(Carbon::parse('2026-08-06 03:00', 'Africa/Lagos')))->toBeTrue()
+        ->and($settings->isQuietAt(Carbon::parse('2026-08-06 07:59', 'Africa/Lagos')))->toBeTrue()
+        ->and($settings->isQuietAt(Carbon::parse('2026-08-06 08:00', 'Africa/Lagos')))->toBeFalse()
+        ->and($settings->isQuietAt(Carbon::parse('2026-08-06 19:59', 'Africa/Lagos')))->toBeFalse()
+        ->and($settings->isQuietAt(Carbon::parse('2026-08-06 20:00', 'Africa/Lagos')))->toBeTrue();
 });
 
 test('a waking window that wraps midnight is handled', function () {

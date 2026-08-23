@@ -85,7 +85,10 @@ class SendVendorDailySummaryCommand extends Command
         }
 
         if ($force) {
-            return $now->copy()->subDay()->startOfDay();
+            // Yesterday on the shop's calendar, matching dailySummaryDueFor.
+            return Carbon::instance(
+                VendorNotificationSetting::inBusinessTimezone($now)->copy()->subDay()->startOfDay()->toDateTime()
+            );
         }
 
         $due = $settings->dailySummaryDueFor($now);

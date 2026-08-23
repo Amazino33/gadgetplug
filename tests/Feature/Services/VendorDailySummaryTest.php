@@ -336,12 +336,59 @@ test('one vendor is never told about another vendors trading', function () {
 
 // --- Scheduling ---------------------------------------------------------
 
+// The configured hour is the shop's hour, not the server's. app.timezone is UTC
+// and the business runs on WAT (UTC+1), so a 07:00 setting must fire at 06:00 UTC.
+test('the send hour is read on the business clock, not the server clock', function () {
+    config(['services.messaging.timezone' => 'Africa/Lagos']);
+
+    $data = setUpSummaryVendor(['daily_summary_time' => '07:00:00']);
+    $settings = VendorNotificationSetting::forVendor($data['vendor'])->fresh();
+
+    // 05:30 UTC = 06:30 Lagos — not yet.
+    expect($settings->dailySummaryDueFor(Carbon::parse('2026-08-23 05:30', 'UTC')))->toBeNull();
+
+    // 06:00 UTC = 07:00 Lagos — due.
+    expect($settings->dailySummaryDueFor(Carbon::parse('2026-08-23 06:00', 'UTC')))->not->toBeNull();
+});
+
+test('quiet hours are read on the business clock too', function () {
+    config(['services.messaging.timezone' => 'Africa/Lagos']);
+
+    $data = setUpSummaryVendor([
+        'quiet_hours_enabled' => true,
+        'quiet_from' => '08:00:00',
+        'quiet_until' => '20:00:00',
+    ]);
+    $settings = VendorNotificationSetting::forVendor($data['vendor'])->fresh();
+
+    // 07:30 UTC = 08:30 Lagos — inside the waking window.
+    expect($settings->isQuietAt(Carbon::parse('2026-08-23 07:30', 'UTC')))->toBeFalse();
+
+    // 19:30 UTC = 20:30 Lagos — past it.
+    expect($settings->isQuietAt(Carbon::parse('2026-08-23 19:30', 'UTC')))->toBeTrue();
+});
+
+// Near midnight the server date and the shop date differ; summarising the
+// server's "yesterday" would skip or repeat a whole day of trading.
+test('the covered date is yesterday on the business calendar', function () {
+    config(['services.messaging.timezone' => 'Africa/Lagos']);
+
+    $data = setUpSummaryVendor(['daily_summary_time' => '00:30:00']);
+    $settings = VendorNotificationSetting::forVendor($data['vendor'])->fresh();
+
+    // 23:45 UTC on the 23rd is already 00:45 on the 24th in Lagos, so the day
+    // to report is the 23rd, not the 22nd.
+    expect($settings->dailySummaryDueFor(Carbon::parse('2026-08-23 23:45', 'UTC'))?->toDateString())
+        ->toBe('2026-08-23');
+});
+
 test('the summary is due once the configured hour has passed', function () {
     $data = setUpSummaryVendor(['daily_summary_time' => '07:00:00']);
     $settings = VendorNotificationSetting::forVendor($data['vendor'])->fresh();
 
-    expect($settings->dailySummaryDueFor(Carbon::parse('2026-08-23 06:30')))->toBeNull()
-        ->and($settings->dailySummaryDueFor(Carbon::parse('2026-08-23 07:00'))?->toDateString())->toBe('2026-08-22');
+    // Parsed in the business timezone so the test states which clock it means.
+    expect($settings->dailySummaryDueFor(Carbon::parse('2026-08-23 06:30', 'Africa/Lagos')))->toBeNull()
+        ->and($settings->dailySummaryDueFor(Carbon::parse('2026-08-23 07:00', 'Africa/Lagos'))?->toDateString())->toBe('2026-08-22');
 });
 
 // A missed 07:00 tick must not skip the day entirely.

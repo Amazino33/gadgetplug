@@ -53,8 +53,12 @@ return Application::configure(basePath: dirname(__DIR__))
         // decides whether its summary is due. An hourly tick that mostly does
         // nothing is the cost of letting every store pick its own hour without
         // a schedule entry per store.
+        // Every fifteen minutes rather than hourly: the send time is a specific
+        // clock time a vendor picked, and an hourly tick would round it up to the
+        // next hour — 14:43 would not go out until 15:00. The run is a cheap
+        // no-op for every vendor that is not due.
         $schedule->command('vendor:daily-summary')
-            ->hourly()
+            ->everyFifteenMinutes()
             ->withoutOverlapping();
 
         // Hourly for the same reason as the affiliate hold above: the 24h
