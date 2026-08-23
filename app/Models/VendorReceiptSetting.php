@@ -36,6 +36,9 @@ class VendorReceiptSetting extends Model
         'show_item_unit_price' => true,
         'footer_alignment'     => 'center',
         'feed_lines'           => 2,
+        'show_qr'              => true,
+        'loyalty_enabled'      => false,
+        'loyalty_goal'         => 10,
     ];
 
     protected function casts(): array
@@ -48,6 +51,9 @@ class VendorReceiptSetting extends Model
             'show_datetime'        => 'boolean',
             'show_item_unit_price' => 'boolean',
             'feed_lines'           => 'integer',
+            'show_qr'              => 'boolean',
+            'loyalty_enabled'      => 'boolean',
+            'loyalty_goal'         => 'integer',
         ];
     }
 

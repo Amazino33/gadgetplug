@@ -24,7 +24,39 @@ class PosSale extends Model
         'synced'          => 'boolean',
         'synced_at'       => 'datetime',
         'completed_at'    => 'datetime',
+        'loyalty_claimed_at' => 'datetime',
     ];
+
+    /**
+     * Every sale gets the token its customer-facing copy is addressed by.
+     *
+     * Set here rather than at the call site so offline sales replayed through
+     * the sync endpoint, and any future path that creates a sale, all get one —
+     * a receipt printed without a token would carry a QR leading nowhere.
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (self $sale) {
+            if (blank($sale->public_token)) {
+                $sale->public_token = static::generatePublicToken();
+            }
+        });
+    }
+
+    public static function generatePublicToken(): string
+    {
+        do {
+            $token = \Illuminate\Support\Str::random(16);
+        } while (static::where('public_token', $token)->exists());
+
+        return $token;
+    }
+
+    /** The address a customer's QR opens. Null until the sale is saved. */
+    public function publicUrl(): ?string
+    {
+        return $this->public_token ? route('receipt.public', $this->public_token) : null;
+    }
 
     public function vendor(): BelongsTo
     {

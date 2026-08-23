@@ -53,6 +53,17 @@ Route::get('/pos/{vendor:slug}', function (\App\Models\Vendor $vendor) {
     ]);
 })->name('pos.vendor');
 
+// The customer's own copy, opened by the QR on the paper. Public by necessity --
+// a customer walking out has no account -- so the random token is the secret, and
+// the page never renders the customer's name or phone. Short path keeps the
+// printed QR coarse enough to scan off thermal paper.
+Route::get('/receipt/{token}', [App\Http\Controllers\PublicReceiptController::class, 'show'])
+    ->name('receipt.public');
+Route::get('/receipt/{token}/pdf', [App\Http\Controllers\PublicReceiptController::class, 'pdf'])
+    ->name('receipt.public.pdf');
+Route::post('/receipt/{token}/loyalty', [App\Http\Controllers\PublicReceiptController::class, 'claimLoyalty'])
+    ->name('receipt.public.loyalty');
+
 // A sale rendered as an 80mm receipt document, printed from its own page rather
 // than out of the POS modal. Session-authenticated and vendor-scoped: it names
 // the cashier and customer, so it is not the customer-facing copy.

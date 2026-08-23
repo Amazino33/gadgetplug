@@ -6,6 +6,7 @@ namespace App\Filament\Vendor\Pages;
 
 use App\Models\PosSale;
 use App\Models\VendorReceiptSetting;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -57,6 +58,8 @@ class ReceiptSettings extends Page
             'show_logo', 'header_alignment',
             'show_receipt_number', 'show_cashier', 'show_customer', 'show_datetime', 'show_item_unit_price',
             'footer_text', 'footer_alignment', 'feed_lines',
+            'show_qr', 'qr_caption', 'banner_image', 'banner_link', 'cta_label', 'cta_link',
+            'loyalty_enabled', 'loyalty_goal', 'loyalty_reward_text',
         ]) + [
             // firstOrNew gives an unsaved model, so column defaults are not
             // applied yet — spell them out so the form never opens blank.
@@ -69,6 +72,9 @@ class ReceiptSettings extends Page
             'show_item_unit_price' => $settings->show_item_unit_price ?? true,
             'show_logo'            => $settings->show_logo ?? false,
             'feed_lines'           => $settings->feed_lines ?? 2,
+            'show_qr'              => $settings->show_qr ?? true,
+            'loyalty_enabled'      => $settings->loyalty_enabled ?? false,
+            'loyalty_goal'         => $settings->loyalty_goal ?? 10,
         ]);
     }
 
@@ -135,6 +141,68 @@ class ReceiptSettings extends Page
                             ->helperText('Feeds the paper so your cut falls clear of the text.'),
                     ])
                     ->columns(2),
+
+                Section::make('QR code')
+                    ->description('Prints a code the customer scans to open their own copy of the receipt on their phone, where they can save it as a PDF.')
+                    ->schema([
+                        Toggle::make('show_qr')
+                            ->label('Print a QR code on the receipt')
+                            ->helperText('The link is unguessable, and the customer\'s name and phone are never shown on that page.'),
+
+                        TextInput::make('qr_caption')
+                            ->label('Words under the code')
+                            ->maxLength(60)
+                            ->placeholder('Scan for your receipt'),
+                    ])
+                    ->columns(2),
+
+                Section::make('On the customer\'s page')
+                    ->description('What the customer sees after scanning — your promo and where you want to send them.')
+                    ->schema([
+                        FileUpload::make('banner_image')
+                            ->label('Banner image')
+                            ->image()
+                            ->directory('receipt-banners')
+                            ->maxSize(2048)
+                            ->helperText('Wide and short works best — roughly 3:1. Shown full width above the buttons.'),
+
+                        TextInput::make('banner_link')
+                            ->label('Banner links to')
+                            ->url()->maxLength(300)
+                            ->placeholder('https://wa.me/2348012345678'),
+
+                        TextInput::make('cta_label')
+                            ->label('Button text')
+                            ->maxLength(40)
+                            ->placeholder('Chat with us on WhatsApp'),
+
+                        TextInput::make('cta_link')
+                            ->label('Button links to')
+                            ->url()->maxLength(300),
+                    ])
+                    ->columns(2),
+
+                Section::make('Loyalty card')
+                    ->description('A card the customer marks on their receipt page. Progress is counted from their real purchase history at your store, so the number they see is one you can stand behind.')
+                    ->schema([
+                        Toggle::make('loyalty_enabled')
+                            ->label('Offer a loyalty card')
+                            ->live(),
+
+                        TextInput::make('loyalty_goal')
+                            ->label('Purchases needed')
+                            ->numeric()->minValue(2)->maxValue(50)->default(10)
+                            ->visible(fn ($get) => $get('loyalty_enabled')),
+
+                        TextInput::make('loyalty_reward_text')
+                            ->label('What they earn')
+                            ->maxLength(80)
+                            ->placeholder('a 10% discount')
+                            ->helperText('Written into the sentence "only 3 more to earn ___", so a short phrase reads best.')
+                            ->visible(fn ($get) => $get('loyalty_enabled'))
+                            ->columnSpanFull(),
+                    ])
+                    ->columns(2),
             ])
             ->statePath('data');
     }
@@ -164,6 +232,17 @@ class ReceiptSettings extends Page
                 'footer_text'          => $data['footer_text'] ?: null,
                 'footer_alignment'     => $data['footer_alignment'] ?? 'center',
                 'feed_lines'           => (int) ($data['feed_lines'] ?? 2),
+
+                'show_qr'              => (bool) ($data['show_qr'] ?? true),
+                'qr_caption'           => $data['qr_caption'] ?: null,
+                'banner_image'         => $data['banner_image'] ?: null,
+                'banner_link'          => $data['banner_link'] ?: null,
+                'cta_label'            => $data['cta_label'] ?: null,
+                'cta_link'             => $data['cta_link'] ?: null,
+
+                'loyalty_enabled'      => (bool) ($data['loyalty_enabled'] ?? false),
+                'loyalty_goal'         => (int) ($data['loyalty_goal'] ?? 10),
+                'loyalty_reward_text'  => $data['loyalty_reward_text'] ?: null,
             ]
         );
 
