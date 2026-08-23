@@ -3,6 +3,7 @@
 use App\Http\Middleware\TrackAffiliateEngagement;
 use App\Jobs\ClearAffiliateHoldsJob;
 use App\Jobs\DemoteInactiveAffiliatesJob;
+use App\Jobs\ReleaseStaleReservationsJob;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -47,6 +48,12 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('storekeeper:remind')
             ->hourly()
             ->withoutOverlapping();
+
+        // Hourly for the same reason as the affiliate hold above: the 24h
+        // staleness window doesn't need finer granularity, but a reservation
+        // sitting stuck for up to a day longer than that window blocks real
+        // stock from real buyers the whole time it waits.
+        $schedule->job(new ReleaseStaleReservationsJob())->hourly();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // Both handlers below exist for the same reason: an error page the user

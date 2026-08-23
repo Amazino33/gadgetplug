@@ -65,6 +65,8 @@ class Order extends Model
         return [
             'preferred_delivery_date'    => 'date',
             'delivery_preference_set_at' => 'datetime',
+            'reserved_at'                => 'datetime',
+            'reservation_released_at'    => 'datetime',
         ];
     }
 

@@ -113,6 +113,11 @@ const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect, autoFocus 
                                 <p className={`text-xs ${p.is_low_stock ? 'text-orange-500' : 'text-gray-400 dark:text-gray-500'}`}>
                                     {p.available_stock} left
                                 </p>
+                                {p.reserved > 0 && (
+                                    <p className="text-[11px] text-amber-600 dark:text-amber-400" title="Held by online order(s) not yet dispatched">
+                                        {p.reserved} reserved online
+                                    </p>
+                                )}
                             </div>
                         </button>
                     ))}

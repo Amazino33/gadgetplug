@@ -3,6 +3,7 @@
 namespace App\Actions\Inventory;
 
 use App\Models\InventoryLedger;
+use App\Models\OrderItem;
 use App\Models\OrderItemStoreAllocation;
 use App\Models\Product;
 use App\Models\Store;
@@ -96,6 +97,19 @@ class ReserveStockAction
                     'reference'        => $reference,
                     'description'      => $description ?? 'Stock reserved for order.',
                 ]);
+            }
+
+            // Stamped once, here, rather than by each of the three checkout
+            // paths that call this action — this is the one place that always
+            // runs when a hold is actually placed. whereNull guards a re-
+            // reserve top-up on the same line from pushing the stale-
+            // reservation clock back out.
+            if ($orderItemId !== null) {
+                $order = OrderItem::find($orderItemId)?->order;
+
+                if ($order !== null && $order->reserved_at === null) {
+                    $order->update(['reserved_at' => now()]);
+                }
             }
 
             // The last store's row, preserving the previous single-row return

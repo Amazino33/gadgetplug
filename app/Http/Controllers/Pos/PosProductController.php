@@ -140,6 +140,11 @@ class PosProductController extends Controller
             // back to the mirror when they are absent.
             'available_stock' => $p->storeAvailable(),
             'is_low_stock'    => $p->isStoreLowStock(),
+            // Shown to the cashier so an override of an online reservation is
+            // a deliberate choice, not a blind one — the goods are still
+            // physically here (available_stock already accounts for this),
+            // but someone is counting on them.
+            'reserved'        => $p->storeReserved(),
             'image'           => $p->getFirstMediaUrl('product-images', 'thumb'),
         ];
     }

@@ -3,9 +3,12 @@
 namespace App\Actions\Inventory;
 
 use App\Models\InventoryLedger;
+use App\Models\Order;
 use App\Models\Product;
+use App\Models\ProductStoreStock;
 use App\Models\Store;
 use App\Services\Inventory\StoreStock;
+use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\DB;
 use Exception;
 
@@ -49,7 +52,7 @@ class AdjustStockAction
             $row->save();
 
             // 5. Record the immutable movement in the ledger
-            return InventoryLedger::create([
+            $ledger = InventoryLedger::create([
                 'vendor_id'        => $product->vendor_id,
                 'store_id'         => $row->store_id,
                 'product_id'       => $product->id,
@@ -61,6 +64,59 @@ class AdjustStockAction
                 'audit_session_id' => $auditSessionId,
                 'reason_code'      => $reasonCode,
             ]);
+
+            // A cashier is deliberately allowed to sell into stock an online
+            // order has reserved — the goods are physically there, and a rider
+            // who never shows up shouldn't leave them dead on the shelf. But
+            // that's a decision only the storekeeper can see is happening if
+            // told, so a sale that pushes this store's row into deficit
+            // (reserved now exceeds what's physically left) flags whichever
+            // online order(s) were counting on it. Scoped to 'pos_sale' only —
+            // every other transaction type (restock, audit_correction, refund)
+            // moves stock for reasons that have nothing to do with this.
+            if ($transactionType === 'pos_sale' && $row->reserved > $row->quantity) {
+                $this->notifyOfOversoldReservation($product, $row);
+            }
+
+            return $ledger;
         });
+    }
+
+    private function notifyOfOversoldReservation(Product $product, ProductStoreStock $row): void
+    {
+        $atRiskOrders = Order::whereIn('status', ['pending', 'confirmed', 'paid'])
+            ->whereHas('items', fn ($q) => $q
+                ->where('product_id', $product->id)
+                ->whereHas('storeAllocations', fn ($sa) => $sa->where('store_id', $row->store_id)))
+            ->with('items.vendor.users', 'items.vendor.user')
+            ->get();
+
+        if ($atRiskOrders->isEmpty()) {
+            return;
+        }
+
+        $shortBy = $row->reserved - $row->quantity;
+
+        foreach ($atRiskOrders as $order) {
+            $vendor = $order->items->first(fn ($item) => $item->product_id === $product->id)?->vendor;
+
+            if (! $vendor) {
+                continue;
+            }
+
+            $recipients = $vendor->users()->get()
+                ->push($vendor->user)
+                ->filter()
+                ->unique('id');
+
+            foreach ($recipients as $user) {
+                Notification::make()
+                    ->title('POS sale oversold a reservation')
+                    ->body("{$product->name} was sold at the till, but order #{$order->reference} was counting on {$shortBy} of that same stock. Check whether that order can still be fulfilled.")
+                    ->icon('heroicon-o-exclamation-triangle')
+                    ->danger()
+                    ->sendToDatabase($user);
+            }
+        }
     }
 }
