@@ -6,6 +6,7 @@ use App\Http\Controllers\Pos\PosCustomerController;
 use App\Http\Controllers\Pos\PosSaleController;
 use App\Http\Controllers\Pos\PosSessionController;
 use App\Http\Controllers\Pos\PosSyncController;
+use App\Http\Middleware\EnsurePosVendorAccess;
 use App\Http\Middleware\NoStoreApiResponse;
 use Illuminate\Support\Facades\Route;
 
@@ -15,7 +16,10 @@ Route::prefix('pos')->middleware(NoStoreApiResponse::class)->group(function () {
     Route::post('auth/login',  [PosAuthController::class, 'login']);
     Route::post('auth/logout', [PosAuthController::class, 'logout'])->middleware('auth:sanctum');
 
-    Route::middleware('auth:sanctum')->group(function () {
+    // Authenticated AND authorised for the vendor the till claims to be. The
+    // second half is not optional: a valid token says who you are, not whose
+    // store you may ring up sales in.
+    Route::middleware(['auth:sanctum', EnsurePosVendorAccess::class])->group(function () {
 
         // Products — initial load + barcode/name search
         Route::get('products',        [PosProductController::class, 'index']);

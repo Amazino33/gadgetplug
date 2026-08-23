@@ -27,6 +27,12 @@ function historyContext(): array
     $cashierA = User::factory()->create();
     $cashierB = User::factory()->create();
 
+    // Both cashiers actually work here. Without this they are strangers to the
+    // vendor, and EnsurePosVendorAccess correctly refuses them the store's
+    // history — the endpoint is not "any authenticated user may read this
+    // vendor's sales", it never was meant to be.
+    $vendor->users()->syncWithoutDetaching([$cashierA->id, $cashierB->id]);
+
     return compact('vendor', 'vendorOwner', 'product', 'cashierA', 'cashierB');
 }
 
