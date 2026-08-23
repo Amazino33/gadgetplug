@@ -19,6 +19,7 @@ use Filament\Support\Icons\Heroicon;
 
 class NotificationSettings extends Page
 {
+    protected static string|null|\UnitEnum $navigationGroup = 'Settings';
     use InteractsWithForms;
 
     protected string $view = 'filament.vendor.pages.notification-settings';
@@ -29,7 +30,7 @@ class NotificationSettings extends Page
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedChatBubbleOvalLeft;
 
-    protected static ?int $navigationSort = 11;
+    protected static ?int $navigationSort = 8;
 
     public ?array $data = [];
 

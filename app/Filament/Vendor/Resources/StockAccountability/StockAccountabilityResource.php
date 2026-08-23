@@ -31,7 +31,7 @@ class StockAccountabilityResource extends Resource
     protected static string|null|\BackedEnum $navigationIcon  = 'heroicon-o-scale';
     protected static string|null|UnitEnum    $navigationGroup = 'Inventory';
     protected static ?string                 $navigationLabel = 'Stock Accountability';
-    protected static ?int                    $navigationSort  = 6;
+    protected static ?int $navigationSort = 6;
 
     // Reuses the same gate as the audit screen this is the consequence of —
     // anyone trusted to review counts can see what came of them.

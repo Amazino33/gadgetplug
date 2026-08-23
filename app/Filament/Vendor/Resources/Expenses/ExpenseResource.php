@@ -30,9 +30,9 @@ class ExpenseResource extends Resource
     protected static ?string $tenantOwnershipRelationshipName = 'vendor';
 
     protected static string|null|\BackedEnum $navigationIcon  = Heroicon::OutlinedReceiptPercent;
-    protected static string|null|UnitEnum   $navigationGroup = 'Store';
+    protected static string|null|UnitEnum   $navigationGroup = 'Money';
     protected static ?string                $navigationLabel = 'Expenses';
-    protected static ?int                   $navigationSort  = 8;
+    protected static ?int $navigationSort = 2;
 
     public static function canAccess(): bool
     {

@@ -27,7 +27,7 @@ class BlindCount extends Page
     protected static string|null|UnitEnum   $navigationGroup = 'Inventory';
     protected static ?string $navigationLabel = 'Inventory Count';
     protected static ?string $title           = 'Inventory Count';
-    protected static ?int    $navigationSort  = 3;
+    protected static ?int $navigationSort = 2;
     protected string  $view = 'filament.vendor.pages.blind-count';
 
     public static function canAccess(): bool

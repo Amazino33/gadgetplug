@@ -15,10 +15,11 @@ use BackedEnum;
 
 class InventoryPage extends Page
 {
+    protected static string|null|\UnitEnum $navigationGroup = 'Inventory';
     protected static null|string|BackedEnum $navigationIcon  = 'heroicon-o-clipboard-document-list';
     protected static ?string $navigationLabel = 'Inventory';
     protected static ?string $title           = 'Inventory & Stock Evaluation';
-    protected static ?int    $navigationSort  = 2;
+    protected static ?int $navigationSort = 1;
     protected string  $view            = 'filament.vendor.pages.inventory';
 
     /**

@@ -19,7 +19,7 @@ class ProcurementResource extends Resource
     protected static string|null|\BackedEnum $navigationIcon  = 'heroicon-o-inbox-arrow-down';
     protected static string|null|\UnitEnum  $navigationGroup = 'Procurement';
     protected static ?string                $navigationLabel = 'Procurements';
-    protected static ?int                   $navigationSort  = 11;
+    protected static ?int $navigationSort = 2;
 
     public static function canAccess(): bool
     {

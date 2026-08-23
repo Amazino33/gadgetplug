@@ -12,6 +12,8 @@ use Illuminate\Support\Str;
 
 class RoleResource extends ShieldRoleResource
 {
+    protected static ?int $navigationSort = 7;
+    protected static string|null|\UnitEnum $navigationGroup = 'Settings';
     public static function isScopedToTenant(): bool
     {
         return false;

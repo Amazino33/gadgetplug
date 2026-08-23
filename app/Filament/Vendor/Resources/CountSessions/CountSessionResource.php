@@ -29,7 +29,7 @@ class CountSessionResource extends Resource
     // old screen of that name, which listed every counted line flat with
     // nothing grouping them — you audit a count, not a wall of product rows.
     protected static ?string                 $navigationLabel = 'Audit Sessions';
-    protected static ?int                    $navigationSort  = 4;
+    protected static ?int $navigationSort = 4;
 
     // Without these, Filament titles the page from the model name and it reads
     // "Blind Count Sessions" — internal wording nobody outside the code uses.

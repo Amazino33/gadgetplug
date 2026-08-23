@@ -22,7 +22,7 @@ class ActivityLogResource extends Resource
     protected static string|null|BackedEnum $navigationIcon  = 'heroicon-o-clipboard-document-list';
     protected static string|null|UnitEnum   $navigationGroup = 'Settings';
     protected static ?string                $navigationLabel = 'Activity Log';
-    protected static ?int                   $navigationSort  = 99;
+    protected static ?int $navigationSort = 9;
 
     public static function isScopedToTenant(): bool
     {

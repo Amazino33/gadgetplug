@@ -18,7 +18,7 @@ class InventoryLedgerResource extends Resource
     protected static string|null|\BackedEnum $navigationIcon  = 'heroicon-o-arrows-up-down';
     protected static string|null|UnitEnum   $navigationGroup = 'Inventory';
     protected static ?string                $navigationLabel = 'Stock Movement';
-    protected static ?int                   $navigationSort  = 5;
+    protected static ?int $navigationSort = 5;
 
     public static function canAccess(): bool
     {

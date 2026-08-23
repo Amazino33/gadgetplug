@@ -29,13 +29,13 @@ class TopSellersReport extends Page
 
     protected static string|null|BackedEnum $navigationIcon = 'heroicon-o-fire';
 
-    protected static string|null|UnitEnum $navigationGroup = 'Store';
+    protected static string|null|UnitEnum $navigationGroup = 'Reports';
 
     protected static ?string $navigationLabel = 'Top Sellers';
 
     protected static ?string $title = 'Top Sellers';
 
-    protected static ?int $navigationSort = 6;
+    protected static ?int $navigationSort = 3;
 
     protected string $view = 'filament.vendor.pages.top-sellers-report';
 

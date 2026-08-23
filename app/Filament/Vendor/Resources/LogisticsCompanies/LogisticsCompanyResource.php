@@ -24,7 +24,7 @@ class LogisticsCompanyResource extends Resource
     protected static string|null|\BackedEnum $navigationIcon  = 'heroicon-o-building-office-2';
     protected static string|null|\UnitEnum  $navigationGroup = 'Logistics';
     protected static ?string                $navigationLabel = 'Logistics Companies';
-    protected static ?int                   $navigationSort  = 10;
+    protected static ?int $navigationSort = 1;
 
     public static function canAccess(): bool
     {

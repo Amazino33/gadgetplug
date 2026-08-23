@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class OrderResource extends Resource
 {
+    protected static string|null|\UnitEnum $navigationGroup = 'Orders';
     protected static ?string $model = Order::class;
 
     // Orders don't have a direct vendor relationship — scoping is handled in getEloquentQuery()

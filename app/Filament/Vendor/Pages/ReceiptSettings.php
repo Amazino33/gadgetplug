@@ -27,8 +27,8 @@ class ReceiptSettings extends Page
     protected static ?string $navigationLabel = 'Receipt Settings';
     protected static ?string $title           = 'Receipt Settings';
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedPrinter;
-    protected static string|null|\UnitEnum   $navigationGroup = 'Store';
-    protected static ?int $navigationSort = 11;
+    protected static string|null|\UnitEnum   $navigationGroup = 'Settings';
+    protected static ?int $navigationSort = 2;
 
     public ?array $data = [];
 

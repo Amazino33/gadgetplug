@@ -17,6 +17,8 @@ use Filament\Support\Icons\Heroicon;
 
 class TeamMembers extends Page
 {
+    protected static ?int $navigationSort = 6;
+    protected static string|null|\UnitEnum $navigationGroup = 'Settings';
     protected static ?string $navigationLabel = 'Team Members';
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedUsers;
     protected static ?string $title = 'Team Members';

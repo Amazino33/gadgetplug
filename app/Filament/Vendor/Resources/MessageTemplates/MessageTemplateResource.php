@@ -26,7 +26,7 @@ class MessageTemplateResource extends Resource
     protected static string|null|\BackedEnum $navigationIcon  = 'heroicon-o-chat-bubble-left-right';
     protected static string|null|\UnitEnum  $navigationGroup = 'Logistics';
     protected static ?string                $navigationLabel = 'Message Templates';
-    protected static ?int                   $navigationSort  = 30;
+    protected static ?int $navigationSort = 3;
 
     public static function canAccess(): bool
     {

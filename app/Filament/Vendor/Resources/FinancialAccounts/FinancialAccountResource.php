@@ -27,9 +27,9 @@ class FinancialAccountResource extends Resource
     protected static ?string $tenantOwnershipRelationshipName = 'vendor';
 
     protected static string|null|\BackedEnum $navigationIcon  = Heroicon::OutlinedBanknotes;
-    protected static string|null|UnitEnum   $navigationGroup = 'Store';
+    protected static string|null|UnitEnum   $navigationGroup = 'Money';
     protected static ?string                $navigationLabel = 'Financial Accounts';
-    protected static ?int                   $navigationSort  = 7;
+    protected static ?int $navigationSort = 1;
 
     public static function canAccess(): bool
     {

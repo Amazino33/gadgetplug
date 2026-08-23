@@ -19,6 +19,7 @@ use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use Filament\Navigation\NavigationGroup;
 use Filament\Navigation\NavigationItem;
 use App\Filament\Vendor\Widgets\StoreMetricsOverview;
 use App\Filament\Vendor\Widgets\SalesChannelChart;
@@ -68,12 +69,33 @@ class VendorPanelProvider extends PanelProvider
                 Authenticate::class,
             ])
             ->tenant(Vendor::class, slugAttribute: 'slug', ownershipRelationship: 'vendors')
+            // No ->icon() on the groups: Filament refuses to render a sidebar
+            // where a group and its items both carry icons, and the per-item
+            // icons are the more useful of the two.
+            //
+            // Declared here so the order is one list you can read, rather than
+            // something inferred from navigationSort values scattered across
+            // thirty-five classes. Every group is collapsed on a user's first
+            // visit — collapsed() also turns on collapsible(), which is what puts
+            // the chevron there — and Filament remembers each person's own
+            // expand/collapse choices in local storage from then on.
+            ->navigationGroups([
+                NavigationGroup::make('Point of Sale')->collapsed(),
+                NavigationGroup::make('Orders')->collapsed(),
+                NavigationGroup::make('Products')->collapsed(),
+                NavigationGroup::make('Inventory')->collapsed(),
+                NavigationGroup::make('Procurement')->collapsed(),
+                NavigationGroup::make('Logistics')->collapsed(),
+                NavigationGroup::make('Money')->collapsed(),
+                NavigationGroup::make('Reports')->collapsed(),
+                NavigationGroup::make('Settings')->collapsed(),
+            ])
             ->navigationItems([
                 NavigationItem::make('POS Terminal')
                     ->url(fn(): string => url('/pos/' . (filament()->getTenant()?->slug ?? '')))
                     ->icon('heroicon-o-computer-desktop')
-                    ->group('Store')
-                    ->sort(99)
+                    ->group('Point of Sale')
+                    ->sort(1)
                     ->visible(function () {
                         $user = auth()->user();
                         $vendor = filament()->getTenant();

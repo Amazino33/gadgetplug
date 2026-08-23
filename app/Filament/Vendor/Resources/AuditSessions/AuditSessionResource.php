@@ -41,7 +41,7 @@ class AuditSessionResource extends Resource
     protected static string|null|BackedEnum $navigationIcon  = 'heroicon-o-clipboard-document-list';
     protected static string|null|UnitEnum   $navigationGroup = 'Inventory';
     protected static ?string                $navigationLabel = 'All Counted Lines';
-    protected static ?int                   $navigationSort  = 5;
+    protected static ?int $navigationSort = 7;
 
     // Off the menu. Auditing now starts from a count and drills into its lines,
     // so a flat list of every line ever counted is not where anyone should

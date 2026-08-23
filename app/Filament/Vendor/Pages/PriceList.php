@@ -15,10 +15,10 @@ use UnitEnum;
 class PriceList extends Page
 {
     protected static null|string|BackedEnum $navigationIcon  = 'heroicon-o-tag';
-    protected static string|null|UnitEnum   $navigationGroup = 'Store';
+    protected static string|null|UnitEnum   $navigationGroup = 'Products';
     protected static ?string $navigationLabel = 'Price List';
     protected static ?string $title           = 'Price List';
-    protected static ?int    $navigationSort  = 5;
+    protected static ?int $navigationSort = 2;
     protected string $view = 'filament.vendor.pages.price-list';
 
     // Deliberately the broadest product permission: this is a reference sheet

@@ -22,13 +22,13 @@ class SalesReport extends Page
 
     protected static string|null|BackedEnum $navigationIcon = 'heroicon-o-chart-bar';
 
-    protected static string|null|UnitEnum $navigationGroup = 'Store';
+    protected static string|null|UnitEnum $navigationGroup = 'Reports';
 
     protected static ?string $navigationLabel = 'Sales Report';
 
     protected static ?string $title = 'Sales Report';
 
-    protected static ?int $navigationSort = 5;
+    protected static ?int $navigationSort = 2;
 
     protected string $view = 'filament.vendor.pages.sales-report';
 

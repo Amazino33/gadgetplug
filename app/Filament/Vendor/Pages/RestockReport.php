@@ -30,13 +30,13 @@ class RestockReport extends Page
 
     protected static string|null|BackedEnum $navigationIcon = 'heroicon-o-arrow-path-rounded-square';
 
-    protected static string|null|UnitEnum $navigationGroup = 'Inventory';
+    protected static string|null|UnitEnum $navigationGroup = 'Reports';
 
     protected static ?string $navigationLabel = 'Restock Report';
 
     protected static ?string $title = 'Restock Report';
 
-    protected static ?int $navigationSort = 6;
+    protected static ?int $navigationSort = 5;
 
     protected string $view = 'filament.vendor.pages.restock-report';
 

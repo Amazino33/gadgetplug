@@ -15,6 +15,7 @@ use Filament\Support\Icons\Heroicon;
 
 class StoreProfile extends Page
 {
+    protected static string|null|\UnitEnum $navigationGroup = 'Settings';
     use InteractsWithForms;
 
     protected string $view = 'filament.vendor.pages.store-profile';
@@ -23,7 +24,7 @@ class StoreProfile extends Page
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedBuildingStorefront;
 
-    protected static ?int $navigationSort = 10;
+    protected static ?int $navigationSort = 1;
 
     public ?array $data = [];
 

@@ -25,7 +25,7 @@ class ReportsHub extends Page
 {
     protected static string|null|BackedEnum $navigationIcon = 'heroicon-o-squares-2x2';
 
-    protected static string|null|UnitEnum $navigationGroup = null;
+    protected static string|null|UnitEnum $navigationGroup = 'Reports';
 
     protected static ?string $navigationLabel = 'Reports';
 
@@ -33,7 +33,7 @@ class ReportsHub extends Page
 
     // Ungrouped, right after the Dashboard — the landing surface for every
     // other report, not filed under any one of them.
-    protected static ?int $navigationSort = -1;
+    protected static ?int $navigationSort = 1;
 
     protected string $view = 'filament.vendor.pages.reports-hub';
 

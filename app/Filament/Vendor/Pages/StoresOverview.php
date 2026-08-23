@@ -26,10 +26,10 @@ use UnitEnum;
 class StoresOverview extends Page
 {
     protected static null|string|BackedEnum $navigationIcon  = 'heroicon-o-building-office-2';
-    protected static string|null|UnitEnum   $navigationGroup = 'Store';
+    protected static string|null|UnitEnum   $navigationGroup = 'Settings';
     protected static ?string $navigationLabel = 'All Stores';
     protected static ?string $title           = 'All Stores';
-    protected static ?int    $navigationSort  = 1;
+    protected static ?int $navigationSort = 4;
     protected string $view = 'filament.vendor.pages.stores-overview';
 
     // Days of sales the comparison covers. Fixed rather than configurable:

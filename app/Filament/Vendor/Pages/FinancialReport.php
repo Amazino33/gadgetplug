@@ -25,13 +25,13 @@ class FinancialReport extends Page
 
     protected static string|null|BackedEnum $navigationIcon = 'heroicon-o-document-chart-bar';
 
-    protected static string|null|UnitEnum $navigationGroup = 'Store';
+    protected static string|null|UnitEnum $navigationGroup = 'Reports';
 
     protected static ?string $navigationLabel = 'Financial Report';
 
     protected static ?string $title = 'Financial Report';
 
-    protected static ?int $navigationSort = 9;
+    protected static ?int $navigationSort = 4;
 
     protected string $view = 'filament.vendor.pages.financial-report';
 

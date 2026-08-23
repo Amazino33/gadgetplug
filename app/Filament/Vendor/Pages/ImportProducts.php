@@ -45,7 +45,7 @@ class ImportProducts extends Page
 
     protected static ?string $title = 'Import Products';
 
-    protected static ?int $navigationSort = 9;
+    protected static ?int $navigationSort = 3;
 
     protected string $view = 'filament.vendor.pages.import-products';
 

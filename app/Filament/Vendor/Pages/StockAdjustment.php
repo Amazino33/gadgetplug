@@ -33,7 +33,7 @@ class StockAdjustment extends Page
     protected static string|null|UnitEnum   $navigationGroup = 'Inventory';
     protected static ?string $navigationLabel = 'Stock Adjustment';
     protected static ?string $title           = 'Stock Adjustment';
-    protected static ?int    $navigationSort  = 4;
+    protected static ?int $navigationSort = 3;
     protected string $view = 'filament.vendor.pages.stock-adjustment';
 
     /**

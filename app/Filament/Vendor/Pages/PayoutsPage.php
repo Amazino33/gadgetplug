@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\DB;
 
 class PayoutsPage extends Page implements HasTable
 {
+    protected static string|null|\UnitEnum $navigationGroup = 'Money';
     use InteractsWithForms;
     use InteractsWithTable;
 
@@ -31,7 +32,7 @@ class PayoutsPage extends Page implements HasTable
 
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedBanknotes;
 
-    protected static ?int $navigationSort = 20;
+    protected static ?int $navigationSort = 3;
 
     public ?array $data = [];
 

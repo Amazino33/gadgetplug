@@ -21,9 +21,9 @@ class PosSaleResource extends Resource
     protected static ?string $tenantOwnershipRelationshipName = 'vendor';
 
     protected static string|null|\BackedEnum $navigationIcon  = 'heroicon-o-receipt-percent';
-    protected static string|null|UnitEnum   $navigationGroup = 'Store';
+    protected static string|null|UnitEnum   $navigationGroup = 'Point of Sale';
     protected static ?string                $navigationLabel = 'POS Sales';
-    protected static ?int                   $navigationSort  = 6;
+    protected static ?int $navigationSort = 2;
 
     public static function canAccess(): bool
     {

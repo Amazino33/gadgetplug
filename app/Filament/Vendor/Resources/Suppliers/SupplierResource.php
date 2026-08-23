@@ -21,7 +21,7 @@ class SupplierResource extends Resource
     protected static string|null|\BackedEnum $navigationIcon  = 'heroicon-o-truck';
     protected static string|null|\UnitEnum  $navigationGroup = 'Procurement';
     protected static ?string                $navigationLabel = 'Suppliers';
-    protected static ?int                   $navigationSort  = 10;
+    protected static ?int $navigationSort = 1;
 
     public static function canAccess(): bool
     {

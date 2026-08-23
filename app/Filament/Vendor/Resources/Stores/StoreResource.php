@@ -46,9 +46,9 @@ class StoreResource extends Resource
     protected static bool $isScopedToTenant = false;
 
     protected static string|null|\BackedEnum $navigationIcon  = Heroicon::OutlinedBuildingStorefront;
-    protected static string|null|UnitEnum    $navigationGroup = 'Store';
+    protected static string|null|UnitEnum    $navigationGroup = 'Settings';
     protected static ?string                 $navigationLabel = 'Manage Stores';
-    protected static ?int                    $navigationSort  = 2;
+    protected static ?int $navigationSort = 5;
     protected static ?string                 $modelLabel      = 'store';
 
     public static function canAccess(): bool

@@ -20,10 +20,10 @@ use UnitEnum;
 class StoreSelector extends Page
 {
     protected static null|string|BackedEnum $navigationIcon  = 'heroicon-o-building-storefront';
-    protected static string|null|UnitEnum   $navigationGroup = 'Store';
+    protected static string|null|UnitEnum   $navigationGroup = 'Settings';
     protected static ?string $navigationLabel = 'Switch Store';
     protected static ?string $title           = 'Your Stores';
-    protected static ?int    $navigationSort  = 0;
+    protected static ?int $navigationSort = 3;
     protected string $view = 'filament.vendor.pages.store-selector';
 
     // Everyone who can see products can see the stores they hold them in —
