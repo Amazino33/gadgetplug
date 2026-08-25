@@ -43,58 +43,72 @@
     .al-right  { text-align: right; }
 
     .store-name {
-        font-size: 16px;
+        font-size: 19px;
         font-weight: bold;
-        letter-spacing: .5px;
-        margin: 0 0 2px;
+        letter-spacing: 1px;
+        margin: 0 0 1mm;
         text-transform: uppercase;
+        line-height: 1.15;
     }
     .header-line { margin: 0; font-size: 11px; }
 
     .logo { max-width: 40mm; max-height: 18mm; margin: 0 auto 4px; display: block; }
 
+    /* Solid black hairline, never a grey or a dashed one. A thermal head is
+       1-bit: any grey is dithered into a speckled line, and dashes at 203dpi
+       come out chewed. Weight is varied with thickness instead of colour. */
     hr {
         border: 0;
-        border-top: 1px dashed #000;
-        margin: 6px 0;
+        border-top: 1px solid #000;
+        margin: 2mm 0;
     }
 
     /* Label/value rows — the label is allowed to wrap, the value never is. */
     .row {
         display: flex;
         justify-content: space-between;
-        gap: 6px;
+        gap: 4mm;
         font-size: 11px;
+        padding: .2mm 0;
     }
     .row .v { white-space: nowrap; text-align: right; }
 
-    table.items { width: 100%; border-collapse: collapse; }
-    table.items td { padding: 1px 0; vertical-align: top; font-size: 11px; }
-    td.qty   { width: 8mm;  text-align: left; white-space: nowrap; }
-    td.amt   { width: 20mm; text-align: right; white-space: nowrap; }
-    .item-name { word-break: break-word; }
-    .unit-price { font-size: 10px; }
+    /* One item = a full-width name, then its money on the line below. Three
+       columns across 72mm leave the amount about 20mm, which is fine for
+       44,000.00 and breaks 1,122,300.00 across two lines. */
+    .items { margin: 1mm 0; }
+    .item { margin-bottom: 1.6mm; }
+    .item-name { word-break: break-word; font-size: 12px; }
+    .item-line {
+        display: flex;
+        justify-content: space-between;
+        gap: 4mm;
+        font-size: 11px;
+    }
+    .item-qty { color: #000; }
+    .item-amt { white-space: nowrap; font-weight: bold; }
 
     .totals .row { font-size: 11px; }
     .grand {
-        font-size: 15px;
+        font-size: 17px;
         font-weight: bold;
-        border-top: 1px solid #000;
-        padding-top: 3px;
-        margin-top: 3px;
+        border-top: 2px solid #000;
+        border-bottom: 2px solid #000;
+        padding: 1.2mm 0;
+        margin-top: 1.5mm;
     }
 
-    .footer { margin-top: 8px; font-size: 11px; white-space: pre-line; }
+    .footer { margin-top: 2.5mm; font-size: 11px; white-space: pre-line; line-height: 1.4; }
 
     /* 30mm square. Smaller than this and a thermal head's dot size starts
        eating the finder patterns, which is when phones stop reading it. */
-    .qr-block { margin-top: 4px; }
+    .qr-block { margin-top: 3mm; }
     /* Inline SVG rather than an <img> data URI, so the code stays vector all
        the way into the print raster instead of being rasterised at screen dpi
        and upscaled by the printer. */
     .qr { width: 30mm; height: 30mm; margin: 0 auto 2px; }
     .qr svg { width: 100%; height: 100%; display: block; }
-    .qr-caption { margin: 0; font-size: 10px; }
+    .qr-caption { margin: .5mm 0 0; font-size: 10px; }
     .feed { height: 0; }
 
     /* On screen (the POS preview / a phone) give it a paper-like frame; when
@@ -147,21 +161,27 @@
 
 <hr>
 
-{{-- ── Items ──────────────────────────────────────────────────────────── --}}
-<table class="items">
+{{-- ── Items ──────────────────────────────────────────────────────────────
+     The name gets the full width and the money sits on its own line beneath it.
+     Squeezing name, quantity and amount into three columns of 72mm leaves the
+     amount barely 20mm — enough for 44,000.00 but not 1,122,300.00, which then
+     wraps mid-number. Two lines per item is more paper and far more readable. --}}
+<div class="items">
     @foreach($items as $item)
-    <tr>
-        <td class="qty">{{ $item['quantity'] }}x</td>
-        <td>
-            <div class="item-name">{{ $item['name'] }}</div>
-            @if($settings->show_item_unit_price)
-                <div class="unit-price">@ {{ $money($item['unit_price']) }}</div>
-            @endif
-        </td>
-        <td class="amt">{{ $money($item['total']) }}</td>
-    </tr>
+    <div class="item">
+        <div class="item-name">{{ $item['name'] }}</div>
+        <div class="item-line">
+            <span class="item-qty">
+                {{ $item['quantity'] }}
+                @if($settings->show_item_unit_price)
+                    &times; {{ $money($item['unit_price']) }}
+                @endif
+            </span>
+            <span class="item-amt">{{ $money($item['total']) }}</span>
+        </div>
+    </div>
     @endforeach
-</table>
+</div>
 
 <hr>
 
