@@ -31,7 +31,7 @@ export default function ActionGrid({
     cartEmpty, noSelection,
     onDeleteItem, onSearch, onChangeQty, onNewSale,
     onDiscount, onCustomer,
-    onQuickCash, onSuspend, onPayment, onVoid,
+    onQuickCash, onQuickPOS, onSuspend, onPayment, onVoid,
     onZReport, onReturn,
     pendingSales = [], onResumePending, onClearPending, pendingError,
 }) {
@@ -65,7 +65,7 @@ export default function ActionGrid({
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">Payment</p>
                 <div className="grid grid-cols-2 gap-2">
                     <Btn label="Quick Cash"      hotkey="F12" disabled={cartEmpty}    onClick={onQuickCash} />
-                    <Btn label="Suspend Sale"    hotkey="F9"  disabled={cartEmpty}    onClick={onSuspend} />
+                    <Btn label="Quick POS"       hotkey="F11" disabled={cartEmpty}    onClick={onQuickPOS} />
                 </div>
                 <div className="mt-2">
                     <button
@@ -96,6 +96,9 @@ export default function ActionGrid({
                         <span className="text-[10px] font-bold opacity-70">Esc</span>
                         <span className="text-sm font-bold">Void Order</span>
                     </button>
+                </div>
+                <div className="mt-2">
+                    <Btn label="Suspend Sale"    hotkey="F9"  disabled={cartEmpty}    onClick={onSuspend} wide={true} />
                 </div>
 
                 {pendingError && (

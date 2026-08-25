@@ -6,6 +6,7 @@ const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect, autoFocus 
     const [query, setQuery]     = useState('');
     const [results, setResults] = useState([]);
     const [open, setOpen]       = useState(false);
+    const [activeIndex, setActiveIndex] = useState(-1);
     const inputRef              = useRef(null);
     const debounceRef           = useRef(null);
 
@@ -14,7 +15,7 @@ const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect, autoFocus 
     }));
 
     const search = useCallback(async (q) => {
-        if (!q.trim()) { setResults([]); setOpen(false); return; }
+        if (!q.trim()) { setResults([]); setOpen(false); setActiveIndex(-1); return; }
 
         // Search IndexedDB first (offline-capable)
         const local = await db.products
@@ -29,8 +30,9 @@ const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect, autoFocus 
         if (local.length > 0) {
             setResults(local);
             setOpen(true);
+            setActiveIndex(-1);
 
-            // Exact barcode match — auto-add immediately
+            // Exact barcode match ?" auto-add immediately
             const exact = local.find((p) => p.barcode === q);
             if (exact) { pick(exact); return; }
         }
@@ -41,6 +43,7 @@ const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect, autoFocus 
                 const { data } = await api.get('/products/search', { params: { vendor_id: vendorId, q } });
                 setResults(data);
                 setOpen(data.length > 0);
+                setActiveIndex(-1);
                 const exact = data.find((p) => p.barcode === q);
                 if (exact) { pick(exact); return; }
             } catch { /* stay offline */ }
@@ -52,6 +55,7 @@ const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect, autoFocus 
         setQuery('');
         setResults([]);
         setOpen(false);
+        setActiveIndex(-1);
         // Deferred: refocusing synchronously here re-fires the input's onFocus
         // handler with a stale (non-empty) `query` closure from before this
         // batch commits, which calls setOpen(true) again and undoes the close
@@ -67,8 +71,27 @@ const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect, autoFocus 
     };
 
     const onKeyDown = (e) => {
-        if (e.key === 'Escape') { setOpen(false); setQuery(''); }
-        if (e.key === 'Enter' && results.length === 1) pick(results[0]);
+        if (e.key === 'Escape') { setOpen(false); setQuery(''); setActiveIndex(-1); }
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (open && results.length > 0) {
+                setActiveIndex((prev) => (prev < results.length - 1 ? prev + 1 : prev));
+            }
+        }
+        if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            if (open && results.length > 0) {
+                setActiveIndex((prev) => (prev > 0 ? prev - 1 : 0));
+            }
+        }
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            if (open && activeIndex >= 0 && activeIndex < results.length) {
+                pick(results[activeIndex]);
+            } else if (results.length === 1) {
+                pick(results[0]);
+            }
+        }
     };
 
     return (
@@ -86,7 +109,7 @@ const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect, autoFocus 
                     onKeyDown={onKeyDown}
                     onFocus={() => query && setOpen(true)}
                     onBlur={() => setTimeout(() => setOpen(false), 150)}
-                    placeholder="Scan barcode or search product…  [F3]"
+                    placeholder="Scan barcode or search product...  [F3]"
                     autoFocus={autoFocus}
                     className="flex-1 bg-transparent text-sm outline-none placeholder-gray-400 dark:placeholder-gray-500 text-gray-800 dark:text-gray-100"
                 />
@@ -94,11 +117,11 @@ const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect, autoFocus 
 
             {open && results.length > 0 && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg z-50 max-h-72 overflow-y-auto">
-                    {results.map((p) => (
+                    {results.map((p, index) => (
                         <button
                             key={p.id}
                             onMouseDown={() => pick(p)}
-                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 text-left border-b border-gray-50 dark:border-gray-800 last:border-0"
+                            className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 text-left border-b border-gray-50 dark:border-gray-800 last:border-0 ${activeIndex === index ? 'bg-gray-100 dark:bg-gray-800' : ''}`}
                         >
                             {p.image
                                 ? <img src={p.image} className="w-10 h-10 rounded-lg object-cover shrink-0" />

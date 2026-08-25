@@ -157,12 +157,14 @@ export default function POS({ user, vendorId, onLogout }) {
 
     // ── Cart operations ──────────────────────────────────────────────
 
-    const addProduct = useCallback((product) => {
+    const addProduct = useCallback((product, fromSearch = false) => {
         setCart((prev) => {
             const idx = prev.findIndex((i) => i.id === product.id);
             if (idx >= 0) {
                 const updated = [...prev];
-                updated[idx] = { ...updated[idx], qty: updated[idx].qty + 1 };
+                if (!fromSearch) {
+                    updated[idx] = { ...updated[idx], qty: updated[idx].qty + 1 };
+                }
                 setSelectedIdx(idx);
                 return updated;
             }
@@ -172,7 +174,12 @@ export default function POS({ user, vendorId, onLogout }) {
             // customer would otherwise have paid.
             return [...prev, { ...product, listPrice: product.price, qty: 1, lineDiscount: 0 }];
         });
-        setTimeout(() => searchRef.current?.focus(), 50);
+        
+        if (fromSearch) {
+            setModal('quantity');
+        } else {
+            setTimeout(() => searchRef.current?.focus(), 50);
+        }
     }, []);
 
     const updateQty = (idx, qty) => {
@@ -361,14 +368,14 @@ export default function POS({ user, vendorId, onLogout }) {
                         </div>
                     </div>
                     <div className="px-4 pb-3 flex items-center gap-2">
-                        <SearchBar vendorId={vendorId} onSelect={addProduct} autoFocus={false} />
+                        <SearchBar vendorId={vendorId} onSelect={(p) => addProduct(p, true)} autoFocus={false} />
                         <BarcodeScanner vendorId={vendorId} onProductFound={addProduct} />
                     </div>
                 </div>
 
                 {/* ── Desktop header ──────────────────────────────── */}
                 <div className="hidden md:flex items-center gap-2 px-4 py-3 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 shrink-0">
-                    <SearchBar ref={searchRef} vendorId={vendorId} onSelect={addProduct} />
+                    <SearchBar ref={searchRef} vendorId={vendorId} onSelect={(p) => addProduct(p, true)} />
                     <BarcodeScanner vendorId={vendorId} onProductFound={addProduct} />
                     <span className={`text-xs px-2 py-1 rounded-full font-medium shrink-0 ${isOnline ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
                         {isOnline ? '●' : '●'}
@@ -521,16 +528,34 @@ export default function POS({ user, vendorId, onLogout }) {
                                 {fmt(total)}
                             </div>
                         </div>
-                        <button
-                            onClick={() => !cartEmpty && setModal('payment')}
-                            disabled={cartEmpty}
-                            className="h-[74px] w-5/12 rounded-2xl bg-[#068B03] text-white font-bold text-lg flex items-center justify-center gap-2 active:scale-95 transition-all disabled:opacity-40 shrink-0"
-                        >
-                            CHARGE
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
-                        </button>
+                        <div className="w-5/12 flex flex-col gap-1.5 shrink-0">
+                            <div className="flex gap-1.5 h-[34px]">
+                                <button
+                                    onClick={() => !cartEmpty && completeSale({ paymentMethod: 'cash', amountTendered: total })}
+                                    disabled={cartEmpty}
+                                    className="flex-1 rounded-xl bg-white border border-gray-200 text-gray-700 text-[10px] font-bold active:scale-95 transition-all disabled:opacity-40 shadow-sm"
+                                >
+                                    CASH
+                                </button>
+                                <button
+                                    onClick={() => !cartEmpty && completeSale({ paymentMethod: 'pos', amountTendered: total })}
+                                    disabled={cartEmpty}
+                                    className="flex-1 rounded-xl bg-white border border-gray-200 text-gray-700 text-[10px] font-bold active:scale-95 transition-all disabled:opacity-40 shadow-sm"
+                                >
+                                    POS
+                                </button>
+                            </div>
+                            <button
+                                onClick={() => !cartEmpty && setModal('payment')}
+                                disabled={cartEmpty}
+                                className="h-[34px] rounded-xl bg-[#068B03] text-white font-bold text-sm flex items-center justify-center gap-1 active:scale-95 transition-all disabled:opacity-40 shadow-sm"
+                            >
+                                CHARGE
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                </svg>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -547,6 +572,7 @@ export default function POS({ user, vendorId, onLogout }) {
                     onDiscount={() => setModal('discount')}
                     onCustomer={() => setModal('customer')}
                     onQuickCash={() => !cartEmpty && completeSale({ paymentMethod: 'cash', amountTendered: total })}
+                    onQuickPOS={() => !cartEmpty && completeSale({ paymentMethod: 'pos', amountTendered: total })}
                     onSuspend={suspendCurrentSale}
                     onPayment={() => !cartEmpty && setModal('payment')}
                     onVoid={clearCart}
