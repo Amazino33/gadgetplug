@@ -4,6 +4,7 @@ use App\Http\Controllers\Pos\PosAuthController;
 use App\Http\Controllers\Pos\PosProductController;
 use App\Http\Controllers\Pos\PosCustomerController;
 use App\Http\Controllers\Pos\PosSaleController;
+use App\Http\Controllers\Pos\PosReceiptController;
 use App\Http\Controllers\Pos\PosSessionController;
 use App\Http\Controllers\Pos\PosSyncController;
 use App\Http\Middleware\EnsurePosVendorAccess;
@@ -31,6 +32,7 @@ Route::prefix('pos')->middleware(NoStoreApiResponse::class)->group(function () {
 
         // Sales
         Route::post('sales',                       [PosSaleController::class, 'store']);
+        Route::get('sales/{sale}/receipt',         [PosReceiptController::class, 'show']);
         Route::post('sales/{sale}/void',           [PosSaleController::class, 'void']);
         Route::post('sales/{sale}/return',         [PosSaleController::class, 'processReturn']);
         Route::get('sales/{reference}/by-ref',     [PosSaleController::class, 'findByReference']);

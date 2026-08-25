@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { fmt } from '../lib/format';
+import api from '../lib/api';
 
 const CONFIG = window.POS_CONFIG ?? {};
 
@@ -28,7 +29,7 @@ export default function ReceiptModal({ sale, onNewSale, isReprint = false }) {
     //
     // A sale queued offline has no server id yet, so that case still falls back
     // to printing this modal.
-    const print = () => {
+    const print = async () => {
         if (!sale?.id) {
             window.print();
             return;
@@ -41,8 +42,17 @@ export default function ReceiptModal({ sale, onNewSale, isReprint = false }) {
         frame.id = 'receipt-print-frame';
         frame.setAttribute('aria-hidden', 'true');
         frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
-        frame.src = `/pos/receipt/${sale.id}?print=1`;
         document.body.appendChild(frame);
+
+        try {
+            const { data: html } = await api.get(`/sales/${sale.id}/receipt?print=1`);
+            frame.contentWindow.document.open();
+            frame.contentWindow.document.write(html);
+            frame.contentWindow.document.close();
+        } catch (err) {
+            console.error('Failed to load server receipt:', err);
+            window.print();
+        }
     };
 
     const now = new Date();
