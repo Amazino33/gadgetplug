@@ -538,11 +538,18 @@ export default function POS({ user, vendorId, onLogout }) {
                                     CASH
                                 </button>
                                 <button
-                                    onClick={() => !cartEmpty && completeSale({ paymentMethod: 'pos', amountTendered: total })}
+                                    onClick={() => !cartEmpty && completeSale({ paymentMethod: 'card', amountTendered: total })}
                                     disabled={cartEmpty}
                                     className="flex-1 rounded-xl bg-white border border-gray-200 text-gray-700 text-[10px] font-bold active:scale-95 transition-all disabled:opacity-40 shadow-sm"
                                 >
                                     POS
+                                </button>
+                                <button
+                                    onClick={() => !cartEmpty && completeSale({ paymentMethod: 'bank_transfer', amountTendered: total })}
+                                    disabled={cartEmpty}
+                                    className="flex-1 rounded-xl bg-white border border-gray-200 text-gray-700 text-[10px] font-bold active:scale-95 transition-all disabled:opacity-40 shadow-sm"
+                                >
+                                    TFER
                                 </button>
                             </div>
                             <button
@@ -572,7 +579,8 @@ export default function POS({ user, vendorId, onLogout }) {
                     onDiscount={() => setModal('discount')}
                     onCustomer={() => setModal('customer')}
                     onQuickCash={() => !cartEmpty && completeSale({ paymentMethod: 'cash', amountTendered: total })}
-                    onQuickPOS={() => !cartEmpty && completeSale({ paymentMethod: 'pos', amountTendered: total })}
+                    onQuickPOS={() => !cartEmpty && completeSale({ paymentMethod: 'card', amountTendered: total })}
+                    onQuickTransfer={() => !cartEmpty && completeSale({ paymentMethod: 'bank_transfer', amountTendered: total })}
                     onSuspend={suspendCurrentSale}
                     onPayment={() => !cartEmpty && setModal('payment')}
                     onVoid={clearCart}
