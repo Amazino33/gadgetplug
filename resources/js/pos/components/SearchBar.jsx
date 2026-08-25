@@ -31,7 +31,7 @@ const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect, autoFocus 
             setOpen(true);
 
             // Exact barcode match — auto-add immediately
-            const exact = local.find((p) => p.barcode === q || p.sku === q);
+            const exact = local.find((p) => p.barcode === q);
             if (exact) { pick(exact); return; }
         }
 
@@ -41,7 +41,7 @@ const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect, autoFocus 
                 const { data } = await api.get('/products/search', { params: { vendor_id: vendorId, q } });
                 setResults(data);
                 setOpen(data.length > 0);
-                const exact = data.find((p) => p.barcode === q || p.sku === q);
+                const exact = data.find((p) => p.barcode === q);
                 if (exact) { pick(exact); return; }
             } catch { /* stay offline */ }
         }
