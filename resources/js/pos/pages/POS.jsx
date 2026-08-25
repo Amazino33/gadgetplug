@@ -265,7 +265,7 @@ export default function POS({ user, vendorId, onLogout }) {
         if (isOnline) {
             try {
                 const { data } = await api.post('/sales', payload);
-                savedSale = { ...payload, reference: data.reference };
+                savedSale = { ...payload, id: data.id, reference: data.reference };
             } catch (err) {
                 if (err.response) {
                     // The server was reached and refused the sale (insufficient
