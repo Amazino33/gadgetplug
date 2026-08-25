@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { fmt } from '../lib/format';
 import api from '../lib/api';
 
@@ -11,6 +11,10 @@ export default function ReceiptModal({ sale, onNewSale, isReprint = false }) {
     const isSplit = payment_method === 'split';
 
     const printRef = useRef(null);
+
+    // Surfaced on screen when the receipt document could not be fetched, so a
+    // failing printer path is visible at the till instead of silently degrading.
+    const [printWarning, setPrintWarning] = useState(null);
 
     // Auto-focus the "New Sale" button so Enter immediately starts next sale
     const newSaleRef = useRef(null);
@@ -54,7 +58,14 @@ export default function ReceiptModal({ sale, onNewSale, isReprint = false }) {
             frame.contentWindow.document.write(html);
             frame.contentWindow.document.close();
         } catch (err) {
-            console.error('Failed to load server receipt:', err);
+            // Falling back silently is how this stayed hidden: the till printed
+            // the modal — no QR, no store details, wrong paper size — and looked
+            // like the receipt was simply badly designed rather than failing.
+            // Say so, then still give the cashier paper.
+            const status = err?.response?.status;
+            const detail = status ? `HTTP ${status}` : (err?.message ?? 'network error');
+            console.error(`Receipt document failed (${detail}) — printing the fallback copy.`, err);
+            setPrintWarning(`Printed a basic copy — the full receipt could not be loaded (${detail}).`);
             window.print();
         }
     };
@@ -208,6 +219,10 @@ export default function ReceiptModal({ sale, onNewSale, isReprint = false }) {
 
                     <p className="text-center text-[10px] text-gray-300 mt-4">Thank you for shopping with us</p>
                 </div>
+
+                {printWarning && (
+                    <p className="px-6 pb-2 text-[11px] text-amber-600">{printWarning}</p>
+                )}
 
                 {/* Actions */}
                 <div className="flex gap-3 px-6 pb-6">

@@ -57,9 +57,31 @@ class PosReceiptController extends Controller
             // ?print=1 makes the page print itself — that is how the POS opens it
             'autoPrint'    => $request->boolean('print'),
             // Rendered at generous size: a thermal head turns a small QR to mush.
-            'qrSvg'        => ($settings->show_qr ?? true) && $sale->public_token
-                ? \App\Services\QrCode::svg($sale->publicUrl(), 240)
-                : null,
+            //
+            // Never allowed to take the receipt down with it. If the QR encoder
+            // fails, the cashier still needs paper in the customer's hand — and
+            // the POS treats any error from this endpoint as "print the old
+            // modal instead", so an exception here costs the whole layout, not
+            // just the code.
+            'qrSvg'        => $this->qrOrNull($settings, $sale),
         ]);
+    }
+
+    private function qrOrNull(\App\Models\VendorReceiptSetting $settings, PosSale $sale): ?string
+    {
+        if (! ($settings->show_qr ?? true) || ! $sale->public_token) {
+            return null;
+        }
+
+        try {
+            return \App\Services\QrCode::svg($sale->publicUrl(), 240);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Receipt QR could not be generated', [
+                'sale_id' => $sale->id,
+                'error'   => $e->getMessage(),
+            ]);
+
+            return null;
+        }
     }
 }
