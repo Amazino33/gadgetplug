@@ -227,11 +227,11 @@
 
 @if($autoPrint)
 <script>
-    window.addEventListener('load', function () {
+    setTimeout(function () {
         window.print();
         // Close only when this page opened itself as a print window
         window.onafterprint = function () { if (window.opener) { window.close(); } };
-    });
+    }, 250);
 </script>
 @endif
 
