@@ -34,6 +34,10 @@ export default function SalesHistoryModal({ vendorId, onClose, onReprint }) {
 
     const reprint = (sale) => {
         onReprint({
+            // Without this the receipt modal cannot fetch the real document and
+            // silently prints itself instead — no QR, no store details, wrong
+            // paper size. Same omission as the new-sale path had.
+            id:                      sale.id,
             reference:               sale.reference,
             items:                   sale.items,
             subtotal:                sale.subtotal,

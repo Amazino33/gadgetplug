@@ -35,6 +35,14 @@ export default function ReceiptModal({ sale, onNewSale, isReprint = false }) {
     // to printing this modal.
     const print = async () => {
         if (!sale?.id) {
+            // Offline this is expected — the sale has no server id until it
+            // syncs. Online it means whoever built this sale object dropped the
+            // id, and the till quietly prints the wrong thing. That mistake has
+            // now been made twice (new sale, then reprint), so it says so.
+            if (navigator.onLine) {
+                console.warn('Receipt has no sale id — printing the fallback copy instead of the receipt document.');
+                setPrintWarning('Printed a basic copy — this receipt was not linked to a saved sale.');
+            }
             window.print();
             return;
         }
