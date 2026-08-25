@@ -41,7 +41,11 @@ export default function ReceiptModal({ sale, onNewSale, isReprint = false }) {
         const frame = document.createElement('iframe');
         frame.id = 'receipt-print-frame';
         frame.setAttribute('aria-hidden', 'true');
-        frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+        // Sized to the paper and parked off-screen rather than collapsed to
+        // 0x0. A zero-width frame gives the receipt a zero-width containing
+        // block to lay out against, and the printer then scales whatever it got
+        // to fit the roll — which is what made the print blurry.
+        frame.style.cssText = 'position:fixed;left:-10000px;top:0;width:80mm;height:297mm;border:0;';
         document.body.appendChild(frame);
 
         try {

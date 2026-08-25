@@ -57,8 +57,8 @@ class PosReceiptController extends Controller
             // ?print=1 makes the page print itself — that is how the POS opens it
             'autoPrint'    => $request->boolean('print'),
             // Rendered at generous size: a thermal head turns a small QR to mush.
-            'qrDataUri'    => ($settings->show_qr ?? true) && $sale->public_token
-                ? \App\Services\QrCode::svgDataUri($sale->publicUrl(), 240)
+            'qrSvg'        => ($settings->show_qr ?? true) && $sale->public_token
+                ? \App\Services\QrCode::svg($sale->publicUrl(), 240)
                 : null,
         ]);
     }

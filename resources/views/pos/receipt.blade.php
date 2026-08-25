@@ -89,7 +89,11 @@
     /* 30mm square. Smaller than this and a thermal head's dot size starts
        eating the finder patterns, which is when phones stop reading it. */
     .qr-block { margin-top: 4px; }
-    .qr { width: 30mm; height: 30mm; display: block; margin: 0 auto 2px; }
+    /* Inline SVG rather than an <img> data URI, so the code stays vector all
+       the way into the print raster instead of being rasterised at screen dpi
+       and upscaled by the printer. */
+    .qr { width: 30mm; height: 30mm; margin: 0 auto 2px; }
+    .qr svg { width: 100%; height: 100%; display: block; }
     .qr-caption { margin: 0; font-size: 10px; }
     .feed { height: 0; }
 
@@ -212,10 +216,10 @@
 {{-- QR to the customer's own copy. Printed last so a scanner is not hunting
      for it among the figures, and sized generously: a thermal head renders a
      small code as mush, and an unscannable QR is worse than none. --}}
-@if($qrDataUri)
+@if($qrSvg)
 <hr>
 <div class="al-center qr-block">
-    <img src="{{ $qrDataUri }}" alt="" class="qr">
+    <div class="qr">{!! $qrSvg !!}</div>
     <p class="qr-caption">{{ $settings->qr_caption ?: 'Scan for your receipt' }}</p>
 </div>
 @endif

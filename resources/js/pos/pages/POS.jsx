@@ -284,6 +284,11 @@ export default function POS({ user, vendorId, onLogout }) {
         }
 
         const receiptSale = {
+            // Carried through so the receipt can be printed from its own
+            // server-rendered document. Without it ReceiptModal falls back to
+            // printing this modal, which has no QR and no vendor settings on it.
+            // Null while offline — the sale has no server id until it syncs.
+            id:                      savedSale.id ?? null,
             reference:               savedSale.reference ?? payload.offline_id,
             items:                   payload.items,
             subtotal,

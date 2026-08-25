@@ -144,7 +144,8 @@ test('the QR is printed on the paper and points at the public copy', function ()
     $this->actingAs($data['owner'])
         ->get(route('pos.receipt', $sale))
         ->assertOk()
-        ->assertSee('data:image/svg+xml;base64,', false)
+        // Inline SVG, not an <img> data URI: it must stay vector into the print
+        ->assertSee('<svg', false)
         ->assertSee('Scan for your receipt');
 });
 
@@ -157,7 +158,7 @@ test('turning the QR off leaves it off the paper', function () {
     $this->actingAs($data['owner'])
         ->get(route('pos.receipt', $sale))
         ->assertOk()
-        ->assertDontSee('data:image/svg+xml;base64,', false);
+        ->assertDontSee('Scan for your receipt');
 });
 
 // ── Loyalty ───────────────────────────────────────────────────────────────
