@@ -24,4 +24,13 @@ export default defineConfig({
             ignored: ['**/storage/framework/views/**'],
         },
     },
+
+    // Scoped to our own source. Left to its default, vitest walks vendor/ and
+    // picks up TypeScript tests that ship inside composer packages — whose own
+    // dependencies are not installed here, so the run fails on a file that is
+    // not ours and that we have no business executing.
+    test: {
+        include: ['resources/js/**/*.{test,spec}.{js,jsx,ts,tsx}'],
+        exclude: ['**/node_modules/**', '**/vendor/**'],
+    },
 });
