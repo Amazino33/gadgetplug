@@ -32,10 +32,22 @@
         /* Monospace keeps the money column aligned — the single biggest reason
            thermal receipts look "not arranged" is a proportional font. */
         font-family: "Courier New", "DejaVu Sans Mono", monospace;
-        font-size: 12px;
-        line-height: 1.35;
+        font-size: 13px;
+        line-height: 1.4;
         width: 72mm;          /* 80mm paper minus the printer's own margins */
         margin: 0 auto;
+
+        /* Everything is bold on purpose. A thermal head burns dots: it has no
+           grey, so the driver halftones anti-aliased edges and thin strokes come
+           out banded and broken — which is what a light Courier at 11px does on
+           real paper. Bold gives every stroke enough width to survive that.
+           Monospace advance widths do not change when bold, so the columns hold. */
+        font-weight: bold;
+
+        /* Stops the browser lightening anything on its way to the driver, which
+           would hand it more grey to halftone. */
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
     }
 
     .al-left   { text-align: left; }
@@ -50,7 +62,7 @@
         text-transform: uppercase;
         line-height: 1.15;
     }
-    .header-line { margin: 0; font-size: 11px; }
+    .header-line { margin: 0; font-size: 12px; }
 
     .logo { max-width: 40mm; max-height: 18mm; margin: 0 auto 4px; display: block; }
 
@@ -68,8 +80,8 @@
         display: flex;
         justify-content: space-between;
         gap: 4mm;
-        font-size: 11px;
-        padding: .2mm 0;
+        font-size: 12px;
+        padding: .3mm 0;
     }
     .row .v { white-space: nowrap; text-align: right; }
 
@@ -78,17 +90,17 @@
        44,000.00 and breaks 1,122,300.00 across two lines. */
     .items { margin: 1mm 0; }
     .item { margin-bottom: 1.6mm; }
-    .item-name { word-break: break-word; font-size: 12px; }
+    .item-name { word-break: break-word; font-size: 13px; }
     .item-line {
         display: flex;
         justify-content: space-between;
         gap: 4mm;
-        font-size: 11px;
+        font-size: 12px;
     }
     .item-qty { color: #000; }
     .item-amt { white-space: nowrap; font-weight: bold; }
 
-    .totals .row { font-size: 11px; }
+    .totals .row { font-size: 12px; }
     .grand {
         font-size: 17px;
         font-weight: bold;
@@ -98,7 +110,7 @@
         margin-top: 1.5mm;
     }
 
-    .footer { margin-top: 2.5mm; font-size: 11px; white-space: pre-line; line-height: 1.4; }
+    .footer { margin-top: 2.5mm; font-size: 12px; white-space: pre-line; line-height: 1.4; }
 
     /* 30mm square. Smaller than this and a thermal head's dot size starts
        eating the finder patterns, which is when phones stop reading it. */
@@ -108,7 +120,7 @@
        and upscaled by the printer. */
     .qr { width: 30mm; height: 30mm; margin: 0 auto 2px; }
     .qr svg { width: 100%; height: 100%; display: block; }
-    .qr-caption { margin: .5mm 0 0; font-size: 10px; }
+    .qr-caption { margin: .5mm 0 0; font-size: 11px; }
     .feed { height: 0; }
 
     /* On screen (the POS preview / a phone) give it a paper-like frame; when
