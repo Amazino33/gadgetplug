@@ -102,6 +102,57 @@ class PosSaleResource extends Resource
                     ->sortable(),
             ])
             ->defaultSort('completed_at', 'desc')
+            ->actions([
+                \Filament\Tables\Actions\Action::make('void')
+                    ->label('Void Sale')
+                    ->icon('heroicon-o-x-circle')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->modalIcon('heroicon-o-exclamation-triangle')
+                    ->modalHeading('Void POS Sale')
+                    ->modalDescription('Are you sure you want to void this sale? The stock will be returned to inventory and revenue will be reversed. This cannot be undone.')
+                    ->form([
+                        \Filament\Forms\Components\Textarea::make('reason')
+                            ->label('Reason for voiding')
+                            ->required()
+                            ->maxLength(255)
+                            ->placeholder('e.g., Duplicate sale, customer returned immediately...'),
+                    ])
+                    ->visible(fn (PosSale $record) => $record->status === 'completed' && (
+                        auth()->user()->isSuperAdmin() ||
+                        filament()->getTenant()?->isOwner(auth()->user()) ||
+                        auth()->user()->hasVendorPermission(filament()->getTenant()?->id, 'void_sale')
+                    ))
+                    ->action(function (PosSale $record, array $data, \App\Actions\Inventory\AdjustStockAction $adjustStock, \App\Actions\Finance\RecognizePosSaleRevenueAction $revenue) {
+                        $user = auth()->user();
+                        \Illuminate\Support\Facades\DB::transaction(function () use ($record, $data, $adjustStock, $revenue, $user) {
+                            foreach ($record->items as $item) {
+                                $adjustStock->execute(
+                                    productId: $item->product_id,
+                                    quantityChanged: $item->quantity,
+                                    transactionType: 'pos_void',
+                                    userId: $user->id,
+                                    reference: $record->reference,
+                                    description: "Void POS sale — {$item->product_name}. Reason: {$data['reason']}"
+                                );
+                            }
+
+                            $record->update(['status' => 'voided']);
+
+                            $revenue->reverseForVoid($record);
+
+                            activity()->causedBy($user)
+                                ->performedOn($record)
+                                ->tap(fn ($a) => $a->vendor_id = $record->vendor_id)
+                                ->log("Voided sale {$record->reference}. Reason: {$data['reason']}");
+
+                            if ($record->customer_id) {
+                                \App\Models\PosCustomer::where('id', $record->customer_id)->decrement('total_spent', $record->total);
+                                \App\Models\PosCustomer::where('id', $record->customer_id)->decrement('total_transactions');
+                            }
+                        });
+                    })
+            ])
             ->filters([
                 SelectFilter::make('status')
                     ->options([
