@@ -118,11 +118,11 @@ class PosSaleResource extends Resource
                             ->maxLength(255)
                             ->placeholder('e.g., Duplicate sale, customer returned immediately...'),
                     ])
-                    ->visible(fn (PosSale $record) => auth()->check() && $record->status === 'completed' && (
+                    ->visible(fn (?PosSale $record) => $record === null || (auth()->check() && $record->status === 'completed' && (
                         auth()->user()->isSuperAdmin() ||
                         filament()->getTenant()?->isOwner(auth()->user()) ||
                         auth()->user()->hasVendorPermission($record->vendor_id, 'void_sale')
-                    ))
+                    )))
                     ->action(function (PosSale $record, array $data) {
                         $user = auth()->user();
                         $adjustStock = app(\App\Actions\Inventory\AdjustStockAction::class);
