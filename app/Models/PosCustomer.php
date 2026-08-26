@@ -19,4 +19,10 @@ class PosCustomer extends Model
     {
         return $this->hasMany(PosSale::class, 'customer_id');
     }
+
+    /** Every charge, payment and write-off ever posted against this customer. */
+    public function ledgerEntries(): HasMany
+    {
+        return $this->hasMany(PosCustomerLedgerEntry::class, 'pos_customer_id');
+    }
 }

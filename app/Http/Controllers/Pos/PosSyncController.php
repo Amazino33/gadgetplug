@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Pos;
 
 use App\Actions\Inventory\AdjustStockAction;
+use App\Actions\Pos\ChargeCustomerDebtAction;
 use App\Http\Controllers\Controller;
 use App\Models\PosCustomer;
 use App\Models\PosSale;
@@ -32,7 +33,7 @@ class PosSyncController extends Controller
             'sales.*.offline_id'      => 'required|string',
             'sales.*.customer_id'     => 'nullable|integer',
             'sales.*.items'           => 'required|array|min:1',
-            'sales.*.payment_method'  => 'required|in:cash,card,bank_transfer,split',
+            'sales.*.payment_method'  => 'required|in:cash,card,bank_transfer,split,debt',
             'sales.*.total'           => 'required|numeric|min:0',
             'sales.*.vat_amount'      => 'nullable|numeric|min:0',
             'sales.*.discount_amount' => 'nullable|numeric|min:0',
@@ -42,7 +43,7 @@ class PosSyncController extends Controller
             // identical fix in PosSaleController::store() for why a present-but-
             // null 'payments' otherwise fails 'array'/'min' on every plain sale.
             'sales.*.payments'                  => 'nullable|required_if:sales.*.payment_method,split|array|min:2',
-            'sales.*.payments.*.method'         => 'required_if:sales.*.payment_method,split|in:cash,card,bank_transfer',
+            'sales.*.payments.*.method'         => 'required_if:sales.*.payment_method,split|in:cash,card,bank_transfer,debt',
             'sales.*.payments.*.amount'         => 'required_if:sales.*.payment_method,split|numeric|min:0.01',
             'sales.*.payments.*.reference'      => 'nullable|string|max:50',
         ]);
@@ -103,6 +104,23 @@ class PosSyncController extends Controller
                             ]);
                         }
                     }
+
+                    // Same rule as the online path: a wholly-credit sale still
+                    // writes its tender row, so the charge is read identically
+                    // whichever route the sale arrived by.
+                    if ($payload['payment_method'] === 'debt') {
+                        PosSalePayment::create([
+                            'pos_sale_id' => $sale->id,
+                            'method'      => 'debt',
+                            'amount'      => $payload['total'],
+                            'reference'   => null,
+                        ]);
+                    }
+
+                    // The charge posts on sync, not at the till — an offline
+                    // credit sale carries its debt with it and lands the moment
+                    // it reaches the server, dated when it was actually rung up.
+                    app(ChargeCustomerDebtAction::class)->execute($sale);
 
                     // Best available cost for a sale that happened offline: the
                     // product's cost now. The true cost at the time of the

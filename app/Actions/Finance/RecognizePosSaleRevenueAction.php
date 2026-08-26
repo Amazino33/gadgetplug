@@ -32,10 +32,25 @@ class RecognizePosSaleRevenueAction
 {
     public function execute(PosSale $sale): void
     {
+        // Nothing was collected, so there is nothing to recognise. The goods
+        // left and the cost books at stock-out either way; the revenue arrives
+        // only when the customer actually pays, which is what makes an open
+        // debt honestly drag the period instead of flattering it.
+        if ($sale->payment_method === 'debt') {
+            return;
+        }
+
         if ($sale->payment_method === 'split') {
             $sale->loadMissing('payments');
 
             foreach ($sale->payments as $payment) {
+                // The unpaid slice of a part-paid sale, deferred for the same
+                // reason. Its charge is already on the customer's ledger, and
+                // each repayment recognises itself as it lands.
+                if ($payment->method === 'debt') {
+                    continue;
+                }
+
                 // Change is always handed back in cash regardless of how the
                 // customer paid, so only the cash leg of a split can be
                 // reduced by it — the same cash-specific meaning
@@ -125,6 +140,16 @@ class RecognizePosSaleRevenueAction
     private function post(int $vendorId, Model $source, float $amount, string $method, string $description): void
     {
         if ($amount <= 0) {
+            return;
+        }
+
+        // Belt and braces. The callers above already skip debt, but the mapping
+        // below sends anything that is not cash to the bank account — so a debt
+        // tender reaching here would post money into the books that nobody
+        // handed over, and post() logs rather than throws, so it would do it
+        // silently. Refuse it here too rather than rely on every future caller
+        // remembering.
+        if ($method === 'debt') {
             return;
         }
 

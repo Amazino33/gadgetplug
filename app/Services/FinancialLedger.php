@@ -23,6 +23,7 @@ class FinancialLedger
         ?string $description = null,
         ?CarbonInterface $occurredAt = null,
         ?int $createdBy = null,
+        ?int $storeId = null,
     ): FinancialLedgerEntry {
         if (! in_array($direction, ['in', 'out'], true)) {
             throw new InvalidArgumentException("Invalid ledger direction: {$direction}");
@@ -62,6 +63,11 @@ class FinancialLedger
                 'description'          => $description,
                 'occurred_at'          => $occurredAt?->toDateString() ?? now()->toDateString(),
                 'created_by'           => $createdBy,
+                // Which branch the money actually moved through. Optional and
+                // last so every existing caller keeps working unchanged; they
+                // pass nothing and keep writing null, which is honest — a
+                // vendor-level entry has no branch to claim.
+                'store_id'             => $storeId,
             ]);
         } catch (UniqueConstraintViolationException) {
             // Lost the race against a concurrent post for the same source +

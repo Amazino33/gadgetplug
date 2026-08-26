@@ -22,6 +22,7 @@ class VendorRoles
             'access_pos', 'void_sale', 'process_return', 'close_pos_session',
             'manage_inventory', 'view_inventory_reports', 'view_audit_sessions',
             'view_activity_log',
+            'view_customer_debts',
             'authorize_recount', 'adjust_stock',
             'approve_procurement', 'manage_procurement',
         ],

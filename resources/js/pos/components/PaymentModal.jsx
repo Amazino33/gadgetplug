@@ -6,10 +6,13 @@ const METHODS = [
     { key: 'cash',          label: 'Cash',          color: '#068B03' },
     { key: 'card',          label: 'POS / Card',    color: '#3B82F6' },
     { key: 'bank_transfer', label: 'Bank Transfer', color: '#8B5CF6' },
+    // Money not collected. Red on purpose — it should never read like the
+    // other three, because nothing came into the drawer.
+    { key: 'debt',          label: 'Debt (Owing)',  color: '#DC2626' },
 ];
 
-const DEFAULT_SPLITS = { cash: '', card: '', bank_transfer: '' };
-const DEFAULT_REFS   = { cash: '', card: '', bank_transfer: '' };
+const DEFAULT_SPLITS = { cash: '', card: '', bank_transfer: '', debt: '' };
+const DEFAULT_REFS   = { cash: '', card: '', bank_transfer: '', debt: '' };
 
 const NUMPAD_KEYS = ['1','2','3','4','5','6','7','8','9','00','0','⌫'];
 
@@ -25,12 +28,40 @@ export default function PaymentModal({ total, cart, customer, subtotal, discount
 
     useEffect(() => { tenderedRef.current?.focus(); }, []);
 
+    // What this customer already owes. Informational only — it is never allowed
+    // to block a sale, and a till with no signal simply shows nothing rather
+    // than stalling the counter over a figure it cannot reach.
+    const [outstanding, setOutstanding] = useState(null);
+
+    useEffect(() => {
+        if (!customer?.id) { setOutstanding(null); return; }
+
+        let cancelled = false;
+
+        fetch(`/api/pos/customers/${customer.id}/outstanding`, {
+            headers: { Accept: 'application/json' },
+            credentials: 'same-origin',
+        })
+            .then(r => (r.ok ? r.json() : null))
+            .then(d => { if (!cancelled && d) setOutstanding(Number(d.outstanding) || 0); })
+            .catch(() => { /* offline: leave it unknown rather than guess */ });
+
+        return () => { cancelled = true; };
+    }, [customer?.id]);
+
     // ── Single payment logic ────────────────────────────────────────────────
     const tenderedNum       = parseFloat(tendered) || 0;
     const singleChange      = Math.max(0, tenderedNum - total);
-    const singleCanComplete = method !== 'cash'
-        ? (method === 'bank_transfer' ? bankRef.length >= 4 : true)
-        : tenderedNum >= total;
+    // Debt is owed by a person, so there has to be one. Mirrors the server
+    // check rather than replacing it — this is the courtesy, that is the rule.
+    const hasCustomer = Boolean(customer?.id);
+    const debtBlocked = !hasCustomer;
+
+    const singleCanComplete = method === 'debt'
+        ? hasCustomer
+        : method !== 'cash'
+            ? (method === 'bank_transfer' ? bankRef.length >= 4 : true)
+            : tenderedNum >= total;
 
     // ── Split payment logic ─────────────────────────────────────────────────
     const splitAmounts = Object.fromEntries(
@@ -40,9 +71,11 @@ export default function PaymentModal({ total, cart, customer, subtotal, discount
     const remaining      = Math.max(0, total - totalAllocated);
     const splitOverpaid  = Math.max(0, totalAllocated - total);
     const activeSplits   = METHODS.filter(m => splitAmounts[m.key] > 0);
+    const splitHasDebt = splitAmounts.debt > 0;
     const splitCanComplete =
         remaining === 0 &&
         activeSplits.length >= 2 &&
+        (!splitHasDebt || hasCustomer) &&
         (splitAmounts.bank_transfer === 0 || refs.bank_transfer.length >= 4);
 
     const setSplit = (key, value) => setSplits(prev => ({ ...prev, [key]: value }));
@@ -79,7 +112,10 @@ export default function PaymentModal({ total, cart, customer, subtotal, discount
             if (mode === 'single') {
                 await onComplete({
                     paymentMethod:  method,
-                    amountTendered: method === 'cash' ? tenderedNum : total,
+                    // Nothing is handed over on a credit sale, so tendered is
+                    // zero — saying otherwise would report money the drawer
+                    // never received.
+                    amountTendered: method === 'debt' ? 0 : (method === 'cash' ? tenderedNum : total),
                     bankRef:        method === 'bank_transfer' ? bankRef : null,
                     payments:       null,
                 });
@@ -169,6 +205,34 @@ export default function PaymentModal({ total, cart, customer, subtotal, discount
                                 </button>
                             ))}
                         </div>
+
+                        {method === 'debt' && (
+                            <div className="rounded-xl border-2 border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/30 px-4 py-3">
+                                {hasCustomer ? (
+                                    <>
+                                        <div className="text-xs font-semibold text-red-700 dark:text-red-400">
+                                            {customer.name} will owe {fmt(total)}
+                                        </div>
+                                        {/* Exposure, not a gate. Staff decide; the
+                                            system only makes sure they decide knowing. */}
+                                        {outstanding !== null && (
+                                            <div className="text-xs text-red-600 dark:text-red-400 mt-1">
+                                                Already owing {fmt(outstanding)} — this would take them to {fmt(outstanding + total)}.
+                                            </div>
+                                        )}
+                                        {outstanding === null && (
+                                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                                Current balance unavailable offline.
+                                            </div>
+                                        )}
+                                    </>
+                                ) : (
+                                    <div className="text-xs font-semibold text-red-700 dark:text-red-400">
+                                        Attach a customer before selling on credit — a debt nobody is named for can never be collected.
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         {method === 'cash' && (
                             <div>

@@ -53,6 +53,7 @@ class VendorPermissionsSeeder extends Seeder
             'view_restock_report',
             'view_audit_sessions',
             'view_activity_log',
+            'view_customer_debts',
             'approve_procurement',
             'manage_procurement',
 

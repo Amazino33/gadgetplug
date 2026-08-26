@@ -30,6 +30,10 @@ Route::prefix('pos')->middleware(NoStoreApiResponse::class)->group(function () {
         Route::get('customers',       [PosCustomerController::class, 'index']);
         Route::post('customers',      [PosCustomerController::class, 'store']);
 
+        // Route-model bound, so EnsurePosVendorAccess checks the customer's own
+        // vendor rather than trusting a vendor_id in the query string.
+        Route::get('customers/{customer}/outstanding', [PosCustomerController::class, 'outstanding']);
+
         // Sales
         Route::post('sales',                       [PosSaleController::class, 'store']);
         Route::get('sales/{sale}/receipt',         [PosReceiptController::class, 'show']);
