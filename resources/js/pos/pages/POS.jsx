@@ -3,6 +3,7 @@ import { useKeyboard } from '../hooks/useKeyboard';
 import { useSync } from '../hooks/useSync';
 import { fmt, generateOfflineId } from '../lib/format';
 import { db } from '../lib/db';
+import { pruneOldSales, recordSale } from '../lib/salesHistory';
 import api from '../lib/api';
 import Cart from '../components/Cart';
 import SearchBar from '../components/SearchBar';
@@ -76,6 +77,11 @@ export default function POS({ user, vendorId, onLogout }) {
     const searchRef = useRef(null);
 
     const { syncNow } = useSync(vendorId, setStuckSales);
+
+    // Older than the retention window is not this till's business to hold.
+    useEffect(() => {
+        pruneOldSales().catch(() => {});
+    }, []);
 
     useEffect(() => {
         const on  = () => setIsOnline(true);
@@ -266,6 +272,11 @@ export default function POS({ user, vendorId, onLogout }) {
             try {
                 const { data } = await api.post('/sales', payload);
                 savedSale = { ...payload, id: data.id, reference: data.reference };
+                // Kept on the device too. offlineSales below is a queue for
+                // getting a sale uploaded; this is so the cashier can still
+                // look it up afterwards, which the server cannot answer when
+                // the connection is gone.
+                await recordSale(savedSale, user.id);
             } catch (err) {
                 if (err.response) {
                     // The server was reached and refused the sale (insufficient
@@ -278,9 +289,11 @@ export default function POS({ user, vendorId, onLogout }) {
                 }
                 // No response at all reached us — genuine network failure, safe to queue.
                 await db.offlineSales.add({ ...payload, synced: 0 });
+                await recordSale(payload, user.id);
             }
         } else {
             await db.offlineSales.add({ ...payload, synced: 0 });
+            await recordSale(payload, user.id);
         }
 
         const receiptSale = {
@@ -773,6 +786,7 @@ export default function POS({ user, vendorId, onLogout }) {
             {modal === 'salesHistory' && (
                 <SalesHistoryModal
                     vendorId={vendorId}
+                    cashierId={user.id}
                     onClose={() => setModal(null)}
                     onReprint={(sale) => {
                         setModal(null);

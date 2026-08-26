@@ -1,26 +1,39 @@
 import { useEffect, useState } from 'react';
 import { fmt } from '../lib/format';
 import api from '../lib/api';
+import { localSales, mergeSales } from '../lib/salesHistory';
 
 // A cashier's own sales — for looking something up and reprinting a receipt.
 // Scoped server-side to sales this cashier personally rang up.
-export default function SalesHistoryModal({ vendorId, onClose, onReprint }) {
+export default function SalesHistoryModal({ vendorId, cashierId, onClose, onReprint }) {
     const [sales, setSales]     = useState([]);
     const [loading, setLoading] = useState(true);
-    const [error, setError]     = useState('');
+    const [offline, setOffline] = useState(false);
 
     useEffect(() => {
         (async () => {
+            // The device first, so the list is populated before the network is
+            // even attempted. A cashier who traded all morning without signal
+            // could previously see none of it: this screen asked the server,
+            // and the server was the one thing they did not have.
+            const local = await localSales(cashierId).catch(() => []);
+
+            setSales(mergeSales(local, []));
+            setLoading(false);
+
             try {
                 const { data } = await api.get('/sales/my-history', { params: { vendor_id: vendorId } });
-                setSales(data.data ?? []);
+
+                // Server wins where it has an opinion: a sale voided or
+                // refunded after the fact still reads as completed on the
+                // device, and showing that would be worse than showing nothing.
+                setSales(mergeSales(local, data.data ?? []));
+                setOffline(false);
             } catch {
-                setError('Could not load sales history. Check your connection.');
-            } finally {
-                setLoading(false);
+                setOffline(true);
             }
         })();
-    }, [vendorId]);
+    }, [vendorId, cashierId]);
 
     const statusBadge = (status) => {
         const styles = {
@@ -67,15 +80,27 @@ export default function SalesHistoryModal({ vendorId, onClose, onReprint }) {
 
                 <div className="overflow-y-auto px-6 py-4 space-y-2">
                     {loading && <p className="text-sm text-gray-400 text-center py-8">Loading…</p>}
-                    {error && <p className="text-sm text-red-500 text-center py-8">{error}</p>}
-                    {!loading && !error && sales.length === 0 && (
-                        <p className="text-sm text-gray-400 text-center py-8">No sales yet today.</p>
+
+                    {/* Said plainly rather than shown as an error: the list is
+                        real, it is just this device's copy, and a void applied
+                        on the server since would not be reflected in it. */}
+                    {offline && (
+                        <p className="text-xs text-amber-600 dark:text-amber-400 text-center pb-2">
+                            Offline — showing this device's record of the last 7 days.
+                        </p>
+                    )}
+
+                    {!loading && sales.length === 0 && (
+                        <p className="text-sm text-gray-400 text-center py-8">No sales yet.</p>
                     )}
                     {sales.map((sale) => (
-                        <div key={sale.id} className="rounded-xl border border-gray-200 dark:border-gray-800 p-3 flex items-center justify-between gap-3">
+                        <div key={sale.id ?? sale.reference ?? sale.completed_at} className="rounded-xl border border-gray-200 dark:border-gray-800 p-3 flex items-center justify-between gap-3">
                             <div className="min-w-0">
                                 <div className="flex items-center gap-2">
-                                    <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">{sale.reference}</p>
+                                    <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">{sale.reference ?? 'Not uploaded yet'}</p>
+                                    {sale.pending_sync && (
+                                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">Pending upload</span>
+                                    )}
                                     <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${statusBadge(sale.status)}`}>
                                         {sale.status.replace('_', ' ')}
                                     </span>

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { db } from '../lib/db';
 import api from '../lib/api';
+import { markSaleSynced } from '../lib/salesHistory';
 
 /**
  * Background sync: every 30s, push any unsynced IndexedDB sales to the server.
@@ -42,6 +43,14 @@ export function useSync(vendorId, onStuckSalesChange) {
 
                     if (result.status === 'synced' || result.status === 'duplicate') {
                         await db.offlineSales.update(record.id, { synced: 1 });
+                        // The local history copy still knows this sale only by
+                        // its offline id. Without the server id its receipt can
+                        // never be fetched, and it would show twice once the
+                        // server's own copy arrived beside it.
+                        await markSaleSynced(record.offline_id, {
+                            id: result.id ?? null,
+                            reference: result.reference ?? null,
+                        });
                     } else if (result.status === 'rejected' || result.status === 'error') {
                         await db.offlineSales.update(record.id, {
                             sync_status: result.status,
