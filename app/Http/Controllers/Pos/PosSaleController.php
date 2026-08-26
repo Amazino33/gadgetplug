@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Pos;
 
 use App\Actions\Finance\RecognizePosSaleRevenueAction;
+use App\Actions\Pos\ChargeCustomerDebtAction;
 use App\Actions\Inventory\AdjustStockAction;
 use App\Http\Controllers\Controller;
 use App\Models\PosCustomer;
@@ -24,10 +25,26 @@ use Illuminate\Validation\ValidationException;
 
 class PosSaleController extends Controller
 {
+    /** Whether this payload puts any part of the sale on credit. */
+    private function salePayloadHasDebt(Request $request): bool
+    {
+        if ($request->payment_method === 'debt') {
+            return true;
+        }
+
+        return $request->payment_method === 'split'
+            && collect($request->payments ?? [])->contains(fn ($p) => ($p['method'] ?? null) === 'debt');
+    }
+
     public function store(Request $request, AdjustStockAction $adjustStock, PosPriceFloor $priceFloor, RecognizePosSaleRevenueAction $revenue): JsonResponse
     {
         $request->validate([
             'vendor_id'                  => 'required|integer',
+            // The till's own id for this checkout. Not required — an older
+            // client may not send one — but when present it makes this endpoint
+            // idempotent, which is what stops a lost response becoming a second
+            // sale of the same goods.
+            'offline_id'                 => 'nullable|string|max:64',
             'pos_session_id'             => 'nullable|integer',
             'customer_id'                => 'nullable|integer',
             'items'                      => 'required|array|min:1',
@@ -42,7 +59,7 @@ class PosSaleController extends Controller
             'discount_scope'             => 'nullable|in:item,cart',
             'discount_approved_by'       => 'nullable|integer',
             'vat_rate'                   => 'nullable|numeric|min:0|max:100',
-            'payment_method'             => 'required|in:cash,card,bank_transfer,split',
+            'payment_method'             => 'required|in:cash,card,bank_transfer,split,debt',
             'amount_tendered'            => 'nullable|numeric|min:0',
             'bank_transfer_reference'    => 'nullable|string|max:50',
             // 'nullable' is required here even though 'required_if' is present:
@@ -51,15 +68,53 @@ class PosSaleController extends Controller
             // against that null value — rejecting EVERY plain cash/card/bank
             // transfer sale with "the payments field must be an array."
             'payments'                   => 'nullable|required_if:payment_method,split|array|min:2',
-            'payments.*.method'          => 'required_if:payment_method,split|in:cash,card,bank_transfer',
+            'payments.*.method'          => 'required_if:payment_method,split|in:cash,card,bank_transfer,debt',
             'payments.*.amount'          => 'required_if:payment_method,split|numeric|min:0.01',
             'payments.*.reference'       => 'nullable|string|max:50',
         ]);
 
+        // Debt has to be owed by somebody. The till blocks this at the payment
+        // screen, so reaching here without a customer means the payload was
+        // hand-built — and an anonymous debt is worse than a refused sale,
+        // because nobody can ever be asked to pay it.
+        if ($this->salePayloadHasDebt($request) && ! $request->customer_id) {
+            throw ValidationException::withMessages([
+                'customer_id' => 'A credit sale must be attached to a customer.',
+            ]);
+        }
+
         $vendor = Vendor::findOrFail($request->vendor_id);
 
+        // Derived from the till's offline_id, exactly as PosSyncController does.
+        //
+        // The two paths used different schemes: sync built the reference from
+        // the offline_id so a replay could be recognised, while this endpoint
+        // used a random one. A sale that committed here but whose response never
+        // reached the till was therefore queued and re-sent, and the sync's
+        // duplicate check looked for a reference this path had never written —
+        // so it made a second sale, deducting the stock and counting the money
+        // twice. Both paths now name a sale the same way.
+        $offlineId = $request->input('offline_id');
+        $reference = $offlineId
+            ? 'POS-' . strtoupper(substr(md5($offlineId), 0, 8))
+            : 'POS-' . strtoupper(Str::random(8));
+
+        // A replay of a checkout that already landed returns the original sale
+        // rather than ringing it up again.
+        if ($offlineId) {
+            $existing = PosSale::with(['items', 'payments'])->where('reference', $reference)->first();
+
+            if ($existing) {
+                return response()->json($existing, 200);
+            }
+        }
+
         try {
-            $sale = DB::transaction(function () use ($request, $adjustStock, $priceFloor, $vendor, $revenue) {
+            // Five attempts, not one. A deadlock is transient by definition:
+            // MySQL kills one of the two transactions precisely so the other can
+            // finish, and the killed one succeeds on a retry. Laravel re-runs
+            // the closure for exactly this class of error.
+            $sale = DB::transaction(function () use ($request, $adjustStock, $priceFloor, $vendor, $revenue, $reference) {
             $subtotal = collect($request->items)->sum(function ($item) {
                 $lineTotal = $item['unit_price'] * $item['quantity'];
                 return $lineTotal - ($item['discount_amount'] ?? 0);
@@ -93,7 +148,7 @@ class PosSaleController extends Controller
             $change = max(0, $totalTendered - $total);
 
             $sale = PosSale::create([
-                'reference'               => 'POS-' . strtoupper(Str::random(8)),
+                'reference'               => $reference,
                 'vendor_id'               => $request->vendor_id,
                 // The branch this till stands in, derived from the cashier's
                 // assignment — the POS has no panel session to read.
@@ -130,6 +185,19 @@ class PosSaleController extends Controller
                 }
             }
 
+            // A sale paid entirely on credit is not a split, but it still gets a
+            // tender row. Every downstream reader then answers "how much of this
+            // walked out unpaid?" the same way — by summing debt tenders —
+            // instead of special-casing the sale-level columns.
+            if ($request->payment_method === 'debt') {
+                PosSalePayment::create([
+                    'pos_sale_id' => $sale->id,
+                    'method'      => 'debt',
+                    'amount'      => $total,
+                    'reference'   => null,
+                ]);
+            }
+
             // Cost is read once up front rather than per line: profit reporting
             // needs what each item cost AT THIS MOMENT, and a later restock must
             // not retroactively change what this sale earned.
@@ -152,6 +220,19 @@ class PosSaleController extends Controller
                     'total'        => $lineTotal,
                 ]);
 
+            }
+
+            // Stock is deducted in a second pass, ordered by product id.
+            //
+            // AdjustStockAction takes a row lock on each product. Walking the
+            // cart in its own order means two tills selling the same two
+            // products in opposite orders each hold what the other needs — a
+            // deadlock, which MySQL resolves by killing one sale outright. That
+            // is the "Serialization failure: 1213" the cashiers were seeing.
+            // A single agreed order makes the cycle impossible to form.
+            $stockOrder = collect($request->items)->sortBy('product_id')->values();
+
+            foreach ($stockOrder as $item) {
                 // Deduct physical stock immediately (POS = item leaves the shelf now)
                 $adjustStock->execute(
                     productId: $item['product_id'],
@@ -172,10 +253,14 @@ class PosSaleController extends Controller
                 PosCustomer::where('id', $sale->customer_id)->increment('total_transactions');
             }
 
+            // Inside the sale's transaction: goods leaving on credit and the
+            // debt that records it must land together or not at all.
+            app(ChargeCustomerDebtAction::class)->execute($sale);
+
             $revenue->execute($sale);
 
             return $sale;
-            });
+            }, 5);
         } catch (ValidationException $e) {
             throw $e;
         } catch (\Throwable $e) {

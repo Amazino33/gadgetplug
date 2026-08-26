@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { fmt } from '../lib/format';
 import api from '../lib/api';
+import { cacheReceipt, cachedReceipt } from '../lib/salesHistory';
 
 const CONFIG = window.POS_CONFIG ?? {};
 
@@ -60,18 +61,39 @@ export default function ReceiptModal({ sale, onNewSale, isReprint = false }) {
         frame.style.cssText = 'position:fixed;left:-10000px;top:0;width:80mm;height:297mm;border:0;';
         document.body.appendChild(frame);
 
-        try {
-            const { data: html } = await api.get(`/sales/${sale.id}/receipt?print=1`);
+        const writeToFrame = (html) => {
             frame.contentWindow.document.open();
             frame.contentWindow.document.write(html);
             frame.contentWindow.document.close();
+        };
+
+        try {
+            const { data: html } = await api.get(`/sales/${sale.id}/receipt?print=1`);
+            writeToFrame(html);
+
+            // Kept for next time. A customer coming back tomorrow, on a till
+            // with no signal, is exactly when the real receipt is wanted and
+            // exactly when the server cannot supply it.
+            cacheReceipt(sale.id, html).catch(() => {});
         } catch (err) {
+            const status = err?.response?.status;
+            const detail = status ? `HTTP ${status}` : (err?.message ?? 'network error');
+
+            // The stored copy is the real document, QR and store details
+            // included — worth trying before falling back to printing the modal.
+            const stored = await cachedReceipt(sale.id).catch(() => null);
+
+            if (stored) {
+                writeToFrame(stored);
+                setPrintWarning("Printed from this device's saved copy — the server could not be reached.");
+
+                return;
+            }
+
             // Falling back silently is how this stayed hidden: the till printed
             // the modal — no QR, no store details, wrong paper size — and looked
             // like the receipt was simply badly designed rather than failing.
             // Say so, then still give the cashier paper.
-            const status = err?.response?.status;
-            const detail = status ? `HTTP ${status}` : (err?.message ?? 'network error');
             console.error(`Receipt document failed (${detail}) — printing the fallback copy.`, err);
             setPrintWarning(`Printed a basic copy — the full receipt could not be loaded (${detail}).`);
             window.print();
