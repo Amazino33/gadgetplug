@@ -3,6 +3,7 @@
 namespace App\Filament\Vendor\Resources\PosSales;
 
 use App\Models\PosSale;
+use Filament\Actions\Action;
 use Filament\Resources\Resource;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
@@ -102,8 +103,8 @@ class PosSaleResource extends Resource
                     ->sortable(),
             ])
             ->defaultSort('completed_at', 'desc')
-            ->actions([
-                \Filament\Tables\Actions\Action::make('void')
+            ->recordActions([
+                Action::make('void')
                     ->label('Void Sale')
                     ->icon('heroicon-o-x-circle')
                     ->color('danger')
@@ -128,14 +129,21 @@ class PosSaleResource extends Resource
                         $adjustStock = app(\App\Actions\Inventory\AdjustStockAction::class);
                         $revenue = app(\App\Actions\Finance\RecognizePosSaleRevenueAction::class);
                         \Illuminate\Support\Facades\DB::transaction(function () use ($record, $data, $adjustStock, $revenue, $user) {
-                            foreach ($record->items as $item) {
+                            // Ordered by product id, as the sale is: these row
+                            // locks can otherwise deadlock against a concurrent
+                            // till, and voiding a run of duplicates is exactly
+                            // when several of these run together.
+                            foreach ($record->items->sortBy('product_id') as $item) {
                                 $adjustStock->execute(
                                     productId: $item->product_id,
                                     quantityChanged: $item->quantity,
                                     transactionType: 'pos_void',
                                     userId: $user->id,
                                     reference: $record->reference,
-                                    description: "Void POS sale — {$item->product_name}. Reason: {$data['reason']}"
+                                    description: "Void POS sale — {$item->product_name}. Reason: {$data['reason']}",
+                                    // Back to the branch it was sold from, not
+                                    // the vendor's default store.
+                                    store: $record->store_id,
                                 );
                             }
 

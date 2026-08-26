@@ -293,7 +293,10 @@ class PosSaleController extends Controller
         }
 
         DB::transaction(function () use ($sale, $adjustStock, $request, $revenue) {
-            foreach ($sale->items as $item) {
+            // Ordered by product id for the same reason the sale is: these locks
+            // can deadlock against a concurrent sale otherwise, and voiding a run
+            // of duplicates is exactly when several run at once.
+            foreach ($sale->items->sortBy('product_id') as $item) {
                 $adjustStock->execute(
                     productId: $item->product_id,
                     quantityChanged: $item->quantity,
@@ -301,6 +304,10 @@ class PosSaleController extends Controller
                     userId: $request->user()->id,
                     reference: $sale->reference,
                     description: "Void POS sale — {$item->product_name}",
+                    // Back to the branch it was sold from. Without this the stock
+                    // returns to the vendor's default store, so a sale voided at
+                    // one branch quietly credits another.
+                    store: $sale->store_id,
                 );
             }
 
