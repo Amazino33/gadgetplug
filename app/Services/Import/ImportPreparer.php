@@ -39,6 +39,7 @@ class ImportPreparer
         // can answer in one pass each.
         $bySku     = $this->existingIndex($vendor, 'sku');
         $byBarcode = $this->existingIndex($vendor, 'barcode');
+        $names     = Product::where('vendor_id', $vendor->id)->pluck('name', 'id')->all();
 
         $seenSku     = [];
         $seenBarcode = [];
@@ -116,6 +117,29 @@ class ImportPreparer
                 $warnings[] = 'This will archive a product you already sell.';
             }
 
+            // The exact shape of the incident that overwrote 134 real
+            // products: a SKU or barcode that a small placeholder scheme (or
+            // a generic manufacturer part number — a battery's own model code,
+            // reused across completely different phones) happens to also
+            // carry on an unrelated existing product. Matching still succeeds
+            // and the update still happens — this is a warning, not a block,
+            // since a genuine rename looks identical from here — but it puts
+            // the collision in front of the vendor before they confirm,
+            // instead of leaving it to be discovered as "the price keeps
+            // changing" weeks later.
+            if ($matchedId !== null && $name !== '' && isset($names[$matchedId])) {
+                $existingName = (string) $names[$matchedId];
+
+                if (! $this->namesLookRelated($name, $existingName)) {
+                    $warnings[] = sprintf(
+                        'This matches an existing product named "%s" (#%d), but the names look unrelated. If this is actually a different product, a shared SKU/barcode will silently overwrite "%s" instead of creating a new one.',
+                        $existingName,
+                        $matchedId,
+                        $existingName,
+                    );
+                }
+            }
+
             $rows->push(new ParsedRow(
                 line: $line,
                 values: $values,
@@ -157,6 +181,32 @@ class ImportPreparer
             ->filter(fn ($field) => ProductField::tryFrom((string) $field)?->isImportable() === true)
             ->map(fn ($field) => (string) $field)
             ->all();
+    }
+
+    /**
+     * Loose enough to pass a genuine rename or a typo fix, strict enough to
+     * catch two unrelated products that merely happen to share an identifier.
+     * "iPhone 13 Case Clear" vs "iPhone 13 Case (Clear)" should pass; "A1481"
+     * vs "P204 20000MAH" — the real Zelink Tech collision — should not.
+     */
+    private function namesLookRelated(string $a, string $b): bool
+    {
+        $normalize = fn (string $s) => strtolower((string) preg_replace('/[^a-z0-9]+/i', '', $s));
+
+        $na = $normalize($a);
+        $nb = $normalize($b);
+
+        if ($na === '' || $nb === '') {
+            return true;
+        }
+
+        if ($na === $nb || str_contains($na, $nb) || str_contains($nb, $na)) {
+            return true;
+        }
+
+        similar_text($na, $nb, $percent);
+
+        return $percent >= 40.0;
     }
 
     /** @return array<string, int>  identifier => product id */
