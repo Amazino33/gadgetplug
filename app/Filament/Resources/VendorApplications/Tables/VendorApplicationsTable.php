@@ -94,10 +94,13 @@ class VendorApplicationsTable
                                 'is_verified' => true,
                             ]);
 
-                            // Attach user as owner in vendor_users
-                            $vendor->users()->syncWithoutDetaching([
-                                $locked->user_id => ['role' => 'owner'],
-                            ]);
+                            // Membership only. vendor_users carried a `role`
+                            // column until it was dropped for Spatie's
+                            // per-vendor roles, and writing to it here threw
+                            // "Unknown column 'role'" — which is why approving
+                            // failed. Ownership lives on vendors.user_id, set
+                            // just above.
+                            $vendor->users()->syncWithoutDetaching([$locked->user_id]);
 
                             // Mark application approved
                             $locked->update([

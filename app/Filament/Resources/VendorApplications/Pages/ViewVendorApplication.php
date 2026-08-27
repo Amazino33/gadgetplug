@@ -37,9 +37,12 @@ class ViewVendorApplication extends ViewRecord
                         'is_verified' => true,
                     ]);
 
-                    $vendor->users()->syncWithoutDetaching([
-                        $record->user_id => ['role' => 'owner'],
-                    ]);
+                    // Membership only. vendor_users carried a `role` column
+                    // until it was dropped for Spatie's per-vendor roles, and
+                    // writing to it here threw "Unknown column 'role'" — which
+                    // is why approving an application failed. Ownership lives on
+                    // vendors.user_id, set above.
+                    $vendor->users()->syncWithoutDetaching([$record->user_id]);
 
                     $record->update([
                         'status'      => 'approved',
