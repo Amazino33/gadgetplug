@@ -106,10 +106,15 @@ export default function ReceiptModal({ sale, onNewSale, isReprint = false }) {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
+            {/* Bounded to the screen and laid out as a column: the header and the
+                buttons stay put while the middle scrolls. Without a max height
+                the card simply grew with the item list, so on a long sale the
+                Print and New Sale buttons sat below the bottom of the screen
+                with nothing to scroll — the till looked frozen. */}
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 max-h-[90dvh] flex flex-col overflow-hidden receipt-card">
 
                 {/* Success / reprint header */}
-                <div className={`px-6 py-6 text-center ${isReprint ? 'bg-gray-700' : 'bg-[#068B03]'}`}>
+                <div className={`shrink-0 px-6 py-6 text-center ${isReprint ? 'bg-gray-700' : 'bg-[#068B03]'}`}>
                     <div className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center mx-auto mb-3">
                         {isReprint ? (
                             <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -125,6 +130,10 @@ export default function ReceiptModal({ sale, onNewSale, isReprint = false }) {
                     <p className="text-white text-lg font-bold">{isReprint ? 'Receipt Reprint' : 'Sale Complete'}</p>
                     <p className="text-white/70 text-xs mt-1">{reference}</p>
                 </div>
+
+                {/* The scrolling middle. min-h-0 is what actually lets a flex
+                    child shrink below its content and scroll. */}
+                <div className="receipt-scroll flex-1 min-h-0 overflow-y-auto">
 
                 {/* Change due — cash single payment */}
                 {payment_method === 'cash' && change_given > 0 && (
@@ -250,12 +259,15 @@ export default function ReceiptModal({ sale, onNewSale, isReprint = false }) {
                     <p className="text-center text-[10px] text-gray-300 mt-4">Thank you for shopping with us</p>
                 </div>
 
+                </div>
+                {/* ── end scrolling middle ── */}
+
                 {printWarning && (
-                    <p className="px-6 pb-2 text-[11px] text-amber-600">{printWarning}</p>
+                    <p className="shrink-0 px-6 pb-2 text-[11px] text-amber-600">{printWarning}</p>
                 )}
 
-                {/* Actions */}
-                <div className="flex gap-3 px-6 pb-6">
+                {/* Actions — always reachable, whatever the sale's length */}
+                <div className="shrink-0 flex gap-3 px-6 pt-4 pb-6 border-t border-gray-100 bg-white">
                     <button
                         onClick={print}
                         className="flex-1 py-3 rounded-xl border-2 border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50 flex items-center justify-center gap-2"

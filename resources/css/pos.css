@@ -24,4 +24,13 @@ body {
         line-height: 1.4;
     }
     @page { size: 80mm auto; margin: 4mm; }
+
+    /* The modal now caps its height and scrolls its middle so the Print button
+       stays reachable on a long sale. That cap must not follow the receipt onto
+       paper — the offline fallback prints this modal, and a clipped container
+       would print only the visible part of the item list. */
+    .receipt-card, .receipt-scroll {
+        max-height: none !important;
+        overflow: visible !important;
+    }
 }
