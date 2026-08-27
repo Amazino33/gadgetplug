@@ -10,6 +10,7 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
+use Illuminate\Support\Facades\DB;
 
 class ViewVendorApplication extends ViewRecord
 {
@@ -30,24 +31,52 @@ class ViewVendorApplication extends ViewRecord
                 ->action(function (array $data): void {
                     $record = $this->record;
 
-                    // Slug auto-generated uniquely by spatie/laravel-sluggable
-                    $vendor = Vendor::create([
-                        'user_id'     => $record->user_id,
-                        'name'        => $record->store_name,
-                        'is_verified' => true,
-                    ]);
+                    // Locked and re-checked inside a transaction, exactly as the
+                    // table action does.
+                    //
+                    // This ran with neither. Creating the vendor committed on its
+                    // own, so when a later step failed the vendor survived while
+                    // the application stayed pending — and the next click made
+                    // another one. That is how a single application ended up with
+                    // duplicate vendors behind it. ->visible() is no guard here:
+                    // it only hides the button after the page re-renders.
+                    $vendor = DB::transaction(function () use ($record, $data) {
+                        $locked = VendorApplication::whereKey($record->id)->lockForUpdate()->first();
 
-                    // Membership only. vendor_users carried a `role` column
-                    // until it was dropped for Spatie's per-vendor roles, and
-                    // writing to it here threw "Unknown column 'role'" — which
-                    // is why approving an application failed. Ownership lives on
-                    // vendors.user_id, set above.
-                    $vendor->users()->syncWithoutDetaching([$record->user_id]);
+                        if ($locked->status !== 'pending') {
+                            return null;
+                        }
 
-                    $record->update([
-                        'status'      => 'approved',
-                        'admin_notes' => $data['admin_notes'] ?? null,
-                    ]);
+                        // Slug auto-generated uniquely by spatie/laravel-sluggable
+                        $vendor = Vendor::create([
+                            'user_id'     => $locked->user_id,
+                            'name'        => $locked->store_name,
+                            'is_verified' => true,
+                        ]);
+
+                        // Membership only. vendor_users carried a `role` column
+                        // until it was dropped for Spatie's per-vendor roles;
+                        // writing to it here threw "Unknown column 'role'".
+                        // Ownership lives on vendors.user_id, set above.
+                        $vendor->users()->syncWithoutDetaching([$locked->user_id]);
+
+                        $locked->update([
+                            'status'      => 'approved',
+                            'admin_notes' => $data['admin_notes'] ?? null,
+                        ]);
+
+                        return $vendor;
+                    });
+
+                    if (! $vendor) {
+                        Notification::make()
+                            ->title('Already processed')
+                            ->body('This application was already approved or rejected.')
+                            ->warning()
+                            ->send();
+
+                        return;
+                    }
 
                     $panelUrl = route('filament.vendor.home', ['tenant' => $vendor->slug]);
 
