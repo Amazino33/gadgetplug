@@ -78,6 +78,7 @@
                 ['Cash', $report['balances']['cash']],
                 ['Total Cash + Bank', $report['balances']['total_liquid']],
                 ['Value of Stock on Hand', $report['balances']['inventory_value']],
+                ['Owed by Customers (credit sales)', $report['balances']['customer_debt']],
                 ['Initial Capital (what you started with)', $report['balances']['initial_capital']],
                 ['All-Time Profit', $report['balances']['cumulative_profit']],
             ] as [$label, $value])
@@ -88,8 +89,23 @@
             @endforeach
         </div>
 
+        @if ($report['balances']['inventory_cost_is_partial'])
+            <div class="mt-4 flex gap-2 rounded-lg bg-warning-50 p-3 text-xs text-warning-700 ring-1 ring-warning-600/20 dark:bg-warning-400/10 dark:text-warning-400 dark:ring-warning-400/30">
+                <x-filament::icon icon="heroicon-m-exclamation-triangle" class="h-4 w-4 shrink-0" />
+                <span>
+                    <span class="font-semibold">Stock value is understated.</span>
+                    {{ $report['balances']['inventory_missing_cost_count'] }}
+                    {{ \Illuminate\Support\Str::plural('product', $report['balances']['inventory_missing_cost_count']) }}
+                    holding {{ number_format($report['balances']['inventory_missing_cost_units']) }}
+                    {{ \Illuminate\Support\Str::plural('unit', $report['balances']['inventory_missing_cost_units']) }}
+                    {{ $report['balances']['inventory_missing_cost_count'] === 1 ? 'has' : 'have' }}
+                    no cost price recorded, so those goods are counted as worth nothing here. Set their cost price to see the real figure.
+                </span>
+            </div>
+        @endif
+
         <div class="mt-4 rounded-lg bg-gray-50 p-3 text-xs text-gray-500 dark:bg-white/5 dark:text-gray-400">
-            "Total worth" here means your Bank + Cash balances plus the value of the stock you're currently holding. It does NOT include money customers still owe you, money you owe suppliers, or anything you've personally taken out of the business — none of that is tracked yet.
+            "Total worth" here means your Bank + Cash balances, plus the value of the stock you're holding, plus what customers still owe you on credit sales. A credit sale counts as earned the moment the goods leave, so "Owed by Customers" is where that money sits until it's collected. It does NOT include money you owe suppliers, or anything you've personally taken out of the business — neither is tracked yet.
         </div>
     </div>
 

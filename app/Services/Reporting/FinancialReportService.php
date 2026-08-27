@@ -8,6 +8,9 @@ use App\Models\Expense;
 use App\Models\FinancialAccount;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\PosCustomerLedgerEntry;
+use App\Models\PosReturn;
+use App\Models\PosSale;
 use App\Models\PosSaleItem;
 use App\Models\ProcurementLogisticsLeg;
 use App\Models\Product;
@@ -119,17 +122,105 @@ class FinancialReportService
             ->selectRaw('SUM(CASE WHEN order_items.unit_cost IS NULL THEN 1 ELSE 0 END) as estimated_lines')
             ->first();
 
+        // Cost stays at the item level — it is a per-line figure — but revenue
+        // is taken from the sale, because a cart-level discount exists nowhere
+        // else. Summing pos_sale_items.total reaches only the subtotal, so a
+        // whole-cart discount was charged to the customer and never taken off
+        // what the business reported earning.
         $pos = self::recognizedPosSaleItemsQuery($vendorId, $from, $to)
             ->join('products', 'products.id', '=', 'pos_sale_items.product_id')
-            ->selectRaw('COALESCE(SUM(pos_sale_items.total), 0) as revenue')
             ->selectRaw('COALESCE(SUM(pos_sale_items.quantity * COALESCE(pos_sale_items.unit_cost, products.cost_price)), 0) as product_cost')
             ->selectRaw('SUM(CASE WHEN pos_sale_items.unit_cost IS NULL THEN 1 ELSE 0 END) as estimated_lines')
             ->first();
 
+        // subtotal is already net of every line discount (see
+        // PosSaleController::store), so taking discount_amount off it applies
+        // the cart tier exactly once. VAT stays out of revenue on purpose: it
+        // is collected on the government's behalf, not earned.
+        $posRevenue = (float) PosSale::query()
+            ->where('vendor_id', $vendorId)
+            ->where('status', '!=', 'voided')
+            ->whereBetween('completed_at', [$from, $to])
+            ->selectRaw('COALESCE(SUM(subtotal - discount_amount), 0) as revenue')
+            ->value('revenue');
+
+        $returns = $this->posReturns($vendorId, $from, $to);
+
         return [
-            'revenue'      => (float) $online->revenue + (float) $pos->revenue,
-            'product_cost' => (float) $online->product_cost + (float) $pos->product_cost,
-            'estimated'    => ((int) $online->estimated_lines) > 0 || ((int) $pos->estimated_lines) > 0,
+            'revenue'      => (float) $online->revenue + $posRevenue - $returns['revenue'],
+            'product_cost' => (float) $online->product_cost + (float) $pos->product_cost - $returns['product_cost'],
+            'estimated'    => ((int) $online->estimated_lines) > 0
+                || ((int) $pos->estimated_lines) > 0
+                || $returns['estimated'],
+        ];
+    }
+
+    // Goods handed back, netted off the period the RETURN happened in — not the
+    // period of the sale it reverses.
+    //
+    // A sale stays counted where it was made, so a closed month never changes
+    // underneath the person who already read it; the reversal lands where the
+    // money actually went back out. Over any range covering both, the two
+    // cancel exactly. This is why a refunded sale is NOT simply excluded from
+    // recognizedPosSaleItemsQuery(): excluding it would rewrite history for the
+    // period the sale belonged to.
+    //
+    // Cost is reversed at the SALE's own snapshotted unit_cost, not today's
+    // cost_price — the same figure the sale booked, so the pair nets to zero
+    // even if the product has been repriced since. Returned stock goes back on
+    // the shelf (AdjustStockAction, transaction type 'pos_return'), so leaving
+    // the cost booked here would count those goods as both sold and held.
+    private function posReturns(int $vendorId, CarbonInterface $from, CarbonInterface $to): array
+    {
+        $returns = PosReturn::query()
+            ->where('vendor_id', $vendorId)
+            ->whereBetween('created_at', [$from, $to])
+            ->get(['id', 'original_sale_id', 'return_items']);
+
+        if ($returns->isEmpty()) {
+            return ['revenue' => 0.0, 'product_cost' => 0.0, 'estimated' => false];
+        }
+
+        // The originating sale's own cost per product, keyed so a return can
+        // find exactly what its sale booked.
+        $saleCosts = PosSaleItem::query()
+            ->whereIn('pos_sale_id', $returns->pluck('original_sale_id')->filter()->unique())
+            ->get(['pos_sale_id', 'product_id', 'unit_cost'])
+            ->keyBy(fn (PosSaleItem $item) => $item->pos_sale_id . ':' . $item->product_id);
+
+        $revenue = 0.0;
+        $productCost = 0.0;
+        $estimated = false;
+
+        foreach ($returns as $return) {
+            foreach ((array) ($return->return_items ?? []) as $line) {
+                $quantity = (int) ($line['quantity'] ?? 0);
+
+                // What was actually refunded for these units.
+                $revenue += (float) ($line['total'] ?? 0);
+
+                $unitCost = $saleCosts
+                    ->get($return->original_sale_id . ':' . ($line['product_id'] ?? 0))
+                    ?->unit_cost;
+
+                if ($unitCost === null) {
+                    // Nothing was snapshotted, so there is no figure to reverse
+                    // that is guaranteed to match what the sale booked. Flagged
+                    // rather than guessed at with today's cost_price, which
+                    // would leave a residue in profit if the price has moved.
+                    $estimated = true;
+
+                    continue;
+                }
+
+                $productCost += $quantity * (float) $unitCost;
+            }
+        }
+
+        return [
+            'revenue'      => round($revenue, 2),
+            'product_cost' => round($productCost, 2),
+            'estimated'    => $estimated,
         ];
     }
 
@@ -179,8 +270,31 @@ class FinancialReportService
         $bankBalance = $bank?->balance($asOf) ?? 0.0;
         $cashBalance = $cash?->balance($asOf) ?? 0.0;
 
-        $inventoryValue = (float) Product::where('vendor_id', $vendorId)
-            ->sum(DB::raw('stock_quantity * COALESCE(cost_price, 0)'));
+        // COALESCE(cost_price, 0) values goods of unknown cost at nothing, which
+        // is the only safe figure to put in a total — but silently, so a
+        // catalogue with no costs entered reported an inventory worth zero and
+        // looked like a finished number. The count travels with the value so the
+        // page can say the total is incomplete rather than merely small.
+        $inventory = Product::where('vendor_id', $vendorId)
+            ->selectRaw('COALESCE(SUM(stock_quantity * COALESCE(cost_price, 0)), 0) as value')
+            ->selectRaw('COALESCE(SUM(CASE WHEN cost_price IS NULL AND stock_quantity > 0 THEN 1 ELSE 0 END), 0) as missing_cost_count')
+            ->selectRaw('COALESCE(SUM(CASE WHEN cost_price IS NULL AND stock_quantity > 0 THEN stock_quantity ELSE 0 END), 0) as missing_cost_units')
+            ->first();
+
+        $inventoryValue = (float) $inventory->value;
+
+        // What customers still owe, as of the same date as everything else here.
+        //
+        // A credit sale is counted as revenue when the goods leave, so without
+        // this line the money it earned appeared nowhere at all: not in the
+        // bank, not in cash, and no longer in stock. Signed amounts (charges
+        // positive, payments and write-offs negative) mean outstanding is a
+        // plain SUM with no interpretation — the same discipline the customer
+        // ledger itself is built on.
+        $customerDebt = (float) PosCustomerLedgerEntry::query()
+            ->forVendor($vendorId)
+            ->where('occurred_at', '<=', $asOf->toDateString())
+            ->sum('amount');
 
         $initialCapital = (float) (Vendor::find($vendorId)?->initial_capital ?? 0);
 
@@ -189,6 +303,15 @@ class FinancialReportService
             'cash'               => $cashBalance,
             'total_liquid'       => $bankBalance + $cashBalance,
             'inventory_value'    => $inventoryValue,
+            // True when inventory_value is understated because some stocked
+            // products have no cost recorded at all.
+            'inventory_cost_is_partial'   => ((int) $inventory->missing_cost_count) > 0,
+            'inventory_missing_cost_count' => (int) $inventory->missing_cost_count,
+            'inventory_missing_cost_units' => (int) $inventory->missing_cost_units,
+            // Never negative in practice; an overpayment would show as a credit
+            // owed back to the customer, which is worth seeing rather than
+            // clamping away.
+            'customer_debt'      => round($customerDebt, 2),
             'initial_capital'    => $initialCapital,
             'cumulative_profit'  => $this->cumulativeProfit($vendorId, $asOf),
         ];

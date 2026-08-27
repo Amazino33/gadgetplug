@@ -253,7 +253,14 @@ test('a voided POS sale never counts as revenue', function () {
     expect($report['revenue'])->toBe(0.0);
 });
 
-test('a refunded POS sale still counts its original total as revenue — the return is a separate outflow, not an erasure of the sale', function () {
+// The sale's own row is never rewritten by a return — the reversal is a
+// separate contra entry keyed to the PosReturn, so it lands in the period the
+// goods actually came back (see PosReturnsRevenueTest). The status alone
+// therefore changes nothing here; it is the return record that reverses the
+// money. A 'refunded' status with no return row behind it cannot arise from
+// the app — processReturn writes both together — so this only pins down that
+// the status is not itself the trigger.
+test('the refunded status alone does not reverse a sale — the return record is what does', function () {
     $data = reportVendor();
     reportPosSale($data, ['status' => 'refunded']);
 
@@ -271,6 +278,52 @@ test('a POS sale outside the range is excluded, filtered by completed_at', funct
     expect($report['revenue'])->toBe(0.0);
 });
 
+// Revenue used to be summed from pos_sale_items, which only ever reaches the
+// subtotal — so a discount applied to the whole cart was taken off what the
+// customer paid but never off what the business reported earning.
+
+test('a cart-level discount comes off revenue', function () {
+    $data = reportVendor();
+    reportPosSale($data, [
+        'subtotal' => 5000, 'discount_amount' => 1000,
+        'discount_scope' => 'cart', 'discount_type' => 'fixed',
+        'vat_amount' => 0, 'total' => 4000, 'amount_tendered' => 4000,
+    ]);
+
+    $report = app(FinancialReportService::class)->report($data['vendor']->id, now()->subDay(), now()->addDay());
+
+    expect($report['revenue'])->toBe(4000.0);
+});
+
+test('a line discount and a cart discount are each applied exactly once', function () {
+    $data = reportVendor();
+
+    // 5,000 list, 500 off the line, then 1,000 off the cart.
+    $sale = reportPosSale($data, [
+        'subtotal' => 4500, 'discount_amount' => 1000,
+        'discount_scope' => 'cart', 'discount_type' => 'fixed',
+        'vat_amount' => 0, 'total' => 3500, 'amount_tendered' => 3500,
+    ]);
+    $sale->items()->update(['discount_amount' => 500, 'total' => 4500]);
+
+    $report = app(FinancialReportService::class)->report($data['vendor']->id, now()->subDay(), now()->addDay());
+
+    expect($report['revenue'])->toBe(3500.0);
+});
+
+test('VAT is never counted as revenue', function () {
+    $data = reportVendor();
+    reportPosSale($data, [
+        'subtotal' => 5000, 'discount_amount' => 0,
+        'vat_amount' => 375, 'total' => 5375, 'amount_tendered' => 5375,
+    ]);
+
+    $report = app(FinancialReportService::class)->report($data['vendor']->id, now()->subDay(), now()->addDay());
+
+    // The goods earned 5,000. The 375 is the government's, not the vendor's.
+    expect($report['revenue'])->toBe(5000.0);
+});
+
 test('POS product cost falls back to current cost_price and flags the figure when unit_cost is missing', function () {
     $data = reportVendor();
     $sale = reportPosSale($data);
@@ -281,4 +334,135 @@ test('POS product cost falls back to current cost_price and flags the figure whe
 
     expect($report['product_cost'])->toBe(3500.0)
         ->and($report['cost_is_estimated'])->toBeTrue();
+});
+
+// Goods with no cost recorded are valued at nothing, which is the only safe
+// number to put in a total — but the report used to present that silently, so
+// an incomplete figure looked like a finished one.
+
+test('inventory value flags itself as partial when a stocked product has no cost', function () {
+    $data = reportVendor();
+    $data['product']->update(['cost_price' => null, 'stock_quantity' => 20]);
+
+    $balances = app(FinancialReportService::class)
+        ->report($data['vendor']->id, now()->subDay(), now()->addDay())['balances'];
+
+    expect($balances['inventory_value'])->toBe(0.0)
+        ->and($balances['inventory_cost_is_partial'])->toBeTrue()
+        ->and($balances['inventory_missing_cost_count'])->toBe(1)
+        ->and($balances['inventory_missing_cost_units'])->toBe(20);
+});
+
+test('a fully costed catalogue is never flagged as partial', function () {
+    $data = reportVendor();
+    $data['product']->update(['cost_price' => 3000, 'stock_quantity' => 20]);
+
+    $balances = app(FinancialReportService::class)
+        ->report($data['vendor']->id, now()->subDay(), now()->addDay())['balances'];
+
+    expect($balances['inventory_value'])->toBe(60000.0)
+        ->and($balances['inventory_cost_is_partial'])->toBeFalse();
+});
+
+test('a product with no cost but no stock either is not flagged', function () {
+    $data = reportVendor();
+    $data['product']->update(['cost_price' => null, 'stock_quantity' => 0]);
+
+    $balances = app(FinancialReportService::class)
+        ->report($data['vendor']->id, now()->subDay(), now()->addDay())['balances'];
+
+    expect($balances['inventory_cost_is_partial'])->toBeFalse();
+});
+
+// A credit sale is revenue the moment the goods leave, so the money it earned
+// has to be visible somewhere until it is collected. Without this line it sat
+// nowhere: not in the bank, not in cash, and no longer in stock.
+
+test('what customers owe on credit shows as its own balance', function () {
+    $data = reportVendor();
+    $customer = App\Models\PosCustomer::create([
+        'vendor_id' => $data['vendor']->id, 'name' => 'Ada', 'phone' => '0803' . random_int(1000000, 9999999),
+    ]);
+
+    App\Models\PosCustomerLedgerEntry::create([
+        'pos_customer_id' => $customer->id, 'vendor_id' => $data['vendor']->id,
+        'direction' => App\Models\PosCustomerLedgerEntry::DIRECTION_CHARGE,
+        'amount' => 50000, 'occurred_at' => now()->toDateString(), 'description' => 'Credit sale',
+    ]);
+
+    $balances = app(FinancialReportService::class)
+        ->report($data['vendor']->id, now()->subDay(), now()->addDay())['balances'];
+
+    expect($balances['customer_debt'])->toBe(50000.0);
+});
+
+test('a repayment reduces what customers owe', function () {
+    $data = reportVendor();
+    $customer = App\Models\PosCustomer::create([
+        'vendor_id' => $data['vendor']->id, 'name' => 'Ada', 'phone' => '0803' . random_int(1000000, 9999999),
+    ]);
+
+    App\Models\PosCustomerLedgerEntry::create([
+        'pos_customer_id' => $customer->id, 'vendor_id' => $data['vendor']->id,
+        'direction' => App\Models\PosCustomerLedgerEntry::DIRECTION_CHARGE,
+        'amount' => 50000, 'occurred_at' => now()->toDateString(),
+    ]);
+    App\Models\PosCustomerLedgerEntry::create([
+        'pos_customer_id' => $customer->id, 'vendor_id' => $data['vendor']->id,
+        'direction' => App\Models\PosCustomerLedgerEntry::DIRECTION_PAYMENT,
+        'amount' => -20000, 'occurred_at' => now()->toDateString(),
+    ]);
+
+    $balances = app(FinancialReportService::class)
+        ->report($data['vendor']->id, now()->subDay(), now()->addDay())['balances'];
+
+    expect($balances['customer_debt'])->toBe(30000.0);
+});
+
+test('debt owed is reported as of the end of the period, not as of today', function () {
+    $data = reportVendor();
+    $customer = App\Models\PosCustomer::create([
+        'vendor_id' => $data['vendor']->id, 'name' => 'Ada', 'phone' => '0803' . random_int(1000000, 9999999),
+    ]);
+
+    // Charged today, repaid a week from now.
+    App\Models\PosCustomerLedgerEntry::create([
+        'pos_customer_id' => $customer->id, 'vendor_id' => $data['vendor']->id,
+        'direction' => App\Models\PosCustomerLedgerEntry::DIRECTION_CHARGE,
+        'amount' => 50000, 'occurred_at' => now()->toDateString(),
+    ]);
+    App\Models\PosCustomerLedgerEntry::create([
+        'pos_customer_id' => $customer->id, 'vendor_id' => $data['vendor']->id,
+        'direction' => App\Models\PosCustomerLedgerEntry::DIRECTION_PAYMENT,
+        'amount' => -50000, 'occurred_at' => now()->addWeek()->toDateString(),
+    ]);
+
+    $service = app(FinancialReportService::class);
+
+    // Looking at this week, the debt is still outstanding.
+    expect($service->report($data['vendor']->id, now()->subDay(), now()->addDay())['balances']['customer_debt'])
+        ->toBe(50000.0);
+
+    // Looking far enough ahead to include the repayment, it is settled.
+    expect($service->report($data['vendor']->id, now()->subDay(), now()->addWeeks(2))['balances']['customer_debt'])
+        ->toBe(0.0);
+});
+
+test('one vendor never sees another vendor\'s customer debt', function () {
+    $data = reportVendor();
+    $other = reportVendor();
+
+    $customer = App\Models\PosCustomer::create([
+        'vendor_id' => $other['vendor']->id, 'name' => 'Ada', 'phone' => '0803' . random_int(1000000, 9999999),
+    ]);
+    App\Models\PosCustomerLedgerEntry::create([
+        'pos_customer_id' => $customer->id, 'vendor_id' => $other['vendor']->id,
+        'direction' => App\Models\PosCustomerLedgerEntry::DIRECTION_CHARGE,
+        'amount' => 50000, 'occurred_at' => now()->toDateString(),
+    ]);
+
+    $balances = app(FinancialReportService::class)
+        ->report($data['vendor']->id, now()->subDay(), now()->addDay())['balances'];
+
+    expect($balances['customer_debt'])->toBe(0.0);
 });
