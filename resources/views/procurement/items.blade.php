@@ -7,7 +7,11 @@
                 <h2 class="text-xl font-bold text-[#191c1d] dark:text-zinc-100" style="font-family:'Montserrat',sans-serif;">
                     Purchase Order
                 </h2>
-                <p class="text-sm text-[#6f7b68] dark:text-zinc-400 mt-0.5">Supplier: {{ $supplier->name }}</p>
+                <p class="text-sm text-[#6f7b68] dark:text-zinc-400 mt-0.5">
+                    Supplier: {{ $supplier->name }}
+                    <span class="mx-1">·</span>
+                    Delivering to <span class="font-semibold text-[#016c00] dark:text-green-400">{{ $destination->name }}</span>
+                </p>
             </div>
             <div class="text-right">
                 <p class="text-[10px] font-bold text-[#6f7b68] dark:text-zinc-500 uppercase tracking-wider">Total Estimated Value</p>
@@ -199,11 +203,17 @@
             const matches = (q ? products.filter(p => p.name.toLowerCase().includes(q)) : products).slice(0, 20);
 
             box.innerHTML = matches.length
-                ? matches.map(p => `
+                ? matches.map(p => p.receivable
+                    ? `
                     <button type="button" onmousedown="selectProduct(${idx}, ${p.id})"
                         class="w-full text-left px-3 py-2 text-sm hover:bg-[#f3f4f5] dark:hover:bg-zinc-700 text-[#191c1d] dark:text-zinc-100 border-b border-gray-50 dark:border-zinc-800 last:border-0">
                         ${escapeHtml(p.name)}
-                    </button>`).join('')
+                    </button>`
+                    : `
+                    <div class="w-full text-left px-3 py-2 text-sm text-[#6f7b68] dark:text-zinc-500 border-b border-gray-50 dark:border-zinc-800 last:border-0 cursor-not-allowed">
+                        <span class="line-through">${escapeHtml(p.name)}</span>
+                        <span class="block text-xs mt-0.5">Stocked at ${escapeHtml(p.held_at || 'another branch')} — needs its own product here</span>
+                    </div>`).join('')
                 : `<div class="px-3 py-2 text-sm text-[#6f7b68] dark:text-zinc-400">No matching products</div>`;
 
             box.classList.remove('hidden');
@@ -225,7 +235,7 @@
 
         function selectProduct(idx, productId) {
             const product = products.find(p => p.id == productId);
-            if (!product) return;
+            if (!product || !product.receivable) return;
 
             document.getElementById(`productId_${idx}`).value = product.id;
             document.getElementById(`productSearch_${idx}`).value = product.name;

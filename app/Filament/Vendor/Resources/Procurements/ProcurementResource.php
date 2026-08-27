@@ -63,6 +63,11 @@ class ProcurementResource extends Resource
                     ->searchable()
                     ->sortable(),
 
+                TextColumn::make('store.name')
+                    ->label('Deliver To')
+                    ->placeholder('Default store')
+                    ->icon('heroicon-m-building-storefront')
+                    ->toggleable(),
                 TextColumn::make('items_count')
                     ->label('Items')
                     ->counts('items')

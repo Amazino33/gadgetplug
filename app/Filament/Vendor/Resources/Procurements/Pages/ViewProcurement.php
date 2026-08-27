@@ -34,6 +34,8 @@ class ViewProcurement extends ViewRecord
                     ->content(new HtmlString('<span class="font-bold font-mono">' . e($record->reference) . '</span>')),
                 Placeholder::make('supplier')->label('Supplier')
                     ->content($record->supplier->name ?? '—'),
+                Placeholder::make('destination')->label('Deliver To')
+                    ->content($record->store->name ?? 'Default store'),
                 Placeholder::make('status')->label('Status')
                     ->content(new HtmlString($this->badge($record->status, match ($record->status) {
                         'pending'  => 'warning',
@@ -107,9 +109,12 @@ class ViewProcurement extends ViewRecord
                     ->size('lg')
                     ->requiresConfirmation()
                     ->modalHeading('Approve Procurement')
-                    ->modalDescription(fn () => 
-                        "Approving {$this->record->reference} will restock {$this->record->items()->count()} products and update their cost/selling price."
-                    )
+                    ->modalDescription(fn () => sprintf(
+                        'Approving %s will restock %d products into %s and update their cost/selling price.',
+                        $this->record->reference,
+                        $this->record->items()->count(),
+                        $this->record->store->name ?? 'the default store',
+                    ))
                     ->visible(fn () => $this->record->isPending() && $user->hasVendorPermission($vendor->id, 'approve_procurement') && ($this->record->created_by !== auth()->id() || !$vendor->hasOtherApprovers($this->record->created_by)))
                     ->action(function (ApproveProcurementAction $approveAction) {
                         try {

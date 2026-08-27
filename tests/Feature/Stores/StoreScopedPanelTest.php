@@ -235,10 +235,14 @@ test('a panel stock adjustment lands on the active store, not the default', func
         ->and(InventoryLedger::where('product_id', $product->id)->value('store_id'))->toBe($branch->id);
 });
 
-test('procurement approval receives the active store', function () {
+test('procurement approval receives into the store it is given', function () {
+    // The order itself now carries a destination, and that wins whenever it
+    // has one — see ProcurementDestinationTest. This covers what is left: an
+    // order raised before the column existed, where the argument is the only
+    // thing saying where the goods go.
     $vendor = panelVendor();
     $branch = Store::create(['vendor_id' => $vendor->id, 'name' => 'Receiving Branch']);
-    $product = panelProduct($vendor, 'Received', $vendor->defaultStore, 2);
+    $product = panelProduct($vendor, 'Received', $branch, 2);
 
     $supplier = App\Models\Supplier::create(['vendor_id' => $vendor->id, 'name' => 'S '.uniqid()]);
     $procurement = App\Models\Procurement::create([
@@ -254,8 +258,7 @@ test('procurement approval receives the active store', function () {
 
     $rows = ProductStoreStock::where('product_id', $product->id)->get()->keyBy('store_id');
 
-    expect($rows[$branch->id]->quantity)->toBe(5)
-        ->and($rows[$vendor->defaultStore->id]->quantity)->toBe(2);
+    expect($rows[$branch->id]->quantity)->toBe(7);
 });
 
 test('outside the panel the actions still fall back to the default store', function () {

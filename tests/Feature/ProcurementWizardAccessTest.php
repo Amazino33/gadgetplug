@@ -81,7 +81,10 @@ test('a role granted manage_procurement can reach the items step and see cost pr
     $manager->assignRole('store_admin'); // store_admin has manage_procurement by default
 
     $this->actingAs($manager)
-        ->withSession(['procurement.supplier_id' => $supplier->id])
+        ->withSession([
+            'procurement.supplier_id' => $supplier->id,
+            'procurement.store_id'    => $vendor->defaultStore->id,
+        ])
         ->get(route('procurement.items'))
         ->assertOk()
         ->assertSee('Procured Widget');

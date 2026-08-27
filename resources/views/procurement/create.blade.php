@@ -86,6 +86,40 @@
             </button>
         </div>
 
+        {{-- Destination Branch --}}
+        <div class="bg-white dark:bg-zinc-800 rounded-xl p-6 shadow-[0px_4px_20px_rgba(0,0,0,0.04)] border border-[#becab5]/30 dark:border-zinc-700 mb-6">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 rounded-lg bg-[#016c00]/10 dark:bg-green-900/30 flex items-center justify-center">
+                    <span class="material-symbols-outlined text-[#016c00] dark:text-green-400">store</span>
+                </div>
+                <div>
+                    <h3 class="font-semibold text-[#191c1d] dark:text-zinc-100" style="font-family:'Montserrat',sans-serif;">Deliver To</h3>
+                    <p class="text-xs text-[#6f7b68] dark:text-zinc-400">The branch these goods are being received into. Its stock is what goes up on approval.</p>
+                </div>
+            </div>
+
+            @if($stores->count() > 1)
+                <select name="store_id" required
+                    class="w-full rounded-xl border border-[#becab5] dark:border-zinc-600 bg-white dark:bg-zinc-900 text-[#191c1d] dark:text-zinc-100 px-4 py-3 text-sm focus:border-[#016c00] focus:ring-1 focus:ring-[#016c00] outline-none">
+                    @foreach($stores as $store)
+                        <option value="{{ $store->id }}" @selected($selectedStore == $store->id)>
+                            {{ $store->name }}@if($store->is_default) &nbsp;— default @endif
+                        </option>
+                    @endforeach
+                </select>
+            @else
+                {{-- One branch to receive into, so there is nothing to choose. --}}
+                <input type="hidden" name="store_id" value="{{ $selectedStore }}" />
+                <p class="text-sm font-semibold text-[#191c1d] dark:text-zinc-100">
+                    {{ $stores->first()?->name ?? 'No branch available' }}
+                </p>
+            @endif
+
+            @error('store_id')
+                <p class="text-red-600 dark:text-red-400 text-sm mt-2">{{ $message }}</p>
+            @enderror
+        </div>
+
         {{-- Supplier Grid --}}
         @error('supplier_id')
             <p class="text-red-600 dark:text-red-400 text-sm mb-4">{{ $message }}</p>

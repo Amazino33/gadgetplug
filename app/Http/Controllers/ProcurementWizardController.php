@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ProductStoreStock;
+use App\Models\Store;
 use App\Models\Supplier;
 use App\Models\Product;
 use App\Models\Procurement;
@@ -9,7 +11,9 @@ use App\Models\ProcurementItem;
 use App\Models\ProcurementLogisticsLeg;
 use App\Models\Vendor;
 use Illuminate\Http\Request;
+use App\Services\ActiveStore;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 class ProcurementWizardController extends Controller
 {
@@ -43,17 +47,37 @@ class ProcurementWizardController extends Controller
         $selectedSupplier = session('procurement.supplier_id');
         $receiptImage = session('procurement.receipt_image');
 
-        return view('procurement.create', compact('vendor', 'suppliers', 'selectedSupplier', 'receiptImage'));
+        // Only branches this user can actually reach. A storekeeper assigned to
+        // one branch has no business receiving goods into another.
+        $stores = ActiveStore::accessibleFor($vendor, $request->user());
+        $selectedStore = session('procurement.store_id')
+            ?? ActiveStore::currentId()
+            ?? $stores->firstWhere('is_default', true)?->id
+            ?? $stores->first()?->id;
+
+        return view('procurement.create', compact('vendor', 'suppliers', 'selectedSupplier', 'receiptImage', 'stores', 'selectedStore'));
     }
 
     public function storeSupplier(Request $request)
     {
+        $vendor = $this->resolveAuthorizedVendor($request);
+
         $request->validate([
             'supplier_id'   => 'required|exists:suppliers,id',
+            // Checked against the branches this user can reach rather than
+            // exists:stores,id, so a posted id cannot name another vendor's
+            // branch or one this user was never assigned to.
+            'store_id'      => ['required', Rule::in(ActiveStore::accessibleFor($vendor, $request->user())->pluck('id'))],
             'receipt_image'  => 'nullable|image|max:5120',
+        ], [
+            'store_id.required' => 'Choose which branch these goods are being delivered to.',
+            'store_id.in'       => 'You cannot receive goods into that branch.',
         ]);
 
-        session(['procurement.supplier_id' => $request->supplier_id]);
+        session([
+            'procurement.supplier_id' => $request->supplier_id,
+            'procurement.store_id'    => (int) $request->store_id,
+        ]);
 
         if ($request->hasFile('receipt_image')) {
             $path = $request->file('receipt_image')->store('receipts', 'public');
@@ -71,15 +95,42 @@ class ProcurementWizardController extends Controller
 
         $vendor = $this->resolveAuthorizedVendor($request);
 
+        if (! session('procurement.store_id')) {
+            return redirect()->route('procurement.create');
+        }
+
+        $destination = Store::where('vendor_id', $vendor->id)
+            ->findOrFail(session('procurement.store_id'));
+
         $supplier = Supplier::findOrFail(session('procurement.supplier_id'));
         $products = Product::where('vendor_id', $vendor->id)->orderBy('name')->get();
+
+        // Which products already hold stock somewhere other than the branch
+        // being delivered to. Those are the ones approval will refuse, because
+        // a product lives in exactly one branch and receiving here would strand
+        // the units it holds there. Flagged while the order is being built
+        // rather than left to fail at approval, when the goods have arrived and
+        // it is too late to do anything about it.
+        $heldElsewhere = ProductStoreStock::whereIn('product_id', $products->pluck('id'))
+            ->where('store_id', '!=', $destination->id)
+            ->where(fn ($q) => $q->where('quantity', '>', 0)->orWhere('reserved', '>', 0))
+            ->pluck('product_id')
+            ->flip();
+
+        $storeNames = Store::where('vendor_id', $vendor->id)->pluck('name', 'id');
+
         $productsJson = $products->map(fn($p) => [
             'id' => $p->id, 'name' => $p->name,
             'price' => $p->price ?? 0, 'cost_price' => $p->cost_price ?? 0,
+            // Receivable here if it is already homed at this branch, or holds
+            // nothing anywhere — an empty product is re-homed on approval.
+            'receivable' => (int) $p->store_id === (int) $destination->id
+                || ! $heldElsewhere->has($p->id),
+            'held_at' => $storeNames[$p->store_id] ?? null,
         ])->values();
         $items    = session('procurement.items', []);
 
-        return view('procurement.items', compact('vendor', 'supplier', 'products', 'productsJson', 'items'));
+        return view('procurement.items', compact('vendor', 'supplier', 'products', 'productsJson', 'items', 'destination'));
     }
 
     public function storeItems(Request $request)
@@ -165,6 +216,7 @@ class ProcurementWizardController extends Controller
 
         $vendor = $this->resolveAuthorizedVendor($request);
         $supplier   = Supplier::findOrFail(session('procurement.supplier_id'));
+        $destination = Store::find(session('procurement.store_id'));
         $items      = session('procurement.items', []);
         $financials = session('procurement.financials');
         $products   = Product::whereIn('id', array_column($items, 'product_id'))->get()->keyBy('id');
@@ -172,7 +224,7 @@ class ProcurementWizardController extends Controller
         $legs       = session('procurement.logistics', []);
         $logisticsTotal = collect($legs)->sum(fn($l) => (float) $l['amount']);
 
-        return view('procurement.confirm', compact('vendor', 'supplier', 'items', 'products', 'financials', 'subtotal', 'legs', 'logisticsTotal'));
+        return view('procurement.confirm', compact('vendor', 'supplier', 'destination', 'items', 'products', 'financials', 'subtotal', 'legs', 'logisticsTotal'));
     }
 
     public function submit(Request $request)
@@ -195,6 +247,7 @@ class ProcurementWizardController extends Controller
         DB::transaction(function () use ($vendor, $financials, $items, $subtotal, $amountPaid, $paymentStatus, $legs) {
             $procurement = Procurement::create([
                 'vendor_id'      => $vendor->id,
+                'store_id'       => session('procurement.store_id'),
                 'supplier_id'    => session('procurement.supplier_id'),
                 'created_by'     => auth()->id(),
                 'total_cost'     => $subtotal,
@@ -228,7 +281,7 @@ class ProcurementWizardController extends Controller
             }
         });
 
-        session()->forget(['procurement.supplier_id', 'procurement.items', 'procurement.logistics', 'procurement.financials', 'procurement.receipt_image']);
+        session()->forget(['procurement.supplier_id', 'procurement.store_id', 'procurement.items', 'procurement.logistics', 'procurement.financials', 'procurement.receipt_image']);
 
         return redirect()->route('procurement.create')
             ->with('success', 'Procurement submitted successfully and is pending approval.');

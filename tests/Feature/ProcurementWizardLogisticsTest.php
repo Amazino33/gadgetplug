@@ -39,7 +39,7 @@ test('the procurement wizard records transport stages as logistics legs on submi
 
     $this->actingAs($owner);
 
-    $this->post(route('procurement.storeSupplier'), ['supplier_id' => $supplier->id])
+    $this->post(route('procurement.storeSupplier'), ['supplier_id' => $supplier->id, 'store_id' => $vendor->defaultStore->id])
         ->assertRedirect(route('procurement.items'));
 
     $this->post(route('procurement.storeItems'), [
@@ -88,7 +88,7 @@ test('the procurement wizard submits fine when the transport-cost step is skippe
 
     $this->actingAs($owner);
 
-    $this->post(route('procurement.storeSupplier'), ['supplier_id' => $supplier->id]);
+    $this->post(route('procurement.storeSupplier'), ['supplier_id' => $supplier->id, 'store_id' => $vendor->defaultStore->id]);
     $this->post(route('procurement.storeItems'), [
         'items' => [
             ['product_id' => $product->id, 'quantity' => 1, 'unit_cost' => 3000, 'selling_price' => 5000],
@@ -113,7 +113,7 @@ test('a transport stage requires both a label and a cost', function () {
     [$owner, $vendor, $supplier, $product] = bootProcurementWizardVendor();
 
     $this->actingAs($owner);
-    $this->post(route('procurement.storeSupplier'), ['supplier_id' => $supplier->id]);
+    $this->post(route('procurement.storeSupplier'), ['supplier_id' => $supplier->id, 'store_id' => $vendor->defaultStore->id]);
     $this->post(route('procurement.storeItems'), [
         'items' => [
             ['product_id' => $product->id, 'quantity' => 1, 'unit_cost' => 3000, 'selling_price' => 5000],

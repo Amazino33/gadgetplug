@@ -46,6 +46,13 @@
                     <div>
                         <p class="font-semibold text-[#191c1d] dark:text-zinc-100" style="font-family:'Montserrat',sans-serif;">{{ $supplier->name }}</p>
                         <p class="text-xs text-[#6f7b68] dark:text-zinc-400">{{ $supplier->location ?? '' }} {{ $supplier->phone ? '· '.$supplier->phone : '' }}</p>
+                        @if($destination)
+                            <p class="text-xs text-[#6f7b68] dark:text-zinc-400 mt-1">
+                                Delivering to
+                                <span class="font-semibold text-[#016c00] dark:text-green-400">{{ $destination->name }}</span>
+                                — its stock goes up when this order is approved.
+                            </p>
+                        @endif
                     </div>
                 </div>
             </div>

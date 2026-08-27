@@ -26,7 +26,7 @@ class Procurement extends Model
         $activity->vendor_id = $this->vendor_id;
     }
     protected $fillable = [
-        'reference', 'vendor_id', 'supplier_id', 'waybill_image',
+        'reference', 'vendor_id', 'store_id', 'supplier_id', 'waybill_image',
         'total_cost', 'amount_paid', 'payment_status', 'payment_method', 'status',
         'void_reason', 'notes', 'created_by', 'approved_by', 'approved_at',
     ];
@@ -55,6 +55,12 @@ class Procurement extends Model
     public function supplier(): BelongsTo
     {
         return $this->belongsTo(Supplier::class);
+    }
+
+    /** The branch these goods are being received into. */
+    public function store(): BelongsTo
+    {
+        return $this->belongsTo(Store::class);
     }
 
     public function items(): HasMany
