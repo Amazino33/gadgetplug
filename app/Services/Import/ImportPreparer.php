@@ -140,6 +140,21 @@ class ImportPreparer
                 }
             }
 
+            // products.price is NOT NULL with no default, so a new product
+            // without one cannot be written at all. A blank cell raises no
+            // parse error — RowParser rightly reads an empty cell as "column
+            // not supplied" rather than bad data — so without this check the
+            // row previews as a healthy Create and then kills the whole import
+            // on a raw SQL error, one row at a time, however many there are.
+            //
+            // Checked here rather than in RowParser because only this point
+            // knows whether the row is a create: an update with no price column
+            // must leave the existing price alone, exactly as the category
+            // fallback in ProductImporter only applies to new products.
+            if ($matchedId === null && ! isset($values[ProductField::Price->value])) {
+                $errors[] = 'Price is missing. A new product needs one, because it cannot be sold without a price.';
+            }
+
             $rows->push(new ParsedRow(
                 line: $line,
                 values: $values,
