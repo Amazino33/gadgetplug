@@ -144,3 +144,33 @@ test('clearing a held sale removes it without resuming it', function () {
 
     expect(PosSuspendedSale::find($suspended->id))->toBeNull();
 });
+
+// The picker now shows what is actually in each held sale — the item names,
+// the line quantities and prices, and how long ago it was held — so a cashier
+// can tell two holds apart without resuming each one to look. That only works
+// while the list keeps returning those fields; the old sidebar list showed
+// nothing but a label and a count, so trimming them would have gone unnoticed.
+test('the held-sale list carries everything the picker shows', function () {
+    $data = suspendedSaleVendor();
+    Sanctum::actingAs($data['owner']);
+
+    $this->postJson('/api/pos/suspended', [
+        'vendor_id'   => $data['vendor']->id,
+        'label'       => 'Mrs Okafor',
+        'customer_id' => null,
+        'cart_data'   => ['items' => [
+            ['id' => 1, 'name' => 'Anker Cable',   'price' => 4500,  'qty' => 2],
+            ['id' => 2, 'name' => 'Oraimo Buds',   'price' => 12000, 'qty' => 1],
+        ], 'customer' => null],
+    ])->assertCreated();
+
+    $this->getJson('/api/pos/suspended?vendor_id=' . $data['vendor']->id)
+        ->assertOk()
+        ->assertJsonPath('0.label', 'Mrs Okafor')
+        // "held 5 minutes ago" is how a cashier picks the right one out of several
+        ->assertJsonStructure([['id', 'label', 'created_at', 'cart_data' => ['items']]])
+        ->assertJsonPath('0.cart_data.items.0.name', 'Anker Cable')
+        ->assertJsonPath('0.cart_data.items.0.qty', 2)
+        ->assertJsonPath('0.cart_data.items.0.price', 4500)
+        ->assertJsonPath('0.cart_data.items.1.name', 'Oraimo Buds');
+});

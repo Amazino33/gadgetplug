@@ -1,5 +1,3 @@
-import { timeAgo } from '../lib/format';
-
 const Btn = ({ label, hotkey, color = 'default', disabled = false, onClick, wide = false }) => {
     const colors = {
         default: 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50',
@@ -33,7 +31,7 @@ export default function ActionGrid({
     onDiscount, onCustomer,
     onQuickCash, onQuickPOS, onQuickTransfer, onSuspend, onPayment, onVoid,
     onZReport, onReturn,
-    pendingSales = [], onResumePending, onClearPending, pendingError,
+    pendingSales = [], onViewPending, pendingError,
 }) {
     return (
         <div className="w-64 shrink-0 bg-[#F9FAFB] border-l border-gray-200 p-3 flex flex-col gap-3 overflow-y-auto">
@@ -108,44 +106,21 @@ export default function ActionGrid({
                     </div>
                 )}
 
+                {/* The list itself moved to the top bar. Sitting down here it
+                    was below the fold on a till screen — held sales existed but
+                    could not be seen or got back. This is just the doorway. */}
                 {pendingSales.length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-gray-200">
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">
-                            Pending Sales ({pendingSales.length})
-                        </p>
-                        <div className="space-y-1.5 max-h-52 overflow-y-auto">
-                            {pendingSales.map((sale) => (
-                                <div key={sale.id}
-                                    className="flex items-center gap-2 bg-orange-50 border border-orange-200 rounded-lg px-2.5 py-2">
-                                    <button
-                                        onClick={() => cartEmpty && onResumePending(sale)}
-                                        disabled={!cartEmpty}
-                                        className="flex-1 min-w-0 text-left disabled:opacity-50 disabled:cursor-not-allowed"
-                                    >
-                                        <p className="text-xs font-semibold text-gray-700 truncate">
-                                            {sale.label || sale.customer?.name || `Sale #${sale.id}`}
-                                        </p>
-                                        <p className="text-[10px] text-gray-400">
-                                            {sale.cart_data?.items?.length ?? 0} item(s) · {timeAgo(sale.created_at)}
-                                        </p>
-                                    </button>
-                                    <button
-                                        onClick={() => onClearPending(sale.id)}
-                                        className="text-red-400 hover:text-red-600 text-xs shrink-0 px-1"
-                                        aria-label="Discard held sale"
-                                    >
-                                        ✕
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                        {!cartEmpty && (
-                            <p className="text-[10px] text-gray-400 mt-1.5 px-1">
-                                Clear or complete the current cart to resume one of these.
-                            </p>
-                        )}
-                    </div>
+                    <button
+                        onClick={onViewPending}
+                        className="mt-3 w-full flex items-center justify-between gap-2 rounded-lg border border-orange-200 bg-orange-50 px-2.5 py-2 hover:bg-orange-100 transition-colors"
+                    >
+                        <span className="text-xs font-bold text-[#F97316]">
+                            {pendingSales.length} sale{pendingSales.length === 1 ? '' : 's'} on hold
+                        </span>
+                        <span className="text-[10px] font-semibold text-orange-400">View →</span>
+                    </button>
                 )}
+
             </div>
         </div>
     );

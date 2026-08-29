@@ -7,6 +7,7 @@ import { pruneOldSales, recordSale } from '../lib/salesHistory';
 import api from '../lib/api';
 import Cart from '../components/Cart';
 import SearchBar from '../components/SearchBar';
+import SuspendedSalesModal from '../components/SuspendedSalesModal';
 import BarcodeScanner from '../components/BarcodeScanner';
 import ActionGrid from '../components/ActionGrid';
 import PaymentModal from '../components/PaymentModal';
@@ -393,8 +394,32 @@ export default function POS({ user, vendorId, onLogout }) {
 
                 {/* ── Desktop header ──────────────────────────────── */}
                 <div className="hidden md:flex items-center gap-2 px-4 py-3 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 shrink-0">
-                    <SearchBar ref={searchRef} vendorId={vendorId} onSelect={(p) => addProduct(p, true)} />
+                    {/* Capped rather than left to fill the bar. It was taking the
+                        whole width for no benefit — a product search needs far
+                        less than that — and the space is worth more spent on
+                        getting held sales back in reach. */}
+                    <div className="flex flex-1 max-w-md">
+                        <SearchBar ref={searchRef} vendorId={vendorId} onSelect={(p) => addProduct(p, true)} />
+                    </div>
                     <BarcodeScanner vendorId={vendorId} onProductFound={addProduct} />
+                    <button
+                        onClick={() => setModal('suspendedSales')}
+                        className={`flex items-center gap-1.5 shrink-0 rounded-xl border px-3 py-2.5 text-xs font-semibold transition-colors ${
+                            pendingSales.length > 0
+                                ? 'bg-orange-50 dark:bg-orange-950/40 border-orange-200 dark:border-orange-900 text-[#F97316] hover:bg-orange-100 dark:hover:bg-orange-950'
+                                : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                        }`}
+                    >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Suspended
+                        {pendingSales.length > 0 && (
+                            <span className="min-w-4.5 h-4.5 px-1 rounded-full bg-[#F97316] text-white text-[10px] font-bold flex items-center justify-center">
+                                {pendingSales.length}
+                            </span>
+                        )}
+                    </button>
                     <span className={`text-xs px-2 py-1 rounded-full font-medium shrink-0 ${isOnline ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
                         {isOnline ? '●' : '●'}
                     </span>
@@ -604,8 +629,7 @@ export default function POS({ user, vendorId, onLogout }) {
                     onVoid={clearCart}
                     onZReport={() => setModal('zreport')}
                     pendingSales={pendingSales}
-                    onResumePending={resumePendingSale}
-                    onClearPending={clearPendingSale}
+                    onViewPending={() => setModal('suspendedSales')}
                     pendingError={pendingError}
                     onReturn={() => setModal('return')}
                 />
@@ -643,45 +667,16 @@ export default function POS({ user, vendorId, onLogout }) {
                                 onClick={() => { setModal('salesHistory'); setShowMobileMore(false); }}
                                 color="green"
                             />
+                            <SheetBtn
+                                label={pendingSales.length > 0 ? `Suspended (${pendingSales.length})` : 'Suspended'}
+                                onClick={() => { setModal('suspendedSales'); setShowMobileMore(false); }}
+                                color={pendingSales.length > 0 ? 'orange' : 'gray'}
+                            />
                         </div>
 
                         {pendingError && (
                             <div className="mb-3 px-3 py-2 rounded-lg bg-red-50 border border-red-200 text-xs font-semibold text-red-600">
                                 {pendingError}
-                            </div>
-                        )}
-
-                        {pendingSales.length > 0 && (
-                            <div className="border-t border-gray-100 dark:border-gray-800 pt-3 mb-1">
-                                <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">
-                                    Pending Sales ({pendingSales.length})
-                                </p>
-                                <div className="space-y-1.5 max-h-40 overflow-y-auto">
-                                    {pendingSales.map((sale) => (
-                                        <div key={sale.id}
-                                            className="flex items-center gap-2 bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-900 rounded-lg px-3 py-2">
-                                            <button
-                                                onClick={() => { if (cartEmpty) { resumePendingSale(sale); setShowMobileMore(false); } }}
-                                                disabled={!cartEmpty}
-                                                className="flex-1 min-w-0 text-left disabled:opacity-50"
-                                            >
-                                                <p className="text-xs font-semibold text-gray-700 dark:text-gray-200 truncate">
-                                                    {sale.label || sale.customer?.name || `Sale #${sale.id}`}
-                                                </p>
-                                                <p className="text-[10px] text-gray-400">
-                                                    {sale.cart_data?.items?.length ?? 0} item(s)
-                                                </p>
-                                            </button>
-                                            <button
-                                                onClick={() => clearPendingSale(sale.id)}
-                                                className="text-red-400 hover:text-red-600 text-xs shrink-0 px-1"
-                                                aria-label="Discard held sale"
-                                            >
-                                                ✕
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
                             </div>
                         )}
 
@@ -795,6 +790,17 @@ export default function POS({ user, vendorId, onLogout }) {
                     }}
                 />
             )}
+            {modal === 'suspendedSales' && (
+                <SuspendedSalesModal
+                    sales={pendingSales}
+                    cartEmpty={cartEmpty}
+                    error={pendingError}
+                    onResume={async (sale) => { await resumePendingSale(sale); setModal(null); }}
+                    onDiscard={clearPendingSale}
+                    onClose={() => setModal(null)}
+                />
+            )}
+
             {modal === 'stuckSales' && (
                 <StuckSalesModal
                     sales={stuckSales}
