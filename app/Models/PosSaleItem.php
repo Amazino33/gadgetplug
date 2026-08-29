@@ -13,6 +13,7 @@ class PosSaleItem extends Model
         'unit_price'      => 'decimal:2',
         'discount_amount' => 'decimal:2',
         'total'           => 'decimal:2',
+        'cost_total'      => 'decimal:2',
     ];
 
     public function sale(): BelongsTo

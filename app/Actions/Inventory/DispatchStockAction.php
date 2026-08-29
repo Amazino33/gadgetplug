@@ -3,9 +3,11 @@
 namespace App\Actions\Inventory;
 
 use App\Models\InventoryLedger;
+use App\Models\OrderItem;
 use App\Models\OrderItemStoreAllocation;
 use App\Models\Product;
 use App\Models\Store;
+use App\Services\Inventory\StockCostLayers;
 use App\Services\Inventory\StoreStock;
 use Illuminate\Support\Facades\DB;
 
@@ -39,6 +41,11 @@ class DispatchStockAction
 
             $ledger = null;
 
+            // A line can be filled from more than one branch, so the cost of
+            // the goods is accumulated across every branch it draws from
+            // before being written back to the order line as one figure.
+            $dispatchedCost = 0.0;
+
             foreach ($plan as $storeId => $units) {
                 $row = StoreStock::lockedRow($product, $storeId);
 
@@ -50,6 +57,15 @@ class DispatchStockAction
                 $row->reserved -= min($units, $row->reserved);
                 $row->save();
 
+                // Draw the same units off the oldest cost batches. A shortfall
+                // is tolerated here rather than thrown: physical quantity is
+                // deliberately allowed to go negative above, and there is no
+                // layer to draw from below zero — the goods have left either
+                // way, and blocking a dispatch over a bookkeeping gap would be
+                // the wrong trade.
+                $movement = StockCostLayers::consume($product->id, $storeId, $units);
+                $dispatchedCost += $movement['cost'];
+
                 $ledger = InventoryLedger::create([
                     'vendor_id'        => $product->vendor_id,
                     'store_id'         => $storeId,
@@ -57,8 +73,20 @@ class DispatchStockAction
                     'user_id'          => $userId,
                     'transaction_type' => 'dispatched',
                     'quantity_change'  => -$units,
+                    'cost_total'       => $movement['cost'],
                     'reference'        => $reference,
                     'description'      => $description ?? 'Physical deduction on dispatch to rider.',
+                ]);
+            }
+
+            // The order line now knows what its goods actually cost. Written
+            // here and not at checkout because dispatch is the moment the units
+            // leave a named branch's shelf, which is what decides which batches
+            // they came from. Accumulated with any earlier partial dispatch of
+            // the same line rather than overwritten.
+            if ($orderItemId !== null) {
+                OrderItem::whereKey($orderItemId)->update([
+                    'cost_total' => DB::raw('COALESCE(cost_total, 0) + ' . number_format($dispatchedCost, 2, '.', '')),
                 ]);
             }
 

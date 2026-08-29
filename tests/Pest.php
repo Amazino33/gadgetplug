@@ -159,3 +159,58 @@ function actAsDebtOwner(array $ctx): void
     Filament\Facades\Filament::setCurrentPanel(Filament\Facades\Filament::getPanel('vendor'));
     Filament\Facades\Filament::setTenant($ctx['vendor']);
 }
+
+/*
+|--------------------------------------------------------------------------
+| Stock cost layer (FIFO) helpers
+|--------------------------------------------------------------------------
+|
+| Shared by the batch-valuation and cost-of-goods-sold suites, here for the
+| same reason as the debt helpers above: Pest only sees a function from
+| another test file when that file happens to load first, so a suite run on
+| its own would otherwise fail on an undefined function.
+|
+*/
+
+/** A vendor holding no stock and no batches, ready to receive known deliveries. */
+function layersContext(): array
+{
+    $ctx = debtTenderContext();
+
+    App\Models\ProductStoreStock::where('product_id', $ctx['product']->id)
+        ->update(['quantity' => 0, 'reserved' => 0]);
+    App\Models\StockCostLayer::where('product_id', $ctx['product']->id)->delete();
+
+    $ctx['product']->update(['cost_price' => null]);
+    $ctx['product']->refresh();
+
+    $ctx['supplier'] = App\Models\Supplier::create([
+        'vendor_id' => $ctx['vendor']->id, 'name' => 'Supplier',
+    ]);
+
+    return $ctx;
+}
+
+/** One delivery, received through the real approval path so it lays down a batch. */
+function receiveBatch(array $ctx, int $quantity, float $unitCost): void
+{
+    $procurement = App\Models\Procurement::create([
+        'vendor_id' => $ctx['vendor']->id, 'supplier_id' => $ctx['supplier']->id,
+        'created_by' => $ctx['owner']->id, 'store_id' => $ctx['store']->id,
+        'status' => 'pending', 'total_cost' => $quantity * $unitCost, 'amount_paid' => 0,
+        'payment_status' => 'unpaid', 'payment_method' => 'cash',
+    ]);
+
+    App\Models\ProcurementItem::create([
+        'procurement_id' => $procurement->id, 'product_id' => $ctx['product']->id,
+        'quantity' => $quantity, 'unit_cost' => $unitCost, 'selling_price' => $unitCost * 2,
+    ]);
+
+    app(App\Actions\Procurement\ApproveProcurementAction::class)
+        ->execute($procurement, $ctx['store']->id);
+}
+
+function stockValue(array $ctx): float
+{
+    return App\Services\Inventory\StockValuation::forVendor($ctx['vendor']->id)['value'];
+}

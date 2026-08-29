@@ -7,6 +7,7 @@ use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductStoreStock;
 use App\Models\Store;
+use App\Services\Inventory\StockCostLayers;
 use App\Services\Inventory\StoreStock;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\DB;
@@ -51,7 +52,16 @@ class AdjustStockAction
             $row->quantity += $quantityChanged;
             $row->save();
 
-            // 5. Record the immutable movement in the ledger
+            // 4b. Keep the cost batches in step with the units. Inside this
+            // same transaction and under the same product lock taken above, so
+            // the layers can never disagree with the row they describe.
+            $movement = StockCostLayers::applyMovement($product, $row->store_id, $quantityChanged);
+
+            // 5. Record the immutable movement in the ledger, carrying what the
+            // units actually cost when they left. That figure is what the caller
+            // books as cost of goods sold — it is returned on the ledger rather
+            // than through a changed return type so every existing caller of
+            // this action keeps working untouched.
             $ledger = InventoryLedger::create([
                 'vendor_id'        => $product->vendor_id,
                 'store_id'         => $row->store_id,
@@ -59,6 +69,7 @@ class AdjustStockAction
                 'user_id'          => $userId,
                 'transaction_type' => $transactionType,
                 'quantity_change'  => $quantityChanged,
+                'cost_total'       => $movement['cost'] ?? null,
                 'reference'        => $reference,
                 'description'      => $description,
                 'audit_session_id' => $auditSessionId,

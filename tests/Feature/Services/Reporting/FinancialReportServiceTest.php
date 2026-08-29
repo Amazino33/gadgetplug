@@ -366,7 +366,14 @@ test('a fully costed catalogue is never flagged as partial', function () {
 
 test('a product with no cost but no stock either is not flagged', function () {
     $data = reportVendor();
-    $data['product']->update(['cost_price' => null, 'stock_quantity' => 0]);
+
+    // The branch's own row is the stock, not products.stock_quantity — that
+    // column is a mirror ProductStoreStockObserver derives, so writing to it
+    // directly empties nothing. Clearing the row is what actually empties the
+    // shelf, and only then is there nothing left to flag as uncosted.
+    $data['product']->update(['cost_price' => null]);
+    App\Models\ProductStoreStock::where('product_id', $data['product']->id)
+        ->update(['quantity' => 0]);
 
     $balances = app(FinancialReportService::class)
         ->report($data['vendor']->id, now()->subDay(), now()->addDay())['balances'];

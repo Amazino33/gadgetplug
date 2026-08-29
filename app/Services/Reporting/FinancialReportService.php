@@ -15,6 +15,7 @@ use App\Models\PosSaleItem;
 use App\Models\ProcurementLogisticsLeg;
 use App\Models\Product;
 use App\Models\Vendor;
+use App\Services\Inventory\StockValuation;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
@@ -118,8 +119,11 @@ class FinancialReportService
         $online = self::recognizedOrderItemsQuery($vendorId, $from, $to)
             ->join('products', 'products.id', '=', 'order_items.product_id')
             ->selectRaw('COALESCE(SUM(order_items.quantity * order_items.unit_price), 0) as revenue')
-            ->selectRaw('COALESCE(SUM(order_items.quantity * COALESCE(order_items.unit_cost, products.cost_price)), 0) as product_cost')
-            ->selectRaw('SUM(CASE WHEN order_items.unit_cost IS NULL THEN 1 ELSE 0 END) as estimated_lines')
+            // cost_total is what the dispatched units actually cost, from the
+            // batches they left in. The quantity x unit_cost arithmetic behind
+            // it is the fallback for lines dispatched before batches existed.
+            ->selectRaw('COALESCE(SUM(COALESCE(order_items.cost_total, order_items.quantity * COALESCE(order_items.unit_cost, products.cost_price))), 0) as product_cost')
+            ->selectRaw('SUM(CASE WHEN order_items.cost_total IS NULL AND order_items.unit_cost IS NULL THEN 1 ELSE 0 END) as estimated_lines')
             ->first();
 
         // Cost stays at the item level — it is a per-line figure — but revenue
@@ -129,8 +133,8 @@ class FinancialReportService
         // what the business reported earning.
         $pos = self::recognizedPosSaleItemsQuery($vendorId, $from, $to)
             ->join('products', 'products.id', '=', 'pos_sale_items.product_id')
-            ->selectRaw('COALESCE(SUM(pos_sale_items.quantity * COALESCE(pos_sale_items.unit_cost, products.cost_price)), 0) as product_cost')
-            ->selectRaw('SUM(CASE WHEN pos_sale_items.unit_cost IS NULL THEN 1 ELSE 0 END) as estimated_lines')
+            ->selectRaw('COALESCE(SUM(COALESCE(pos_sale_items.cost_total, pos_sale_items.quantity * COALESCE(pos_sale_items.unit_cost, products.cost_price))), 0) as product_cost')
+            ->selectRaw('SUM(CASE WHEN pos_sale_items.cost_total IS NULL AND pos_sale_items.unit_cost IS NULL THEN 1 ELSE 0 END) as estimated_lines')
             ->first();
 
         // subtotal is already net of every line discount (see
@@ -185,7 +189,7 @@ class FinancialReportService
         // find exactly what its sale booked.
         $saleCosts = PosSaleItem::query()
             ->whereIn('pos_sale_id', $returns->pluck('original_sale_id')->filter()->unique())
-            ->get(['pos_sale_id', 'product_id', 'unit_cost'])
+            ->get(['pos_sale_id', 'product_id', 'unit_cost', 'quantity', 'cost_total'])
             ->keyBy(fn (PosSaleItem $item) => $item->pos_sale_id . ':' . $item->product_id);
 
         $revenue = 0.0;
@@ -199,9 +203,15 @@ class FinancialReportService
                 // What was actually refunded for these units.
                 $revenue += (float) ($line['total'] ?? 0);
 
-                $unitCost = $saleCosts
-                    ->get($return->original_sale_id . ':' . ($line['product_id'] ?? 0))
-                    ?->unit_cost;
+                $soldLine = $saleCosts->get($return->original_sale_id . ':' . ($line['product_id'] ?? 0));
+
+                // Reversed at the rate the sale itself booked. Where the sale
+                // was costed from its batches, cost_total covers the whole line
+                // and is spread back across its units, so returning some of a
+                // line reverses its share and no more.
+                $unitCost = ($soldLine?->cost_total !== null && (int) $soldLine->quantity > 0)
+                    ? (float) $soldLine->cost_total / (int) $soldLine->quantity
+                    : $soldLine?->unit_cost;
 
                 if ($unitCost === null) {
                     // Nothing was snapshotted, so there is no figure to reverse
@@ -270,18 +280,15 @@ class FinancialReportService
         $bankBalance = $bank?->balance($asOf) ?? 0.0;
         $cashBalance = $cash?->balance($asOf) ?? 0.0;
 
-        // COALESCE(cost_price, 0) values goods of unknown cost at nothing, which
-        // is the only safe figure to put in a total — but silently, so a
-        // catalogue with no costs entered reported an inventory worth zero and
-        // looked like a finished number. The count travels with the value so the
-        // page can say the total is incomplete rather than merely small.
-        $inventory = Product::where('vendor_id', $vendorId)
-            ->selectRaw('COALESCE(SUM(stock_quantity * COALESCE(cost_price, 0)), 0) as value')
-            ->selectRaw('COALESCE(SUM(CASE WHEN cost_price IS NULL AND stock_quantity > 0 THEN 1 ELSE 0 END), 0) as missing_cost_count')
-            ->selectRaw('COALESCE(SUM(CASE WHEN cost_price IS NULL AND stock_quantity > 0 THEN stock_quantity ELSE 0 END), 0) as missing_cost_units')
-            ->first();
+        // Valued from the batches the goods actually arrived in, so restocking
+        // at a higher price no longer revalues stock bought cheaply. Units with
+        // no recorded cost are counted separately rather than quietly valued at
+        // zero — the page says the total is incomplete instead of merely small.
+        // See StockValuation for how stock that never passed through a stock
+        // action (a seed, an import) is reconciled.
+        $inventory = StockValuation::forVendor($vendorId);
 
-        $inventoryValue = (float) $inventory->value;
+        $inventoryValue = $inventory['value'];
 
         // What customers still owe, as of the same date as everything else here.
         //
@@ -305,9 +312,9 @@ class FinancialReportService
             'inventory_value'    => $inventoryValue,
             // True when inventory_value is understated because some stocked
             // products have no cost recorded at all.
-            'inventory_cost_is_partial'   => ((int) $inventory->missing_cost_count) > 0,
-            'inventory_missing_cost_count' => (int) $inventory->missing_cost_count,
-            'inventory_missing_cost_units' => (int) $inventory->missing_cost_units,
+            'inventory_cost_is_partial'   => $inventory['uncosted_product_count'] > 0,
+            'inventory_missing_cost_count' => $inventory['uncosted_product_count'],
+            'inventory_missing_cost_units' => $inventory['uncosted_units'],
             // Never negative in practice; an overpayment would show as a credit
             // owed back to the customer, which is worth seeing rather than
             // clamping away.

@@ -7,6 +7,7 @@ use App\Models\Procurement;
 use App\Models\Product;
 use App\Models\ProductStoreStock;
 use App\Models\Store;
+use App\Services\Inventory\StockCostLayers;
 use App\Services\Inventory\StoreStock;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -77,6 +78,19 @@ class ApproveProcurementAction
 
                 $row->quantity += $item->quantity;
                 $row->save();
+
+                // The batch, at what this order actually paid for it — not at
+                // the product's cost_price, which the update below is about to
+                // overwrite with this same figure anyway. Recording the layer
+                // here is what stops the next, dearer delivery revaluing these
+                // units along with its own.
+                StockCostLayers::receive(
+                    productId: $product->id,
+                    storeId: $row->store_id,
+                    quantity: $item->quantity,
+                    unitCost: $item->unit_cost !== null ? (float) $item->unit_cost : null,
+                    source: $item,
+                );
 
                 $changes = [
                     'cost_price' => $item->unit_cost,

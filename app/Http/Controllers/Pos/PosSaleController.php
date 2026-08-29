@@ -204,11 +204,16 @@ class PosSaleController extends Controller
             $costPrices = Product::whereIn('id', collect($request->items)->pluck('product_id'))
                 ->pluck('cost_price', 'id');
 
-            foreach ($request->items as $item) {
+            // Kept against the payload's own line numbers, so the batch cost
+            // worked out during the stock pass below lands back on the right
+            // line even when the same product appears on the cart twice.
+            $saleItems = [];
+
+            foreach ($request->items as $line => $item) {
                 $lineDiscount = (float) ($item['discount_amount'] ?? 0);
                 $lineTotal    = ($item['unit_price'] * $item['quantity']) - $lineDiscount;
 
-                PosSaleItem::create([
+                $saleItems[$line] = PosSaleItem::create([
                     'pos_sale_id'  => $sale->id,
                     'product_id'   => $item['product_id'],
                     'product_name' => $item['product_name'],
@@ -230,11 +235,16 @@ class PosSaleController extends Controller
             // deadlock, which MySQL resolves by killing one sale outright. That
             // is the "Serialization failure: 1213" the cashiers were seeing.
             // A single agreed order makes the cycle impossible to form.
-            $stockOrder = collect($request->items)->sortBy('product_id')->values();
+            // keys() rather than values(): the line numbers are what tie each
+            // movement back to the sale line it belongs to, and the sort still
+            // gives the single agreed product order the deadlock fix needs.
+            $stockOrder = collect($request->items)->sortBy('product_id')->keys();
 
-            foreach ($stockOrder as $item) {
+            foreach ($stockOrder as $line) {
+                $item = $request->items[$line];
+
                 // Deduct physical stock immediately (POS = item leaves the shelf now)
-                $adjustStock->execute(
+                $ledger = $adjustStock->execute(
                     productId: $item['product_id'],
                     quantityChanged: -$item['quantity'],
                     transactionType: 'pos_sale',
@@ -245,6 +255,15 @@ class PosSaleController extends Controller
                     // vendor's default branch.
                     store: $sale->store_id,
                 );
+
+                // What these units genuinely cost, from the batches they came
+                // out of, rather than the product's current cost_price the line
+                // was provisionally stamped with above. Left alone when the
+                // batches could not say — the unit_cost snapshot still stands
+                // as the fallback, exactly as before.
+                if ($ledger?->cost_total !== null) {
+                    $saleItems[$line]->update(['cost_total' => $ledger->cost_total]);
+                }
             }
 
             // Update customer spend stats
