@@ -253,9 +253,15 @@ it('hides the write-off button from someone who may not use it', function () {
     setPermissionsTeamId($ctx['vendor']->id);
     $admin->assignRole('store_admin');
 
+    // Assigned to the branch the credit was given at: everyone but the owner is
+    // now scoped to their current store, so an unassigned user sees no rows at
+    // all and the action could not be found either way.
+    $admin->stores()->syncWithoutDetaching([$ctx['store']->id]);
+
     $this->actingAs($admin);
     Filament\Facades\Filament::setCurrentPanel(Filament\Facades\Filament::getPanel('vendor'));
     Filament\Facades\Filament::setTenant($ctx['vendor']);
+    App\Services\ActiveStore::set($ctx['vendor'], $admin, $ctx['store']);
 
     Livewire::test(ListCustomerDebts::class)
         ->assertTableActionHidden('writeOff', $ctx['customer']);

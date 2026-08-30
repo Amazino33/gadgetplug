@@ -53,6 +53,11 @@ class VendorRoles
             'view_order_items', 'view_any_order_items',
             'access_pos',
             'manage_inventory', 'perform_inventory_count',
+            // Whoever is at the counter has to be able to take a repayment —
+            // a customer settling up should never be told to come back when
+            // the owner is in. Their view is scoped to their own store, and
+            // writing a debt off remains the owner's decision alone.
+            'view_customer_debts',
         ],
         'member' => [
             'view_products', 'view_any_products',

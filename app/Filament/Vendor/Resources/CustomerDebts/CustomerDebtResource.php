@@ -5,6 +5,7 @@ namespace App\Filament\Vendor\Resources\CustomerDebts;
 use App\Filament\Vendor\Resources\CustomerDebts\Pages\ListCustomerDebts;
 use App\Filament\Vendor\Resources\CustomerDebts\Pages\ViewCustomerDebt;
 use App\Models\PosCustomer;
+use App\Services\ActiveStore;
 use App\Models\PosCustomerLedgerEntry;
 use Filament\Resources\Resource;
 use Illuminate\Database\Eloquent\Builder;
@@ -98,9 +99,54 @@ class CustomerDebtResource extends Resource
                 . ' where pos_customer_ledger_entries.pos_customer_id = pos_customers.id) > 0');
     }
 
+    /**
+     * Narrows the debt list to customers who took credit at one store.
+     *
+     * Deliberately "took credit here", not "every ledger row stamped here": a
+     * customer is a vendor-level person who can owe from two branches and pay
+     * at a third, so summing rows per store would show a branch chasing money
+     * already collected somewhere else. This way the figure shown is always
+     * their true remaining balance, and anyone who has settled up disappears
+     * from every branch's list at once.
+     *
+     * The cost is overlap: someone who took credit at two stores appears in
+     * both, so branch lists can add up to more than the vendor total. That is
+     * labelled wherever it is shown rather than quietly netted off.
+     */
+    public static function scopedToStore(Builder $query, int $storeId): Builder
+    {
+        return $query->whereExists(fn ($sub) => $sub
+            ->selectRaw('1')
+            ->from('pos_customer_ledger_entries')
+            ->whereColumn('pos_customer_ledger_entries.pos_customer_id', 'pos_customers.id')
+            ->where('pos_customer_ledger_entries.direction', PosCustomerLedgerEntry::DIRECTION_CHARGE)
+            ->where('pos_customer_ledger_entries.store_id', $storeId));
+    }
+
     public static function getEloquentQuery(): Builder
     {
-        return static::baseDebtQuery((int) filament()->getTenant()?->id);
+        $vendor = filament()->getTenant();
+        $query  = static::baseDebtQuery((int) $vendor?->id);
+
+        $user = auth()->user();
+
+        // The owner and platform staff see the whole book. Everyone else sees
+        // the branch they are standing in, which is the one they can collect
+        // for.
+        if (! $user || $user->isSuperAdmin() || $vendor?->isOwner($user)) {
+            return $query;
+        }
+
+        $storeId = ActiveStore::currentId();
+
+        // Fails closed. A staff member with no resolvable store is not "allowed
+        // everywhere" — that reading would have shown an unassigned storekeeper
+        // every customer the vendor is owed by, which is exactly what scoping
+        // them to a branch was meant to prevent. Same discipline RoleResource
+        // uses when it has no tenant to filter on.
+        return $storeId
+            ? static::scopedToStore($query, $storeId)
+            : $query->whereRaw('0 = 1');
     }
 
     public static function getPages(): array

@@ -212,7 +212,7 @@ it('never shows another vendor customer', function () {
 
 // ─── Access ─────────────────────────────────────────────────────────────
 
-it('lets a store admin in through the permission, and keeps a storekeeper out', function () {
+it('lets a store admin and a storekeeper in, and keeps a plain member out', function () {
     $ctx = repaymentContext();
     (new VendorPermissionsSeeder())->run();
     VendorRoles::seedFor($ctx['vendor']);
@@ -227,12 +227,26 @@ it('lets a store admin in through the permission, and keeps a storekeeper out', 
     Filament::setTenant($ctx['vendor']);
     expect(CustomerDebtResource::canAccess())->toBeTrue();
 
+    // A storekeeper collects too — whoever is at the counter has to be able to
+    // take a repayment. Their list is scoped to their branch, and write-off
+    // stays refused; see CustomerDebtDashboardTest.
     $storekeeper = User::factory()->create();
     $ctx['vendor']->users()->syncWithoutDetaching([$storekeeper->id]);
     setPermissionsTeamId($ctx['vendor']->id);
     $storekeeper->assignRole('storekeeper');
 
     $this->actingAs($storekeeper);
+    Filament::setCurrentPanel(Filament::getPanel('vendor'));
+    Filament::setTenant($ctx['vendor']);
+    expect(CustomerDebtResource::canAccess())->toBeTrue();
+
+    // A plain member has no business in the debt book at all.
+    $member = User::factory()->create();
+    $ctx['vendor']->users()->syncWithoutDetaching([$member->id]);
+    setPermissionsTeamId($ctx['vendor']->id);
+    $member->assignRole('member');
+
+    $this->actingAs($member);
     Filament::setCurrentPanel(Filament::getPanel('vendor'));
     Filament::setTenant($ctx['vendor']);
     expect(CustomerDebtResource::canAccess())->toBeFalse();
