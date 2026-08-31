@@ -39,6 +39,9 @@ class ListProducts extends ListRecords
     #[Url(as: 'status', keep: true)]
     public ?string $statusFilter = null;
 
+    #[Url(as: 'category', keep: true)]
+    public ?string $categoryFilter = null;
+
     /** @var array<int> */
     public array $selected = [];
 
@@ -57,6 +60,33 @@ class ListProducts extends ListRecords
         $this->resetLivewirePage('productsPage');
     }
 
+    public function updatingCategoryFilter(): void
+    {
+        $this->resetLivewirePage('productsPage');
+    }
+
+    /**
+     * Categories this branch actually stocks something in, for the filter.
+     *
+     * Deliberately not every category on the platform: those are shared across
+     * all vendors, so listing them all would offer a shop selling phones a
+     * filter for groceries that can only ever return nothing. Derived from the
+     * same scoped query the list itself uses, so the options and the results
+     * can never disagree.
+     *
+     * @return array<int, string>
+     */
+    public function getCategoryOptions(): array
+    {
+        return Category::query()
+            ->whereIn('id', ProductResource::getEloquentQuery()
+                ->select('products.category_id')
+                ->distinct())
+            ->orderBy('name')
+            ->pluck('name', 'id')
+            ->all();
+    }
+
     public function getProducts(): LengthAwarePaginator
     {
         return ProductResource::getEloquentQuery()
@@ -65,6 +95,9 @@ class ListProducts extends ListRecords
                     ->orWhere('sku', 'like', "%{$this->search}%")
             ))
             ->when($this->statusFilter, fn (Builder $query) => $query->where('status', $this->statusFilter))
+            // Column-qualified: getEloquentQuery() already joins for the
+            // per-store stock columns, so a bare category_id is ambiguous.
+            ->when($this->categoryFilter, fn (Builder $query) => $query->where('products.category_id', $this->categoryFilter))
             ->latest()
             ->paginate(10, pageName: 'productsPage');
     }

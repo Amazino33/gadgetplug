@@ -28,6 +28,15 @@
                 <option value="archived">Archived</option>
             </select>
 
+            <select wire:model.live="categoryFilter"
+                aria-label="Filter by category"
+                class="rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+                <option value="">All categories</option>
+                @foreach($this->getCategoryOptions() as $categoryId => $categoryName)
+                    <option value="{{ $categoryId }}">{{ $categoryName }}</option>
+                @endforeach
+            </select>
+
             @if(count($selected) > 0)
             <button wire:click="deleteSelected"
                 wire:confirm="Delete {{ count($selected) }} selected product(s)? This cannot be undone."
