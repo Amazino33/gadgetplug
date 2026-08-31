@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Vendor\Pages;
 
+use App\Services\ActiveStore;
 use App\Services\Reporting\ReportPeriod;
 use App\Services\Reporting\SalesReportService;
 use BackedEnum;
@@ -47,6 +48,16 @@ class SalesReport extends Page
             ->components([
                 Section::make()
                     ->schema([
+                        Select::make('store')
+                            ->label('Store')
+                            ->options(fn (): array => self::selectableStores())
+                            ->default(null)
+                            ->placeholder('All stores')
+                            ->live()
+                            // One branch means there is nothing to choose
+                            // between, and an empty dropdown is just noise.
+                            ->visible(fn (): bool => count(self::selectableStores()) > 1),
+
                         Select::make('preset')
                             ->label('Period')
                             ->options(ReportPeriod::PRESETS)
@@ -71,6 +82,22 @@ class SalesReport extends Page
     }
 
     /**
+     * The branches this user may report on: an owner or super admin sees every
+     * one, anyone else only those they are assigned to — the same rule that
+     * decides which branch they can sell from.
+     *
+     * @return array<int, string>
+     */
+    protected static function selectableStores(): array
+    {
+        $vendor = filament()->getTenant();
+
+        return ActiveStore::accessibleFor($vendor, auth()->user())
+            ->pluck('name', 'id')
+            ->all();
+    }
+
+    /**
      * Everything the view renders, resolved through the same service the
      * dashboard widgets use so the two screens can never disagree.
      */
@@ -81,16 +108,27 @@ class SalesReport extends Page
         $period = ReportPeriod::fromFilters($this->filters);
         $previous = $period->previous();
 
-        $summary = $reports->summary($vendorId, $period->from, $period->to);
+        // Null means every branch, which is what the report has always shown.
+        // A branch this user cannot reach is ignored rather than honoured, so a
+        // hand-edited filter cannot read another branch's takings.
+        $storeId = $this->filters['store'] ?? null;
+        $storeId = $storeId !== null && array_key_exists((int) $storeId, self::selectableStores())
+            ? (int) $storeId
+            : null;
+
+        $summary = $reports->summary($vendorId, $period->from, $period->to, $storeId);
 
         return [
             'period' => $period,
             'summary' => $summary,
-            'previous' => $reports->summary($vendorId, $previous->from, $previous->to),
-            'channels' => $reports->channelBreakdown($vendorId, $period->from, $period->to),
-            'topProducts' => $reports->topProducts($vendorId, $period->from, $period->to, 10),
-            'cashiers' => $reports->cashierBreakdown($vendorId, $period->from, $period->to),
-            'onlineStatuses' => $reports->onlineOrderStatusBreakdown($vendorId, $period->from, $period->to),
+            'storeId' => $storeId,
+            'storeName' => $storeId ? (self::selectableStores()[$storeId] ?? null) : null,
+            'previous' => $reports->summary($vendorId, $previous->from, $previous->to, $storeId),
+            'channels' => $reports->channelBreakdown($vendorId, $period->from, $period->to, $storeId),
+            'stores' => $reports->storeBreakdown($vendorId, $period->from, $period->to),
+            'topProducts' => $reports->topProducts($vendorId, $period->from, $period->to, 10, $storeId),
+            'cashiers' => $reports->cashierBreakdown($vendorId, $period->from, $period->to, $storeId),
+            'onlineStatuses' => $reports->onlineOrderStatusBreakdown($vendorId, $period->from, $period->to, $storeId),
         ];
     }
 

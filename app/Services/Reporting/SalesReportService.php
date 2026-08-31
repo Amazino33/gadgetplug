@@ -6,9 +6,11 @@ namespace App\Services\Reporting;
 
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\OrderItemStoreAllocation;
 use App\Models\PosReturn;
 use App\Models\PosSale;
 use App\Models\PosSaleItem;
+use App\Models\Store;
 use Carbon\CarbonPeriod;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
@@ -46,14 +48,20 @@ class SalesReportService
 
     private const ONLINE_COST_SQL = 'COALESCE(SUM(order_items.quantity * COALESCE(order_items.unit_cost, products.cost_price)), 0)';
 
+    // The allocated equivalents of the two above: same money definition, but
+    // measured in the units a branch actually supplied.
+    private const ALLOCATED_REVENUE_SQL = 'COALESCE(SUM(order_item_store_allocations.quantity * order_items.unit_price), 0)';
+
+    private const ALLOCATED_COST_SQL = 'COALESCE(SUM(order_item_store_allocations.quantity * COALESCE(order_items.unit_cost, products.cost_price)), 0)';
+
     private const POS_REVENUE_SQL = 'COALESCE(SUM(subtotal - discount_amount), 0)';
 
     private const POS_COST_SQL = 'COALESCE(SUM(pos_sale_items.quantity * COALESCE(pos_sale_items.unit_cost, products.cost_price)), 0)';
 
-    public function summary(int $vendorId, CarbonInterface $from, CarbonInterface $to): array
+    public function summary(int $vendorId, CarbonInterface $from, CarbonInterface $to, ?int $storeId = null): array
     {
-        $online = $this->onlineTotals($vendorId, $from, $to);
-        $pos = $this->posTotals($vendorId, $from, $to);
+        $online = $this->onlineTotals($vendorId, $from, $to, $storeId);
+        $pos = $this->posTotals($vendorId, $from, $to, $storeId);
 
         $revenue = $online['revenue'] + $pos['revenue'];
         $cost = $online['cost'] + $pos['cost'];
@@ -74,9 +82,9 @@ class SalesReportService
         ];
     }
 
-    public function channelBreakdown(int $vendorId, CarbonInterface $from, CarbonInterface $to): array
+    public function channelBreakdown(int $vendorId, CarbonInterface $from, CarbonInterface $to, ?int $storeId = null): array
     {
-        $summary = $this->summary($vendorId, $from, $to);
+        $summary = $this->summary($vendorId, $from, $to, $storeId);
 
         return [
             'Online' => $summary['online_revenue'],
@@ -169,12 +177,13 @@ class SalesReportService
      *
      * @return Collection<int, array{cashier_id: int, cashier_name: string, orders: int, revenue: float}>
      */
-    public function cashierBreakdown(int $vendorId, CarbonInterface $from, CarbonInterface $to): Collection
+    public function cashierBreakdown(int $vendorId, CarbonInterface $from, CarbonInterface $to, ?int $storeId = null): Collection
     {
         return PosSale::query()
             ->join('users', 'users.id', '=', 'pos_sales.cashier_id')
             ->where('pos_sales.vendor_id', $vendorId)
             ->where('pos_sales.status', '!=', 'voided')
+            ->when($storeId, fn ($q) => $q->where('pos_sales.store_id', $storeId))
             ->whereBetween(DB::raw('COALESCE(pos_sales.completed_at, pos_sales.created_at)'), [$from, $to])
             ->groupBy('pos_sales.cashier_id', 'users.name')
             ->selectRaw('pos_sales.cashier_id as cashier_id, users.name as cashier_name')
@@ -199,10 +208,14 @@ class SalesReportService
      *
      * @return array<string, int>
      */
-    public function onlineOrderStatusBreakdown(int $vendorId, CarbonInterface $from, CarbonInterface $to): array
+    public function onlineOrderStatusBreakdown(int $vendorId, CarbonInterface $from, CarbonInterface $to, ?int $storeId = null): array
     {
         return Order::query()
-            ->whereHas('items', fn ($q) => $q->where('vendor_id', $vendorId))
+            ->whereHas('items', fn ($q) => $q->where('vendor_id', $vendorId)
+                ->when($storeId, fn ($i) => $i->whereHas(
+                    'storeAllocations',
+                    fn ($a) => $a->where('store_id', $storeId),
+                )))
             ->whereBetween('created_at', [$from, $to])
             ->groupBy('status')
             ->selectRaw('status, COUNT(*) as count')
@@ -211,14 +224,71 @@ class SalesReportService
     }
 
     /**
+     * What each branch took in the period, newest-first by revenue.
+     *
+     * One summary() per branch rather than one grouped query: the money
+     * definition lives in summary(), and duplicating it here in GROUP BY form
+     * is how the per-branch figures would drift from the totals above them. A
+     * vendor has a handful of branches, so the extra queries are cheap.
+     *
+     * The rows can sum to less than the vendor total, because an online line
+     * fulfilled without an allocation belongs to no branch. That difference is
+     * reported as its own row rather than hidden or blamed on a branch.
+     *
+     * @return Collection<int, array{store_id: ?int, store_name: string, orders: int, units: int, revenue: float}>
+     */
+    public function storeBreakdown(int $vendorId, CarbonInterface $from, CarbonInterface $to): Collection
+    {
+        $rows = Store::query()
+            ->where('vendor_id', $vendorId)
+            ->orderByDesc('is_default')
+            ->orderBy('name')
+            ->get()
+            ->map(function (Store $store) use ($vendorId, $from, $to): array {
+                $summary = $this->summary($vendorId, $from, $to, $store->id);
+
+                return [
+                    'store_id'   => $store->id,
+                    'store_name' => $store->name,
+                    'orders'     => $summary['orders'],
+                    'units'      => $summary['units'],
+                    'revenue'    => $summary['revenue'],
+                ];
+            })
+            ->sortByDesc('revenue')
+            ->values();
+
+        $total = $this->summary($vendorId, $from, $to);
+        $gap = $total['revenue'] - $rows->sum('revenue');
+
+        // Guarded against floating-point dust rather than > 0, or a rounding
+        // remainder of a fraction of a kobo would show as a phantom row.
+        if ($gap > 0.01) {
+            $rows->push([
+                'store_id'   => null,
+                'store_name' => 'Not tied to a branch',
+                'orders'     => max(0, $total['orders'] - $rows->sum('orders')),
+                'units'      => max(0, $total['units'] - $rows->sum('units')),
+                'revenue'    => $gap,
+            ]);
+        }
+
+        return $rows;
+    }
+
+    /**
      * Best sellers across both channels, ranked by revenue.
      */
-    public function topProducts(int $vendorId, CarbonInterface $from, CarbonInterface $to, int $limit = 10): Collection
+    public function topProducts(int $vendorId, CarbonInterface $from, CarbonInterface $to, int $limit = 10, ?int $storeId = null): Collection
     {
         $online = OrderItem::query()
             ->join('orders', 'orders.id', '=', 'order_items.order_id')
             ->join('products', 'products.id', '=', 'order_items.product_id')
             ->where('order_items.vendor_id', $vendorId)
+            ->when($storeId, fn ($q) => $q->whereHas(
+                'storeAllocations',
+                fn ($a) => $a->where('store_id', $storeId),
+            ))
             ->whereIn('orders.status', self::PAID_ORDER_STATUSES)
             ->whereBetween('orders.created_at', [$from, $to])
             ->groupBy('order_items.product_id', 'products.name')
@@ -233,6 +303,7 @@ class SalesReportService
             ->join('products', 'products.id', '=', 'pos_sale_items.product_id')
             ->where('pos_sales.vendor_id', $vendorId)
             ->where('pos_sales.status', '!=', 'voided')
+            ->when($storeId, fn ($q) => $q->where('pos_sales.store_id', $storeId))
             ->whereBetween(DB::raw('COALESCE(pos_sales.completed_at, pos_sales.created_at)'), [$from, $to])
             ->groupBy('pos_sale_items.product_id', 'products.name')
             ->selectRaw('pos_sale_items.product_id, products.name as name')
@@ -259,17 +330,37 @@ class SalesReportService
             ->values();
     }
 
-    private function onlineTotals(int $vendorId, CarbonInterface $from, CarbonInterface $to): array
+    private function onlineTotals(int $vendorId, CarbonInterface $from, CarbonInterface $to, ?int $storeId = null): array
     {
-        $row = OrderItem::query()
+        // An online line has no branch of its own — what a branch supplied is
+        // recorded in order_item_store_allocations. So a per-branch figure
+        // reads the allocations and prices the ALLOCATED units, or a line split
+        // between two branches would credit each with the whole amount.
+        //
+        // Vendor-wide deliberately reads the lines instead: a line that was
+        // never reserved through ReserveStockAction has no allocation at all,
+        // and joining here would drop its revenue entirely. The consequence is
+        // that the branches can sum to slightly less than the vendor total —
+        // that gap is unattributed fulfilment, and storeBreakdown() shows it
+        // rather than quietly assigning it to a branch.
+        $base = $storeId === null
+            ? OrderItem::query()
+                ->selectRaw(self::ONLINE_REVENUE_SQL.' as revenue')
+                ->selectRaw(self::ONLINE_COST_SQL.' as cost')
+                ->selectRaw('COALESCE(SUM(order_items.quantity), 0) as units')
+            : OrderItemStoreAllocation::query()
+                ->join('order_items', 'order_items.id', '=', 'order_item_store_allocations.order_item_id')
+                ->where('order_item_store_allocations.store_id', $storeId)
+                ->selectRaw(self::ALLOCATED_REVENUE_SQL.' as revenue')
+                ->selectRaw(self::ALLOCATED_COST_SQL.' as cost')
+                ->selectRaw('COALESCE(SUM(order_item_store_allocations.quantity), 0) as units');
+
+        $row = $base
             ->join('orders', 'orders.id', '=', 'order_items.order_id')
             ->join('products', 'products.id', '=', 'order_items.product_id')
             ->where('order_items.vendor_id', $vendorId)
             ->whereIn('orders.status', self::PAID_ORDER_STATUSES)
             ->whereBetween('orders.created_at', [$from, $to])
-            ->selectRaw(self::ONLINE_REVENUE_SQL.' as revenue')
-            ->selectRaw(self::ONLINE_COST_SQL.' as cost')
-            ->selectRaw('COALESCE(SUM(order_items.quantity), 0) as units')
             ->selectRaw('COUNT(DISTINCT order_items.order_id) as orders')
             ->selectRaw('SUM(CASE WHEN order_items.unit_cost IS NULL THEN 1 ELSE 0 END) as estimated')
             ->first();
@@ -283,7 +374,7 @@ class SalesReportService
         ];
     }
 
-    private function posTotals(int $vendorId, CarbonInterface $from, CarbonInterface $to): array
+    private function posTotals(int $vendorId, CarbonInterface $from, CarbonInterface $to, ?int $storeId = null): array
     {
         // Sale-level for money: subtotal/discount live on the sale, and a
         // cart-wide discount has no line to belong to.
@@ -292,6 +383,7 @@ class SalesReportService
         $sales = PosSale::query()
             ->where('vendor_id', $vendorId)
             ->where('status', '!=', 'voided')
+            ->when($storeId, fn ($q) => $q->where('store_id', $storeId))
             ->whereBetween(DB::raw('COALESCE(completed_at, created_at)'), [$from, $to])
             ->selectRaw(self::POS_REVENUE_SQL.' as revenue')
             ->selectRaw('COUNT(*) as orders')
@@ -303,6 +395,7 @@ class SalesReportService
             ->join('products', 'products.id', '=', 'pos_sale_items.product_id')
             ->where('pos_sales.vendor_id', $vendorId)
             ->where('pos_sales.status', '!=', 'voided')
+            ->when($storeId, fn ($q) => $q->where('pos_sales.store_id', $storeId))
             ->whereBetween(DB::raw('COALESCE(pos_sales.completed_at, pos_sales.created_at)'), [$from, $to])
             ->selectRaw(self::POS_COST_SQL.' as cost')
             ->selectRaw('COALESCE(SUM(pos_sale_items.quantity), 0) as units')
@@ -313,8 +406,15 @@ class SalesReportService
         // earnings. The cost of returned goods is NOT reversed here, which makes
         // profit conservative rather than flattering in a heavy-refund period.
         $refunds = (float) PosReturn::query()
-            ->where('vendor_id', $vendorId)
-            ->whereBetween('created_at', [$from, $to])
+            ->where('pos_returns.vendor_id', $vendorId)
+            ->whereBetween('pos_returns.created_at', [$from, $to])
+            // A return has no branch column: it belongs to the branch that made
+            // the sale being reversed, so it is netted off that branch's takings
+            // rather than spread across all of them.
+            ->when($storeId, fn ($q) => $q->whereIn(
+                'pos_returns.original_sale_id',
+                PosSale::query()->select('id')->where('store_id', $storeId),
+            ))
             ->sum('refund_amount');
 
         return [

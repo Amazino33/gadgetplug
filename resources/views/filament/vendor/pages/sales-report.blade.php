@@ -19,6 +19,15 @@
         $totalChannel = array_sum($channels);
     @endphp
 
+    {{-- Scoped to one branch, so every figure below means something narrower
+         than it usually does. Said once, up top, rather than repeated on each. --}}
+    @if ($storeName)
+        <div class="mt-6 flex items-center gap-2 rounded-lg bg-primary-50 px-4 py-3 text-sm text-primary-700 ring-1 ring-primary-600/10 dark:bg-primary-500/10 dark:text-primary-300 dark:ring-primary-400/20">
+            <x-filament::icon icon="heroicon-m-building-storefront" class="h-5 w-5 shrink-0" />
+            <span>Showing <span class="font-semibold">{{ $storeName }}</span> only. Every figure below covers this branch.</span>
+        </div>
+    @endif
+
     {{-- Headline figures --}}
     <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mt-6">
         @foreach ([
@@ -88,6 +97,56 @@
             </div>
         @endif
     </div>
+
+    {{-- What each branch took --}}
+    @if ($stores->count() > 1)
+        <div class="fi-section mt-6 rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
+            <div class="p-6 pb-3">
+                <h3 class="text-base font-semibold text-gray-950 dark:text-white">Sales by store</h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400">
+                    Every branch over this period, whichever branch is selected above.
+                </p>
+            </div>
+
+            @php $topStore = $stores->max('revenue') ?: 1; @endphp
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="border-y border-gray-200 bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:border-white/10 dark:bg-white/5 dark:text-gray-400">
+                        <tr>
+                            <th class="px-6 py-3 text-left font-medium">Store</th>
+                            <th class="px-6 py-3 text-right font-medium">Sales</th>
+                            <th class="px-6 py-3 text-right font-medium">Units</th>
+                            <th class="px-6 py-3 text-right font-medium">Revenue</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200 dark:divide-white/10">
+                        @foreach ($stores as $store)
+                            <tr @class(['bg-primary-50/50 dark:bg-primary-500/5' => $storeId && $store['store_id'] === $storeId])>
+                                <td class="px-6 py-3">
+                                    <div class="text-gray-950 dark:text-white">
+                                        {{ $store['store_name'] }}
+                                        @if ($store['store_id'] === null)
+                                            <span class="ml-1 text-xs font-normal text-gray-500 dark:text-gray-400">
+                                                — online sales fulfilled without a branch recorded
+                                            </span>
+                                        @endif
+                                    </div>
+                                    <div class="mt-1 h-1.5 w-40 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+                                        <div class="h-full rounded-full {{ $store['store_id'] === null ? 'bg-gray-400' : 'bg-emerald-500' }}"
+                                             style="width: {{ max(0, ($store['revenue'] / $topStore) * 100) }}%"></div>
+                                    </div>
+                                </td>
+                                <td class="px-6 py-3 text-right text-gray-700 dark:text-gray-300">{{ number_format($store['orders']) }}</td>
+                                <td class="px-6 py-3 text-right text-gray-700 dark:text-gray-300">{{ number_format($store['units']) }}</td>
+                                <td class="px-6 py-3 text-right font-medium text-gray-950 dark:text-white">₦{{ number_format($store['revenue'], 2) }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    @endif
 
     {{-- Who sold it — every cashier's POS contribution --}}
     <div class="fi-section mt-6 rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
