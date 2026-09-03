@@ -162,3 +162,124 @@ test('deleting a product also removes its media rows', function () {
     expect(Product::find($product->id))->toBeNull()
         ->and(Spatie\MediaLibrary\MediaCollections\Models\Media::find($mediaId))->toBeNull();
 });
+
+// ── Restricting history, and clearing one branch ───────────────────────────
+//
+// blind_count_entries, pos_sale_items and procurement_items all restrict
+// rather than cascade. --with-history used to walk straight into a foreign-key
+// error on any of them, and the report called count entries a cascade — the
+// exact case anyone who has run an inventory count is in.
+
+function purgeCountedProduct(Vendor $vendor, string $name): Product
+{
+    $product = purgeProductsProduct($vendor, $name);
+
+    $session = App\Models\BlindCountSession::create([
+        'vendor_id'        => $vendor->id,
+        'status'           => 'a_counting',
+        'frequency'        => 'daily',
+        'product_order'    => [$product->id],
+        'storekeeper_a_id' => $vendor->user_id,
+    ]);
+
+    App\Models\BlindCountEntry::create([
+        'blind_count_session_id' => $session->id,
+        'user_id'                => $vendor->user_id,
+        'product_id'             => $product->id,
+        'position'               => 1,
+        'count'                  => 3,
+    ]);
+
+    return $product;
+}
+
+test('a counted product is held back by default, and named as a blocker', function () {
+    $vendor  = purgeProductsVendor();
+    $counted = purgeCountedProduct($vendor, 'Counted');
+
+    $this->artisan('products:purge', ['vendor' => $vendor->slug, '--force' => true])
+        ->expectsOutputToContain('inventory count entries')
+        ->assertSuccessful();
+
+    expect(Product::find($counted->id))->not->toBeNull();
+});
+
+test('with-history clears the count entries and removes the product', function () {
+    $vendor  = purgeProductsVendor();
+    $counted = purgeCountedProduct($vendor, 'Counted');
+
+    // Before the fix this threw a foreign-key violation and rolled back.
+    $this->artisan('products:purge', [
+        'vendor' => $vendor->slug, '--force' => true, '--with-history' => true,
+    ])->assertSuccessful();
+
+    expect(Product::find($counted->id))->toBeNull()
+        ->and(App\Models\BlindCountEntry::where('product_id', $counted->id)->count())->toBe(0);
+});
+
+test('only the named branch is cleared, never its neighbours', function () {
+    $vendor = purgeProductsVendor();
+    $here   = App\Models\Store::where('vendor_id', $vendor->id)->where('is_default', true)->first();
+    $there  = App\Models\Store::create([
+        'vendor_id' => $vendor->id, 'name' => 'Itel Home', 'is_default' => false,
+    ]);
+
+    $stays = purgeProductsProduct($vendor, 'Stays Here');
+    $stays->update(['store_id' => $here->id]);
+
+    $goes = purgeProductsProduct($vendor, 'Goes Away');
+    $goes->update(['store_id' => $there->id]);
+
+    $this->artisan('products:purge', [
+        'vendor' => $vendor->slug, '--store' => 'Itel Home', '--force' => true,
+    ])->assertSuccessful();
+
+    expect(Product::find($goes->id))->toBeNull()
+        ->and(Product::find($stays->id))->not->toBeNull();
+});
+
+test('a branch can be cleared without naming its vendor', function () {
+    $vendor = purgeProductsVendor();
+    $there  = App\Models\Store::create([
+        'vendor_id' => $vendor->id, 'name' => 'Itel Home', 'is_default' => false,
+    ]);
+
+    $goes = purgeProductsProduct($vendor, 'Goes Away');
+    $goes->update(['store_id' => $there->id]);
+
+    $this->artisan('products:purge', ['--store' => 'Itel Home', '--force' => true])
+        ->assertSuccessful();
+
+    expect(Product::find($goes->id))->toBeNull();
+});
+
+test('a branch belonging to another vendor is refused', function () {
+    $vendor = purgeProductsVendor();
+
+    $otherOwner  = User::factory()->create();
+    $otherVendor = Vendor::create(['user_id' => $otherOwner->id, 'name' => 'Other Co', 'slug' => 'other-co']);
+    $foreign     = App\Models\Store::create([
+        'vendor_id' => $otherVendor->id, 'name' => 'Foreign Branch', 'is_default' => false,
+    ]);
+
+    $this->artisan('products:purge', [
+        'vendor' => $vendor->slug, '--store' => 'Foreign Branch', '--force' => true,
+    ])->assertFailed();
+
+    expect(App\Models\Store::find($foreign->id))->not->toBeNull();
+});
+
+test('an unknown branch fails cleanly and deletes nothing', function () {
+    $vendor = purgeProductsVendor();
+    $product = purgeProductsProduct($vendor, 'Untouched');
+
+    $this->artisan('products:purge', [
+        'vendor' => $vendor->slug, '--store' => 'no-such-branch', '--force' => true,
+    ])->assertFailed();
+
+    expect(Product::find($product->id))->not->toBeNull();
+});
+
+test('naming neither a vendor nor a branch fails rather than guessing', function () {
+    $this->artisan('products:purge')->assertFailed();
+});
