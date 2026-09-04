@@ -91,10 +91,17 @@ class InventoryLedgerResource extends Resource
                     ->placeholder('—')
                     ->limit(60),
 
+                // Shown by default. Who moved the stock is the first thing
+                // asked when a figure looks wrong, and hiding it behind the
+                // column toggle meant the answer was there but invisible.
+                // "System" rather than blank: an online sale deducts stock with
+                // no staff member behind it, and an empty cell reads as missing
+                // data rather than as nobody.
                 TextColumn::make('user.name')
                     ->label('By')
                     ->placeholder('System')
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->searchable()
+                    ->toggleable(),
             ])
             ->defaultSort('created_at', 'desc')
             ->filters([
