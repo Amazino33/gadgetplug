@@ -197,7 +197,7 @@ export default function PickingsModal({ vendorId, isOnline, cart = [], onClose, 
                 </div>
 
                 <div className="flex gap-1 border-b border-gray-200 px-5 pt-3 dark:border-zinc-700">
-                    {[['pay', 'Take payment'], ['release', `Release cart${cart.length ? ` (${cart.length})` : ''}`]].map(([key, label]) => (
+                    {[['pay', 'Take payment'], ['release', `Record pickings${cart.length ? ` (${cart.length})` : ''}`]].map(([key, label]) => (
                         <button
                             key={key}
                             onClick={() => { setMode(key); setResult(null); setError(null); }}
