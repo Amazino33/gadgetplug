@@ -183,3 +183,41 @@ test('a release the branch cannot cover leaves the shelf untouched', function ()
     expect(shelfQuantity($product, $store))->toBe(2)
         ->and(App\Models\Picking::count())->toBe(0);
 });
+
+test('a picker holding nothing can still be given goods from the till', function () {
+    $vendor = pickingVendor();
+    $store = $vendor->defaultStore;
+    $product = pickingProduct($vendor, $store, 10);
+
+    // Two traders on the books, neither holding anything yet.
+    pickingPicker($vendor, 'Chibuike');
+    pickingPicker($vendor, 'Normal');
+
+    Sanctum::actingAs(User::find($vendor->user_id));
+
+    $response = $this->getJson('/api/pos/pickings?vendor_id=' . $vendor->id)->assertOk();
+
+    // Nobody is holding goods, so the payment list is empty — but both are
+    // offered for a first trip, which is the whole point of the release list.
+    expect($response->json('pickers'))->toBeEmpty()
+        ->and($response->json('available_pickers'))->toHaveCount(2)
+        ->and(collect($response->json('available_pickers'))->pluck('name')->all())
+            ->toContain('Chibuike', 'Normal');
+});
+
+test('a picker who has stopped trading is not offered goods', function () {
+    $vendor = pickingVendor();
+    pickingPicker($vendor, 'Still Here');
+    pickingPicker($vendor, 'Gone Away')->update(['is_active' => false]);
+
+    Sanctum::actingAs(User::find($vendor->user_id));
+
+    $names = collect($this->getJson('/api/pos/pickings?vendor_id=' . $vendor->id)
+        ->assertOk()
+        ->json('available_pickers'))
+        ->pluck('name')
+        ->all();
+
+    expect($names)->toContain('Still Here')
+        ->and($names)->not->toContain('Gone Away');
+});

@@ -25,6 +25,9 @@ export default function PickingsModal({ vendorId, isOnline, cart = [], onClose, 
     const [releaseTo, setReleaseTo] = useState('');
     const [releasing, setReleasing] = useState(false);
     const [pickers, setPickers] = useState([]);
+    // Everyone who could take goods — including those holding nothing yet, who
+    // are exactly who a first trip gets recorded for.
+    const [availablePickers, setAvailablePickers] = useState([]);
     const [selected, setSelected] = useState(null);
     const [ticked, setTicked] = useState([]);
     const [amount, setAmount] = useState('');
@@ -45,6 +48,7 @@ export default function PickingsModal({ vendorId, isOnline, cart = [], onClose, 
 
             if (alive && cache) {
                 setPickers(cache.pickers ?? []);
+                setAvailablePickers(cache.available_pickers ?? []);
                 setStale(true);
             }
 
@@ -58,6 +62,7 @@ export default function PickingsModal({ vendorId, isOnline, cart = [], onClose, 
                 if (!alive) return;
 
                 setPickers(data.pickers ?? []);
+                setAvailablePickers(data.available_pickers ?? []);
                 setStale(false);
                 await cachePickings(vendorId, data);
             } catch {
@@ -113,6 +118,7 @@ export default function PickingsModal({ vendorId, isOnline, cart = [], onClose, 
             const refreshed = await api.get('/pickings', { params: { vendor_id: vendorId } });
 
             setPickers(refreshed.data.pickers ?? []);
+            setAvailablePickers(refreshed.data.available_pickers ?? []);
             await cachePickings(vendorId, refreshed.data);
         } catch (e) {
             // Nothing left the shelf: the trip is one transaction, so a line the
@@ -165,6 +171,7 @@ export default function PickingsModal({ vendorId, isOnline, cart = [], onClose, 
             const refreshed = await api.get('/pickings', { params: { vendor_id: vendorId } });
 
             setPickers(refreshed.data.pickers ?? []);
+            setAvailablePickers(refreshed.data.available_pickers ?? []);
             await cachePickings(vendorId, refreshed.data);
             setTicked([]);
             setAmount('');
@@ -250,12 +257,12 @@ export default function PickingsModal({ vendorId, isOnline, cart = [], onClose, 
                                         className="w-full rounded-xl border border-gray-300 px-4 py-3 dark:border-zinc-600 dark:bg-zinc-800 dark:text-white"
                                     >
                                         <option value="">Who is taking these goods?</option>
-                                        {pickers.map((p) => (
+                                        {availablePickers.map((p) => (
                                             <option key={p.id} value={p.id}>{p.name}</option>
                                         ))}
                                     </select>
 
-                                    {pickers.length === 0 && (
+                                    {availablePickers.length === 0 && (
                                         <p className="text-xs text-gray-500 dark:text-zinc-400">
                                             No pickers yet. Add one in Dashboard → Point of Sale → Vendor Pickings.
                                         </p>

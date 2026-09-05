@@ -19,6 +19,7 @@ export async function cachePickings(vendorId, payload) {
         vendor_id: vendorId,
         store_id: payload.store_id ?? null,
         pickers: payload.pickers ?? [],
+        available_pickers: payload.available_pickers ?? [],
         cached_at: new Date().toISOString(),
     });
 }

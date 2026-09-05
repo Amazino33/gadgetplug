@@ -88,7 +88,18 @@ class PosPickingController extends Controller
             ])->values(),
         ])->values();
 
-        return response()->json(['store_id' => $storeId, 'pickers' => $pickers]);
+        return response()->json([
+            'store_id' => $storeId,
+            'pickers'  => $pickers,
+            // Everyone who could take goods, not only those already holding
+            // some. The payment list above is the wrong source for the release
+            // dropdown: a picker holding nothing is correctly absent there, and
+            // that is exactly who a first trip is being recorded for.
+            'available_pickers' => Picker::forVendor($vendorId)
+                ->active()
+                ->orderBy('name')
+                ->get(['id', 'name']),
+        ]);
     }
 
     /**
