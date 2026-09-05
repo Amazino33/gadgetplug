@@ -25,6 +25,7 @@ class VendorRoles
             'view_customer_debts',
             'authorize_recount', 'adjust_stock',
             'approve_procurement', 'manage_procurement',
+            'manage_pickings',
         ],
         'product_manager' => [
             'view_products', 'view_any_products', 'create_products', 'edit_products', 'delete_products',
@@ -47,6 +48,7 @@ class VendorRoles
             'manage_inventory', 'view_inventory_reports', 'view_audit_sessions',
             'authorize_recount', 'adjust_stock',
             'approve_procurement', 'manage_procurement',
+            'manage_pickings',
         ],
         'storekeeper' => [
             'view_products', 'view_any_products',
@@ -58,6 +60,9 @@ class VendorRoles
             // the owner is in. Their view is scoped to their own store, and
             // writing a debt off remains the owner's decision alone.
             'view_customer_debts',
+            // Same reasoning as the debt line above: the trader comes back on
+            // the day he has sold, not on the day the owner is in.
+            'manage_pickings',
         ],
         'member' => [
             'view_products', 'view_any_products',

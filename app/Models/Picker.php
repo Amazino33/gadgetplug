@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 /**
  * A trader who takes goods to sell in their own shop and pays as they sell.
@@ -30,6 +31,18 @@ class Picker extends Model
     public function pickings(): HasMany
     {
         return $this->hasMany(Picking::class);
+    }
+
+    /**
+     * Every line this picker has ever taken, across all their trips.
+     *
+     * Through the trips rather than on them, because the question the screen
+     * answers is "what is this man holding", and that is a list of products —
+     * which trip each came on is detail hanging off it.
+     */
+    public function pickingItems(): HasManyThrough
+    {
+        return $this->hasManyThrough(PickingItem::class, Picking::class);
     }
 
     public function scopeForVendor(Builder $query, int $vendorId): Builder

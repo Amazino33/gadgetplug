@@ -57,6 +57,17 @@ class VendorPermissionsSeeder extends Seeder
             'approve_procurement',
             'manage_procurement',
 
+            // Vendor Pickings
+            //
+            // Handing goods out and taking the money for them are one job: the
+            // trader comes back on whatever day he has sold, and whoever is at
+            // the counter has to be able to deal with him. Writing the loss off
+            // is a separate permission granted to no role at all, which makes it
+            // the owner's alone — hasVendorPermission() short-circuits true for
+            // the owner, so nobody else can reach it however their role is cut.
+            'manage_pickings',
+            'write_off_picking',
+
             // Logistics & Delivery Messaging
             'manage_logistics',
 
