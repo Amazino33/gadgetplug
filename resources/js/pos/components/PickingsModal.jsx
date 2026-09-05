@@ -18,7 +18,12 @@ const naira = (value) => `₦${Number(value ?? 0).toLocaleString(undefined, { mi
  * total of what was ticked as a guide, never as a promise, because the price
  * may have moved or somebody else may have paid first.
  */
-export default function PickingsModal({ vendorId, isOnline, onClose }) {
+export default function PickingsModal({ vendorId, isOnline, cart = [], onClose, onReleased }) {
+    // 'pay' takes money for goods already out; 'release' hands new goods over,
+    // using whatever the cashier has put in the cart.
+    const [mode, setMode] = useState('pay');
+    const [releaseTo, setReleaseTo] = useState('');
+    const [releasing, setReleasing] = useState(false);
     const [pickers, setPickers] = useState([]);
     const [selected, setSelected] = useState(null);
     const [ticked, setTicked] = useState([]);
@@ -78,6 +83,45 @@ export default function PickingsModal({ vendorId, isOnline, onClose }) {
 
     const toggle = (id) => setTicked((current) =>
         current.includes(id) ? current.filter((x) => x !== id) : [...current, id]);
+
+    /**
+     * Hand the cart over as a trip.
+     *
+     * Online only: whether this branch holds the goods is decided on the server,
+     * and letting a release queue would mean goods leaving on a record that
+     * could still be refused.
+     */
+    const releaseCart = async () => {
+        if (!releaseTo || cart.length === 0 || !isOnline) return;
+
+        setReleasing(true);
+        setError(null);
+
+        try {
+            const { data } = await api.post('/pickings/release', {
+                vendor_id: vendorId,
+                picker_id: Number(releaseTo),
+                items: cart.map((item) => ({ product_id: item.id, quantity: item.qty })),
+            });
+
+            setResult({ released: true, ...data });
+            setReleaseTo('');
+
+            // The cart is now a trip, so it must not also become a sale.
+            onReleased?.();
+
+            const refreshed = await api.get('/pickings', { params: { vendor_id: vendorId } });
+
+            setPickers(refreshed.data.pickers ?? []);
+            await cachePickings(vendorId, refreshed.data);
+        } catch (e) {
+            // Nothing left the shelf: the trip is one transaction, so a line the
+            // branch cannot cover takes the whole thing with it.
+            setError(e?.response?.data?.message ?? 'Nothing was released.');
+        } finally {
+            setReleasing(false);
+        }
+    };
 
     const submit = async () => {
         const money = Number(amount);
@@ -152,6 +196,22 @@ export default function PickingsModal({ vendorId, isOnline, onClose }) {
                     </button>
                 </div>
 
+                <div className="flex gap-1 border-b border-gray-200 px-5 pt-3 dark:border-zinc-700">
+                    {[['pay', 'Take payment'], ['release', `Release cart${cart.length ? ` (${cart.length})` : ''}`]].map(([key, label]) => (
+                        <button
+                            key={key}
+                            onClick={() => { setMode(key); setResult(null); setError(null); }}
+                            className={`rounded-t-lg px-4 py-2 text-sm font-semibold ${
+                                mode === key
+                                    ? 'bg-gray-100 text-gray-900 dark:bg-zinc-800 dark:text-white'
+                                    : 'text-gray-500 hover:text-gray-800 dark:text-zinc-400'
+                            }`}
+                        >
+                            {label}
+                        </button>
+                    ))}
+                </div>
+
                 {stale && (
                     <div className="bg-amber-50 px-5 py-2 text-xs text-amber-700 dark:bg-amber-500/10 dark:text-amber-300">
                         Offline — showing what this till last saw. What a payment settles is worked out when it goes up.
@@ -159,7 +219,78 @@ export default function PickingsModal({ vendorId, isOnline, onClose }) {
                 )}
 
                 <div className="flex-1 overflow-y-auto px-5 py-4">
-                    {result && (
+                    {mode === 'release' && (
+                        <div className="space-y-4">
+                            {!isOnline && (
+                                <div className="rounded-xl bg-amber-50 p-4 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
+                                    Releasing needs a connection. Whether this branch actually holds the goods is
+                                    decided on the server, and goods must not leave on a record that might be
+                                    refused later.
+                                </div>
+                            )}
+
+                            {cart.length === 0 ? (
+                                <p className="py-10 text-center text-sm text-gray-500 dark:text-zinc-400">
+                                    Put the goods in the cart first — scan or search as you would for a sale, then come back here.
+                                </p>
+                            ) : (
+                                <>
+                                    <div className="space-y-2">
+                                        {cart.map((item) => (
+                                            <div key={item.id} className="flex items-center justify-between rounded-xl border border-gray-200 px-4 py-3 dark:border-zinc-700">
+                                                <span className="truncate font-semibold text-gray-900 dark:text-white">{item.name}</span>
+                                                <span className="ml-3 shrink-0 text-sm text-gray-500 dark:text-zinc-400">x{item.qty}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    <select
+                                        value={releaseTo}
+                                        onChange={(e) => setReleaseTo(e.target.value)}
+                                        className="w-full rounded-xl border border-gray-300 px-4 py-3 dark:border-zinc-600 dark:bg-zinc-800 dark:text-white"
+                                    >
+                                        <option value="">Who is taking these goods?</option>
+                                        {pickers.map((p) => (
+                                            <option key={p.id} value={p.id}>{p.name}</option>
+                                        ))}
+                                    </select>
+
+                                    {pickers.length === 0 && (
+                                        <p className="text-xs text-gray-500 dark:text-zinc-400">
+                                            No pickers yet. Add one in Dashboard → Point of Sale → Vendor Pickings.
+                                        </p>
+                                    )}
+
+                                    <button
+                                        onClick={releaseCart}
+                                        disabled={releasing || !isOnline || !releaseTo}
+                                        className="w-full rounded-xl bg-amber-600 px-6 py-3 font-bold text-white disabled:opacity-40"
+                                    >
+                                        {releasing ? '…' : 'Release these goods'}
+                                    </button>
+
+                                    <p className="text-[11px] text-gray-400 dark:text-zinc-500">
+                                        The goods leave the shelf now. They stay yours until paid for, and can be asked back.
+                                    </p>
+                                </>
+                            )}
+                        </div>
+                    )}
+
+                    {mode === 'release' && result?.released && (
+                        <div className="mb-4 rounded-xl bg-green-50 p-4 text-sm text-green-800 dark:bg-green-500/10 dark:text-green-300">
+                            {result.reference} — {result.lines} line{result.lines === 1 ? '' : 's'} released to {result.picker}.
+                            The goods are off the shelf and out on trust.
+                        </div>
+                    )}
+
+                    {mode === 'release' && error && (
+                        <div className="mb-4 rounded-xl bg-red-50 p-4 text-sm text-red-800 dark:bg-red-500/10 dark:text-red-300">
+                            {error}
+                        </div>
+                    )}
+
+                    {mode === 'pay' && result && (
                         <div className="mb-4 rounded-xl bg-green-50 p-4 text-sm text-green-800 dark:bg-green-500/10 dark:text-green-300">
                             {result.queued ? (
                                 <>Saved on this till: {naira(result.amount)}. It will be applied when the connection returns.</>
@@ -172,13 +303,13 @@ export default function PickingsModal({ vendorId, isOnline, onClose }) {
                         </div>
                     )}
 
-                    {error && (
+                    {mode === 'pay' && error && (
                         <div className="mb-4 rounded-xl bg-amber-50 p-4 text-sm text-amber-800 dark:bg-amber-500/10 dark:text-amber-300">
                             {error}
                         </div>
                     )}
 
-                    {!picker && (
+                    {mode === 'pay' && !picker && (
                         pickers.length === 0 ? (
                             <p className="py-10 text-center text-sm text-gray-500 dark:text-zinc-400">
                                 Nobody is holding goods from this branch.
@@ -209,7 +340,7 @@ export default function PickingsModal({ vendorId, isOnline, onClose }) {
                         )
                     )}
 
-                    {picker && (
+                    {mode === 'pay' && picker && (
                         <div className="space-y-2">
                             <button
                                 onClick={() => { setSelected(null); setTicked([]); }}
@@ -248,7 +379,7 @@ export default function PickingsModal({ vendorId, isOnline, onClose }) {
                     )}
                 </div>
 
-                {picker && (
+                {mode === 'pay' && picker && (
                     <div className="border-t border-gray-200 px-5 py-4 dark:border-zinc-700">
                         <div className="mb-3 flex items-center justify-between text-sm">
                             <span className="text-gray-500 dark:text-zinc-400">

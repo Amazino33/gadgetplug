@@ -64,6 +64,7 @@ Route::prefix('pos')->middleware(NoStoreApiResponse::class)->group(function () {
         // one the offline queue replays.
         Route::get('pickings',          [PosPickingController::class, 'index']);
         Route::post('pickings/payment', [PosPickingController::class, 'pay']);
+        Route::post('pickings/release', [PosPickingController::class, 'release']);
 
         Route::post('sync', [PosSyncController::class, 'sync']);
     });

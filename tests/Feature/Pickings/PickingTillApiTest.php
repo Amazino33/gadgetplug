@@ -143,3 +143,43 @@ test('a picker from another vendor is refused', function () {
         'item_ids'  => [1],
     ])->assertNotFound();
 });
+
+test('the till can hand the cart over as a trip', function () {
+    $vendor = pickingVendor();
+    $store = $vendor->defaultStore;
+    $product = pickingProduct($vendor, $store, 10, price: 1650);
+    $picker = pickingPicker($vendor, 'Musa Bala');
+
+    Sanctum::actingAs(User::find($vendor->user_id));
+
+    $this->postJson('/api/pos/pickings/release', [
+        'vendor_id' => $vendor->id,
+        'picker_id' => $picker->id,
+        'items'     => [['product_id' => $product->id, 'quantity' => 3]],
+    ])->assertOk()->assertJson(['picker' => 'Musa Bala', 'lines' => 1]);
+
+    // Off the shelf, and now listed for payment on this same till.
+    expect(shelfQuantity($product, $store))->toBe(7);
+
+    $listed = $this->getJson('/api/pos/pickings?vendor_id=' . $vendor->id)->assertOk();
+
+    expect($listed->json('pickers.0.lines.0.held'))->toBe(3);
+});
+
+test('a release the branch cannot cover leaves the shelf untouched', function () {
+    $vendor = pickingVendor();
+    $store = $vendor->defaultStore;
+    $product = pickingProduct($vendor, $store, 2);
+    $picker = pickingPicker($vendor);
+
+    Sanctum::actingAs(User::find($vendor->user_id));
+
+    $this->postJson('/api/pos/pickings/release', [
+        'vendor_id' => $vendor->id,
+        'picker_id' => $picker->id,
+        'items'     => [['product_id' => $product->id, 'quantity' => 5]],
+    ])->assertStatus(422);
+
+    expect(shelfQuantity($product, $store))->toBe(2)
+        ->and(App\Models\Picking::count())->toBe(0);
+});

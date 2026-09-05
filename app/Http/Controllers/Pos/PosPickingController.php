@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Pos;
 
 use App\Actions\Pickings\RecordPickingPaymentAction;
+use App\Actions\Pickings\ReleaseToPickerAction;
 use App\Http\Controllers\Controller;
 use App\Models\Picker;
 use App\Models\PickingItem;
@@ -88,6 +89,61 @@ class PosPickingController extends Controller
         ])->values();
 
         return response()->json(['store_id' => $storeId, 'pickers' => $pickers]);
+    }
+
+    /**
+     * Hand goods to a picker straight from the till.
+     *
+     * The cashier builds the trip in the cart the same way they build a sale —
+     * same scanner, same search — and releases it here instead of taking money
+     * for it. Requiring them to leave the counter for the panel to do the one
+     * thing they are standing there to do was friction worth removing.
+     *
+     * Online only, deliberately. Whether a branch actually holds the goods is
+     * decided by the server, and a release queued offline could be refused
+     * after the trader has already walked out with them — which is a worse
+     * position than telling the cashier to wait for a connection.
+     */
+    public function release(Request $request, ReleaseToPickerAction $release): JsonResponse
+    {
+        $request->validate([
+            'vendor_id'         => 'required|integer',
+            'picker_id'         => 'required|integer',
+            'items'             => 'required|array|min:1',
+            'items.*.product_id' => 'required|integer',
+            'items.*.quantity'  => 'required|integer|min:1',
+            'notes'             => 'nullable|string|max:500',
+        ]);
+
+        $vendorId = (int) $request->vendor_id;
+        $picker = Picker::where('vendor_id', $vendorId)->find($request->picker_id);
+
+        if (! $picker) {
+            return response()->json(['message' => 'That picker is not one of yours.'], 404);
+        }
+
+        try {
+            $picking = $release->execute(
+                picker: $picker,
+                store: TillStore::resolve($request->user(), $vendorId),
+                lines: array_map(fn ($row) => [
+                    'product_id' => (int) $row['product_id'],
+                    'quantity'   => (int) $row['quantity'],
+                ], $request->items),
+                userId: $request->user()->id,
+                notes: $request->notes,
+            );
+        } catch (Throwable $e) {
+            // Nothing was released: the trip is one transaction, so a line the
+            // branch cannot cover takes the whole thing with it.
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json([
+            'reference' => $picking->reference,
+            'picker'    => $picker->name,
+            'lines'     => $picking->items->count(),
+        ]);
     }
 
     /**

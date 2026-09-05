@@ -792,6 +792,8 @@ export default function POS({ user, vendorId, onLogout }) {
                 <PickingsModal
                     vendorId={vendorId}
                     isOnline={isOnline}
+                    cart={cart}
+                    onReleased={clearCart}
                     onClose={() => setModal(null)}
                 />
             )}
