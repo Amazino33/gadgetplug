@@ -432,6 +432,10 @@ export default function POS({ user, vendorId, onLogout }) {
                     )}
                     <span className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-25">{user.name}</span>
                     <div className="ml-auto flex items-center gap-3">
+                        <button onClick={() => setModal('pickings')}
+                            className="text-xs text-gray-400 dark:text-gray-500 hover:text-[#068B03] transition-colors shrink-0">
+                            Pickings
+                        </button>
                         <button onClick={() => setModal('salesHistory')}
                             className="text-xs text-gray-400 dark:text-gray-500 hover:text-[#068B03] transition-colors shrink-0">
                             My Sales
