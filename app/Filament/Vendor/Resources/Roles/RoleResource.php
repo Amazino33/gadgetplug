@@ -12,6 +12,47 @@ use Illuminate\Support\Str;
 
 class RoleResource extends ShieldRoleResource
 {
+    /**
+     * Permissions a vendor may hand to a role.
+     *
+     * A whitelist, not every permission that exists: seeding a new one is not
+     * enough to make it grantable, it has to be named here too. That gap is
+     * what left manage_pickings invisible on this screen after it shipped.
+     *
+     * write_off_picking is absent on purpose — the owner gets it by ownership,
+     * and listing it would let it be granted to a role, which is exactly what
+     * its absence prevents.
+     *
+     * @var array<int, string>
+     */
+    public const GRANTABLE_PERMISSIONS = [
+                        'view_products', 'view_any_products', 'create_products', 'edit_products', 'delete_products', 'view_cost_price',
+                        'view_order_items', 'view_any_order_items', 'edit_order_items',
+                        'view_vendor', 'edit_vendor',
+                        'view_team_members', 'invite_team_members', 'edit_team_members', 'remove_team_members',
+                        'access_pos', 'void_sale', 'process_return', 'close_pos_session',
+                        'manage_inventory', 'perform_inventory_count', 'authorize_recount', 'adjust_stock',
+                        'view_inventory_reports', 'view_restock_report', 'view_audit_sessions',
+                        'approve_procurement', 'manage_procurement',
+                        // Whoever is at the counter deals with the trader who
+                        // walks in, so both of these are grantable to a role.
+                        //
+                        // write_off_picking is deliberately absent: it is the
+                        // owner's alone, and hasVendorPermission() gives it to
+                        // them by ownership. Listing it here would let it be
+                        // granted to a role, which is exactly what being absent
+                        // prevents.
+                        'view_customer_debts',
+                        'manage_pickings',
+                        'manage_logistics',
+                        'view_payouts',
+                        'manage_notification_settings',
+                        'manage_financial_accounts',
+                        'manage_expenses',
+                        'manage_financial_reports',
+                        'view_reports_hub',
+                    ];
+
     protected static ?int $navigationSort = 7;
     protected static string|null|\UnitEnum $navigationGroup = 'Settings';
     public static function isScopedToTenant(): bool
@@ -64,23 +105,7 @@ class RoleResource extends ShieldRoleResource
                 ->relationship(
                     'permissions',
                     'name',
-                    fn ($query) => $query->whereIn('name', [
-                        'view_products', 'view_any_products', 'create_products', 'edit_products', 'delete_products', 'view_cost_price',
-                        'view_order_items', 'view_any_order_items', 'edit_order_items',
-                        'view_vendor', 'edit_vendor',
-                        'view_team_members', 'invite_team_members', 'edit_team_members', 'remove_team_members',
-                        'access_pos', 'void_sale', 'process_return', 'close_pos_session',
-                        'manage_inventory', 'perform_inventory_count', 'authorize_recount', 'adjust_stock',
-                        'view_inventory_reports', 'view_restock_report', 'view_audit_sessions',
-                        'approve_procurement', 'manage_procurement',
-                        'manage_logistics',
-                        'view_payouts',
-                        'manage_notification_settings',
-                        'manage_financial_accounts',
-                        'manage_expenses',
-                        'manage_financial_reports',
-                        'view_reports_hub',
-                    ])
+                    fn ($query) => $query->whereIn('name', self::GRANTABLE_PERMISSIONS)
                 )
                 ->getOptionLabelFromRecordUsing(fn ($record) => Str::headline($record->name))
                 ->bulkToggleable()
