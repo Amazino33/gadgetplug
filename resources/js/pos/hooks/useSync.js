@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { db } from '../lib/db';
 import api from '../lib/api';
 import { markSaleSynced } from '../lib/salesHistory';
+import { markPickingPaymentSynced, pendingPickingPayments, prunePickingPayments } from '../lib/pickings';
 
 /**
  * Background sync: every 30s, push any unsynced IndexedDB sales to the server.
@@ -63,7 +64,46 @@ export function useSync(vendorId, onStuckSalesChange) {
             }
         }
 
+        await syncPickingPayments();
         await reportStuck();
+    };
+
+    /**
+     * Money taken from pickers while the till was offline.
+     *
+     * Sent one at a time and carrying its own offline id: the server answers a
+     * repeated id as a duplicate rather than an error, so a payment that went up
+     * but whose answer never came back is settled once and marked here on the
+     * retry, instead of being applied twice or retried for ever.
+     */
+    const syncPickingPayments = async () => {
+        const pending = await pendingPickingPayments();
+
+        for (const payment of pending) {
+            try {
+                const { data } = await api.post('/pickings/payment', {
+                    vendor_id: payment.vendor_id,
+                    picker_id: payment.picker_id,
+                    amount: payment.amount,
+                    item_ids: payment.item_ids,
+                    payment_method: payment.payment_method ?? 'cash',
+                    reference: payment.offline_id,
+                });
+
+                await markPickingPaymentSynced(payment.offline_id, data);
+            } catch (e) {
+                // A refusal is final — the money was understood and could not be
+                // applied, so retrying forever would only hide it. Anything else
+                // is a network problem and goes again next cycle.
+                if (e?.response?.status === 422 || e?.response?.status === 404) {
+                    await db.pickingPayments
+                        .where('offline_id').equals(payment.offline_id)
+                        .modify({ synced: 1, sync_status: 'rejected', sync_message: e?.response?.data?.message ?? null });
+                }
+            }
+        }
+
+        await prunePickingPayments();
     };
 
     useEffect(() => {

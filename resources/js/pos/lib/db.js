@@ -27,4 +27,22 @@ db.version(2).stores({
     sales: '++id, cashier_id, completed_at, reference, offline_id, server_id',
 });
 
+// v3 adds vendor pickings: the traders holding the vendor's goods, and the
+// money they bring back for them.
+//
+// pickingPayments is a QUEUE, like offlineSales. It holds only what the cashier
+// did — this picker paid this much against these lines — and never what that
+// settles. The server works that out on arrival, against live prices and
+// whatever is still outstanding, so two tills that both took money offline
+// cannot double-settle: whoever syncs second simply finds less owing.
+//
+// pickingCache is the last list the server gave us, kept so a cashier with no
+// connection can still see who is holding what and take money for it. It goes
+// stale the moment somebody else takes a payment, which is exactly why the till
+// is not allowed to decide what a payment settles.
+db.version(3).stores({
+    pickingPayments: '++id, offline_id, synced, created_at',
+    pickingCache:    'vendor_id',
+});
+
 export default db;

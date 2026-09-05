@@ -20,6 +20,7 @@ import ZReportModal from '../components/ZReportModal';
 import ReceiptModal from '../components/ReceiptModal';
 import StuckSalesModal from '../components/StuckSalesModal';
 import SalesHistoryModal from '../components/SalesHistoryModal';
+import PickingsModal from '../components/PickingsModal';
 
 const CONFIG = window.POS_CONFIG ?? {};
 
@@ -668,6 +669,11 @@ export default function POS({ user, vendorId, onLogout }) {
                                 color="green"
                             />
                             <SheetBtn
+                                label="Pickings"
+                                onClick={() => { setModal('pickings'); setShowMobileMore(false); }}
+                                color="orange"
+                            />
+                            <SheetBtn
                                 label={pendingSales.length > 0 ? `Suspended (${pendingSales.length})` : 'Suspended'}
                                 onClick={() => { setModal('suspendedSales'); setShowMobileMore(false); }}
                                 color={pendingSales.length > 0 ? 'orange' : 'gray'}
@@ -778,6 +784,14 @@ export default function POS({ user, vendorId, onLogout }) {
                     }}
                 />
             )}
+            {modal === 'pickings' && (
+                <PickingsModal
+                    vendorId={vendorId}
+                    isOnline={isOnline}
+                    onClose={() => setModal(null)}
+                />
+            )}
+
             {modal === 'salesHistory' && (
                 <SalesHistoryModal
                     vendorId={vendorId}
