@@ -26,6 +26,7 @@ class VendorRoles
             'authorize_recount', 'adjust_stock',
             'approve_procurement', 'manage_procurement',
             'manage_pickings',
+            'submit_cash', 'receive_cash',
         ],
         'product_manager' => [
             'view_products', 'view_any_products', 'create_products', 'edit_products', 'delete_products',
@@ -49,6 +50,7 @@ class VendorRoles
             'authorize_recount', 'adjust_stock',
             'approve_procurement', 'manage_procurement',
             'manage_pickings',
+            'submit_cash', 'receive_cash',
         ],
         'storekeeper' => [
             'view_products', 'view_any_products',
@@ -63,6 +65,10 @@ class VendorRoles
             // Same reasoning as the debt line above: the trader comes back on
             // the day he has sold, not on the day the owner is in.
             'manage_pickings',
+            // Handing the day's takings over is the job, not a privilege.
+            // receive_cash is deliberately not here: the whole value of the
+            // record is that the two names on it belong to different people.
+            'submit_cash',
         ],
         'member' => [
             'view_products', 'view_any_products',

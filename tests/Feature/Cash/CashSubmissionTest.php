@@ -13,37 +13,9 @@ use App\Services\Cash\CashDrawer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 
+require_once __DIR__ . '/Helpers.php';
+
 uses(RefreshDatabase::class);
-
-function cashVendor(): Vendor
-{
-    return Vendor::create([
-        'user_id' => User::factory()->create()->id,
-        'name'    => 'Cash Vendor '.uniqid(),
-    ]);
-}
-
-/** A completed sale, exactly as the till writes one. */
-function cashSale(Vendor $vendor, Store $store, int $cashierId, array $over = []): PosSale
-{
-    $total = $over['total'] ?? 10000;
-
-    return PosSale::create(array_merge([
-        'reference'       => 'POS-'.Str::random(10),
-        'vendor_id'       => $vendor->id,
-        'store_id'        => $store->id,
-        'cashier_id'      => $cashierId,
-        'subtotal'        => $total,
-        'discount_amount' => 0,
-        'vat_amount'      => 0,
-        'total'           => $total,
-        'payment_method'  => 'cash',
-        'amount_tendered' => $total,
-        'change_given'    => 0,
-        'status'          => 'completed',
-        'completed_at'    => now(),
-    ], $over));
-}
 
 test('what a cashier should be holding is what they took, less what they handed over', function () {
     $vendor = cashVendor();

@@ -21,6 +21,7 @@ import ReceiptModal from '../components/ReceiptModal';
 import StuckSalesModal from '../components/StuckSalesModal';
 import SalesHistoryModal from '../components/SalesHistoryModal';
 import PickingsModal from '../components/PickingsModal';
+import CashSubmitModal from '../components/CashSubmitModal';
 
 const CONFIG = window.POS_CONFIG ?? {};
 
@@ -432,6 +433,10 @@ export default function POS({ user, vendorId, onLogout }) {
                     )}
                     <span className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-25">{user.name}</span>
                     <div className="ml-auto flex items-center gap-3">
+                        <button onClick={() => setModal('submitCash')}
+                            className="text-xs text-gray-400 dark:text-gray-500 hover:text-[#068B03] transition-colors shrink-0">
+                            Submit Cash
+                        </button>
                         <button onClick={() => setModal('pickings')}
                             className="text-xs text-gray-400 dark:text-gray-500 hover:text-[#068B03] transition-colors shrink-0">
                             Pickings
@@ -678,6 +683,11 @@ export default function POS({ user, vendorId, onLogout }) {
                                 color="orange"
                             />
                             <SheetBtn
+                                label="Submit Cash"
+                                onClick={() => { setModal('submitCash'); setShowMobileMore(false); }}
+                                color="green"
+                            />
+                            <SheetBtn
                                 label={pendingSales.length > 0 ? `Suspended (${pendingSales.length})` : 'Suspended'}
                                 onClick={() => { setModal('suspendedSales'); setShowMobileMore(false); }}
                                 color={pendingSales.length > 0 ? 'orange' : 'gray'}
@@ -788,6 +798,14 @@ export default function POS({ user, vendorId, onLogout }) {
                     }}
                 />
             )}
+            {modal === 'submitCash' && (
+                <CashSubmitModal
+                    vendorId={vendorId}
+                    isOnline={isOnline}
+                    onClose={() => setModal(null)}
+                />
+            )}
+
             {modal === 'pickings' && (
                 <PickingsModal
                     vendorId={vendorId}

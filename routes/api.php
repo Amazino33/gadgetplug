@@ -6,6 +6,7 @@ use App\Http\Controllers\Pos\PosCustomerController;
 use App\Http\Controllers\Pos\PosSaleController;
 use App\Http\Controllers\Pos\PosReceiptController;
 use App\Http\Controllers\Pos\PosSessionController;
+use App\Http\Controllers\Pos\PosCashController;
 use App\Http\Controllers\Pos\PosPickingController;
 use App\Http\Controllers\Pos\PosSyncController;
 use App\Http\Middleware\EnsurePosVendorAccess;
@@ -65,6 +66,10 @@ Route::prefix('pos')->middleware(NoStoreApiResponse::class)->group(function () {
         Route::get('pickings',          [PosPickingController::class, 'index']);
         Route::post('pickings/payment', [PosPickingController::class, 'pay']);
         Route::post('pickings/release', [PosPickingController::class, 'release']);
+
+        // Handing the day's takings over. Online only — see the controller.
+        Route::get('cash',        [PosCashController::class, 'index']);
+        Route::post('cash/submit', [PosCashController::class, 'submit']);
 
         Route::post('sync', [PosSyncController::class, 'sync']);
     });

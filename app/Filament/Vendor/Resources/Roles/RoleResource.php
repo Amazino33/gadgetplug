@@ -44,6 +44,7 @@ class RoleResource extends ShieldRoleResource
                         // prevents.
                         'view_customer_debts',
                         'manage_pickings',
+                        'submit_cash', 'receive_cash',
                         'manage_logistics',
                         'view_payouts',
                         'manage_notification_settings',

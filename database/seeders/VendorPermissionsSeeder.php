@@ -86,6 +86,10 @@ class VendorPermissionsSeeder extends Seeder
             // Financial Report
             'manage_financial_reports',
 
+            // Cash handovers
+            'submit_cash',
+            'receive_cash',
+
             // Reports Hub
             'view_reports_hub',
         ];
