@@ -9,7 +9,7 @@ use App\Models\Picker;
 use App\Models\Picking;
 use App\Models\Product;
 use App\Models\Store;
-use Illuminate\Support\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -37,7 +37,7 @@ class ReleaseToPickerAction
         array $lines,
         ?int $userId = null,
         ?string $notes = null,
-        ?Carbon $takenAt = null,
+        ?CarbonInterface $takenAt = null,
     ): Picking {
         if ($lines === []) {
             throw new RuntimeException('A picking needs at least one product.');

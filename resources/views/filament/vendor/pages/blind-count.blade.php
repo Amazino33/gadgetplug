@@ -397,6 +397,17 @@
                     @if($product->barcode){{ $product->barcode }}@endif
                 </p>
                 @endif
+
+                {{-- The shelf is genuinely short by this much, and the system
+                     agrees: picked units left stock when they went out. Said
+                     here so a counter does not report a shortage for goods
+                     sitting in somebody else's shop. --}}
+                @php $outOnPicking = $this->unitsOutOnPicking(); @endphp
+                @if($outOnPicking > 0)
+                <p class="mt-2 inline-flex items-center gap-1 rounded-md bg-amber-500/15 px-2 py-1 text-[11px] font-semibold text-amber-300">
+                    {{ $outOnPicking }} more out on picking — do not count {{ $outOnPicking === 1 ? 'it' : 'them' }}
+                </p>
+                @endif
             </div>
 
             {{-- Counter --}}

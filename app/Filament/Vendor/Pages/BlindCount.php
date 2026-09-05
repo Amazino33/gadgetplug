@@ -12,6 +12,7 @@ use App\Models\BlindCountEntry;
 use App\Models\BlindCountSession;
 use App\Models\Product;
 use App\Models\ProductStoreStock;
+use App\Services\Pickings\PickingLedger;
 use App\Models\User;
 use App\Services\ShortageCaseService;
 use Filament\Notifications\Notification;
@@ -101,6 +102,26 @@ class BlindCount extends Page
         if (! $productId) return null;
 
         return Product::with(['media', 'category'])->find($productId);
+    }
+
+    /**
+     * Units of the product being counted that are out with a picker.
+     *
+     * The counter is looking at a shelf that is genuinely short by this much,
+     * and the system agrees — the units left stock when they were picked. Shown
+     * so nobody reports a shortage for goods that are exactly where they are
+     * supposed to be, in somebody else's shop.
+     */
+    public function unitsOutOnPicking(): int
+    {
+        $session = $this->getSession();
+        $product = $this->getCurrentProduct();
+
+        if (! $session || ! $product) {
+            return 0;
+        }
+
+        return PickingLedger::heldQuantityForProduct($product->id, $session->store_id);
     }
 
     public function getRole(): string

@@ -8,6 +8,7 @@ use App\Models\InventoryLedger;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
+use App\Services\Pickings\PickingLedger;
 use Filament\Facades\Filament;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Infolist;
@@ -97,6 +98,20 @@ class InventoryTableWidget extends BaseWidget
                         default      => 'success',
                     })
                     ->tooltip('What the storefront shows buyers = On Shelf − Reserved'),
+
+                Tables\Columns\TextColumn::make('on_trust')
+                    ->label('On Trust')
+                    ->state(fn (Product $record): int => PickingLedger::heldQuantityForProduct(
+                        $record->id,
+                        $this->storeFilter,
+                    ))
+                    ->badge()
+                    ->color(fn (int $state): string => $state > 0 ? 'warning' : 'gray')
+                    ->tooltip('Out with pickers — still yours, not on the shelf. Click to see who is holding it.')
+                    // Clicking the figure is how the owner finds out who has
+                    // the goods, which is the first question asked when a
+                    // count comes up short.
+                    ->action($this->holdersAction()),
                 // ────────────────────────────────────────────────────────────
 
                 Tables\Columns\TextColumn::make('cost_price')
@@ -349,5 +364,48 @@ class InventoryTableWidget extends BaseWidget
                 </table>
             </div>
         ");
+    }
+
+    /**
+     * Who is holding this product, and since when.
+     *
+     * Read-only: acting on a line belongs on the picker's own screen, where the
+     * rest of their history is in front of you. This answers the one question
+     * the inventory page raises — where did the missing units go.
+     */
+    private function holdersAction(): \Filament\Actions\Action
+    {
+        return \Filament\Actions\Action::make('holders')
+            ->label('Who is holding it')
+            ->modalHeading(fn (Product $record) => 'Out on picking — ' . $record->name)
+            ->modalSubmitAction(false)
+            ->modalCancelActionLabel('Close')
+            ->modalContent(function (Product $record) {
+                $holders = PickingLedger::holdersOfProduct($record->id, $this->storeFilter);
+
+                if ($holders->isEmpty()) {
+                    return new \Illuminate\Support\HtmlString(
+                        '<p class="text-sm text-gray-500 dark:text-gray-400">Nobody is holding this product.</p>'
+                    );
+                }
+
+                $rows = $holders->map(fn (array $row) => '<tr class="border-b border-gray-100 dark:border-white/10">'
+                    . '<td class="py-2 pr-4 text-gray-950 dark:text-white">' . e($row['picker_name']) . '</td>'
+                    . '<td class="py-2 pr-4 text-right font-semibold">' . (int) $row['units'] . '</td>'
+                    . '<td class="py-2 pr-4 text-gray-500 dark:text-gray-400">'
+                    . e(\Illuminate\Support\Carbon::parse($row['taken_at'])->format('d M Y')) . '</td>'
+                    . '<td class="py-2 text-gray-500 dark:text-gray-400 font-mono text-xs">'
+                    . e($row['reference'] ?? '—') . '</td></tr>')->implode('');
+
+                return new \Illuminate\Support\HtmlString(
+                    '<div class="overflow-x-auto"><table class="w-full text-sm">'
+                    . '<thead><tr class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">'
+                    . '<th class="pb-2 pr-4 text-left font-medium">Picker</th>'
+                    . '<th class="pb-2 pr-4 text-right font-medium">Units</th>'
+                    . '<th class="pb-2 pr-4 text-left font-medium">Taken</th>'
+                    . '<th class="pb-2 text-left font-medium">Trip</th>'
+                    . '</tr></thead><tbody>' . $rows . '</tbody></table></div>'
+                );
+            });
     }
 }

@@ -102,6 +102,28 @@ class PickingLedger
     }
 
     /**
+     * Everything out with pickers for a vendor, or for one branch of it.
+     *
+     * The units are still owned — a picker holds them, they have not been sold —
+     * so this is what the inventory screens add back on top of what is on the
+     * shelf to say what the business owns in all.
+     *
+     * @return array{units: int, value: float}
+     */
+    public static function heldTotals(int $vendorId, ?int $storeId = null): array
+    {
+        $row = self::heldLines($vendorId, $storeId)
+            ->selectRaw('COALESCE(SUM('.self::HELD_SQL.'), 0) as units')
+            ->selectRaw('COALESCE(SUM('.self::HELD_SQL.' * products.price), 0) as value')
+            ->first();
+
+        return [
+            'units' => max(0, (int) $row->units),
+            'value' => max(0.0, (float) $row->value),
+        ];
+    }
+
+    /**
      * Who is holding a given product, for the drill-down behind the "on trust"
      * figure.
      *

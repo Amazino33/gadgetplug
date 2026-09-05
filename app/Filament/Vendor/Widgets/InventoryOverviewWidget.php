@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Vendor\Widgets;
 
 use App\Models\Product;
+use App\Services\Pickings\PickingLedger;
 use Filament\Facades\Filament;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Livewire\Attributes\Reactive;
@@ -47,6 +48,12 @@ class InventoryOverviewWidget extends BaseWidget
         $lowStock    = (clone $base)->where('stock_quantity', '>', 0)->where('stock_quantity', '<', 5)->count();
         $outOfStock  = (clone $base)->where('stock_quantity', 0)->count();
 
+        // Goods out with pickers are still the vendor's — they can be asked for
+        // back — so they belong in what the business owns. But they are not on
+        // the shelf and cannot be sold from here, which is why they are their
+        // own figure rather than folded into the ones above.
+        $onTrust = PickingLedger::heldTotals($vendorId, $this->storeFilter);
+
         return [
             Stat::make('Total SKUs', number_format($totalSKUs))
                 ->description('Unique products in your catalogue')
@@ -72,6 +79,15 @@ class InventoryOverviewWidget extends BaseWidget
                 ->description(number_format($margin, 1) . '% average gross margin on stock')
                 ->descriptionIcon('heroicon-m-arrow-trending-up')
                 ->color($profit >= 0 ? 'success' : 'danger'),
+
+            Stat::make('Out on Picking', number_format($onTrust['units']))
+                ->description(
+                    $onTrust['units'] > 0
+                        ? '₦' . number_format($onTrust['value']) . ' with pickers · ₦' . number_format($retailValue + $onTrust['value']) . ' owned in all'
+                        : 'Nothing is out with pickers'
+                )
+                ->descriptionIcon('heroicon-m-hand-raised')
+                ->color($onTrust['units'] > 0 ? 'warning' : 'gray'),
 
             Stat::make('Stock Alerts', $outOfStock . ' out of stock · ' . $lowStock . ' low')
                 ->description(

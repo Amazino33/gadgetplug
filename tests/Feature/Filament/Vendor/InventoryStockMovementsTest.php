@@ -56,7 +56,10 @@ test('a movement shows what happened, who did it and when', function () {
     $html = movementsHtml($ctx);
 
     expect($html)->toContain('Restock')                       // how
-        ->and($html)->toContain($ctx['owner']->name)          // who
+        // Escaped, because that is what lands in the HTML: a faker name
+        // carrying an apostrophe (O'Hara) renders as O&#039;Hara and made this
+        // assertion fail at random.
+        ->and($html)->toContain(e($ctx['owner']->name))       // who
         ->and($html)->toContain(now()->format('d M Y'))       // when
         ->and($html)->toContain('+10')                        // what changed
         ->and($html)->toContain('Opening delivery');          // why
