@@ -6,6 +6,7 @@ use App\Http\Controllers\Pos\PosCustomerController;
 use App\Http\Controllers\Pos\PosSaleController;
 use App\Http\Controllers\Pos\PosReceiptController;
 use App\Http\Controllers\Pos\PosSessionController;
+use App\Http\Controllers\Pos\PosPickingController;
 use App\Http\Controllers\Pos\PosSyncController;
 use App\Http\Middleware\EnsurePosVendorAccess;
 use App\Http\Middleware\NoStoreApiResponse;
@@ -58,6 +59,12 @@ Route::prefix('pos')->middleware(NoStoreApiResponse::class)->group(function () {
         Route::delete('suspended/{suspendedSale}',       [PosSessionController::class, 'clearSuspended']);
 
         // Offline sync — bulk submit queued transactions
+        // Vendor pickings: what is still out at this till's branch, and the
+        // money traders bring back for it. The payment endpoint doubles as the
+        // one the offline queue replays.
+        Route::get('pickings',          [PosPickingController::class, 'index']);
+        Route::post('pickings/payment', [PosPickingController::class, 'pay']);
+
         Route::post('sync', [PosSyncController::class, 'sync']);
     });
 });
