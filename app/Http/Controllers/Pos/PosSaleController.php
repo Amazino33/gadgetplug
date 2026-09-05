@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Pos;
 
 use App\Actions\Finance\RecognizePosSaleRevenueAction;
 use App\Actions\Pos\ChargeCustomerDebtAction;
+use App\Actions\Pos\ReverseCustomerDebtAction;
 use App\Actions\Inventory\AdjustStockAction;
 use App\Http\Controllers\Controller;
 use App\Models\PosCustomer;
@@ -334,6 +335,9 @@ class PosSaleController extends Controller
 
             $revenue->reverseForVoid($sale);
 
+            // The goods never left, so the customer cannot still owe for them.
+            app(ReverseCustomerDebtAction::class)->forVoid($sale);
+
             activity()->causedBy($request->user())
                 ->performedOn($sale)
                 ->tap(fn ($a) => $a->vendor_id = $sale->vendor_id)
@@ -448,6 +452,11 @@ class PosSaleController extends Controller
             $sale->update(['status' => $fullyReturned ? 'refunded' : 'partial_refund']);
 
             $revenue->reverseForReturn($sale, $posReturn);
+
+            // Same for goods handed back: whatever share of them was taken on
+            // credit stops being owed. Without this the debt list would send
+            // somebody to collect for a product sitting back on the shelf.
+            app(ReverseCustomerDebtAction::class)->forReturn($sale, $posReturn);
 
             activity()->causedBy($request->user())
                 ->performedOn($sale)

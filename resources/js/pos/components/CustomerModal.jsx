@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import api from '../lib/api';
+import { db } from '../lib/db';
 
 export default function CustomerModal({ vendorId, current, onSelect, onClose }) {
     const [query, setQuery]       = useState('');
@@ -11,12 +12,33 @@ export default function CustomerModal({ vendorId, current, onSelect, onClose }) 
 
     useEffect(() => { inputRef.current?.focus(); }, []);
 
+    const [offline, setOffline] = useState(false);
+
+    // Cached names and phones, so a credit sale can still be attached to
+    // somebody when the connection is gone. The server is asked first because
+    // it knows about anyone added since this till last signed in.
+    const searchCache = async (q) => {
+        const needle = q.trim().toLowerCase();
+
+        return db.customers
+            .where('vendor_id').equals(Number(vendorId))
+            .filter((c) => (c.name ?? '').toLowerCase().includes(needle)
+                || (c.phone ?? '').includes(needle))
+            .limit(30)
+            .toArray();
+    };
+
     const search = async (q) => {
-        if (!q.trim()) { setResults([]); return; }
+        if (!q.trim()) { setResults([]); setOffline(false); return; }
+
         try {
             const { data } = await api.get('/customers', { params: { vendor_id: vendorId, q } });
             setResults(data);
-        } catch { /* offline */ }
+            setOffline(false);
+        } catch {
+            setResults(await searchCache(q));
+            setOffline(true);
+        }
     };
 
     const createCustomer = async () => {
@@ -24,8 +46,16 @@ export default function CustomerModal({ vendorId, current, onSelect, onClose }) 
         setLoading(true);
         try {
             const { data } = await api.post('/customers', { vendor_id: vendorId, ...form });
+            // Straight into the cache, so the person just added is findable
+            // again if the connection drops a minute later.
+            await db.customers.put({ ...data, vendor_id: Number(vendorId) });
             onSelect(data);
-        } catch { /* handle */ } finally {
+        } catch {
+            // A new customer needs a server id before anything can be charged
+            // to them, so this is one thing the till genuinely cannot do
+            // offline. Said plainly rather than failing silently.
+            setOffline(true);
+        } finally {
             setLoading(false);
         }
     };
@@ -49,6 +79,14 @@ export default function CustomerModal({ vendorId, current, onSelect, onClose }) 
                 </div>
 
                 <div className="p-6">
+                    {offline && (
+                        <div className="mb-3 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">
+                            {mode === 'create'
+                                ? 'No connection — a new customer cannot be added until the till is back online. Search for an existing one instead.'
+                                : 'No connection — searching the customers saved on this till.'}
+                        </div>
+                    )}
+
                     {mode === 'search' ? (
                         <>
                             <input

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Pos;
 
+use App\Actions\Finance\RecognizePosSaleRevenueAction;
 use App\Actions\Inventory\AdjustStockAction;
 use App\Actions\Pos\ChargeCustomerDebtAction;
 use App\Http\Controllers\Controller;
@@ -121,6 +122,16 @@ class PosSyncController extends Controller
                     // credit sale carries its debt with it and lands the moment
                     // it reaches the server, dated when it was actually rung up.
                     app(ChargeCustomerDebtAction::class)->execute($sale);
+
+                    // Revenue, which this path never recognised at all. A sale
+                    // rung up offline banked no money when it finally uploaded,
+                    // so cash taken with no signal simply never reached the
+                    // accounts — the debt half of the picture was being built on
+                    // a cash half that was missing. The same action the online
+                    // path uses, so a synced sale is recognised exactly as a
+                    // counter one: the collected tenders only, with any debt
+                    // slice deferred until it is repaid.
+                    app(RecognizePosSaleRevenueAction::class)->execute($sale);
 
                     // Best available cost for a sale that happened offline: the
                     // product's cost now. The true cost at the time of the

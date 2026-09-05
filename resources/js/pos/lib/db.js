@@ -45,4 +45,16 @@ db.version(3).stores({
     pickingCache:    'vendor_id',
 });
 
+// v4 caches the customer list, for the same reason products are cached: the
+// till has to keep working with no signal.
+//
+// Selling on credit REQUIRES a named customer — an anonymous debt can never be
+// collected — but searching for one hit the network, so the one sale that most
+// needs a customer attached was the one that could not have it offline. Names
+// and phones only; balances are deliberately not cached, because a stale figure
+// about money owed is worse than no figure at all.
+db.version(4).stores({
+    customers: 'id, vendor_id, name, phone',
+});
+
 export default db;

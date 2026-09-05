@@ -54,10 +54,25 @@ class PosCustomerController extends Controller
             'email'     => 'nullable|email|max:100',
         ]);
 
-        $customer = PosCustomer::firstOrCreate(
-            ['vendor_id' => $request->vendor_id, 'phone' => $request->phone],
-            ['name' => $request->name, 'email' => $request->email]
-        );
+        // Matching on phone only works when there IS one. firstOrCreate with a
+        // null phone becomes "where phone is null", which matches ANY
+        // phone-less customer this vendor has — so the second walk-in with no
+        // number came back as the first one, and a credit sale would land on a
+        // stranger's ledger while looking perfectly consistent.
+        //
+        // With a number, reuse is still right and still what the till wants: the
+        // same person should not accumulate three records and three balances.
+        $customer = filled($request->phone)
+            ? PosCustomer::firstOrCreate(
+                ['vendor_id' => $request->vendor_id, 'phone' => $request->phone],
+                ['name' => $request->name, 'email' => $request->email],
+            )
+            : PosCustomer::create([
+                'vendor_id' => $request->vendor_id,
+                'name'      => $request->name,
+                'email'     => $request->email,
+                'phone'     => null,
+            ]);
 
         return response()->json($customer, 201);
     }

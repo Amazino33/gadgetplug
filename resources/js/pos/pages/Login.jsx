@@ -45,6 +45,15 @@ export default function Login({ onLogin }) {
             await db.products.clear();
             await db.products.bulkPut(products);
 
+            // Customers too, so a credit sale can still name who owes when the
+            // connection drops. Non-fatal on its own: failing to cache them must
+            // never stop a cashier signing in and trading.
+            try {
+                const { data: customers } = await api.get('/customers', { params: { vendor_id: vendorId } });
+                await db.customers.clear();
+                await db.customers.bulkPut(customers);
+            } catch { /* offline or refused — the till still opens */ }
+
             onLogin(data.user, Number(vendorId));
         } catch {
             setError('Invalid PIN. Try again.');
