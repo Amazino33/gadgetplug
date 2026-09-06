@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\MediaLibrary\HasMedia;
@@ -73,6 +74,50 @@ class Product extends Model implements HasMedia
 
     // "Published" governs whether a product physically exists/is live at all;
     // these two further gate which sales channel(s) it's actually exposed to.
+    /**
+     * The supplier's product this listing resells, if it is a linked listing.
+     *
+     * Price and stock resolve from here live; images and description do not —
+     * those are copied once at publish and belong to the reseller thereafter,
+     * so the supplier editing his product never mutates a published listing.
+     */
+    public function sourceProduct(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'source_product_id');
+    }
+
+    /** The link that permits this listing to read its source. */
+    public function supplierLink(): BelongsTo
+    {
+        return $this->belongsTo(SupplierLink::class);
+    }
+
+    /** Listings other vendors have published from this product. */
+    public function resoldListings(): HasMany
+    {
+        return $this->hasMany(self::class, 'source_product_id');
+    }
+
+    /**
+     * Whether this listing is resold from a supplier rather than genuinely
+     * stocked. Null source means an ordinary product, which is every row that
+     * existed before this feature.
+     */
+    public function isLinked(): bool
+    {
+        return $this->source_product_id !== null;
+    }
+
+    public function scopeLinked(Builder $query): Builder
+    {
+        return $query->whereNotNull('source_product_id');
+    }
+
+    public function scopeOwnStock(Builder $query): Builder
+    {
+        return $query->whereNull('source_product_id');
+    }
+
     public function scopeVisibleOnline(Builder $query): void
     {
         $query->published()->where('show_online', true)
