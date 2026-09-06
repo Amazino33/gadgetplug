@@ -15,39 +15,9 @@ use App\Services\VendorLink\SupplierPayable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 
+require_once __DIR__ . '/Helpers.php';
+
 uses(RefreshDatabase::class);
-
-function linkVendor(string $name, bool $online = true): Vendor
-{
-    return Vendor::create([
-        'user_id'              => User::factory()->create()->id,
-        'name'                 => $name.' '.uniqid(),
-        'online_sales_enabled' => $online,
-    ]);
-}
-
-function linkProduct(Vendor $vendor, float $price = 10000, int $stock = 5): Product
-{
-    return Product::create([
-        'vendor_id'      => $vendor->id,
-        'store_id'       => $vendor->defaultStore->id,
-        'category_id'    => Category::firstOrCreate(['name' => 'VendorLink Cat'])->id,
-        'name'           => 'Linked Widget '.Str::random(5),
-        'price'          => $price,
-        'cost_price'     => $price * 0.6,
-        'stock_quantity' => $stock,
-        'status'         => 'published',
-    ]);
-}
-
-function makeLink(Vendor $reseller, Vendor $supplier, float $markup = 40): SupplierLink
-{
-    return SupplierLink::create([
-        'reseller_vendor_id' => $reseller->id,
-        'supplier_vendor_id' => $supplier->id,
-        'markup_percent'     => $markup,
-    ]);
-}
 
 describe('the link itself', function () {
     test('a link names a reseller and a supplier, and defaults to active', function () {

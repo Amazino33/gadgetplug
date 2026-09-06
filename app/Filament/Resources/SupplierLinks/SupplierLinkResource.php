@@ -7,6 +7,7 @@ use App\Models\SupplierLink;
 use App\Models\Vendor;
 use App\Services\VendorLink\Rounding\RoundingRules;
 use BackedEnum;
+use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -90,7 +91,7 @@ class SupplierLinkResource extends Resource
                 Tables\Filters\TernaryFilter::make('is_active')->label('Active'),
             ])
             ->recordActions([
-                Tables\Actions\EditAction::make(),
+                EditAction::make(),
             ])
             // No delete action: listings and debts point at these rows. The
             // active toggle is how a link is ended.
