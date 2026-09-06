@@ -55,7 +55,11 @@ return new class extends Migration
             // created_at.
             $table->timestamp('created_at')->useCurrent();
 
-            $table->index(['vendor_id', 'supplier_link_id', 'entry_type']);
+            // Named explicitly: the generated name would be 68 characters and
+            // MySQL refuses anything over 64. SQLite does not enforce that at
+            // all, so the test suite cannot catch it — this failed on the first
+            // real deploy, after every test had passed.
+            $table->index(['vendor_id', 'supplier_link_id', 'entry_type'], 'spe_vendor_link_type_index');
         });
     }
 
