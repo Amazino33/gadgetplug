@@ -62,7 +62,7 @@ new class extends Component {
     {
         $query = Product::visibleOnline()
             ->with(['vendor', 'category', 'media'])
-            ->whereRaw('CAST(stock_quantity AS SIGNED) - CAST(reserved_stock AS SIGNED) > 0')
+            ->inStockForSale()
             ->when($this->selectedCategory, fn($q) => $q->where('category_id', $this->selectedCategory))
             ->when($this->search, fn($q) => $q->where(function ($sq) {
                 $sq->where('name', 'like', "%{$this->search}%")

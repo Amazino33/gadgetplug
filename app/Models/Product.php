@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use App\Services\VendorLink\LinkedPricing;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -131,10 +132,77 @@ class Product extends Model implements HasMedia
 
     /**
      * Units actually available to sell = physical stock minus those held for pending orders.
+     *
+     * A linked listing holds no stock of its own, so it answers with the
+     * supplier's. This is where every PHP reader of stock — the cart, the
+     * product page, the checkout guard — resolves it, which is why the
+     * interception is here rather than at each of them.
      */
     public function getAvailableStockAttribute(): int
     {
+        if ($this->isLinked()) {
+            return LinkedPricing::stockFor($this);
+        }
+
         return max(0, $this->stock_quantity - $this->reserved_stock);
+    }
+
+    /**
+     * What this sells for.
+     *
+     * A linked listing quotes the supplier's price plus the link's markup, live,
+     * so his price change moves the shelf price with no sync and nothing to run.
+     * The stored column is a mirror kept for SQL sorting, and is the fallback
+     * when the source is gone or the link switched off — a stale real price
+     * beats showing a customer zero.
+     */
+    public function getPriceAttribute($value)
+    {
+        // castAttribute, not the raw value: defining an accessor BYPASSES the
+        // decimal:2 cast on this column, so returning $value straight would
+        // quietly change the type every reader has always seen — which is
+        // exactly what it did, and what broke the catalogue export's CSV.
+        if (! $this->isLinked()) {
+            return $this->castAttribute('price', $value);
+        }
+
+        $resolved = LinkedPricing::priceFor($this);
+
+        return $this->castAttribute('price', $resolved ?? $value);
+    }
+
+    /**
+     * Products that can actually be bought right now.
+     *
+     * Own stock is the column; a linked listing's is the supplier's, which SQL
+     * has to reach through the source row — the storefront filters and sorts in
+     * the database, so an accessor alone would leave every linked listing out of
+     * the catalogue.
+     */
+    public function scopeInStockForSale(Builder $query): Builder
+    {
+        return $query->where(function (Builder $q) {
+            $q->where(function (Builder $own) {
+                $own->whereNull('source_product_id')
+                    ->whereRaw('CAST(stock_quantity AS SIGNED) - CAST(reserved_stock AS SIGNED) > 0');
+            })->orWhere(function (Builder $linked) {
+                $linked->whereNotNull('source_product_id')
+                    ->whereExists(function ($sub) {
+                        $sub->selectRaw('1')
+                            ->from('products as src')
+                            ->whereColumn('src.id', 'products.source_product_id')
+                            ->whereRaw('CAST(src.stock_quantity AS SIGNED) - CAST(src.reserved_stock AS SIGNED) > 0');
+                    })
+                    // The arrangement has to still be on. A switched-off link
+                    // stops the listing selling, the same as it stops it pricing.
+                    ->whereExists(function ($sub) {
+                        $sub->selectRaw('1')
+                            ->from('supplier_links')
+                            ->whereColumn('supplier_links.id', 'products.supplier_link_id')
+                            ->where('supplier_links.is_active', true);
+                    });
+            });
+        });
     }
 
     // Store-scoped counterparts of the three above, for screens that operate

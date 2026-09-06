@@ -268,8 +268,17 @@ class OrderObserver
         $userId = auth()->id();
 
         if ($order->status === 'shipped') {
-            $order->load('items');
+            $order->load('items.product');
             foreach ($order->items as $item) {
+                // Nothing of ours moved: a resold line's goods are the
+                // supplier's and were never reserved out of our stock, so there
+                // is nothing here to deduct. Skipped rather than left to fail
+                // and be logged, which would bury a real dispatch failure in
+                // noise.
+                if ($item->product?->isLinked()) {
+                    continue;
+                }
+
                 try {
                     app(DispatchStockAction::class)->execute(
                         productId:   $item->product_id,
@@ -288,8 +297,14 @@ class OrderObserver
         }
 
         if ($order->status === 'cancelled') {
-            $order->load('items');
+            $order->load('items.product');
             foreach ($order->items as $item) {
+                // Nothing was reserved for a resold line, so there is nothing
+                // to give back.
+                if ($item->product?->isLinked()) {
+                    continue;
+                }
+
                 try {
                     app(ReleaseReservationAction::class)->execute(
                         productId:   $item->product_id,

@@ -347,7 +347,12 @@ new class extends Component {
                 'unit_price' => $item['product']->price,
                 // Cost as of this moment — a later restock must not rewrite
                 // what this sale earned.
-                'unit_cost'  => $item['product']->cost_price,
+                //
+                // Null for a resold listing: what it costs is what the supplier
+                // charges on the day the goods are actually delivered, and that
+                // is frozen onto the line then. Writing today's figure here
+                // would freeze a cost for units that may never be delivered.
+                'unit_cost'  => $item['product']->isLinked() ? null : $item['product']->cost_price,
             ]);
         }
 
@@ -369,6 +374,18 @@ new class extends Component {
 
             try {
                 foreach ($this->cartItems as $item) {
+                    // A resold listing holds no stock of its own — the goods sit
+                    // in the supplier's shop and are read, never written. Trying
+                    // to reserve against zero throws "insufficient stock" and the
+                    // catch below deletes the whole order, so every order
+                    // containing one would fail. Skipped deliberately: the race
+                    // where he sells the last unit first is accepted, and a
+                    // pay-on-delivery order that cannot be filled simply cancels
+                    // with nothing paid.
+                    if ($item['product']->isLinked()) {
+                        continue;
+                    }
+
                     $reserveStock->execute(
                         productId:   $item['product']->id,
                         quantity:    $item['quantity'],
