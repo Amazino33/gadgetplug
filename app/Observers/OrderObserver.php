@@ -3,6 +3,7 @@
 namespace App\Observers;
 
 use App\Actions\Finance\RecognizeOrderRevenueAction;
+use App\Actions\VendorLink\BookSupplierPayableAction;
 use App\Actions\Inventory\DispatchStockAction;
 use App\Actions\Inventory\ReleaseReservationAction;
 use App\Models\DeliveryMessage;
@@ -294,6 +295,18 @@ class OrderObserver
                     Log::error("Dispatch stock failed for order {$order->id}: " . $e->getMessage());
                 }
             }
+        }
+
+        // Goods reached the customer, so the supplier is now owed for any
+        // resold lines on this order.
+        //
+        // Hung on the delivered transition itself rather than on revenue
+        // recognition, which no-ops when a POD order has no payment_channel
+        // captured. What we owe him does not depend on whether we recorded how
+        // the customer paid us — the goods are gone either way, and a debt that
+        // silently fails to book is money quietly lost.
+        if ($order->status === 'delivered') {
+            app(BookSupplierPayableAction::class)->execute($order);
         }
 
         if ($order->status === 'cancelled') {
