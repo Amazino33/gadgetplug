@@ -107,6 +107,22 @@ describe('booking what the supplier is owed', function () {
         expect(app(SupplierPayable::class)->balance($link))->toBe(10000.0);
     });
 
+    test('a prepaid order books nothing, because its revenue landed earlier', function () {
+        ['order' => $order, 'link' => $link, 'item' => $item] = orderForListing(quantity: 2);
+
+        // Prepaid recognises revenue at 'paid' and delivers later, so booking
+        // the cost at delivery would put the earning in one period and the cost
+        // of earning it in another. Pay-on-delivery is the arrangement this
+        // feature serves; a prepaid resale needs its timing decided on purpose
+        // before it books anything.
+        $order->update(['payment_method' => 'paystack']);
+        $order->update(['status' => 'delivered']);
+
+        expect(SupplierPayableEntry::count())->toBe(0)
+            ->and(app(SupplierPayable::class)->balance($link))->toBe(0.0)
+            ->and($item->fresh()->unit_cost)->toBeNull();
+    });
+
     test('an ordinary product owes no supplier anything', function () {
         $vendor = linkVendor('Ordinary');
         $product = linkProduct($vendor, price: 5000, stock: 10);

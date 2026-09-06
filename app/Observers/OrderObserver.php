@@ -305,7 +305,13 @@ class OrderObserver
         // captured. What we owe him does not depend on whether we recorded how
         // the customer paid us — the goods are gone either way, and a debt that
         // silently fails to book is money quietly lost.
-        if ($order->status === 'delivered') {
+        //
+        // Pay-on-delivery only. A prepaid order recognises its revenue at
+        // 'paid' and is delivered later, so booking the cost here would put
+        // revenue in one period and the cost of earning it in another. Until a
+        // prepaid resale exists and its timing is decided deliberately, it books
+        // nothing rather than booking it at the wrong moment.
+        if ($order->status === 'delivered' && $order->payment_method === 'pay_on_delivery') {
             app(BookSupplierPayableAction::class)->execute($order);
         }
 
