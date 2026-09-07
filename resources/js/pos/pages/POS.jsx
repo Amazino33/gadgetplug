@@ -3,6 +3,7 @@ import { useKeyboard } from '../hooks/useKeyboard';
 import { useSync } from '../hooks/useSync';
 import { fmt, generateOfflineId } from '../lib/format';
 import { createCheckoutId } from '../lib/checkoutId';
+import { shouldRedirectTypingToSearch } from '../lib/typeAhead';
 import { db } from '../lib/db';
 import { pruneOldSales, recordSale } from '../lib/salesHistory';
 import api from '../lib/api';
@@ -359,21 +360,93 @@ export default function POS({ user, vendorId, onLogout }) {
         setLastSale(receiptSale);
     };
 
+    // ── Focus (desktop) ──────────────────────────────────────────────
+
+    // Anything covering the till owns the keyboard while it is up.
+    const tillIsCovered = Boolean(modal || lastSale || saleError || submitting || showMobileMore);
+
+    // Never taken off a field someone is actually filling in — including the
+    // search box itself, where this is a no-op anyway.
+    const focusSearch = useCallback(() => {
+        const tag = document.activeElement?.tagName;
+
+        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag)) return;
+
+        searchRef.current?.focus();
+    }, []);
+
+    // The caret belongs in the search box whenever nothing is covering the
+    // till, so the next scan or product name just types. Owned here rather
+    // than at each of the twenty-odd places that close something: a modal
+    // added later cannot forget to hand focus back, because it never had to
+    // remember. Runs on cart changes too — clicking a row or a bin icon puts
+    // focus on that button, and the next thing the cashier does is type.
+    //
+    // Only the desktop search bar carries searchRef, and it is display:none
+    // below md, so this is inert on a phone — where forcing focus would mean
+    // an on-screen keyboard shoving the till off the screen after every tap.
+    useEffect(() => {
+        if (tillIsCovered) return;
+
+        const t = setTimeout(focusSearch, 60);
+
+        return () => clearTimeout(t);
+    }, [tillIsCovered, cart, focusSearch]);
+
+    // And if a keystroke does land on the page at large — focus lost to a
+    // button, or a handheld scanner firing at whatever happens to be focused
+    // — it is redirected into the search box rather than dropped. Focusing
+    // during keydown lets the character itself land in the box.
+    useEffect(() => {
+        const onKeyDown = (e) => {
+            if (! shouldRedirectTypingToSearch({
+                key: e.key,
+                ctrlKey: e.ctrlKey,
+                metaKey: e.metaKey,
+                altKey: e.altKey,
+                activeTag: document.activeElement?.tagName,
+                blocked: tillIsCovered,
+            })) return;
+
+            searchRef.current?.focus();
+        };
+
+        window.addEventListener('keydown', onKeyDown);
+
+        return () => window.removeEventListener('keydown', onKeyDown);
+    }, [tillIsCovered]);
+
     // ── Keyboard shortcuts (desktop) ─────────────────────────────────
 
+    // Function keys and Escape keep working while the cashier is typing —
+    // they have to, now that the search box holds focus almost all the time.
+    // Left on the default (ignored while a field has focus) they would have
+    // gone quiet exactly when the till became keyboard-first.
     useKeyboard({
+        F2:     () => { if (!lastSale && !cartEmpty) setModal('discount'); },
         F3:     () => { if (!lastSale) searchRef.current?.focus(); },
         F4:     () => { if (!lastSale && selectedIdx !== null) setModal('quantity'); },
+        // Was 'c'. A bare letter cannot be a shortcut on a till that puts
+        // every letter into the search box — it would open this instead of
+        // typing the first character of "cable".
+        F6:     () => { if (!lastSale) setModal('customer'); },
         F8:     () => { if (!lastSale) clearCart(); },
-        F2:     () => { if (!lastSale && !cartEmpty) setModal('discount'); },
-        c:      () => { if (!lastSale) setModal('customer'); },
-        C:      () => { if (!lastSale) setModal('customer'); },
+        // F7 and F11 were printed on the buttons but never bound to anything,
+        // so the two fastest ways to take a card or transfer payment did
+        // nothing at all when pressed.
+        F7:     () => { if (!lastSale && !cartEmpty) completeSale({ paymentMethod: 'bank_transfer', amountTendered: total }); },
         F9:     () => { if (!lastSale && !cartEmpty) suspendCurrentSale(); },
         F10:    () => { if (!lastSale && !cartEmpty) setModal('payment'); },
+        F11:    () => { if (!lastSale && !cartEmpty) completeSale({ paymentMethod: 'card', amountTendered: total }); },
         F12:    () => { if (!lastSale && !cartEmpty) completeSale({ paymentMethod: 'cash', amountTendered: total }); },
         Escape: () => { if (saleError) setSaleError(null); else if (lastSale) setLastSale(null); else if (showMobileMore) setShowMobileMore(false); else setModal(null); },
+    }, [cart, selectedIdx, total, modal, lastSale, showMobileMore, saleError], { allowInInput: true });
+
+    // Delete stays out of the search box on purpose — in there it is how you
+    // fix a typo, not how you remove a line from the sale.
+    useKeyboard({
         Delete: () => { if (!lastSale && selectedIdx !== null) removeItem(selectedIdx); },
-    }, [cart, selectedIdx, total, modal, lastSale, showMobileMore, saleError]);
+    }, [cart, selectedIdx, lastSale]);
 
     return (
         <div className="flex flex-col md:flex-row h-dvh bg-[#F9FAFB] dark:bg-gray-950 overflow-hidden select-none"

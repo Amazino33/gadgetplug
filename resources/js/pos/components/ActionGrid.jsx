@@ -52,7 +52,11 @@ export default function ActionGrid({
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">Customer & Cart</p>
                 <div className="grid grid-cols-2 gap-2">
                     <Btn label="Discount"        hotkey="F2"  disabled={cartEmpty}    onClick={onDiscount} />
-                    <Btn label="Customer"        hotkey="C"                           onClick={onCustomer} />
+                    {/* Was "C". A bare letter cannot be a shortcut on a till
+                        that sends every letter to the search box — it would
+                        open this instead of typing the first character of
+                        "cable". */}
+                    <Btn label="Customer"        hotkey="F6"                          onClick={onCustomer} />
                     <Btn label="Return"          hotkey=""    color="gray"            onClick={onReturn} />
                     <Btn label="Z-Report"        hotkey=""    color="gray"            onClick={onZReport} />
                 </div>
