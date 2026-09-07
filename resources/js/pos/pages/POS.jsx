@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useKeyboard } from '../hooks/useKeyboard';
 import { useSync } from '../hooks/useSync';
 import { fmt, generateOfflineId } from '../lib/format';
+import { createCheckoutId } from '../lib/checkoutId';
 import { db } from '../lib/db';
 import { pruneOldSales, recordSale } from '../lib/salesHistory';
 import api from '../lib/api';
@@ -237,10 +238,40 @@ export default function POS({ user, vendorId, onLogout }) {
 
     // ── Complete sale ────────────────────────────────────────────────
 
+    // Guards one checkout from being rung up twice.
+    //
+    // A ref and not state: two taps a few milliseconds apart both run before
+    // React has re-rendered, so both would read the same stale `false` from
+    // state and both would submit. A ref updates synchronously, so the second
+    // tap sees the first one's flag and stops.
+    const submittingRef = useRef(false);
+    const [submitting, setSubmitting] = useState(false);
+
+    // The id that identifies THIS checkout to the server, held still across
+    // repeated attempts at it. See lib/checkoutId for why that matters and what
+    // it used to do instead.
+    const checkoutRef = useRef(null);
+    checkoutRef.current ??= createCheckoutId(generateOfflineId);
+
     const completeSale = async ({ paymentMethod, amountTendered, bankRef, payments }) => {
+        if (submittingRef.current) return;
+
+        submittingRef.current = true;
+        setSubmitting(true);
+
+        try {
+            await submitSale({ paymentMethod, amountTendered, bankRef, payments });
+        } finally {
+            submittingRef.current = false;
+            setSubmitting(false);
+        }
+    };
+
+    const submitSale = async ({ paymentMethod, amountTendered, bankRef, payments }) => {
         const isSplit = paymentMethod === 'split';
+
         const payload = {
-            offline_id:              generateOfflineId(),
+            offline_id:              checkoutRef.current.forAttempt(),
             vendor_id:               vendorId,
             pos_session_id:          session?.id ?? null,
             customer_id:             customer?.id ?? null,
@@ -318,6 +349,9 @@ export default function POS({ user, vendorId, onLogout }) {
             payments:                isSplit ? payments : null,
             customer,
         };
+
+        // This checkout is done, so the next customer starts a new one.
+        checkoutRef.current.settled();
 
         clearCart();
         setModal(null);
@@ -584,25 +618,25 @@ export default function POS({ user, vendorId, onLogout }) {
                         <div className="w-5/12 flex flex-col gap-1.5 shrink-0">
                             <div className="flex gap-1.5 h-[34px]">
                                 <button
-                                    onClick={() => !cartEmpty && completeSale({ paymentMethod: 'cash', amountTendered: total })}
-                                    disabled={cartEmpty}
+                                    onClick={() => !cartEmpty && !submitting && completeSale({ paymentMethod: 'cash', amountTendered: total })}
+                                    disabled={cartEmpty || submitting}
                                     className="flex-1 rounded-xl bg-white border border-gray-200 text-gray-700 text-[10px] font-bold active:scale-95 transition-all disabled:opacity-40 shadow-sm"
                                 >
-                                    CASH
+                                    {submitting ? '…' : 'CASH'}
                                 </button>
                                 <button
-                                    onClick={() => !cartEmpty && completeSale({ paymentMethod: 'card', amountTendered: total })}
-                                    disabled={cartEmpty}
+                                    onClick={() => !cartEmpty && !submitting && completeSale({ paymentMethod: 'card', amountTendered: total })}
+                                    disabled={cartEmpty || submitting}
                                     className="flex-1 rounded-xl bg-white border border-gray-200 text-gray-700 text-[10px] font-bold active:scale-95 transition-all disabled:opacity-40 shadow-sm"
                                 >
-                                    POS
+                                    {submitting ? '…' : 'POS'}
                                 </button>
                                 <button
-                                    onClick={() => !cartEmpty && completeSale({ paymentMethod: 'bank_transfer', amountTendered: total })}
-                                    disabled={cartEmpty}
+                                    onClick={() => !cartEmpty && !submitting && completeSale({ paymentMethod: 'bank_transfer', amountTendered: total })}
+                                    disabled={cartEmpty || submitting}
                                     className="flex-1 rounded-xl bg-white border border-gray-200 text-gray-700 text-[10px] font-bold active:scale-95 transition-all disabled:opacity-40 shadow-sm"
                                 >
-                                    TFER
+                                    {submitting ? '…' : 'TFER'}
                                 </button>
                             </div>
                             <button
@@ -845,6 +879,28 @@ export default function POS({ user, vendorId, onLogout }) {
                     onClose={() => setModal(null)}
                     onRetried={() => syncNow()}
                 />
+            )}
+            {/* A slow connection used to leave the screen looking untouched, so
+                a cashier pressed the payment button again — and again — and rang
+                up the same goods several times. This says the till has the sale
+                and covers the screen while it lands, so there is nothing left to
+                press. It clears itself when the receipt appears or the sale is
+                refused. */}
+            {submitting && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+                    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center">
+                        <div className="w-14 h-14 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-3">
+                            <svg className="w-7 h-7 text-[#068B03] animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                            </svg>
+                        </div>
+                        <p className="text-sm font-bold text-gray-800 dark:text-gray-100 mb-1">Recording this sale…</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">
+                            It has been captured. Please don't press again — the receipt will show as soon as it lands.
+                        </p>
+                    </div>
+                </div>
             )}
             {saleError && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
