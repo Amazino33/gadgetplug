@@ -18,31 +18,98 @@ document.addEventListener('alpine:init', () => {
      * nothing persists a lie.
      */
     Alpine.store('feed', {
-        toggleLike(post) {
-            // Optimistic: the heart moves on tap, not on the round trip. On a
-            // slow connection the difference is the whole feel of the thing.
-            post.liked = ! post.liked;
-            post.like_count = Math.max(0, post.like_count + (post.liked ? 1 : -1));
+        /** Laravel's CSRF token, needed on every write below. */
+        token() {
+            return document.querySelector('meta[name="csrf-token"]')?.content ?? '';
         },
 
-        save(post) {
-            post.saved = ! post.saved;
+        async post(url, body = {}) {
+            return fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': this.token(),
+                    Accept: 'application/json',
+                },
+                body: JSON.stringify(body),
+            });
+        },
+
+        async toggleLike(post) {
+            // Optimistic: the heart moves on tap, not on the round trip. On a
+            // slow connection that difference is the whole feel of the thing.
+            const wasLiked = post.liked;
+            const wasCount = post.like_count;
+
+            post.liked = ! wasLiked;
+            post.like_count = Math.max(0, wasCount + (post.liked ? 1 : -1));
+
+            try {
+                const res = await this.post(`/feed/${post.id}/like`);
+
+                if (! res.ok) throw new Error(res.status);
+
+                // The server's count wins. A double tap, a second device or a
+                // lost request would otherwise leave the guess drifting further
+                // with every tap.
+                const data = await res.json();
+                post.liked = data.liked;
+                post.like_count = data.like_count;
+            } catch {
+                // Put it back. Showing a like that was never recorded is worse
+                // than the tap appearing not to register.
+                post.liked = wasLiked;
+                post.like_count = wasCount;
+            }
+        },
+
+        async save(post) {
+            const wasSaved = post.saved;
+            post.saved = ! wasSaved;
+
+            try {
+                const res = await this.post(`/feed/${post.id}/save`);
+
+                if (res.status === 401) {
+                    // Saving needs an account. The intent is already stashed
+                    // server-side, so signing in completes the save rather than
+                    // dropping them back on a feed that forgot what they wanted.
+                    const data = await res.json();
+                    post.saved = wasSaved;
+                    window.location.href = data.login_url;
+
+                    return;
+                }
+
+                if (! res.ok) throw new Error(res.status);
+
+                post.saved = (await res.json()).saved;
+            } catch {
+                post.saved = wasSaved;
+            }
         },
 
         async share(post) {
             const url = post.url;
+
+            // Logged first: it is the intent to share that is worth counting,
+            // and the native sheet never tells us whether they went through
+            // with it.
+            this.post(`/feed/${post.id}/share`)
+                .then((res) => res.ok && res.json())
+                .then((data) => { if (data) post.share_count = data.share_count; })
+                .catch(() => {});
 
             // The native sheet where it exists, which on a phone is everywhere
             // that matters. The clipboard is the fallback, not the default.
             if (navigator.share) {
                 try {
                     await navigator.share({ title: post.name, url });
-
-                    return;
                 } catch {
-                    // Cancelled, or refused. Not an error worth showing.
-                    return;
+                    // Cancelled. Not an error worth showing.
                 }
+
+                return;
             }
 
             try {
@@ -53,8 +120,28 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
+        /**
+         * Buy Now — a real form post, not a fetch.
+         *
+         * It ends on the checkout page, so the browser should follow the
+         * redirect itself: the cart lives in the session, and letting fetch
+         * chase a redirect it cannot navigate to would put the customer nowhere.
+         *
+         * No variant picker: this catalogue is flat SKUs, confirmed in recon.
+         */
         buyNow(post) {
-            window.location.href = post.url;
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = `/feed/${post.id}/buy`;
+
+            const token = document.createElement('input');
+            token.type = 'hidden';
+            token.name = '_token';
+            token.value = this.token();
+            form.appendChild(token);
+
+            document.body.appendChild(form);
+            form.submit();
         },
     });
 

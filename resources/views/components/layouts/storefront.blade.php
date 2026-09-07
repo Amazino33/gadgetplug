@@ -9,6 +9,9 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    {{-- The feed's actions post from Alpine rather than through a Blade form,
+         so they need the token from somewhere. --}}
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $title }}</title>
     <meta name="description" content="{{ $description }}">
 

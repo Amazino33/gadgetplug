@@ -4,6 +4,7 @@ use App\Http\Controllers\AffiliateClickController;
 use App\Http\Controllers\Payment\PaystackCallbackController;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Storefront\FeedActionController;
 use App\Http\Controllers\Storefront\FeedController;
 use Livewire\Volt\Volt;
 
@@ -18,6 +19,13 @@ Volt::route('/cart', 'pages.cart')->name('cart');
 // nothing more — this runs on mobile data.
 Route::get('/feed/posts',      [FeedController::class, 'index'])->name('feed.posts');
 Route::get('/feed/categories', [FeedController::class, 'categories'])->name('feed.categories');
+
+// What a tap on a post does. Every rule is enforced in the controller as well
+// as in the interface — the UI gate is a courtesy, this is the control.
+Route::post('/feed/{product}/like',  [FeedActionController::class, 'like'])->name('feed.like');
+Route::post('/feed/{product}/save',  [FeedActionController::class, 'save'])->name('feed.save');
+Route::post('/feed/{product}/share', [FeedActionController::class, 'share'])->name('feed.share');
+Route::post('/feed/{product}/buy',   [FeedActionController::class, 'buyNow'])->name('feed.buy');
 Volt::route('/checkout', 'checkout')->name('checkout');
 
 Route::get('/payment/callback', PaystackCallbackController::class)->name('payment.callback');
