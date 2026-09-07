@@ -12,6 +12,9 @@ Volt::route('/', 'pages.product-catalog')->name('home');
 Volt::route('/track', 'pages.track-order')->name('track-order');
 Route::view('/privacy-policy', 'pages.privacy-policy')->name('privacy-policy');
 Volt::route('/product/{product:slug}', 'pages.product-detail')->name('product.show');
+// A store's own page — where the feed's store line lands, so a customer who
+// likes one product can see the rest of what that shop sells.
+Volt::route('/store/{vendor:slug}', 'pages.vendor-store')->name('store.show');
 Volt::route('/cart', 'pages.cart')->name('cart');
 
 // The social feed's data, called on every scroll. Kept as plain JSON routes

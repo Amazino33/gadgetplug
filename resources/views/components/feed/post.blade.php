@@ -21,9 +21,15 @@
     style="content-visibility: auto; contain-intrinsic-size: auto 620px;"
     x-data="{ expanded: false }"
 >
-    {{-- 1. HEADER — product name leads, store identifies it. --}}
+    {{-- 1. HEADER — product name leads, store identifies it.
+
+         The avatar and the store line go to the store's page; the product name
+         goes to the product. Two destinations in one header, so each is its own
+         anchor rather than one wrapping the other — a link inside a link is
+         invalid markup and browsers resolve it unpredictably. --}}
     <div class="flex items-center gap-2.5 px-4 py-3">
-        <div class="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-brand-bg ring-1 ring-brand-border">
+        <a :href="post.store.url || post.url"
+           class="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-brand-bg ring-1 ring-brand-border">
             <template x-if="post.store.logo">
                 <img :src="post.store.logo" :alt="post.store.name" class="h-full w-full object-cover" loading="lazy" />
             </template>
@@ -33,7 +39,7 @@
                 <span class="flex h-full w-full items-center justify-center font-montserrat text-[11px] font-black text-brand"
                       x-text="(post.store.name || '?').slice(0, 2).toUpperCase()"></span>
             </template>
-        </div>
+        </a>
 
         <div class="min-w-0 flex-1">
             <a :href="post.url"
@@ -42,9 +48,19 @@
 
             {{-- Store, then location if the store has set one. Built as one
                  string with the separator baked in, so a store with no city
-                 shows its name alone rather than a dangling "·". --}}
-            <p class="truncate text-[12px] leading-tight text-brand-muted"
-               x-text="post.store.location ? post.store.name + ' · ' + post.store.location : post.store.name"></p>
+                 shows its name alone rather than a dangling "·".
+
+                 Rendered as a span when there is no store page to reach, so it
+                 never looks tappable without going anywhere. --}}
+            <template x-if="post.store.url">
+                <a :href="post.store.url"
+                   class="block truncate text-[12px] leading-tight text-brand-muted underline-offset-2 active:underline"
+                   x-text="post.store.location ? post.store.name + ' · ' + post.store.location : post.store.name"></a>
+            </template>
+            <template x-if="! post.store.url">
+                <p class="truncate text-[12px] leading-tight text-brand-muted"
+                   x-text="post.store.location ? post.store.name + ' · ' + post.store.location : post.store.name"></p>
+            </template>
         </div>
     </div>
 

@@ -232,6 +232,9 @@ class FeedQuery
                 // Null when the store has set no location, which the card
                 // reads as "print the name alone" rather than a stray separator.
                 'location' => $p->vendor?->location,
+                // Where the store line lands. Null without a slug rather than
+                // a route to nowhere, and the card renders plain text then.
+                'url' => $p->vendor?->slug ? route('store.show', $p->vendor->slug) : null,
             ],
             'like_count'  => (int) $p->like_count,
             'share_count' => (int) $p->share_count,
