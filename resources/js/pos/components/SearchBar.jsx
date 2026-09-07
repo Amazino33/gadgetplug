@@ -47,6 +47,15 @@ const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect, autoFocus 
 
         if (!trimmed) { setResults([]); setOpen(false); setActiveIndex(-1); setSearching(false); return; }
 
+        // The panel comes down as soon as there is something being searched
+        // for, and stays down until the cashier picks something, clears the
+        // box, presses Escape, or taps away. It is deliberately NOT tied to
+        // whether there are results: doing that meant a search with no local
+        // match rendered nothing at all — not "no matches", nothing — since
+        // every panel below is gated on this.
+        setOpen(true);
+        setActiveIndex(-1);
+
         // IndexedDB first — instant and offline-capable, and it's re-seeded
         // on every login, so it's usually the whole answer.
         const local = await db.products
@@ -64,8 +73,6 @@ const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect, autoFocus 
         if (!latestSearch.isCurrent(token)) return;
 
         setResults(local);
-        setOpen(local.length > 0);
-        setActiveIndex(-1);
 
         // Only worth asking the network when the local catalogue came up
         // empty — keeps the common case (which is nearly every search)
@@ -84,7 +91,6 @@ const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect, autoFocus 
                 });
                 if (!latestSearch.isCurrent(token)) return;
                 setResults(data);
-                setOpen(data.length > 0);
                 setActiveIndex(-1);
             } catch { /* stay offline-friendly — nothing local, nothing from the network */ }
             finally {
@@ -191,6 +197,12 @@ const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect, autoFocus 
                             // dragging the list to scroll added whatever
                             // happened to be under it. A click only lands
                             // when a tap starts and ends on the same row.
+                            //
+                            // The prevented mousedown stops the row stealing
+                            // focus from the input on the way there — that
+                            // blur mid-tap is what this used to be a mousedown
+                            // handler to avoid.
+                            onMouseDown={(e) => e.preventDefault()}
                             onClick={() => pick(p)}
                             className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 text-left border-b border-gray-50 dark:border-gray-800 last:border-0 ${activeIndex === index ? 'bg-gray-100 dark:bg-gray-800' : ''}`}
                         >

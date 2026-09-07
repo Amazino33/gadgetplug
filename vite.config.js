@@ -32,5 +32,11 @@ export default defineConfig({
     test: {
         include: ['resources/js/**/*.{test,spec}.{js,jsx,ts,tsx}'],
         exclude: ['**/node_modules/**', '**/vendor/**'],
+
+        // The till's search box has to be driven the way a cashier drives it —
+        // type, arrow, Enter, tap a row — because every bug it has had was in
+        // that interaction rather than in any single function. jsdom is what
+        // lets those be tests instead of hopeful reasoning.
+        environment: 'happy-dom',
     },
 });
