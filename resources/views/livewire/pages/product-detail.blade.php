@@ -81,7 +81,7 @@ new class extends Component {
 
     public function incrementQty(): void
     {
-        if ($this->quantity < $this->product->stock_quantity) {
+        if ($this->quantity < $this->product->available_stock) {
             $this->quantity++;
         }
     }
@@ -273,7 +273,7 @@ $categoryIcon = \App\Support\CategoryIcon::for($product->category?->name);
                 <span class="font-montserrat font-black text-[32px] text-brand leading-none">
                     ₦{{ number_format($product->price) }}
                 </span>
-                @if ($product->stock_quantity <= 0)
+                @if ($product->available_stock <= 0)
                 <span class="flex items-center gap-1 bg-[#fce4ec] text-red-600 text-[11px] font-bold font-montserrat px-2.5 py-1 rounded-full">
                     <span class="w-1.5 h-1.5 rounded-full bg-red-500 inline-block"></span>
                     Out of Stock
@@ -311,7 +311,7 @@ $categoryIcon = \App\Support\CategoryIcon::for($product->category?->name);
             </div>
 
             {{-- Quantity selector --}}
-            @if ($product->stock_quantity > 0)
+            @if ($product->available_stock > 0)
             <div class="mb-4">
                 <label class="text-[12px] font-semibold text-brand-dark dark:text-[#e8f5e9] mb-2 block">Quantity</label>
                 <div class="flex items-center gap-0">
@@ -325,7 +325,7 @@ $categoryIcon = \App\Support\CategoryIcon::for($product->category?->name);
                     </div>
                     <button wire:click="incrementQty"
                         class="w-10 h-10 rounded-r-xl bg-brand-bg dark:bg-[#1a2a1a] border border-brand-border dark:border-[#2a3a2a] flex items-center justify-center text-brand font-bold text-lg hover:bg-brand hover:text-white hover:border-brand transition-colors cursor-pointer"
-                        @disabled($quantity >= $product->stock_quantity)>
+                        @disabled($quantity >= $product->available_stock)>
                         +
                     </button>
                 </div>
@@ -336,7 +336,7 @@ $categoryIcon = \App\Support\CategoryIcon::for($product->category?->name);
             <div class="hidden md:flex flex-col gap-2.5 mb-6">
                 <button wire:click="buyNow"
                     class="w-full flex items-center justify-center gap-2 bg-brand-orange hover:bg-[#e06610] text-white font-montserrat font-bold text-[15px] py-4 rounded-xl border-0 cursor-pointer transition-all hover:-translate-y-px shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
-                    @disabled($product->stock_quantity < 1)>
+                    @disabled($product->available_stock < 1)>
                     <svg class="w-5 h-5 fill-none flex-shrink-0" style="stroke:currentColor;stroke-width:2" viewBox="0 0 24 24">
                         <path d="M5 12h14M12 5l7 7-7 7"/>
                     </svg>
@@ -345,7 +345,7 @@ $categoryIcon = \App\Support\CategoryIcon::for($product->category?->name);
                 <div class="flex gap-2.5">
                     <button wire:click="addToCart"
                         class="flex-1 flex items-center justify-center gap-2 bg-white dark:bg-[#1a2a1a] border-2 border-brand text-brand hover:bg-brand hover:text-white font-montserrat font-bold text-[13px] py-3 rounded-xl cursor-pointer transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                        @disabled($product->stock_quantity < 1)>
+                        @disabled($product->available_stock < 1)>
                         <svg class="w-4 h-4 fill-none flex-shrink-0" style="stroke:currentColor;stroke-width:2.5" viewBox="0 0 24 24">
                             <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
                             <line x1="3" y1="6" x2="21" y2="6"/>
@@ -404,7 +404,7 @@ $categoryIcon = \App\Support\CategoryIcon::for($product->category?->name);
          style="bottom: 3rem; z-index: 50;">
         <button wire:click="buyNow"
             class="w-full flex items-center justify-center gap-2 bg-brand-orange hover:bg-[#e06610] text-white font-montserrat font-bold text-[14px] py-3.5 rounded-xl transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-            @disabled($product->stock_quantity < 1)>
+            @disabled($product->available_stock < 1)>
             <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path d="M5 12h14M12 5l7 7-7 7"/>
             </svg>
@@ -413,7 +413,7 @@ $categoryIcon = \App\Support\CategoryIcon::for($product->category?->name);
         <div class="flex gap-2.5">
             <button wire:click="addToCart"
                 class="flex-1 flex items-center justify-center gap-2 bg-white dark:bg-[#1a2a1a] border-2 border-brand text-brand font-montserrat font-bold text-[12px] py-2.5 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                @disabled($product->stock_quantity < 1)>
+                @disabled($product->available_stock < 1)>
                 <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
                     <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
                     <line x1="3" y1="6" x2="21" y2="6"/>
