@@ -16,6 +16,8 @@ import SearchBar from './SearchBar';
 
 const charger = { id: 1, name: 'Samsung 25W Charger', sku: 'SAM-25', barcode: '6001234567890', price: 5300, available_stock: 4 };
 const cable   = { id: 2, name: 'Samsung Cable',       sku: 'SAM-CB', barcode: '6009876543210', price: 1500, available_stock: 9 };
+// Real shape of this catalogue: imports have left products on single-digit SKUs.
+const battery = { id: 3, name: 'BATTERY BL-5C',       sku: '5',      barcode: null,            price: 1695, available_stock: 655 };
 
 let localCatalogue = [];
 
@@ -154,7 +156,22 @@ describe('nothing is chosen until the cashier says which one', () => {
         expect(onSelect).toHaveBeenCalledWith(charger);
     });
 
-    it('adds the product whose whole barcode was entered, which is what a scanner sends', async () => {
+    it('adds nothing when a single digit happens to be a real product SKU', async () => {
+        // Imports have left real products on SKUs like "5". Pressing 5 used
+        // to hand the cashier that product and a quantity prompt.
+        const onSelect = vi.fn();
+        localCatalogue = [battery];
+        render(<SearchBar vendorId={1} onSelect={onSelect} />);
+
+        await type('5');
+        expect(await screen.findByText('BATTERY BL-5C')).toBeDefined();
+
+        await userEvent.keyboard('{Enter}');
+
+        expect(onSelect).not.toHaveBeenCalled();
+    });
+
+    it('adds nothing on Enter for a full barcode either — pointing at it is the only way in', async () => {
         const onSelect = vi.fn();
         render(<SearchBar vendorId={1} onSelect={onSelect} />);
 
@@ -163,7 +180,7 @@ describe('nothing is chosen until the cashier says which one', () => {
 
         await userEvent.keyboard('{Enter}');
 
-        expect(onSelect).toHaveBeenCalledWith(cable);
+        expect(onSelect).not.toHaveBeenCalled();
     });
 });
 

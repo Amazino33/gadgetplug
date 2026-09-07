@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { selectionForEnter } from './searchSelection';
 
 // The rule that decides whether a keypress is allowed to put goods in a
-// customer's basket. Getting it wrong in the permissive direction charges
-// someone for a product nobody picked.
+// customer's basket. Every permissive version of this rule has, in
+// production, charged someone for a product nobody picked.
 
 const charger = { id: 1, name: 'Samsung 25W Charger', sku: 'SAM-25', barcode: '6001234567890' };
 const cable   = { id: 2, name: 'Samsung Cable',       sku: 'SAM-CB', barcode: '6009876543210' };
+// Real shape of this catalogue: imports have left products on single-digit SKUs.
+const battery = { id: 3, name: 'BATTERY BL-5C',       sku: '5',      barcode: null };
 
 describe('selectionForEnter', () => {
     it('takes the row the cashier arrowed onto', () => {
@@ -16,40 +18,30 @@ describe('selectionForEnter', () => {
     });
 
     it('takes nothing when a lone result was never pointed at', () => {
-        // The exact case behind "it picks on its own": one result on screen,
-        // and the phone keyboard's Go key sends Enter.
+        // One result on screen, and the phone keyboard's Go key sends Enter.
         const picked = selectionForEnter({ results: [charger], activeIndex: -1, query: 'sam' });
 
         expect(picked).toBeNull();
     });
 
-    it('takes the product whose full barcode was entered, which is what a scanner sends', () => {
-        const picked = selectionForEnter({ results: [charger, cable], activeIndex: -1, query: '6009876543210' });
-
-        expect(picked).toBe(cable);
-    });
-
-    it('takes the product whose full SKU was entered, whatever the casing', () => {
-        const picked = selectionForEnter({ results: [charger, cable], activeIndex: -1, query: 'sam-cb' });
-
-        expect(picked).toBe(cable);
-    });
-
-    it('takes nothing for a partial identifier', () => {
-        // Half a scanned barcode, or a cashier still typing.
-        expect(selectionForEnter({ results: [charger], activeIndex: -1, query: '600123' })).toBeNull();
-        expect(selectionForEnter({ results: [charger], activeIndex: -1, query: 'SAM' })).toBeNull();
-    });
-
-    it('takes nothing for a name, however exactly it is typed', () => {
-        const picked = selectionForEnter({ results: [charger], activeIndex: -1, query: 'Samsung 25W Charger' });
+    it('takes nothing when a single digit happens to be a real product SKU', () => {
+        // The one that bit us: pressing "5" produced a product and a quantity
+        // prompt, because a product really is called SKU "5".
+        const picked = selectionForEnter({ results: [battery], activeIndex: -1, query: '5' });
 
         expect(picked).toBeNull();
     });
 
-    it('takes nothing on an empty or blank query', () => {
-        expect(selectionForEnter({ results: [charger], activeIndex: -1, query: '' })).toBeNull();
-        expect(selectionForEnter({ results: [charger], activeIndex: -1, query: '   ' })).toBeNull();
+    it('takes nothing for a full barcode either', () => {
+        const picked = selectionForEnter({ results: [cable], activeIndex: -1, query: '6009876543210' });
+
+        expect(picked).toBeNull();
+    });
+
+    it('takes nothing for a fully typed name', () => {
+        const picked = selectionForEnter({ results: [charger], activeIndex: -1, query: 'Samsung 25W Charger' });
+
+        expect(picked).toBeNull();
     });
 
     it('takes nothing when there is nothing to take', () => {

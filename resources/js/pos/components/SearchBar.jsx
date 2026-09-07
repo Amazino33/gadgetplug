@@ -136,12 +136,10 @@ const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect, autoFocus 
         if (e.key === 'Enter') {
             e.preventDefault();
 
-            // Only ever adds what the cashier actually pointed at — an
-            // arrowed-onto row, or a full barcode/SKU (i.e. a scan). See
-            // lib/searchSelection. A lone result nobody chose is deliberately
-            // NOT taken: on a phone, Enter is the keyboard's Go key, and
-            // taking it was how products got rung up that nobody picked.
-            const chosen = selectionForEnter({ results, activeIndex, query });
+            // Only ever adds the row the cashier arrowed onto. See
+            // lib/searchSelection for the two softer rules that were tried
+            // here and what each of them rang up by mistake.
+            const chosen = selectionForEnter({ results, activeIndex });
 
             if (chosen) pick(chosen);
         }
