@@ -1,7 +1,8 @@
-import { useState, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
+import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { db } from '../lib/db';
 import api from '../lib/api';
 import { createLatestSearch } from '../lib/latestSearch';
+import { selectionForEnter } from '../lib/searchSelection';
 
 const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect, autoFocus = true }, ref) {
     const [query, setQuery]     = useState('');
@@ -11,6 +12,7 @@ const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect, autoFocus 
     const [activeIndex, setActiveIndex] = useState(-1);
     const inputRef              = useRef(null);
     const debounceRef           = useRef(null);
+    const rootRef               = useRef(null);
 
     // See latestSearch.js — the local lookup and the network fallback take
     // unrelated amounts of time, so answers can come back in a different
@@ -20,6 +22,24 @@ const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect, autoFocus 
     useImperativeHandle(ref, () => ({
         focus: () => inputRef.current?.focus(),
     }));
+
+    // Closing on the input's own blur is unreliable on a touchscreen — the
+    // keyboard opening and closing fires focus events of its own, and a
+    // scroll inside the list can steal focus without the cashier having
+    // dismissed anything. So the panel closes on a tap outside it instead,
+    // which is the only gesture that actually means "I'm done here", and it
+    // closes every panel below, not just the results list.
+    useEffect(() => {
+        const closeOnOutsideTap = (e) => {
+            if (rootRef.current && !rootRef.current.contains(e.target)) {
+                setOpen(false);
+            }
+        };
+
+        document.addEventListener('pointerdown', closeOnOutsideTap);
+
+        return () => document.removeEventListener('pointerdown', closeOnOutsideTap);
+    }, []);
 
     const search = useCallback(async (q) => {
         const token = latestSearch.start();
@@ -109,16 +129,20 @@ const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect, autoFocus 
         }
         if (e.key === 'Enter') {
             e.preventDefault();
-            if (open && activeIndex >= 0 && activeIndex < results.length) {
-                pick(results[activeIndex]);
-            } else if (results.length === 1) {
-                pick(results[0]);
-            }
+
+            // Only ever adds what the cashier actually pointed at — an
+            // arrowed-onto row, or a full barcode/SKU (i.e. a scan). See
+            // lib/searchSelection. A lone result nobody chose is deliberately
+            // NOT taken: on a phone, Enter is the keyboard's Go key, and
+            // taking it was how products got rung up that nobody picked.
+            const chosen = selectionForEnter({ results, activeIndex, query });
+
+            if (chosen) pick(chosen);
         }
     };
 
     return (
-        <div className="relative flex-1">
+        <div className="relative flex-1" ref={rootRef}>
             <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5">
                 {searching ? (
                     <svg className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -137,21 +161,20 @@ const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect, autoFocus 
                     value={query}
                     onChange={onChange}
                     onKeyDown={onKeyDown}
-                    onFocus={() => query.trim() && results.length > 0 && setOpen(true)}
-                    onBlur={() => setTimeout(() => setOpen(false), 150)}
+                    onFocus={() => query.trim() && setOpen(true)}
                     placeholder="Scan barcode or search product...  [F3]"
                     autoFocus={autoFocus}
                     className="flex-1 bg-transparent text-sm outline-none placeholder-gray-400 dark:placeholder-gray-500 text-gray-800 dark:text-gray-100"
                 />
             </div>
 
-            {!open && query.trim() && searching && (
+            {open && results.length === 0 && query.trim() && searching && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg z-50 px-4 py-3">
                     <p className="text-xs text-gray-400 dark:text-gray-500">Searching…</p>
                 </div>
             )}
 
-            {!open && query.trim() && !searching && results.length === 0 && (
+            {open && results.length === 0 && query.trim() && !searching && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg z-50 px-4 py-3">
                     <p className="text-xs text-gray-400 dark:text-gray-500">No product matches "{query.trim()}".</p>
                 </div>
@@ -162,7 +185,13 @@ const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect, autoFocus 
                     {results.map((p, index) => (
                         <button
                             key={p.id}
-                            onMouseDown={() => pick(p)}
+                            type="button"
+                            // A real click, not mousedown: on a touchscreen,
+                            // mousedown fires as soon as a finger lands, so
+                            // dragging the list to scroll added whatever
+                            // happened to be under it. A click only lands
+                            // when a tap starts and ends on the same row.
+                            onClick={() => pick(p)}
                             className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 text-left border-b border-gray-50 dark:border-gray-800 last:border-0 ${activeIndex === index ? 'bg-gray-100 dark:bg-gray-800' : ''}`}
                         >
                             {p.image
