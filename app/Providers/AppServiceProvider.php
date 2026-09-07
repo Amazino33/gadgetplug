@@ -13,6 +13,9 @@ use App\Observers\OrderObserver;
 use App\Observers\ProductObserver;
 use App\Observers\ProductStoreStockObserver;
 use App\Observers\VendorObserver;
+use App\Listeners\ClaimGuestFeedActivity;
+use Illuminate\Auth\Events\Login;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 use Illuminate\Support\Facades\Gate;
@@ -39,6 +42,10 @@ class AppServiceProvider extends ServiceProvider
         Vendor::observe(VendorObserver::class);
         Product::observe(ProductObserver::class);
         ProductStoreStock::observe(ProductStoreStockObserver::class);
+
+        // Hands a guest's feed likes to the account they just signed into, and
+        // replays a save the login gate interrupted.
+        Event::listen(Login::class, ClaimGuestFeedActivity::class);
         // Your existing HTTPS force code
         if (config('app.env') === 'production') {
             URL::forceScheme('https');

@@ -42,6 +42,13 @@ class ProductObserver
      */
     public function creating(Product $product): void
     {
+        // Where this product falls in the feed's rotation. Assigned once and
+        // never changed: the feed's order has to be stable within a session or
+        // a cursor would repeat and skip posts as it pages.
+        if (blank($product->feed_bucket)) {
+            $product->feed_bucket = random_int(0, 99);
+        }
+
         if ($product->store_id !== null) {
             return;
         }

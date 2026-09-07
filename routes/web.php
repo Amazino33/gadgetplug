@@ -4,6 +4,7 @@ use App\Http\Controllers\AffiliateClickController;
 use App\Http\Controllers\Payment\PaystackCallbackController;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Storefront\FeedController;
 use Livewire\Volt\Volt;
 
 Volt::route('/', 'pages.product-catalog')->name('home');
@@ -11,6 +12,12 @@ Volt::route('/track', 'pages.track-order')->name('track-order');
 Route::view('/privacy-policy', 'pages.privacy-policy')->name('privacy-policy');
 Volt::route('/product/{product:slug}', 'pages.product-detail')->name('product.show');
 Volt::route('/cart', 'pages.cart')->name('cart');
+
+// The social feed's data, called on every scroll. Kept as plain JSON routes
+// rather than Livewire methods so the payload is exactly what a post needs and
+// nothing more — this runs on mobile data.
+Route::get('/feed/posts',      [FeedController::class, 'index'])->name('feed.posts');
+Route::get('/feed/categories', [FeedController::class, 'categories'])->name('feed.categories');
 Volt::route('/checkout', 'checkout')->name('checkout');
 
 Route::get('/payment/callback', PaystackCallbackController::class)->name('payment.callback');

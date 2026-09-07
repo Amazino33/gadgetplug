@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnsureDeviceToken;
 use App\Http\Middleware\TrackAffiliateEngagement;
 use App\Jobs\ClearAffiliateHoldsJob;
 use App\Jobs\DemoteInactiveAffiliatesJob;
@@ -30,6 +31,11 @@ return Application::configure(basePath: dirname(__DIR__))
         // response — it counts pages a referred visitor actually landed on,
         // which is what the engaged-visit reward is paid against.
         $middleware->web(append: [TrackAffiliateEngagement::class]);
+
+        // Gives an anonymous visitor a stable identity so a guest can like a
+        // feed post. Appended for the same reason as above — it needs the
+        // session started and the final response to set its cookie on.
+        $middleware->web(append: [EnsureDeviceToken::class]);
     })
     ->withSchedule(function (Schedule $schedule): void {
         // Hourly rather than daily since the hold is measured in days; this keeps
