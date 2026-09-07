@@ -4,6 +4,8 @@ use App\Models\Product;
 use App\Models\Category;
 use App\Models\Wishlist;
 use App\Services\CartService;
+use App\Services\Feed\FeedCursor;
+use App\Services\Feed\FeedQuery;
 use Livewire\Volt\Component;
 use Livewire\WithPagination;
 use Illuminate\Support\Facades\Session;
@@ -94,7 +96,44 @@ new class extends Component {
         return [
             'products'   => $query->paginate(9),
             'categories' => $categories,
+
+            // The mobile feed's opening page and chips, handed to Alpine as
+            // initial state rather than rendered as a second set of markup —
+            // page one and page fifty go through one template that way, and
+            // two templates of the same post would drift.
+            // Filtered the same way the grid beside it is. A search that
+            // excludes a product from the page must exclude it from the feed's
+            // payload too — otherwise the page still carries a product the
+            // customer filtered out, and the two presentations disagree the
+            // moment the window is resized.
+            'feedFirstPage'  => app(FeedQuery::class)->page(
+                seedBucket: FeedCursor::seedForSession(),
+                categoryId: $this->selectedCategory,
+                search: $this->search !== '' ? $this->search : null,
+            ),
+            'feedCategories' => $this->feedCategories(),
         ];
+    }
+
+    /**
+     * Chips for categories that actually have something in them.
+     *
+     * A chip that opens an empty feed reads as the shop being broken rather
+     * than the category being quiet, so an empty one is never offered.
+     */
+    public function feedCategories(): array
+    {
+        return Category::query()
+            ->where('is_active', true)
+            // whereHas for "has any", not HAVING on the withCount alias: that
+            // alias is a subquery rather than an aggregate, which SQLite
+            // rejects outright — and the suite runs on SQLite.
+            ->whereHas('products', fn ($q) => $q->visibleOnline()->inStockForSale())
+            ->withCount(['products' => fn ($q) => $q->visibleOnline()->inStockForSale()])
+            ->orderByDesc('products_count')
+            ->get(['id', 'name', 'slug'])
+            ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name, 'slug' => $c->slug])
+            ->all();
     }
 
     public function filterCategory(?int $categoryId): void
@@ -151,6 +190,12 @@ $cardBgs = [
 
 <div>
 <x-layouts.storefront>
+
+{{-- Mobile: the social feed. Desktop keeps everything below, untouched. --}}
+<x-feed.mobile-feed :first-page="$feedFirstPage" :categories="$feedCategories"
+                    :category-id="$selectedCategory" :search="$search" />
+
+<div class="hidden lg:block">
 
 @if($cartError)
     <div class="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-red-600 text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-lg"
@@ -599,6 +644,8 @@ $cardBgs = [
         @endforeach
     </div>
 </section>
+
+</div>{{-- /hidden lg:block --}}
 
 </x-layouts.storefront>
 </div>
