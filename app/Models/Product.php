@@ -52,6 +52,36 @@ class Product extends Model implements HasMedia
         return 'slug';
     }
 
+    /**
+     * Resolve a product URL to one a customer can actually be shown.
+     *
+     * Slugs are unique PER VENDOR — getSlugOptions() scopes uniqueness with
+     * extraScope(vendor_id) — but route binding is global, so two vendors
+     * holding the same slug means Laravel's default lookup takes whichever row
+     * comes first, which is simply the lowest id.
+     *
+     * That silently broke resold listings: a VendorLink listing carries the
+     * same name, and therefore the same slug, as the supplier product it was
+     * published from. The supplier's shop is hidden from the marketplace, so
+     * the URL resolved to HIS row and the detail page refused it with a 404 —
+     * while the reseller's listing sat there in stock and reachable by nobody.
+     *
+     * Preferring a marketplace-visible row fixes that, and also fixes the older
+     * latent case it shares a cause with: any two vendors selling an
+     * identically-named product collide the same way.
+     *
+     * Falls back to the plain lookup so nothing that used to resolve stops
+     * resolving — an unpublished or hidden product still reaches the page and
+     * is refused there, which is where that decision already lives.
+     */
+    public function resolveRouteBinding($value, $field = null): ?self
+    {
+        $field ??= $this->getRouteKeyName();
+
+        return static::query()->where($field, $value)->visibleOnline()->first()
+            ?? static::query()->where($field, $value)->first();
+    }
+
     protected $casts = [
         'price'           => 'decimal:2',
         'cost_price'      => 'decimal:2',
