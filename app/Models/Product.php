@@ -356,5 +356,72 @@ class Product extends Model implements HasMedia
             ->quality(90)
             ->sharpen(5)
             ->nonQueued();
+
+        // What the social feed serves.
+        //
+        // The feed is an endless scroll of images on Nigerian mobile data, so
+        // the existing 'preview' — 800px square at quality 90, JPEG or PNG — is
+        // several times heavier than it can afford. WebP at quality 72 carries
+        // the same picture at a fraction of the bytes, and 'contain' rather than
+        // 'crop' because a post shows the whole product, not a square of it.
+        //
+        // Queued, unlike the two above: this is a third conversion on every
+        // upload and doing it in-request would slow the vendor's product form
+        // for the sake of a screen they are not looking at. Product::feedImage()
+        // falls back to 'preview' until it exists, so an upload is never
+        // waiting on it and a stalled queue degrades to heavier images rather
+        // than broken ones.
+        $this->addMediaConversion('feed')
+            ->format('webp')
+            ->fit(Fit::Contain, 800, 800)
+            ->quality(72)
+            ->queued();
+
+        // The second entry in the feed's srcset — served to narrow phones,
+        // which is most of them.
+        $this->addMediaConversion('feed_small')
+            ->format('webp')
+            ->fit(Fit::Contain, 400, 400)
+            ->quality(70)
+            ->queued();
+    }
+
+    /**
+     * The image a feed post shows, with everything that can go wrong handled.
+     *
+     * Falls back through the conversions in weight order and ends at a static
+     * placeholder, because a feed of broken image icons is worse than a feed of
+     * heavy ones — and a product whose upload failed should still be sellable.
+     *
+     * @return array{src: string, srcset: ?string, ready: bool}
+     */
+    public function feedImage(): array
+    {
+        $media = $this->getFirstMedia('product-images');
+
+        if (! $media) {
+            return ['src' => asset('images/product-placeholder.svg'), 'srcset' => null, 'ready' => false];
+        }
+
+        $feed = $media->hasGeneratedConversion('feed') ? $media->getUrl('feed') : null;
+        $small = $media->hasGeneratedConversion('feed_small') ? $media->getUrl('feed_small') : null;
+
+        // Not generated yet — a queue that has not caught up, or one that is not
+        // running at all. Serving the heavier preview is the honest degradation.
+        if (! $feed) {
+            return [
+                'src'    => $media->hasGeneratedConversion('preview')
+                    ? $media->getUrl('preview')
+                    : $media->getUrl(),
+                'srcset' => null,
+                'ready'  => false,
+            ];
+        }
+
+        return [
+            'src'    => $feed,
+            'srcset' => $small ? "{$small} 400w, {$feed} 800w" : null,
+            'ready'  => true,
+        ];
     }
 }
