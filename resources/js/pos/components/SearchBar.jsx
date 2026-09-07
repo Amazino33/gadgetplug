@@ -1,54 +1,77 @@
 import { useState, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { db } from '../lib/db';
 import api from '../lib/api';
+import { createLatestSearch } from '../lib/latestSearch';
 
 const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect, autoFocus = true }, ref) {
     const [query, setQuery]     = useState('');
     const [results, setResults] = useState([]);
     const [open, setOpen]       = useState(false);
+    const [searching, setSearching] = useState(false);
     const [activeIndex, setActiveIndex] = useState(-1);
     const inputRef              = useRef(null);
     const debounceRef           = useRef(null);
+
+    // See latestSearch.js — the local lookup and the network fallback take
+    // unrelated amounts of time, so answers can come back in a different
+    // order than the searches that asked for them started in.
+    const latestSearch = useRef(createLatestSearch()).current;
 
     useImperativeHandle(ref, () => ({
         focus: () => inputRef.current?.focus(),
     }));
 
     const search = useCallback(async (q) => {
-        if (!q.trim()) { setResults([]); setOpen(false); setActiveIndex(-1); return; }
+        const token = latestSearch.start();
+        const trimmed = q.trim();
 
-        // Search IndexedDB first (offline-capable)
+        if (!trimmed) { setResults([]); setOpen(false); setActiveIndex(-1); setSearching(false); return; }
+
+        // IndexedDB first — instant and offline-capable, and it's re-seeded
+        // on every login, so it's usually the whole answer.
         const local = await db.products
             .filter((p) =>
-                p.barcode === q ||
-                (p.sku && p.sku.toLowerCase() === q.toLowerCase()) ||
-                (p.name && p.name.toLowerCase().includes(q.toLowerCase()))
+                p.barcode === trimmed ||
+                (p.sku && p.sku.toLowerCase() === trimmed.toLowerCase()) ||
+                (p.name && p.name.toLowerCase().includes(trimmed.toLowerCase()))
             )
             .limit(10)
             .toArray();
 
-        if (local.length > 0) {
-            setResults(local);
-            setOpen(true);
-            setActiveIndex(-1);
+        // A newer search has started since this one began — its answer is
+        // no longer relevant to what's on screen, so it's dropped rather
+        // than shown.
+        if (!latestSearch.isCurrent(token)) return;
 
-            // Exact barcode match ?" auto-add immediately
-            const exact = local.find((p) => p.barcode === q);
-            if (exact) { pick(exact); return; }
-        }
+        setResults(local);
+        setOpen(local.length > 0);
+        setActiveIndex(-1);
 
-        // Fallback to API when online
-        if (navigator.onLine) {
+        // Only worth asking the network when the local catalogue came up
+        // empty — keeps the common case (which is nearly every search)
+        // fully local, and cuts how often two answers to the same search
+        // can race each other in the first place.
+        if (local.length === 0 && navigator.onLine) {
+            setSearching(true);
             try {
-                const { data } = await api.get('/products/search', { params: { vendor_id: vendorId, q } });
+                // Short timeout on top of the client's generous default — a
+                // cashier waiting on a search result needs an answer in
+                // seconds, not whatever the slowest thing on the till can
+                // tolerate. Local results (if any) are already showing.
+                const { data } = await api.get('/products/search', {
+                    params: { vendor_id: vendorId, q: trimmed },
+                    timeout: 5000,
+                });
+                if (!latestSearch.isCurrent(token)) return;
                 setResults(data);
                 setOpen(data.length > 0);
                 setActiveIndex(-1);
-                const exact = data.find((p) => p.barcode === q);
-                if (exact) { pick(exact); return; }
-            } catch { /* stay offline */ }
+            } catch { /* stay offline-friendly — nothing local, nothing from the network */ }
+            finally {
+                if (latestSearch.isCurrent(token)) setSearching(false);
+            }
         }
-    }, [vendorId]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [vendorId, latestSearch]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const pick = (product) => {
         onSelect(product);
@@ -97,23 +120,42 @@ const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect, autoFocus 
     return (
         <div className="relative flex-1">
             <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5">
-                <svg className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
+                {searching ? (
+                    <svg className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                    </svg>
+                ) : (
+                    <svg className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                )}
                 <input
                     ref={inputRef}
                     type="text"
                     value={query}
                     onChange={onChange}
                     onKeyDown={onKeyDown}
-                    onFocus={() => query && setOpen(true)}
+                    onFocus={() => query.trim() && results.length > 0 && setOpen(true)}
                     onBlur={() => setTimeout(() => setOpen(false), 150)}
                     placeholder="Scan barcode or search product...  [F3]"
                     autoFocus={autoFocus}
                     className="flex-1 bg-transparent text-sm outline-none placeholder-gray-400 dark:placeholder-gray-500 text-gray-800 dark:text-gray-100"
                 />
             </div>
+
+            {!open && query.trim() && searching && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg z-50 px-4 py-3">
+                    <p className="text-xs text-gray-400 dark:text-gray-500">Searching…</p>
+                </div>
+            )}
+
+            {!open && query.trim() && !searching && results.length === 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg z-50 px-4 py-3">
+                    <p className="text-xs text-gray-400 dark:text-gray-500">No product matches "{query.trim()}".</p>
+                </div>
+            )}
 
             {open && results.length > 0 && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg z-50 max-h-72 overflow-y-auto">
