@@ -6,6 +6,11 @@
     first page in Blade and the rest in Alpine would be two templates of the same
     thing, and they would drift.
 
+    The order is a Facebook post's: who posted, what they said, the picture, then
+    the actions. Here the product is the poster — its name is the headline and
+    the store is the subline, because a customer scrolling a marketplace is
+    looking for the thing, not the shop.
+
     content-visibility:auto is what lets the feed run to hundreds of posts on a
     cheap phone: the browser skips layout and paint for anything off-screen,
     which is native windowing for one line of CSS. contain-intrinsic-size gives
@@ -16,22 +21,44 @@
     style="content-visibility: auto; contain-intrinsic-size: auto 620px;"
     x-data="{ expanded: false }"
 >
+    {{-- 1. HEADER — product name leads, store identifies it. --}}
     <div class="flex items-center gap-2.5 px-4 py-3">
-        <div class="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-brand-bg ring-1 ring-brand-border">
+        <div class="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-brand-bg ring-1 ring-brand-border">
             <template x-if="post.store.logo">
                 <img :src="post.store.logo" :alt="post.store.name" class="h-full w-full object-cover" loading="lazy" />
             </template>
+            {{-- No logo is the normal case, not the exception: nothing uploads
+                 one yet. The initials chip is the design, not a placeholder. --}}
             <template x-if="! post.store.logo">
                 <span class="flex h-full w-full items-center justify-center font-montserrat text-[11px] font-black text-brand"
                       x-text="(post.store.name || '?').slice(0, 2).toUpperCase()"></span>
             </template>
         </div>
-        {{-- Not a link: there is no public store page on this platform yet. --}}
-        <span class="truncate font-montserrat text-[13px] font-bold text-brand-dark" x-text="post.store.name"></span>
+
+        <div class="min-w-0 flex-1">
+            <a :href="post.url"
+               class="block truncate font-montserrat text-[14px] font-bold leading-tight text-brand-dark"
+               x-text="post.name"></a>
+
+            {{-- Store, then location if the store has set one. Built as one
+                 string with the separator baked in, so a store with no city
+                 shows its name alone rather than a dangling "·". --}}
+            <p class="truncate text-[12px] leading-tight text-brand-muted"
+               x-text="post.store.location ? post.store.name + ' · ' + post.store.location : post.store.name"></p>
+        </div>
     </div>
 
-    {{-- Lazy and async so a fast scroll never blocks on decoding an image the
-         reader has already passed. --}}
+    {{-- 2. CAPTION — above the image, the way a post reads. --}}
+    <template x-if="post.caption">
+        <p class="px-4 pb-3 text-[13px] leading-snug text-brand-muted">
+            <span x-text="expanded || post.caption.length <= 90 ? post.caption : post.caption.slice(0, 90).trimEnd()"></span><!--
+            --><button type="button" x-show="! expanded && post.caption.length > 90" @click="expanded = true"
+                      class="ml-1 font-semibold text-brand-dark">…more</button>
+        </p>
+    </template>
+
+    {{-- 3. IMAGE — untouched. Lazy and async so a fast scroll never blocks on
+         decoding an image the reader has already passed. --}}
     <a :href="post.url" class="block bg-brand-bg">
         <img
             :src="post.image.src"
@@ -44,7 +71,9 @@
         />
     </a>
 
-    <div class="flex items-center gap-5 px-4 pt-3">
+    {{-- 4. ACTIONS — like/save/share left, price and Buy Now together right,
+         because the price is what the button is asking them to agree to. --}}
+    <div class="flex items-center gap-5 px-4 py-3">
         <button type="button" @click="$store.feed.toggleLike(post)" class="flex items-center gap-1.5" :aria-pressed="post.liked">
             <svg class="h-6 w-6 transition-transform active:scale-90" :class="post.liked ? 'text-red-500' : 'text-brand-dark'"
                  :fill="post.liked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
@@ -66,24 +95,14 @@
             </svg>
         </button>
 
-        <button type="button" @click="$store.feed.buyNow(post)"
-                class="ml-auto rounded-full bg-brand px-5 py-2 font-montserrat text-[13px] font-black text-white active:scale-95 transition-transform">
-            Buy Now
-        </button>
-    </div>
-
-    <div class="px-4 pb-4 pt-2">
-        <p class="font-montserrat text-[15px] font-black text-brand">
-            ₦<span x-text="Number(post.price).toLocaleString()"></span>
-        </p>
-        <a :href="post.url" class="mt-0.5 block font-montserrat text-[14px] font-bold text-brand-dark" x-text="post.name"></a>
-
-        <template x-if="post.caption">
-            <p class="mt-1 text-[13px] leading-snug text-brand-muted">
-                <span x-text="expanded || post.caption.length <= 90 ? post.caption : post.caption.slice(0, 90).trimEnd()"></span><!--
-                --><button type="button" x-show="! expanded && post.caption.length > 90" @click="expanded = true"
-                          class="ml-1 font-semibold text-brand-dark">…more</button>
+        <div class="ml-auto flex items-center gap-2.5">
+            <p class="font-montserrat text-[15px] font-black text-brand">
+                ₦<span x-text="Number(post.price).toLocaleString()"></span>
             </p>
-        </template>
+            <button type="button" @click="$store.feed.buyNow(post)"
+                    class="rounded-full bg-brand px-5 py-2 font-montserrat text-[13px] font-black text-white active:scale-95 transition-transform">
+                Buy Now
+            </button>
+        </div>
     </div>
 </article>

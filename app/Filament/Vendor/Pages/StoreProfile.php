@@ -28,6 +28,15 @@ class StoreProfile extends Page
 
     public ?array $data = [];
 
+    /** Nigeria's 36 states and the FCT, for the public location line. */
+    private const STATES = [
+        'Abia', 'Adamawa', 'Akwa Ibom', 'Anambra', 'Bauchi', 'Bayelsa', 'Benue',
+        'Borno', 'Cross River', 'Delta', 'Ebonyi', 'Edo', 'Ekiti', 'Enugu',
+        'FCT - Abuja', 'Gombe', 'Imo', 'Jigawa', 'Kaduna', 'Kano', 'Katsina',
+        'Kebbi', 'Kogi', 'Kwara', 'Lagos', 'Nasarawa', 'Niger', 'Ogun', 'Ondo',
+        'Osun', 'Oyo', 'Plateau', 'Rivers', 'Sokoto', 'Taraba', 'Yobe', 'Zamfara',
+    ];
+
     public function mount(): void
     {
         $vendor = filament()->getTenant();
@@ -36,6 +45,8 @@ class StoreProfile extends Page
             'name'            => $vendor->name,
             'description'     => $vendor->description,
             'whatsapp'        => $vendor->whatsapp,
+            'city'            => $vendor->city,
+            'state'           => $vendor->state,
             'bank_name'       => $vendor->bank_name,
             'account_number'  => $vendor->account_number,
             'account_name'    => $vendor->account_name,
@@ -65,6 +76,22 @@ class StoreProfile extends Page
                             ->tel()
                             ->placeholder('08012345678')
                             ->maxLength(20),
+
+                        TextInput::make('city')
+                            ->label('City / Town')
+                            ->placeholder('e.g. Ikeja')
+                            ->maxLength(100)
+                            ->helperText('Shown to customers on your posts, as "City, State". Leave both blank to show only your store name.'),
+
+                        // A list rather than a free text box: this is printed
+                        // publicly on every post, and "Lagos", "lagos" and
+                        // "LAG" typed by three different stores would read as
+                        // three different places.
+                        Select::make('state')
+                            ->label('State')
+                            ->options(array_combine(self::STATES, self::STATES))
+                            ->searchable()
+                            ->placeholder('Select a state'),
 
                         Textarea::make('description')
                             ->label('Store Description')
@@ -170,6 +197,8 @@ class StoreProfile extends Page
         $updateData = [
             'description'     => $data['description'],
             'whatsapp'        => $data['whatsapp'],
+            'city'            => $data['city'] ?: null,
+            'state'           => $data['state'] ?: null,
             'bank_name'       => $data['bank_name'],
             'account_number'  => $data['account_number'],
             'account_name'    => $data['account_name'],

@@ -139,7 +139,7 @@ class FeedQuery
         return Product::query()
             ->visibleOnline()
             ->inStockForSale()
-            ->with(['vendor:id,name,slug', 'media'])
+            ->with(['vendor:id,name,slug,logo,city,state', 'media'])
             ->when($categoryId, fn (Builder $q) => $q->where('products.category_id', $categoryId))
             ->when($search, function (Builder $q, string $term) {
                 $like = '%'.str_replace(['%', '_'], ['\%', '\_'], $term).'%';
@@ -226,6 +226,12 @@ class FeedQuery
             'store'       => [
                 'name' => $p->vendor?->name,
                 'slug' => $p->vendor?->slug,
+                // Null for every store until a logo can be uploaded; the card
+                // falls back to an initials chip rather than a broken image.
+                'logo' => $p->vendor?->logo_url,
+                // Null when the store has set no location, which the card
+                // reads as "print the name alone" rather than a stray separator.
+                'location' => $p->vendor?->location,
             ],
             'like_count'  => (int) $p->like_count,
             'share_count' => (int) $p->share_count,

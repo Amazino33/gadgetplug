@@ -15,7 +15,7 @@ class Vendor extends Model
 
     protected $fillable = [
         'user_id', 'name', 'slug', 'logo', 'is_verified',
-        'description', 'whatsapp', 'bank_name', 'account_number', 'account_name',
+        'description', 'whatsapp', 'city', 'state', 'bank_name', 'account_number', 'account_name',
         'pos_vat_enabled', 'pos_vat_rate', 'pos_blind_count_participants',
         'pos_blind_count_frequency', 'pos_blind_count_custom_days', 'owner_can_manage_roles',
         'pos_min_margin_percent', 'online_sales_enabled', 'initial_capital',
@@ -31,6 +31,33 @@ class Vendor extends Model
         'restock_target_cover_days' => 'integer',
         'restock_safety_buffer_days' => 'integer',
     ];
+
+    /**
+     * "City, State" — or whichever half of it the store has filled in.
+     *
+     * Null when neither is set, so a caller can hide the whole line rather
+     * than print a dangling separator. Most stores have set nothing, which is
+     * the case this is written around, not an edge case.
+     */
+    public function getLocationAttribute(): ?string
+    {
+        $parts = array_filter([trim((string) $this->city), trim((string) $this->state)]);
+
+        return $parts ? implode(', ', $parts) : null;
+    }
+
+    /**
+     * The store's logo as a URL, matching how the receipts already resolve it.
+     *
+     * Note that nothing currently uploads to `vendors.logo` — there is no field
+     * for it on StoreProfile — so this is null for every store today and the
+     * initials chip is what shows. It is wired now so a logo appears the moment
+     * one can be set.
+     */
+    public function getLogoUrlAttribute(): ?string
+    {
+        return $this->logo ? asset('storage/'.$this->logo) : null;
+    }
 
     // Single place both RestockReport and the reports-hub Restock card resolve
     // "what settings does this vendor actually use" — each column is nullable

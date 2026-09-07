@@ -335,3 +335,48 @@ describe('shares', function () {
             ->and($product->fresh()->share_count)->toBe(2);
     });
 });
+
+describe('the store line on a post', function () {
+    test('a store with a city and state is presented as "City, State"', function () {
+        $vendor = feedVendor('Peters');
+        $vendor->update(['city' => 'Ikeja', 'state' => 'Lagos']);
+        feedProduct($vendor);
+
+        $post = app(FeedQuery::class)->page(0, null, null, null, 5)['posts']->first();
+
+        expect($post['store']['location'])->toBe('Ikeja, Lagos');
+    });
+
+    test('a store that has set no location gets null, so the card prints no dangling separator', function () {
+        feedProduct(feedVendor('Nowhere'));
+
+        $post = app(FeedQuery::class)->page(0, null, null, null, 5)['posts']->first();
+
+        // The card reads this as "show the store name alone". An empty string
+        // here would still render the " · " before it.
+        expect($post['store']['location'])->toBeNull();
+    });
+
+    test('half a location is better than none', function () {
+        $vendor = feedVendor('Half');
+        $vendor->update(['state' => 'Rivers']);
+        feedProduct($vendor);
+
+        $post = app(FeedQuery::class)->page(0, null, null, null, 5)['posts']->first();
+
+        expect($post['store']['location'])->toBe('Rivers');
+    });
+
+    test('the logo is a URL when set and null when not, never a broken path', function () {
+        $withLogo = feedVendor('Logoed');
+        $withLogo->update(['logo' => 'vendor-logos/peters.png']);
+        feedProduct($withLogo);
+
+        $post = app(FeedQuery::class)->page(0, null, null, null, 5)['posts']->first();
+
+        expect($post['store']['logo'])->toContain('storage/vendor-logos/peters.png');
+
+        // And the case every store is actually in today.
+        expect(feedVendor('Bare')->logo_url)->toBeNull();
+    });
+});
