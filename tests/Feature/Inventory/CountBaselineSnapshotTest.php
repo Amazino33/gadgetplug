@@ -65,10 +65,14 @@ it('freezes the system quantity when a solo count is submitted', function () {
     $this->actingAs($c['staff']);
     enterVendorPanel($c['vendor']);
 
-    Livewire::test(BlindCount::class)
-        ->call('startSession')
-        ->set('count', 7)
-        ->call('submitAll');
+    $component = Livewire::test(BlindCount::class)->call('startSession');
+    $session   = BlindCountSession::find($component->get('sessionId'));
+
+    $entries = collect($session->product_order)
+        ->mapWithKeys(fn (int $productId) => [$productId => ['count' => 7, 'note' => null]])
+        ->all();
+
+    $component->call('finishCounting', $entries);
 
     $audit = AuditSession::where('product_id', $c['product']->id)->first();
 

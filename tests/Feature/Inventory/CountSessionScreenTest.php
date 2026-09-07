@@ -63,10 +63,14 @@ function runSoloCount(array $c, int $counted): BlindCountSession
     test()->actingAs($c['staff']);
     enterPanel($c['vendor']);
 
-    Livewire::test(BlindCount::class)
-        ->call('startSession')
-        ->set('count', $counted)
-        ->call('submitAll');
+    $component = Livewire::test(BlindCount::class)->call('startSession');
+    $session   = BlindCountSession::find($component->get('sessionId'));
+
+    $entries = collect($session->product_order)
+        ->mapWithKeys(fn (int $productId) => [$productId => ['count' => $counted, 'note' => null]])
+        ->all();
+
+    $component->call('finishCounting', $entries);
 
     return BlindCountSession::where('vendor_id', $c['vendor']->id)->latest()->firstOrFail();
 }

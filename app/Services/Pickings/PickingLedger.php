@@ -76,6 +76,46 @@ class PickingLedger
     }
 
     /**
+     * The same figure as heldQuantityForProduct(), for every product in one
+     * count session at once. A count walks the whole catalogue — asking this
+     * one at a time would be two queries per product instead of two total.
+     *
+     * @param  array<int, int>  $productIds
+     * @return array<int, int>  product id => units held
+     */
+    public static function heldQuantitiesForProducts(array $productIds, ?int $storeId = null): array
+    {
+        if ($productIds === []) {
+            return [];
+        }
+
+        $taken = PickingItem::query()
+            ->join('pickings', 'pickings.id', '=', 'picking_items.picking_id')
+            ->whereIn('picking_items.product_id', $productIds)
+            ->when($storeId, fn ($q) => $q->where('pickings.store_id', $storeId))
+            ->selectRaw('picking_items.product_id, SUM(picking_items.quantity) as total')
+            ->groupBy('picking_items.product_id')
+            ->pluck('total', 'product_id');
+
+        $accounted = PickingLedgerEntry::query()
+            ->join('picking_items', 'picking_items.id', '=', 'picking_ledger_entries.picking_item_id')
+            ->join('pickings', 'pickings.id', '=', 'picking_items.picking_id')
+            ->whereIn('picking_items.product_id', $productIds)
+            ->when($storeId, fn ($q) => $q->where('pickings.store_id', $storeId))
+            ->selectRaw('picking_items.product_id, SUM(picking_ledger_entries.quantity) as total')
+            ->groupBy('picking_items.product_id')
+            ->pluck('total', 'product_id');
+
+        $held = [];
+
+        foreach ($productIds as $productId) {
+            $held[$productId] = max(0, (int) ($taken[$productId] ?? 0) - (int) ($accounted[$productId] ?? 0));
+        }
+
+        return $held;
+    }
+
+    /**
      * Every picker still holding something, with what it is worth today.
      *
      * Valued at the product's current price, because that is what they will be

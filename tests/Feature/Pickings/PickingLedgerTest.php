@@ -85,6 +85,30 @@ test('the on-trust figure counts only what is still out, per branch', function (
         ->and(PickingLedger::heldQuantityForProduct($product->id))->toBe(4);
 });
 
+test('the batch figure matches the single-product one for every product asked about, in one pass', function () {
+    $vendor = pickingVendor();
+    $store = $vendor->defaultStore;
+    $held = pickingProduct($vendor, $store, 20);
+    $untouched = pickingProduct($vendor, $store, 20);
+
+    $picking = app(ReleaseToPickerAction::class)->execute(
+        pickingPicker($vendor), $store, [['product_id' => $held->id, 'quantity' => 6]],
+    );
+    app(ReturnFromPickerAction::class)->execute($picking->items->first(), 2);
+
+    $batch = PickingLedger::heldQuantitiesForProducts([$held->id, $untouched->id], $store->id);
+
+    expect($batch)->toBe([
+        $held->id      => 4,
+        $untouched->id => 0,
+    ])
+        ->and($batch[$held->id])->toBe(PickingLedger::heldQuantityForProduct($held->id, $store->id));
+});
+
+test('the batch figure returns empty for an empty product list rather than querying', function () {
+    expect(PickingLedger::heldQuantitiesForProducts([]))->toBe([]);
+});
+
 test('every picker still holding something is listed, worth what it costs today', function () {
     $vendor = pickingVendor();
     $store = $vendor->defaultStore;

@@ -73,19 +73,7 @@ class BlindCount extends Page
 
     // ── Livewire state ────────────────────────────────────────────────────────
     public ?int    $sessionId       = null;
-    public int     $currentPosition = 1;
-    public int     $count           = 0;
-    public string  $note            = '';
-    public bool    $showSearch      = false;
-    public string  $searchQuery     = '';
     public bool    $byCategory      = false;
-
-    // One-shot undo snapshot — captures the previous value of whichever entry
-    // was just overwritten by saveCurrentEntry(), so undoLast() can restore it.
-    public bool    $canUndo           = false;
-    public ?int    $undoPosition      = null;
-    public ?int    $undoPreviousCount = null;
-    public ?string $undoPreviousNote  = null;
 
     // ── Helpers ───────────────────────────────────────────────────────────────
     public function getSession(): ?BlindCountSession
@@ -93,35 +81,54 @@ class BlindCount extends Page
         return $this->sessionId ? BlindCountSession::find($this->sessionId) : null;
     }
 
-    public function getCurrentProduct(): ?Product
-    {
-        $session = $this->getSession();
-        if (! $session) return null;
-
-        $productId = $session->product_order[$this->currentPosition - 1] ?? null;
-        if (! $productId) return null;
-
-        return Product::with(['media', 'category'])->find($productId);
-    }
-
     /**
-     * Units of the product being counted that are out with a picker.
+     * Every product this session covers, preloaded once with everything the
+     * counting screen needs to walk the whole list without another round trip:
+     * identity, image, and how much is out with a picker. This is what makes
+     * the rest of the count — navigating, typing, marking not-found, jumping to
+     * a scanned barcode — a purely client-side affair instead of one Livewire
+     * call per step, which is what made the screen crawl on a bad connection.
      *
-     * The counter is looking at a shelf that is genuinely short by this much,
-     * and the system agrees — the units left stock when they were picked. Shown
-     * so nobody reports a shortage for goods that are exactly where they are
-     * supposed to be, in somebody else's shop.
+     * @return array<int, array{id: int, name: string, sku: ?string, barcode: ?string, image: ?string, out_on_picking: int}>
      */
-    public function unitsOutOnPicking(): int
+    public function productsForCounting(): array
     {
         $session = $this->getSession();
-        $product = $this->getCurrentProduct();
+        if (! $session) return [];
 
-        if (! $session || ! $product) {
-            return 0;
-        }
+        $productIds = $session->product_order;
 
-        return PickingLedger::heldQuantityForProduct($product->id, $session->store_id);
+        $products = Product::with('media')
+            ->whereIn('id', $productIds)
+            ->get()
+            ->keyBy('id');
+
+        // Units held by a picker are already something the system knows about,
+        // never something the counter is being asked to notice a discrepancy
+        // for. Batched once for the whole session — the whole point of this
+        // payload is that nothing here costs a query per product.
+        $outOnPicking = PickingLedger::heldQuantitiesForProducts($productIds, $session->store_id);
+
+        return collect($productIds)
+            ->map(function (int $id) use ($products, $outOnPicking) {
+                $product = $products->get($id);
+
+                if (! $product) return null;
+
+                return [
+                    'id'             => $product->id,
+                    'name'           => $product->name,
+                    'sku'            => $product->sku,
+                    'barcode'        => $product->barcode,
+                    // No stock/reorder signal here — a blind count must never
+                    // see system stock state while counting.
+                    'image'          => $product->getFirstMediaUrl('product-images', 'preview') ?: null,
+                    'out_on_picking' => $outOnPicking[$id] ?? 0,
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
     }
 
     public function getRole(): string
@@ -145,22 +152,6 @@ class BlindCount extends Page
         return in_array($this->getRole(), ['a', 'b'], true);
     }
 
-    public function getCountedEntries(): \Illuminate\Database\Eloquent\Collection
-    {
-        if (! $this->sessionId) return collect();
-
-        return BlindCountEntry::where('blind_count_session_id', $this->sessionId)
-            ->where('user_id', auth()->id())
-            ->whereNotNull('count')
-            ->with('product')
-            ->when($this->searchQuery, fn ($q) => $q->whereHas('product', fn ($pq) =>
-                $pq->where('name', 'like', "%{$this->searchQuery}%")
-                   ->orWhere('sku', 'like', "%{$this->searchQuery}%")
-            ))
-            ->orderBy('position')
-            ->get();
-    }
-
     // ── Mount ─────────────────────────────────────────────────────────────────
     public function mount(): void
     {
@@ -172,23 +163,6 @@ class BlindCount extends Page
 
         if ($session) {
             $this->sessionId = $session->id;
-            $this->restorePosition($session);
-        }
-    }
-
-    private function restorePosition(BlindCountSession $session): void
-    {
-        $position              = $session->currentPositionFor(auth()->id());
-        $this->currentPosition = max(1, min($position, count($session->product_order)));
-
-        $productId = $session->product_order[$this->currentPosition - 1] ?? null;
-        if ($productId) {
-            $entry       = BlindCountEntry::where('blind_count_session_id', $session->id)
-                ->where('user_id', auth()->id())
-                ->where('product_id', $productId)
-                ->first();
-            $this->count = $entry?->count ?? 0;
-            $this->note  = $entry?->note ?? '';
         }
     }
 
@@ -234,11 +208,7 @@ class BlindCount extends Page
             'product_order'    => $productIds,
         ]);
 
-        $this->sessionId       = $session->id;
-        $this->currentPosition = 1;
-        $this->count           = 0;
-        $this->note            = '';
-        $this->canUndo         = false;
+        $this->sessionId = $session->id;
     }
 
     // ── Cadence / re-count authorisation ──────────────────────────────────────
@@ -404,153 +374,84 @@ class BlindCount extends Page
         $this->consumeAuthorization($vendor);
 
         $session->update(['storekeeper_b_id' => auth()->id()]);
-        $this->restorePosition($session->fresh());
     }
 
-    public function increment(): void
+    // The counting screen runs full-screen with the panel chrome hidden, so
+    // there is no nav to leave by — exiting has to be an explicit action.
+    // Nothing to save here any more: every entry lives in the browser (and its
+    // localStorage draft) until finishCounting() ships the whole thing in one
+    // request, so leaving mid-count risks nothing server-side. The session
+    // itself stays open; BlindCountInProgressWidget leads back to it, and the
+    // draft picks up where it left off on the same device.
+    public function exitCount(): void
     {
-        if (! $this->isParticipant()) return;
-        $this->count++;
+        $this->redirect(filament()->getPanel('vendor')->getUrl(filament()->getTenant()));
     }
 
-    public function decrement(): void
+    /**
+     * Writes every counted entry in one transaction, then runs exactly the
+     * same finishing logic submitAll() always has. Split from submitAll()
+     * rather than folded into it: submitAll() alone is still how a session
+     * whose entries already exist in the database gets finished (tests, and
+     * anything that writes BlindCountEntry rows directly), while this is the
+     * one new call the counting screen itself makes, with everything the
+     * counter entered while offline-tolerant of the network in one shot.
+     *
+     * @param  array<int, array{count?: int|string|null, note?: ?string}>  $entries  product id => what was counted
+     */
+    public function finishCounting(array $entries): void
     {
-        if (! $this->isParticipant()) return;
-        $this->count = max(0, $this->count - 1);
+        $this->saveAllEntries($entries);
+        $this->submitAll();
     }
 
-    public function next(): void
-    {
-        if (! $this->isParticipant()) return;
-
-        $this->saveCurrentEntry();
-
-        $total = $this->getTotalProducts();
-        if ($this->currentPosition < $total) {
-            $this->currentPosition++;
-            $this->loadCountForPosition($this->currentPosition);
-        }
-    }
-
-    public function previous(): void
-    {
-        if (! $this->isParticipant()) return;
-
-        $this->saveCurrentEntry();
-
-        if ($this->currentPosition > 1) {
-            $this->currentPosition--;
-            $this->loadCountForPosition($this->currentPosition);
-        }
-    }
-
-    // Quick "item isn't on the shelf" action — counts as 0 and advances like next().
-    public function markNotFound(): void
-    {
-        if (! $this->isParticipant()) return;
-
-        $this->count = 0;
-        $this->note  = 'Not found';
-        $this->next();
-    }
-
-    // Reverts whichever entry saveCurrentEntry() last overwrote back to its
-    // previous value. One-shot — not a multi-step undo stack.
-    public function undoLast(): void
-    {
-        if (! $this->isParticipant() || ! $this->canUndo || $this->undoPosition === null) return;
-
-        $session   = $this->getSession();
-        if (! $session) return;
-
-        $productId = $session->product_order[$this->undoPosition - 1] ?? null;
-        if (! $productId) return;
-
-        BlindCountEntry::updateOrCreate(
-            [
-                'blind_count_session_id' => $session->id,
-                'user_id'                => auth()->id(),
-                'product_id'             => $productId,
-            ],
-            [
-                'position'   => $this->undoPosition,
-                'count'      => $this->undoPreviousCount,
-                'note'       => $this->undoPreviousNote,
-                'counted_at' => $this->undoPreviousCount !== null ? now() : null,
-            ]
-        );
-
-        $this->currentPosition = $this->undoPosition;
-        $this->loadCountForPosition($this->undoPosition);
-
-        $this->canUndo           = false;
-        $this->undoPosition      = null;
-        $this->undoPreviousCount = null;
-        $this->undoPreviousNote  = null;
-
-        Notification::make()->title('Reverted to previous value.')->success()->send();
-    }
-
-    // Resolves a scanned/typed barcode to a product in this session and jumps to it.
-    public function jumpToBarcode(string $barcode): void
+    private function saveAllEntries(array $entries): void
     {
         if (! $this->isParticipant()) return;
 
         $session = $this->getSession();
         if (! $session) return;
 
-        $barcode = trim($barcode);
-        if ($barcode === '') return;
+        $now  = now();
+        $rows = [];
 
-        $product = Product::where('vendor_id', $session->vendor_id)
-            ->where(fn ($q) => $q->where('barcode', $barcode)->orWhere('sku', $barcode))
-            ->first();
+        foreach ($session->product_order as $index => $productId) {
+            $entry = $entries[$productId] ?? null;
+            $count = $entry['count'] ?? null;
 
-        if (! $product) {
-            Notification::make()->title("No product found for \"{$barcode}\".")->warning()->send();
-            return;
+            // A product the client never sent anything for is left out rather
+            // than defaulted to zero here — submitAll()'s completeness check
+            // below is what decides whether that blocks finishing, the same
+            // guard it has always enforced.
+            if ($count === null || $count === '') continue;
+
+            $note = ! empty($entry['note']) ? (string) $entry['note'] : null;
+
+            $rows[] = [
+                'blind_count_session_id' => $session->id,
+                'user_id'                => auth()->id(),
+                'product_id'             => $productId,
+                'position'               => $index + 1,
+                'count'                  => (int) $count,
+                'note'                   => $note,
+                'counted_at'             => $now,
+                'created_at'             => $now,
+                'updated_at'             => $now,
+            ];
         }
 
-        $position = array_search($product->id, $session->product_order, true);
+        if ($rows === []) return;
 
-        if ($position === false) {
-            Notification::make()->title("{$product->name} isn't part of this count session.")->warning()->send();
-            return;
-        }
-
-        $this->goToPosition($position + 1);
-    }
-
-    // The counting screen runs full-screen with the panel chrome hidden, so there
-    // is no nav to leave by — exiting has to be an explicit action. Save first:
-    // the in-progress entry is only persisted by next()/previous(), so without
-    // this the number on screen would be silently lost on the way out. The
-    // session itself stays open; BlindCountInProgressWidget leads back to it.
-    public function exitCount(): void
-    {
-        if ($this->isParticipant()) {
-            $this->saveCurrentEntry();
-        }
-
-        $this->redirect(filament()->getPanel('vendor')->getUrl(filament()->getTenant()));
-    }
-
-    public function goToPosition(int $position): void
-    {
-        if (! $this->isParticipant()) return;
-
-        $this->saveCurrentEntry();
-        $this->currentPosition = $position;
-        $this->loadCountForPosition($position);
-        $this->showSearch  = false;
-        $this->searchQuery = '';
+        BlindCountEntry::upsert(
+            $rows,
+            ['blind_count_session_id', 'user_id', 'product_id'],
+            ['position', 'count', 'note', 'counted_at', 'updated_at']
+        );
     }
 
     public function submitAll(): void
     {
         if (! $this->isParticipant()) return;
-
-        $this->saveCurrentEntry();
 
         $session = $this->getSession();
         if (! $session) return;
@@ -653,13 +554,7 @@ class BlindCount extends Page
         $session->delete();
 
         // Back to a clean slate so the page re-renders on the start screen
-        $this->sessionId       = null;
-        $this->currentPosition = 1;
-        $this->count           = 0;
-        $this->note            = '';
-        $this->canUndo         = false;
-        $this->showSearch      = false;
-        $this->searchQuery     = '';
+        $this->sessionId = null;
 
         Notification::make()
             ->title('Count session cancelled')
@@ -687,72 +582,7 @@ class BlindCount extends Page
             'b_submitted_at'   => null,
         ]);
 
-        $this->currentPosition = 1;
-        $this->count           = 0;
-        $this->note            = '';
-        $this->canUndo         = false;
-
         Notification::make()->title('Session reset. Storekeeper A can start their count over.')->success()->send();
-    }
-
-    private function saveCurrentEntry(): void
-    {
-        if (! $this->isParticipant()) return;
-
-        $session   = $this->getSession();
-        if (! $session) return;
-
-        $productId = $session->product_order[$this->currentPosition - 1] ?? null;
-        if (! $productId) return;
-
-        $note     = $this->note !== '' ? $this->note : null;
-        $existing = BlindCountEntry::where('blind_count_session_id', $session->id)
-            ->where('user_id', auth()->id())
-            ->where('product_id', $productId)
-            ->first();
-
-        // Nothing changed since it was last saved — skip the snapshot/toast noise
-        if ($existing && $existing->count === $this->count && $existing->note === $note) {
-            return;
-        }
-
-        $this->undoPosition      = $this->currentPosition;
-        $this->undoPreviousCount = $existing?->count;
-        $this->undoPreviousNote  = $existing?->note;
-        $this->canUndo           = true;
-
-        BlindCountEntry::updateOrCreate(
-            [
-                'blind_count_session_id' => $session->id,
-                'user_id'                => auth()->id(),
-                'product_id'             => $productId,
-            ],
-            [
-                'position'   => $this->currentPosition,
-                'count'      => $this->count,
-                'note'       => $note,
-                'counted_at' => now(),
-            ]
-        );
-
-        $product = Product::find($productId);
-        $this->dispatch('entry-saved', productName: $product?->name ?? 'Item', count: $this->count);
-    }
-
-    private function loadCountForPosition(int $position): void
-    {
-        $session   = $this->getSession();
-        if (! $session) return;
-
-        $productId = $session->product_order[$position - 1] ?? null;
-        if (! $productId) return;
-
-        $entry       = BlindCountEntry::where('blind_count_session_id', $session->id)
-            ->where('user_id', auth()->id())
-            ->where('product_id', $productId)
-            ->first();
-        $this->count = $entry?->count ?? 0;
-        $this->note  = $entry?->note ?? '';
     }
 
     // Solo counts get the same scrutiny as dual counts: any variance — over or

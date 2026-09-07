@@ -57,8 +57,13 @@ function setUpCadenceVendor(string $frequency = 'daily', ?int $customDays = null
 function completeACount(): void
 {
     $c = Livewire::test(BlindCount::class)->call('startSession');
-    $c->set('count', 10)->call('next');
-    $c->set('count', 10)->call('submitAll');
+    $session = BlindCountSession::find($c->get('sessionId'));
+
+    $entries = collect($session->product_order)
+        ->mapWithKeys(fn (int $productId) => [$productId => ['count' => 10, 'note' => null]])
+        ->all();
+
+    $c->call('finishCounting', $entries);
 }
 
 test('a completed count blocks the same counter until the cadence elapses', function () {
