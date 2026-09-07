@@ -208,3 +208,35 @@ describe('buy now', function () {
         expect(Session::get('cart', []))->toBeEmpty();
     });
 });
+
+describe('the URL the browser actually posts to', function () {
+    /**
+     * These build the path by hand on purpose.
+     *
+     * Every other test here calls route(), which generates whatever shape the
+     * route file declares — so all of them passed while production 404'd on
+     * every tap. Product::getRouteKeyName() is 'slug', the feed's JavaScript
+     * posts /feed/{id}/..., and the binding was looking for a slug equal to a
+     * number. Buy Now showed it because it navigates; like, save and share
+     * failed inside fetch and silently rolled back.
+     */
+    test('a numeric id reaches every action, because that is what the client sends', function () {
+        $product = actionProduct();
+
+        asDevice((string) Str::uuid(), 'POST', "/feed/{$product->id}/like")->assertOk();
+        asDevice((string) Str::uuid(), 'POST', "/feed/{$product->id}/share")->assertOk();
+
+        $this->post("/feed/{$product->id}/buy")->assertRedirect(route('checkout'));
+
+        $this->actingAs(User::factory()->create())
+            ->postJson("/feed/{$product->id}/save")
+            ->assertOk();
+    });
+
+    test('route() generates the id URL, so these tests exercise the real path', function () {
+        $product = actionProduct();
+
+        expect(route('feed.buy', $product))->toEndWith("/feed/{$product->id}/buy")
+            ->and(route('feed.like', $product))->toEndWith("/feed/{$product->id}/like");
+    });
+});

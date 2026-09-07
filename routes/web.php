@@ -22,10 +22,20 @@ Route::get('/feed/categories', [FeedController::class, 'categories'])->name('fee
 
 // What a tap on a post does. Every rule is enforced in the controller as well
 // as in the interface — the UI gate is a courtesy, this is the control.
-Route::post('/feed/{product}/like',  [FeedActionController::class, 'like'])->name('feed.like');
-Route::post('/feed/{product}/save',  [FeedActionController::class, 'save'])->name('feed.save');
-Route::post('/feed/{product}/share', [FeedActionController::class, 'share'])->name('feed.share');
-Route::post('/feed/{product}/buy',   [FeedActionController::class, 'buyNow'])->name('feed.buy');
+//
+// Bound on :id explicitly. Product::getRouteKeyName() is 'slug' for the sake of
+// the public product URL, but a feed post is addressed by id — that is what the
+// JSON payload carries and what the client posts. Without the field here the
+// binding looked for a slug equal to "123", found nothing, and answered 404 to
+// every tap: visibly on Buy Now, which navigates, and silently on the other
+// three, whose fetch failure was swallowed and rolled the button back.
+//
+// route() honours the binding field when generating these too, so the tests
+// exercise the same URL the browser does rather than a slug URL nothing calls.
+Route::post('/feed/{product:id}/like',  [FeedActionController::class, 'like'])->name('feed.like');
+Route::post('/feed/{product:id}/save',  [FeedActionController::class, 'save'])->name('feed.save');
+Route::post('/feed/{product:id}/share', [FeedActionController::class, 'share'])->name('feed.share');
+Route::post('/feed/{product:id}/buy',   [FeedActionController::class, 'buyNow'])->name('feed.buy');
 Volt::route('/checkout', 'checkout')->name('checkout');
 
 Route::get('/payment/callback', PaystackCallbackController::class)->name('payment.callback');
