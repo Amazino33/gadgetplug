@@ -173,6 +173,7 @@ const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect, autoFocus 
                     onChange={onChange}
                     onKeyDown={onKeyDown}
                     onFocus={() => query.trim() && setOpen(true)}
+                    aria-label="Search products"
                     placeholder="Scan barcode or search product...  [F3]"
                     autoFocus={autoFocus}
                     className="flex-1 bg-transparent text-sm outline-none placeholder-gray-400 dark:placeholder-gray-500 text-gray-800 dark:text-gray-100"
