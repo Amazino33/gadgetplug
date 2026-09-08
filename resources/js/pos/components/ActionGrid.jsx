@@ -1,3 +1,5 @@
+import { buildLabel } from '../lib/build';
+
 const Btn = ({ label, hotkey, color = 'default', disabled = false, onClick, wide = false }) => {
     const colors = {
         default: 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50',
@@ -124,6 +126,15 @@ export default function ActionGrid({
                         <span className="text-[10px] font-semibold text-orange-400">View →</span>
                     </button>
                 )}
+
+                {/* Which build this till is actually running. Deliberately
+                    visible rather than hidden in a console: when a fix is
+                    reported as "not working", this is the first thing that
+                    has to be ruled out, and it cannot be read over the phone
+                    from a developer tools panel. */}
+                <p className="mt-3 text-center text-[10px] font-mono text-gray-300 select-text" title="Build running on this till">
+                    build {buildLabel()}
+                </p>
 
             </div>
         </div>

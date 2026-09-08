@@ -2,8 +2,30 @@ import { defineConfig } from 'vite';
 import laravel from 'laravel-vite-plugin';
 import tailwindcss from "@tailwindcss/vite";
 import react from '@vitejs/plugin-react';
+import { execSync } from 'node:child_process';
+
+// Stamped into the bundle so a till can be asked what it is actually running.
+// "Is the fix live?" has repeatedly been unanswerable from the counter: the
+// server can hold the new commit while the device still runs an old bundle,
+// and the two are indistinguishable by looking at the screen. Now the screen
+// says which.
+const buildStamp = (() => {
+    try {
+        return execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] })
+            .toString()
+            .trim();
+    } catch {
+        // No git on the box, or a source-only deploy — the timestamp below
+        // still distinguishes one build from another.
+        return 'nogit';
+    }
+})();
 
 export default defineConfig({
+    define: {
+        __BUILD_ID__: JSON.stringify(buildStamp),
+        __BUILT_AT__: JSON.stringify(new Date().toISOString().slice(0, 16).replace('T', ' ')),
+    },
     plugins: [
         laravel({
             input: [
