@@ -21,6 +21,11 @@ const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect, autoFocus 
 
     useImperativeHandle(ref, () => ({
         focus: () => inputRef.current?.focus(),
+        // The till hands the keyboard away when something covers it. Without
+        // this, a popup that fails to take focus leaves the cashier typing a
+        // quantity into the search box behind it, where the characters are
+        // both invisible and wrong.
+        blur:  () => inputRef.current?.blur(),
     }));
 
     // Closing on the input's own blur is unreliable on a touchscreen — the

@@ -65,4 +65,23 @@ describe('opening the quantity box from the search box', () => {
 
         expect(onConfirm).toHaveBeenCalledWith(4);
     });
+
+    it('never types into the search box behind it', async () => {
+        // Reported from the counter: the popup opened with no cursor in it,
+        // and the quantity being typed went into the product search
+        // underneath — invisible, and wrong.
+        const onConfirm = vi.fn();
+        render(<Till onConfirm={onConfirm} />);
+
+        const search = screen.getByRole('textbox', { name: /search/i });
+
+        await userEvent.click(search);
+        await userEvent.keyboard('{Enter}');
+        await screen.findByRole('textbox', { name: /quantity/i });
+
+        await userEvent.keyboard('7');
+
+        expect(search.value).toBe('');
+        expect(screen.getByRole('textbox', { name: /quantity/i }).value).toBe('7');
+    });
 });

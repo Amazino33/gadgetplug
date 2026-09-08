@@ -386,7 +386,18 @@ export default function POS({ user, vendorId, onLogout }) {
     // below md, so this is inert on a phone — where forcing focus would mean
     // an on-screen keyboard shoving the till off the screen after every tap.
     useEffect(() => {
-        if (tillIsCovered) return;
+        if (tillIsCovered) {
+            // Hand the keyboard away the moment something covers the till.
+            // A popup owns its own focus, but if it ever fails to take it,
+            // the caret must not still be sitting in the search box behind —
+            // that is how a typed quantity ends up as invisible text in the
+            // product search instead. Only ever the search box, never
+            // whatever the popup has just focused: a child's effect runs
+            // before its parent's, so by here the popup already holds it.
+            searchRef.current?.blur();
+
+            return;
+        }
 
         const t = setTimeout(focusSearch, 60);
 
