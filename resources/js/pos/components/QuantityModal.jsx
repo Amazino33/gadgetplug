@@ -5,10 +5,28 @@ export default function QuantityModal({ item, onConfirm, onClose, onNegotiate })
     const [qty, setQty] = useState(String(item.qty));
     const inputRef = useRef(null);
 
-    useEffect(() => { inputRef.current?.select(); }, []);
+    // Opens holding the keyboard with the current quantity selected, so the
+    // cashier types the number they want straight over it and presses Enter.
+    // No click, no clearing the box first.
+    //
+    // focus() is explicit rather than relying on select() to bring it along:
+    // select() alone leaves the caret wherever it was on some browsers, and
+    // on <input type="number"> it is ignored outright — which is why this is
+    // a text input with a numeric keypad hint instead.
+    useEffect(() => {
+        const el = inputRef.current;
+
+        if (! el) return;
+
+        el.focus();
+        el.select();
+    }, []);
 
     const confirm = () => {
-        const n = parseInt(qty, 10);
+        // An emptied box means "leave it as it was" — the alternative is
+        // Enter doing nothing at all, which reads as the till being stuck.
+        const n = qty.trim() === '' ? item.qty : parseInt(qty, 10);
+
         if (!isNaN(n) && n >= 0) onConfirm(n);
     };
 
@@ -21,13 +39,19 @@ export default function QuantityModal({ item, onConfirm, onClose, onNegotiate })
                 <p className="text-xs text-gray-400 mb-4 truncate">{item.name}</p>
                 <input
                     ref={inputRef}
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    autoComplete="off"
+                    aria-label="Quantity"
                     value={qty}
-                    min={0}
-                    onChange={(e) => setQty(e.target.value)}
+                    // Digits only: a text input is what makes select() reliable,
+                    // so it has to refuse the "e", "+" and "-" that a number
+                    // input would have allowed through on its own.
+                    onChange={(e) => setQty(e.target.value.replace(/[^0-9]/g, ''))}
                     className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-4xl font-bold text-gray-800 text-center focus:outline-none focus:border-[#068B03] mb-4"
                 />
-                <p className="text-xs text-gray-400 text-center mb-4">Set to 0 to remove the item</p>
+                <p className="text-xs text-gray-400 text-center mb-4">Type the quantity and press Enter · 0 removes the item</p>
 
                 {item.can_negotiate && onNegotiate && (
                     <button

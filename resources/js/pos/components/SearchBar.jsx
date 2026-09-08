@@ -105,11 +105,13 @@ const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect, autoFocus 
         setResults([]);
         setOpen(false);
         setActiveIndex(-1);
-        // Deferred: refocusing synchronously here re-fires the input's onFocus
-        // handler with a stale (non-empty) `query` closure from before this
-        // batch commits, which calls setOpen(true) again and undoes the close
-        // above. Waiting a tick lets the empty-query render commit first.
-        setTimeout(() => inputRef.current?.focus(), 0);
+
+        // Deliberately does NOT grab focus back. Picking a product opens the
+        // quantity box, and this used to steal the caret out of it a tick
+        // later — the box would highlight its "1" and then quietly lose the
+        // keyboard, so a typed quantity went nowhere. The till decides where
+        // focus belongs (POS.jsx): back here once nothing is covering it,
+        // which includes the moment the quantity box closes.
     };
 
     const onChange = (e) => {
