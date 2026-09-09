@@ -58,6 +58,10 @@ export default function POS({ user, vendorId, onLogout }) {
     const [selectedIdx, setSelectedIdx]   = useState(null);
     const [customer, setCustomer]         = useState(null);
     const [cartDiscount, setCartDiscount] = useState({ amount: 0, type: 'fixed', approvedBy: null });
+    // Set when a refused sale is pulled back in, so the corrected sale is
+    // recorded on the day the goods actually left rather than the day it was
+    // put right. Null for an ordinary sale.
+    const [recoveredAt, setRecoveredAt]   = useState(null);
     const [session, setSession]           = useState(() => {
         const s = localStorage.getItem('pos_session');
         return s ? JSON.parse(s) : null;
@@ -223,6 +227,7 @@ export default function POS({ user, vendorId, onLogout }) {
 
     const clearCart = () => {
         setCart([]);
+        setRecoveredAt(null);
         setSelectedIdx(null);
         setCustomer(null);
         setCartDiscount({ amount: 0, type: 'fixed', approvedBy: null });
@@ -306,12 +311,17 @@ export default function POS({ user, vendorId, onLogout }) {
             change_given:            Math.max(0, amountTendered - total),
             bank_transfer_reference: isSplit ? null : (bankRef ?? null),
             payments:                isSplit ? payments : null,
-            completed_at:            new Date().toISOString(),
+            completed_at:            recoveredAt ?? new Date().toISOString(),
         };
 
         let savedSale = { ...payload };
 
-        if (isOnline) {
+        // A recovered sale goes back through the offline queue even when the
+        // till is online, because that is the only path that keeps the date it
+        // carries: the live endpoint stamps the moment the sale reaches it, so
+        // yesterday's goods would land in today's takings. The queue is drained
+        // immediately below, so it still goes up straight away.
+        if (isOnline && ! recoveredAt) {
             try {
                 const { data } = await api.post('/sales', payload);
                 savedSale = { ...payload, id: data.id, reference: data.reference };
@@ -361,6 +371,13 @@ export default function POS({ user, vendorId, onLogout }) {
 
         // This checkout is done, so the next customer starts a new one.
         checkoutRef.current.settled();
+
+        // Queued rather than posted, so nudge the sync instead of waiting for
+        // its next cycle — the cashier should not be left wondering.
+        if (recoveredAt) {
+            setRecoveredAt(null);
+            syncNow();
+        }
 
         clearCart();
         setModal(null);
@@ -826,6 +843,18 @@ export default function POS({ user, vendorId, onLogout }) {
                             </div>
                         )}
 
+                        {/* A backdated sale is surprising unless it says so. It
+                            will not appear in today's takings, which is the
+                            point — the goods left on the day named here. */}
+                        {recoveredAt && (
+                            <div className="mb-3 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800">
+                                <span className="font-bold">Correcting an earlier sale.</span>{' '}
+                                This will be recorded on{' '}
+                                {new Date(recoveredAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })},
+                                the day the goods left — not today.
+                            </div>
+                        )}
+
                         <div className="border-t border-gray-100 dark:border-gray-800 pt-3 space-y-0">
                             {CONFIG.panelUrl && (
                                 <a href={CONFIG.panelUrl}
@@ -975,8 +1004,9 @@ export default function POS({ user, vendorId, onLogout }) {
                     // Gated on an empty cart for the same reason resuming a held
                     // sale is: loading one sale over another would lose whatever
                     // is on screen, and a cashier mid-sale would never get it back.
-                    onReturnToCart={(items) => {
+                    onReturnToCart={(items, originalCompletedAt) => {
                         setCart(items);
+                        setRecoveredAt(originalCompletedAt ?? null);
                         setSelectedIdx(null);
                         setCartDiscount({ amount: 0, type: 'fixed', approvedBy: null });
                         setModal(null);
