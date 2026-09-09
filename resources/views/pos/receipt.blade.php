@@ -17,7 +17,11 @@
 <style>
     /* 80mm roll, printed edge to edge. The 4mm margin keeps text off the
        tear-off edge on the common Xprinter/Epson heads. */
-    @page { size: 80mm auto; margin: 4mm; }
+    /* No top margin: thermal paper is consumed top-down and the printer
+       already feeds a leading strip of its own, so a page margin there is
+       blank paper on every single receipt. Sides keep enough to stay off the
+       edge, and the bottom keeps room for the tear. */
+    @page { size: 80mm auto; margin: 0 3mm 4mm; }
 
     * { box-sizing: border-box; }
 
@@ -63,6 +67,16 @@
         line-height: 1.15;
     }
     .header-line { margin: 0; font-size: 12px; }
+
+    /* Smaller than the vendor name but larger than an address line: it is the
+       second thing a customer looks for, not a footnote. */
+    .store-branch {
+        margin: 0 0 1mm;
+        font-size: 14px;
+        font-weight: bold;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
 
     .logo { max-width: 40mm; max-height: 18mm; margin: 0 auto 4px; display: block; }
 
@@ -146,9 +160,33 @@
 
     <p class="store-name">{{ $settings->displayName($vendor) }}</p>
 
-    @foreach($settings->headerLines() as $line)
-        <p class="header-line">{{ $line }}</p>
-    @endforeach
+    {{-- The branch, for a vendor that has more than one. A customer with a
+         query needs to know which shop sold this, and the head office name
+         alone does not tell them. --}}
+    @if($showStore)
+        <p class="store-branch">{{ $store->name }}</p>
+    @endif
+
+    {{-- The branch's own address and phone win over the vendor's: sending
+         somebody to head office for a product they bought across town is
+         worse than printing nothing. --}}
+    @php
+        $address = $showStore && filled($store->address) ? $store->address : $settings->header_address;
+        $phone   = $showStore && filled($store->phone)   ? $store->phone   : $settings->header_phone;
+    @endphp
+
+    @if(filled($settings->header_tagline))
+        <p class="header-line">{{ $settings->header_tagline }}</p>
+    @endif
+    @if(filled($address))
+        <p class="header-line">{{ $address }}</p>
+    @endif
+    @if(filled($phone))
+        <p class="header-line">{{ $phone }}</p>
+    @endif
+    @if(filled($settings->header_extra))
+        <p class="header-line">{{ $settings->header_extra }}</p>
+    @endif
 </div>
 
 <hr>
@@ -240,10 +278,15 @@
 @endif
 
 {{-- ── Footer ─────────────────────────────────────────────────────────── --}}
-@if(trim((string) $settings->footer_text) !== '')
+{{-- A thank-you by default rather than only when configured. Every vendor
+     wants one and none of them thought to type it, so the receipts went out
+     ending on a bare total. A vendor who sets their own text still wins. --}}
 <hr>
-<div class="footer {{ $falign }}">{{ $settings->footer_text }}</div>
-@endif
+<div class="footer {{ $falign }}">
+    {{ trim((string) $settings->footer_text) !== ''
+        ? $settings->footer_text
+        : 'Thank you for your patronage.' }}
+</div>
 
 {{-- QR to the customer's own copy. Printed last so a scanner is not hunting
      for it among the figures, and sized generously: a thermal head renders a

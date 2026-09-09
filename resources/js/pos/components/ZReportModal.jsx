@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { printFallback } from '../lib/printFallback';
 import { fmt } from '../lib/format';
 import api from '../lib/api';
 
@@ -20,7 +21,12 @@ export default function ZReportModal({ session, onClose, onCloseSession }) {
         }
     };
 
-    const printReport = () => window.print();
+    // Was a bare window.print(). The receipt print rules are global in print
+    // media, so `body * { visibility: hidden }` applied here too and the Z
+    // report came out BLANK — nothing on this modal carried the class that
+    // made anything visible again. It now opts into the same scoped mechanism
+    // the receipt fallback uses, and marks what should actually appear.
+    const printReport = () => printFallback();
 
     if (!session) {
         return (
@@ -35,7 +41,9 @@ export default function ZReportModal({ session, onClose, onCloseSession }) {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+            {/* print-receipt marks what actually goes on paper; receipt-card lifts
+                the height cap so a long report is not clipped to one screenful. */}
+            <div className="print-receipt receipt-card bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white z-10">
                     <h2 className="font-bold text-gray-800">Z-Report — Close Session</h2>
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>

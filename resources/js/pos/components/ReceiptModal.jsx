@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { fmt } from '../lib/format';
 import api from '../lib/api';
 import { cacheReceipt, cachedReceipt } from '../lib/salesHistory';
+import { printFallback } from '../lib/printFallback';
 
 const CONFIG = window.POS_CONFIG ?? {};
 
@@ -44,7 +45,7 @@ export default function ReceiptModal({ sale, onNewSale, isReprint = false }) {
                 console.warn('Receipt has no sale id — printing the fallback copy instead of the receipt document.');
                 setPrintWarning('Printed a basic copy — this receipt was not linked to a saved sale.');
             }
-            window.print();
+            printFallback();
             return;
         }
 
@@ -67,9 +68,33 @@ export default function ReceiptModal({ sale, onNewSale, isReprint = false }) {
             frame.contentWindow.document.close();
         };
 
+        // Printed from the parent, after the document has settled. The old
+        // in-document script did this on a 250ms timer; driving it here means
+        // the print happens once, when we say, and never races the fetch.
+        const printFrame = () => {
+            const run = () => {
+                frame.contentWindow.focus();
+                frame.contentWindow.print();
+            };
+
+            // Images and the QR need to be laid out or the thermal head gets a
+            // half-rendered receipt.
+            if (frame.contentWindow.document.readyState === 'complete') {
+                setTimeout(run, 50);
+            } else {
+                frame.contentWindow.addEventListener('load', () => setTimeout(run, 50), { once: true });
+            }
+        };
+
         try {
-            const { data: html } = await api.get(`/sales/${sale.id}/receipt?print=1`);
+            // Fetched WITHOUT ?print=1 on purpose. That flag makes the document
+            // print itself from inside the frame, which left two mechanisms
+            // able to fire for one sale — the frame's own print, and the
+            // parent's @media print rules that still render this modal. One
+            // trigger, owned here, is the only way that cannot double.
+            const { data: html } = await api.get(`/sales/${sale.id}/receipt`);
             writeToFrame(html);
+            printFrame();
 
             // Kept for next time. A customer coming back tomorrow, on a till
             // with no signal, is exactly when the real receipt is wanted and
@@ -85,6 +110,7 @@ export default function ReceiptModal({ sale, onNewSale, isReprint = false }) {
 
             if (stored) {
                 writeToFrame(stored);
+                printFrame();
                 setPrintWarning("Printed from this device's saved copy — the server could not be reached.");
 
                 return;
@@ -96,7 +122,7 @@ export default function ReceiptModal({ sale, onNewSale, isReprint = false }) {
             // Say so, then still give the cashier paper.
             console.error(`Receipt document failed (${detail}) — printing the fallback copy.`, err);
             setPrintWarning(`Printed a basic copy — the full receipt could not be loaded (${detail}).`);
-            window.print();
+            printFallback();
         }
     };
 

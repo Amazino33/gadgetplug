@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Pos;
 
 use App\Http\Controllers\Controller;
 use App\Models\PosSale;
+use App\Models\Store;
 use App\Models\VendorReceiptSetting;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -30,7 +31,7 @@ class PosReceiptController extends Controller
         // page that omits those details.
         abort_unless($user && $sale->vendor && $sale->vendor->canAccess($user), 403);
 
-        $sale->loadMissing(['items', 'payments', 'cashier', 'customer', 'vendor']);
+        $sale->loadMissing(['items', 'payments', 'cashier', 'customer', 'vendor', 'store']);
 
         $vendor   = $sale->vendor;
         $settings = VendorReceiptSetting::forVendor($vendor);
@@ -39,6 +40,13 @@ class PosReceiptController extends Controller
             'sale'         => $sale,
             'vendor'       => $vendor,
             'settings'     => $settings,
+            // Which branch sold this. A vendor with one store gains nothing
+            // from repeating itself, so it is only shown when there is more
+            // than one — otherwise every receipt carries a line the customer
+            // cannot act on.
+            'store'        => $sale->store,
+            'showStore'    => $sale->store !== null
+                && Store::where('vendor_id', $vendor->id)->count() > 1,
             'soldAt'       => $sale->completed_at ?? $sale->created_at,
             'cashierName'  => $sale->cashier?->name,
             'customerName' => $sale->customer?->name,
