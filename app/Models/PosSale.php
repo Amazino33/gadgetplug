@@ -68,6 +68,18 @@ class PosSale extends Model
         return $this->belongsTo(PosSession::class, 'pos_session_id');
     }
 
+    /**
+     * The branch that rang the sale.
+     *
+     * Nullable: sales predating multi-store were backfilled to the vendor's
+     * default store by migration, but the column stays nullable, so anything
+     * reading this must cope with none.
+     */
+    public function store(): BelongsTo
+    {
+        return $this->belongsTo(Store::class);
+    }
+
     public function cashier(): BelongsTo
     {
         return $this->belongsTo(User::class, 'cashier_id');
