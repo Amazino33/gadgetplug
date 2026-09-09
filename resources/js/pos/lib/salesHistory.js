@@ -65,6 +65,26 @@ export async function markSaleSynced(offlineId, { id, reference } = {}) {
         .modify({ server_id: id ?? null, reference: reference ?? null, synced: 1 });
 }
 
+/**
+ * Forgets a sale the device recorded but the server never accepted.
+ *
+ * Used when a rejected sale is pulled back into the cart to be rung again:
+ * without this the till would keep showing the refused attempt in its history
+ * beside the corrected one, as though the goods had gone out twice.
+ *
+ * Deliberately narrow — it only ever matches a local, unsynced row. A sale
+ * carrying a server id is a real sale and is not the device's to erase.
+ */
+export async function forgetUnsyncedSale(offlineId) {
+    if (!offlineId) return 0;
+
+    return db.sales
+        .where('offline_id')
+        .equals(offlineId)
+        .filter((sale) => ! sale.server_id)
+        .delete();
+}
+
 /** This cashier's sales held on the device, newest first. */
 export async function localSales(cashierId) {
     if (!cashierId) return [];

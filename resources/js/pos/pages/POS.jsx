@@ -3,6 +3,7 @@ import { useKeyboard } from '../hooks/useKeyboard';
 import { useSync } from '../hooks/useSync';
 import { fmt, generateOfflineId } from '../lib/format';
 import { createCheckoutId } from '../lib/checkoutId';
+import { cartFloorTotal } from '../lib/cartFloor';
 import { shouldRedirectTypingToSearch } from '../lib/typeAhead';
 import { db } from '../lib/db';
 import { pruneOldSales, recordSale } from '../lib/salesHistory';
@@ -230,6 +231,13 @@ export default function POS({ user, vendorId, onLogout }) {
     // ── Totals ───────────────────────────────────────────────────────
 
     const subtotal       = cart.reduce((s, i) => s + i.price * i.qty - (i.lineDiscount || 0), 0);
+
+    // The least this cart may sell for, the same sum the server works out in
+    // PosPriceFloor::guard(). Every line can sit exactly on its own floor and
+    // still be dragged under it by a discount applied to the whole cart — which
+    // the till used to allow and the server then refused. Offline that refusal
+    // arrives long after the customer has gone, as a sale that can never sync.
+    const cartFloor      = cartFloorTotal(cart);
     const discountAmount = cartDiscount.type === 'percentage'
         ? subtotal * (cartDiscount.amount / 100)
         : cartDiscount.amount;
@@ -867,6 +875,7 @@ export default function POS({ user, vendorId, onLogout }) {
                 <DiscountModal
                     vendorId={vendorId}
                     subtotal={subtotal}
+                    floorTotal={cartFloor}
                     current={cartDiscount}
                     onApply={(d) => { setCartDiscount(d); setModal(null); }}
                     onClose={() => setModal(null)}
@@ -960,8 +969,19 @@ export default function POS({ user, vendorId, onLogout }) {
             {modal === 'stuckSales' && (
                 <StuckSalesModal
                     sales={stuckSales}
+                    cartEmpty={cartEmpty}
                     onClose={() => setModal(null)}
                     onRetried={() => syncNow()}
+                    // Gated on an empty cart for the same reason resuming a held
+                    // sale is: loading one sale over another would lose whatever
+                    // is on screen, and a cashier mid-sale would never get it back.
+                    onReturnToCart={(items) => {
+                        setCart(items);
+                        setSelectedIdx(null);
+                        setCartDiscount({ amount: 0, type: 'fixed', approvedBy: null });
+                        setModal(null);
+                        syncNow();
+                    }}
                 />
             )}
             {/* A slow connection used to leave the screen looking untouched, so

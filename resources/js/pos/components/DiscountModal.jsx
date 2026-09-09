@@ -1,8 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { fmt } from '../lib/format';
+import { breachesFloor } from '../lib/cartFloor';
 import api from '../lib/api';
 
-export default function DiscountModal({ vendorId, subtotal, current, onApply, onClose }) {
+// floorTotal is the least this cart may sell for — the same figure the server
+// works out in PosPriceFloor::guard(). Checked here because the server's
+// refusal arrives too late to help: offline it lands after the customer has
+// left, as a sale that can never sync and goods that are already gone.
+export default function DiscountModal({ vendorId, subtotal, floorTotal = 0, current, onApply, onClose }) {
     const [type, setType]           = useState(current.type || 'fixed');
     const [amount, setAmount]       = useState(current.amount || '');
     const [managerPin, setManagerPin] = useState('');
@@ -18,8 +23,10 @@ export default function DiscountModal({ vendorId, subtotal, current, onApply, on
 
     const afterDiscount = Math.max(0, subtotal - discountValue);
 
+    const belowFloor = breachesFloor(subtotal, floorTotal, discountValue);
+
     const apply = async () => {
-        if (!amount || discountValue <= 0) return;
+        if (!amount || discountValue <= 0 || belowFloor) return;
         setApproving(true);
         setError('');
         try {
@@ -83,6 +90,16 @@ export default function DiscountModal({ vendorId, subtotal, current, onApply, on
                     </div>
                 )}
 
+                {belowFloor && (
+                    <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-4">
+                        <p className="text-xs font-bold text-red-700">Discount too large</p>
+                        <p className="text-xs text-red-600 mt-0.5">
+                            This cart cannot go below {fmt(floorTotal)}. Lower the discount, or take
+                            it off individual lines instead.
+                        </p>
+                    </div>
+                )}
+
                 {/* Manager PIN */}
                 <div className="mb-4">
                     <label className="text-xs font-semibold text-gray-500 mb-1 block">Manager PIN (required)</label>
@@ -103,7 +120,7 @@ export default function DiscountModal({ vendorId, subtotal, current, onApply, on
                     </button>
                     <button
                         onClick={apply}
-                        disabled={!amount || !managerPin || approving}
+                        disabled={!amount || !managerPin || approving || belowFloor}
                         className="flex-1 py-3 rounded-xl bg-[#F97316] text-white text-sm font-bold disabled:opacity-40 hover:bg-[#ea6c0a]">
                         {approving ? 'Verifying…' : 'Apply Discount'}
                     </button>
