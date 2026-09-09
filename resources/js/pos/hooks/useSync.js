@@ -13,6 +13,7 @@ import { markPickingPaymentSynced, pendingPickingPayments, prunePickingPayments 
  */
 export function useSync(vendorId, onStuckSalesChange) {
     const timerRef = useRef(null);
+    const catalogueTimerRef = useRef(null);
 
     const reportStuck = async () => {
         if (!onStuckSalesChange) return;
@@ -106,16 +107,59 @@ export function useSync(vendorId, onStuckSalesChange) {
         await prunePickingPayments();
     };
 
+    /**
+     * Pulls the branch catalogue down again.
+     *
+     * It was previously written once, at login, and never again — so a
+     * product added or restocked during a shift did not exist as far as the
+     * till was concerned until the cashier logged out and back in. Nobody
+     * knows to do that, so the answer to "why can't I sell this?" was a
+     * logout nobody thought to try.
+     *
+     * Replaced wholesale rather than merged: a product that has been
+     * unpublished, moved to another branch or sold out has to leave the till
+     * as surely as a new one has to arrive, and only the server knows which.
+     * The swap happens in one transaction so a search running at that moment
+     * cannot read a half-empty catalogue.
+     */
+    const refreshCatalogue = async () => {
+        if (!navigator.onLine || !vendorId) return;
+
+        try {
+            const { data } = await api.get('/products', { params: { vendor_id: vendorId } });
+
+            if (!Array.isArray(data) || data.length === 0) return;
+
+            await db.transaction('rw', db.products, async () => {
+                await db.products.clear();
+                await db.products.bulkPut(data);
+            });
+        } catch {
+            // Offline or refused — the catalogue already on the device stays
+            // exactly as it is, which is what keeps the till sellable.
+        }
+    };
+
     useEffect(() => {
         sync();
+        refreshCatalogue();
+
         timerRef.current = setInterval(sync, 30_000);
-        window.addEventListener('online', sync);
+        // Far less often than the sale queue: this is a whole catalogue, and
+        // the search box already asks the server directly on every search, so
+        // this is about the till being usable offline with something current
+        // rather than about finding a product right now.
+        catalogueTimerRef.current = setInterval(refreshCatalogue, 10 * 60_000);
+
+        const onOnline = () => { sync(); refreshCatalogue(); };
+        window.addEventListener('online', onOnline);
 
         return () => {
             clearInterval(timerRef.current);
-            window.removeEventListener('online', sync);
+            clearInterval(catalogueTimerRef.current);
+            window.removeEventListener('online', onOnline);
         };
     }, [vendorId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    return { syncNow: sync };
+    return { syncNow: sync, refreshCatalogue };
 }

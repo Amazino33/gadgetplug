@@ -79,11 +79,18 @@ const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect, autoFocus 
 
         setResults(local);
 
-        // Only worth asking the network when the local catalogue came up
-        // empty — keeps the common case (which is nearly every search)
-        // fully local, and cuts how often two answers to the same search
-        // can race each other in the first place.
-        if (local.length === 0 && navigator.onLine) {
+        // The local catalogue is only ever written at login and never
+        // refreshed, so it goes stale the moment a product is added or
+        // restocked mid-shift. The server is therefore asked on every
+        // search, not just when the cache came up empty: skipping it
+        // whenever the cache had *any* match meant a cashier typing "TECNO"
+        // saw yesterday's TECNOs and never the one added this morning.
+        //
+        // Local results are already on screen by now, so this costs the
+        // cashier nothing — it only ever adds what the device did not know
+        // about. Out-of-order answers are handled by the guard below rather
+        // than by not asking.
+        if (navigator.onLine) {
             setSearching(true);
             try {
                 // Short timeout on top of the client's generous default — a
@@ -95,9 +102,16 @@ const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect, autoFocus 
                     timeout: 5000,
                 });
                 if (!latestSearch.isCurrent(token)) return;
+
+                // The server's answer replaces the local one rather than
+                // merging into it: it is the authority on what this branch
+                // may sell right now. A product the cache still lists but
+                // the server no longer returns — unpublished, moved branch,
+                // sold out — must stop being offered, not linger because a
+                // stale copy exists on the device.
                 setResults(data);
                 setActiveIndex(-1);
-            } catch { /* stay offline-friendly — nothing local, nothing from the network */ }
+            } catch { /* offline or too slow — whatever the device knows is already showing */ }
             finally {
                 if (latestSearch.isCurrent(token)) setSearching(false);
             }

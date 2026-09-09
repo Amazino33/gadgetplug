@@ -28,7 +28,17 @@ vi.mock('../lib/db', () => ({
     },
 }));
 
-vi.mock('../lib/api', () => ({ default: { get: vi.fn(async () => ({ data: [] })) } }));
+// The server agrees with the device — the search box replaces local results
+// with the server's, so a mock that knows nothing would empty the list.
+vi.mock('../lib/api', () => ({
+    default: {
+        get: vi.fn(async (url, config) => {
+            const q = (config?.params?.q ?? '').toLowerCase();
+
+            return { data: localCatalogue.filter((p) => p.name.toLowerCase().includes(q)) };
+        }),
+    },
+}));
 
 // The shape POS uses: picking from search always opens the quantity box.
 function Till({ onConfirm }) {

@@ -18,6 +18,9 @@ const charger = { id: 1, name: 'Samsung 25W Charger', sku: 'SAM-25', barcode: '6
 const cable   = { id: 2, name: 'Samsung Cable',       sku: 'SAM-CB', barcode: '6009876543210', price: 1500, available_stock: 9 };
 // Real shape of this catalogue: imports have left products on single-digit SKUs.
 const battery = { id: 3, name: 'BATTERY BL-5C',       sku: '5',      barcode: null,            price: 1695, available_stock: 655 };
+// Added in the admin panel after this till logged in, so it exists on the
+// server but not in the device's catalogue.
+const addedToday = { id: 4, name: 'Samsung A55 (added today)', sku: 'SAM-A55', barcode: '600555', price: 480000, available_stock: 3 };
 
 let localCatalogue = [];
 
@@ -34,14 +37,33 @@ vi.mock('../lib/db', () => ({
 }));
 
 vi.mock('../lib/api', () => ({
-    default: { get: vi.fn(async () => ({ data: [] })) },
+    default: { get: vi.fn() },
 }));
+
+// By default the server agrees with the device — same catalogue, same
+// matching. Tests that care about them diverging (a product added since
+// login, an unreachable server) say so explicitly.
+const serverAgreesWithDevice = async (url, config) => {
+    const q = (config?.params?.q ?? '').toLowerCase();
+
+    return {
+        data: localCatalogue.filter((p) =>
+            String(p.barcode ?? '').toLowerCase() === q ||
+            String(p.sku ?? '').toLowerCase() === q ||
+            p.name.toLowerCase().includes(q)
+        ),
+    };
+};
 
 const type = (text) => userEvent.type(screen.getByRole('textbox'), text);
 
-beforeEach(() => {
+beforeEach(async () => {
     localCatalogue = [charger, cable];
     vi.stubGlobal('navigator', { ...window.navigator, onLine: true });
+
+    const api = (await import('../lib/api')).default;
+    api.get.mockReset();
+    api.get.mockImplementation(serverAgreesWithDevice);
 });
 
 afterEach(() => {
@@ -197,16 +219,32 @@ describe('with no network', () => {
         expect(onSelect).toHaveBeenCalledWith(cable);
     });
 
-    it('never reaches for the network when the local catalogue already answered', async () => {
+    it('still asks the server even when the local catalogue answered, so a product added since login shows up', async () => {
+        // The device's catalogue is only written at login. Skipping the
+        // server whenever the cache had any match meant a product added
+        // mid-shift was invisible to whoever had been logged in all day.
         const api = (await import('../lib/api')).default;
         api.get.mockClear();
+        api.get.mockResolvedValueOnce({ data: [charger, cable, addedToday] });
 
         render(<SearchBar vendorId={1} onSelect={vi.fn()} />);
 
         await type('samsung');
-        expect(await screen.findByText('Samsung Cable')).toBeDefined();
 
-        expect(api.get).not.toHaveBeenCalled();
+        expect(await screen.findByText('Samsung A55 (added today)')).toBeDefined();
+        expect(api.get).toHaveBeenCalled();
+    });
+
+    it('keeps showing what the device knows when the server cannot be reached', async () => {
+        const api = (await import('../lib/api')).default;
+        api.get.mockClear();
+        api.get.mockRejectedValueOnce(new Error('timeout of 5000ms exceeded'));
+
+        render(<SearchBar vendorId={1} onSelect={vi.fn()} />);
+
+        await type('samsung');
+
+        expect(await screen.findByText('Samsung Cable')).toBeDefined();
     });
 
     it('says nothing matched rather than hanging when the network is unreachable', async () => {
