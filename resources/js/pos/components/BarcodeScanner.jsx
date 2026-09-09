@@ -31,23 +31,43 @@ export default function BarcodeScanner({ vendorId, onProductFound }) {
         setError('');
         setNotFound('');
 
-        const local = await db.products.where('barcode').equals(barcode).first();
-        if (local) {
-            onProductFound(local);
-            setOpen(false);
-            return;
-        }
-
+        // The server first whenever there is one to ask.
+        //
+        // This used to answer from the device's own catalogue and only fall
+        // back to the server when it found nothing — which meant a scan
+        // carried whatever price and stock the device last heard about, and
+        // that catalogue is only refreshed periodically. A price raised in
+        // the admin panel would keep selling at the old one, because the
+        // server records the price the till sends and only checks it against
+        // a floor (PosSaleController: the guard is a minimum, not the
+        // catalogue price, so that a negotiated price can still go through).
+        // Cheap goods sold at yesterday's price is not something a cashier
+        // can notice happening.
         if (navigator.onLine) {
             try {
-                const { data } = await api.get('/products/search', { params: { vendor_id: vendorId, q: barcode } });
+                const { data } = await api.get('/products/search', {
+                    params: { vendor_id: vendorId, q: barcode },
+                    // A scan is a hand hovering over the counter — it cannot
+                    // wait on a stalled connection when the device very
+                    // likely already knows this product.
+                    timeout: 5000,
+                });
                 const exact = data.find((p) => p.barcode === barcode);
                 if (exact) {
                     onProductFound(exact);
                     setOpen(false);
                     return;
                 }
-            } catch { /* stay offline-friendly, fall through to not-found */ }
+            } catch { /* unreachable or too slow — the device's copy is next */ }
+        }
+
+        // Offline, or the server had nothing to say: whatever was cached at
+        // the last refresh is what keeps the till selling.
+        const local = await db.products.where('barcode').equals(barcode).first();
+        if (local) {
+            onProductFound(local);
+            setOpen(false);
+            return;
         }
 
         setNotFound(`No product found for "${barcode}".`);
