@@ -263,7 +263,7 @@
         entries: {},
         position: 1,
         // Tied to the session's own updated_at, not just its id: a manager's
-        // "Clear All Counting" (resetSession) touches this same row on a
+        // 'Clear All Counting' (resetSession) touches this same row on a
         // completely different device from the counter's — there is no way to
         // reach into that device's localStorage from here, so instead a reset
         // is made to change the key itself, which orphans the stale draft
@@ -356,7 +356,7 @@
 
         // Snapshots whichever entry is about to be left, so a genuine change
         // (not just re-visiting an untouched value) surfaces the undo toast —
-        // the same "skip the noise if nothing changed" rule saveCurrentEntry()
+        // the same 'skip the noise if nothing changed' rule saveCurrentEntry()
         // used to enforce server-side.
         leavePosition() {
             const id = this.currentProductId;
@@ -400,7 +400,7 @@
             code = (code || '').trim();
             if (!code) return;
             const idx = this.products.findIndex(p => p.barcode === code || p.sku === code);
-            if (idx === -1) { this.showToast('No product found for \"' + code + '\".'); return; }
+            if (idx === -1) { this.showToast('No product found: ' + code); return; }
             this.goTo(idx + 1);
         },
 
