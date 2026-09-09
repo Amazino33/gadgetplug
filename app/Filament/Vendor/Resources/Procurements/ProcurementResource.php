@@ -3,12 +3,14 @@
 namespace App\Filament\Vendor\Resources\Procurements;
 
 use App\Models\Procurement;
+use App\Services\ActiveStore;
 use Filament\Actions\Action;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class ProcurementResource extends Resource
 {
@@ -20,6 +22,113 @@ class ProcurementResource extends Resource
     protected static string|null|\UnitEnum  $navigationGroup = 'Procurement';
     protected static ?string                $navigationLabel = 'Procurements';
     protected static ?int $navigationSort = 2;
+
+    /**
+     * A delivery belongs to the branch it was sent to.
+     *
+     * Goods sent to Oraimo are Oraimo's business: their staff receive them,
+     * check them against the waybill and put them on the shelf. Somebody at
+     * another branch approving that order is approving stock they cannot see,
+     * which is how a delivery ends up recorded onto the wrong shelf.
+     *
+     * Three things stay visible beyond your own branch, each for a reason:
+     *
+     *  - Orders with no destination at all. These predate the destination
+     *    field and belong to no branch, so confining them to one would strand
+     *    them. They keep working exactly as before.
+     *  - Orders you created yourself. Whoever records a purchase needs to
+     *    watch it through to approval; they still cannot approve it.
+     *  - Everything, if you are the owner or a super admin — accessibleFor
+     *    hands them every branch, so that falls out of the same rule rather
+     *    than needing a special case here.
+     */
+    public static function reachableBy(Builder $query): Builder
+    {
+        $vendor = filament()->getTenant();
+        $user   = auth()->user();
+
+        if (! $vendor || ! $user) {
+            return $query;
+        }
+
+        $branches = ActiveStore::accessibleFor($vendor, $user)->pluck('id');
+
+        return $query->where(fn (Builder $q) => $q
+            ->whereIn('procurements.store_id', $branches)
+            ->orWhereNull('procurements.store_id')
+            ->orWhere('procurements.created_by', $user->id));
+    }
+
+    /**
+     * Whether this user may receive this particular delivery into stock.
+     *
+     * The same rule as the list, minus the creator exemption: seeing your own
+     * order through is not the same as being the branch that took delivery of
+     * it, and approving is what actually moves the stock.
+     */
+    public static function canApprove(Procurement $procurement): bool
+    {
+        $vendor = filament()->getTenant();
+        $user   = auth()->user();
+
+        if (! $vendor || ! $user) {
+            return false;
+        }
+
+        // No destination recorded: nothing to be wrong about, and these are
+        // the orders that predate the field.
+        if ($procurement->store_id === null) {
+            return true;
+        }
+
+        return ActiveStore::canAccess($vendor, $user, (int) $procurement->store_id);
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return static::reachableBy(parent::getEloquentQuery());
+    }
+
+    /**
+     * How many deliveries are sitting unapproved.
+     *
+     * Approving is what actually puts the goods on a shelf, so an order left
+     * pending is stock the system does not know it has. The number is here to
+     * be noticed from any other screen in the panel.
+     *
+     * Counted through the same branch rule as the list, so a storekeeper is
+     * never badged about a delivery they cannot open.
+     */
+    public static function getNavigationBadge(): ?string
+    {
+        if (! \Illuminate\Support\Facades\Schema::hasTable('procurements')) {
+            return null;
+        }
+
+        $vendor = filament()->getTenant();
+
+        if (! $vendor) {
+            return null;
+        }
+
+        $count = static::reachableBy(
+            Procurement::query()->where('procurements.vendor_id', $vendor->id)
+        )->where('procurements.status', 'pending')->count();
+
+        // Null rather than "0": a badge showing nothing to do is just noise on
+        // the navigation for the many days there is nothing to do.
+        return $count > 0 ? (string) $count : null;
+    }
+
+    public static function getNavigationBadgeColor(): string
+    {
+        return 'warning';
+    }
+
+    public static function getNavigationBadgeTooltip(): ?string
+    {
+        return 'Deliveries waiting to be approved into stock';
+    }
 
     public static function canAccess(): bool
     {

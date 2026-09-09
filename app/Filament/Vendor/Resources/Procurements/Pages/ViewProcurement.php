@@ -115,7 +115,14 @@ class ViewProcurement extends ViewRecord
                         $this->record->items()->count(),
                         $this->record->store->name ?? 'the default store',
                     ))
-                    ->visible(fn () => $this->record->isPending() && $user->hasVendorPermission($vendor->id, 'approve_procurement') && ($this->record->created_by !== auth()->id() || !$vendor->hasOtherApprovers($this->record->created_by)))
+                    // Branch membership as well as the permission: goods sent
+                    // to Oraimo are received by Oraimo, because approving is
+                    // what puts them on a shelf and only the branch holding
+                    // the cartons can say they arrived.
+                    ->visible(fn () => $this->record->isPending()
+                        && $user->hasVendorPermission($vendor->id, 'approve_procurement')
+                        && ProcurementResource::canApprove($this->record)
+                        && ($this->record->created_by !== auth()->id() || !$vendor->hasOtherApprovers($this->record->created_by)))
                     ->action(function (ApproveProcurementAction $approveAction) {
                         try {
                             // Received into the store the approver is working

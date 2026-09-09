@@ -5,6 +5,7 @@ namespace App\Filament\Vendor\Resources\Procurements\Pages;
 use App\Filament\Vendor\Resources\Procurements\ProcurementResource;
 use App\Models\Product;
 use App\Models\Supplier;
+use App\Services\ActiveStore;
 use Filament\Actions\Action;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Placeholder;
@@ -56,6 +57,26 @@ class CreateProcurement extends CreateRecord
                             )->id;
                         })
                         ->helperText('Can\'t find your supplier? Use the + button to add them.')
+                        ->columnSpanFull(),
+
+                    // Where the goods are actually going.
+                    //
+                    // This step had no destination field at all, so every
+                    // order raised here saved a null store and fell back at
+                    // approval time to whichever branch the approver happened
+                    // to be working in — which is how stock lands on the wrong
+                    // shelf. The wizard at /procurement has always required
+                    // one; this now matches it.
+                    Select::make('store_id')
+                        ->label('Deliver To')
+                        ->options(fn (): array => static::branchOptions())
+                        ->default(fn (): ?int => array_key_first(static::branchOptions()))
+                        ->required()
+                        ->native(false)
+                        ->helperText('The branch receiving these goods. Only staff of that branch can approve the delivery.')
+                        // One branch is not a choice, and asking for it is a
+                        // step for nothing. It is still saved.
+                        ->visible(fn (): bool => count(static::branchOptions()) > 1)
                         ->columnSpanFull(),
 
                     FileUpload::make('waybill_image')
@@ -273,12 +294,49 @@ class CreateProcurement extends CreateRecord
 
     protected static bool $canCreateAnother = false;
 
+    /**
+     * Branches this user may send goods to, default first.
+     *
+     * The same helper the Sales Report and the /procurement wizard use, so a
+     * storekeeper is never offered a branch they have no business receiving
+     * into.
+     *
+     * @return array<int, string>
+     */
+    protected static function branchOptions(): array
+    {
+        $vendor = filament()->getTenant();
+        $user   = auth()->user();
+
+        if (! $vendor || ! $user) {
+            return [];
+        }
+
+        return ActiveStore::accessibleFor($vendor, $user)->pluck('name', 'id')->all();
+    }
+
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         $data['created_by'] = auth()->id();
         $data['vendor_id']  = filament()->getTenant()->id;
         $data['status']     = 'pending';
         $data['total_cost'] = 0;
+
+        $branches = static::branchOptions();
+
+        // A single-branch vendor never sees the field, so it is filled in here
+        // rather than left null — null is exactly the state that let stock
+        // land wherever the approver happened to be standing.
+        $data['store_id'] = $data['store_id'] ?? array_key_first($branches);
+
+        // The id came from a browser. Restricting the dropdown is a courtesy;
+        // this is the control.
+        abort_unless(
+            $data['store_id'] !== null && array_key_exists((int) $data['store_id'], $branches),
+            403,
+            'You cannot receive goods into that branch.',
+        );
+
         return $data;
     }
 
