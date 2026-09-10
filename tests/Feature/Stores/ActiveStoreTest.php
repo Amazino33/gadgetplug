@@ -56,12 +56,27 @@ test('a member sees only the stores they are assigned to', function () {
     expect(ActiveStore::accessibleFor($vendor, $member)->pluck('id')->all())->toBe([$assigned->id]);
 });
 
-test('a member assigned to nothing sees no stores', function () {
+test('a member assigned to nothing sees no stores, once there is more than one', function () {
     $vendor = activeStoreVendor();
+    Store::create(['vendor_id' => $vendor->id, 'name' => 'Second Branch']);
+
     $member = memberOf($vendor);
 
     expect(ActiveStore::accessibleFor($vendor, $member))->toHaveCount(0)
         ->and(ActiveStore::get($vendor, $member))->toBeNull();
+});
+
+test('a member assigned to nothing still reaches the only shop there is', function () {
+    // A vendor that never opened a second branch has no branches to keep
+    // apart, and most have no store_user rows at all, having never been shown
+    // the concept. Read literally that said "may work in none of our stores"
+    // and locked a storekeeper out of the only shop there is.
+    $vendor = activeStoreVendor();
+    $member = memberOf($vendor);
+
+    expect(ActiveStore::accessibleFor($vendor, $member)->pluck('id')->all())
+        ->toBe([$vendor->defaultStore->id])
+        ->and(ActiveStore::get($vendor, $member)?->id)->toBe($vendor->defaultStore->id);
 });
 
 test('another vendor stores never leak into the accessible set', function () {

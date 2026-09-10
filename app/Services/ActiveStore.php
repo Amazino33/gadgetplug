@@ -8,6 +8,7 @@ use App\Models\Store;
 use App\Models\User;
 use App\Models\Vendor;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Session;
 
 // Which store the user is currently operating in, inside the vendor panel.
@@ -19,8 +20,9 @@ use Illuminate\Support\Facades\Session;
 // vendors cannot carry a store across.
 //
 // Access rule, one place, used by the guard and the UI alike:
-//   owner (or super admin) → every store the vendor has
-//   anyone else           → exactly their store_user assignments
+//   owner (or super admin)  → every store the vendor has
+//   single-store vendor     → that store, for everyone
+//   anyone else             → exactly their store_user assignments
 // Owner access runs through vendors.user_id, the same path isOwner()/canAccess()
 // have always used — no owner rows are invented in store_user to make this work.
 class ActiveStore
@@ -34,22 +36,39 @@ class ActiveStore
      */
     public static function accessibleFor(Vendor $vendor, User $user): Collection
     {
-        $query = Store::query()->where('vendor_id', $vendor->id);
+        $stores = Store::query()
+            ->where('vendor_id', $vendor->id)
+            ->orderByDesc('is_default')
+            ->orderBy('name')
+            ->get();
 
         // Super admins are not members of anything, so the membership branch
         // would lock them out of a panel they can otherwise fully administer.
         if ($user->isSuperAdmin() || $vendor->isOwner($user)) {
-            return $query->orderByDesc('is_default')->orderBy('name')->get();
+            return $stores;
         }
 
-        return $query
-            ->whereIn('id', fn ($q) => $q
-                ->select('store_id')
-                ->from('store_user')
-                ->where('user_id', $user->id))
-            ->orderByDesc('is_default')
-            ->orderBy('name')
-            ->get();
+        // A shop that never opened a second branch has no branches to be kept
+        // apart, so an assignment there distinguishes nothing — and its
+        // absence is not a decision anyone made. Most such vendors have no
+        // store_user rows at all, having never been shown the concept, which
+        // otherwise reads here as "this person may work in none of our
+        // stores" and quietly locks a storekeeper out of the inventory,
+        // procurement and till screens of the only shop there is.
+        //
+        // Restricting by branch is a real control the moment a second branch
+        // exists — goods sent to one shop are not the other shop's to receive
+        // — so it applies from that point on, unchanged.
+        if ($stores->count() <= 1) {
+            return $stores;
+        }
+
+        $assigned = DB::table('store_user')
+            ->where('user_id', $user->id)
+            ->pluck('store_id')
+            ->all();
+
+        return $stores->whereIn('id', $assigned)->values();
     }
 
     public static function canAccess(Vendor $vendor, User $user, int $storeId): bool
