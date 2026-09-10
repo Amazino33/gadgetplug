@@ -4,6 +4,7 @@ import { useSync } from '../hooks/useSync';
 import { fmt, generateOfflineId } from '../lib/format';
 import { createCheckoutId } from '../lib/checkoutId';
 import { cartFloorTotal } from '../lib/cartFloor';
+import { addToCart } from '../lib/cartAdd';
 import { shouldRedirectTypingToSearch } from '../lib/typeAhead';
 import { db } from '../lib/db';
 import { pruneOldSales, recordSale } from '../lib/salesHistory';
@@ -56,6 +57,9 @@ export default function POS({ user, vendorId, onLogout }) {
 
     const [cart, setCart]                 = useState([]);
     const [selectedIdx, setSelectedIdx]   = useState(null);
+    // Picked from the search box, not yet in the sale. Held here rather than
+    // added so that Escape at the quantity box means nothing happened.
+    const [pendingProduct, setPendingProduct] = useState(null);
     const [customer, setCustomer]         = useState(null);
     const [cartDiscount, setCartDiscount] = useState({ amount: 0, type: 'fixed', approvedBy: null });
     // Set when a refused sale is pulled back in, so the corrected sale is
@@ -173,30 +177,61 @@ export default function POS({ user, vendorId, onLogout }) {
 
     // ── Cart operations ──────────────────────────────────────────────
 
-    const addProduct = useCallback((product, fromSearch = false) => {
+    /**
+     * Puts goods in the cart. The only function that does.
+     *
+     * Adding, never setting: a product already on the sale gains the quantity
+     * rather than being replaced by it. Scanning the same charger three times
+     * means three chargers, and asking for two of something already sitting
+     * at four means six — which is what a cashier reaching for a second
+     * handful means, and the opposite of what the quantity box does when it
+     * is opened on an existing cart line to correct it.
+     *
+     * It used to seat the line here and open the quantity box afterwards, so
+     * a cashier who picked the wrong product and pressed Escape was left with
+     * it in the sale at qty 1 with nothing on screen to say so. Nothing enters
+     * the cart now until a quantity is confirmed.
+     */
+    const addProduct = useCallback((product, qty = 1) => {
         setCart((prev) => {
-            const idx = prev.findIndex((i) => i.id === product.id);
-            if (idx >= 0) {
-                const updated = [...prev];
-                if (!fromSearch) {
-                    updated[idx] = { ...updated[idx], qty: updated[idx].qty + 1 };
-                }
-                setSelectedIdx(idx);
-                return updated;
-            }
-            setSelectedIdx(prev.length);
-            // listPrice keeps the catalogue price after `price` has been
-            // haggled down, so the modal and receipt can still show what the
-            // customer would otherwise have paid.
-            return [...prev, { ...product, listPrice: product.price, qty: 1, lineDiscount: 0 }];
+            const { items, index } = addToCart(prev, product, qty);
+            setSelectedIdx(index);
+            return items;
         });
-        
-        if (fromSearch) {
-            setModal('quantity');
-        } else {
-            setTimeout(() => searchRef.current?.focus(), 50);
-        }
+
+        // No focus call here on purpose. The effect below owns the caret and
+        // already runs on every cart change — doing it here as well meant a
+        // timer racing whatever modal was opening next for the keyboard.
     }, []);
+
+    const askQuantityFor = useCallback((product) => {
+        setPendingProduct(product);
+        setModal('addQuantity');
+    }, []);
+
+    const cancelPending = useCallback(() => {
+        setPendingProduct(null);
+        setModal(null);
+    }, []);
+
+    const confirmPending = useCallback((qty) => {
+        // Zero is how the quantity box removes a cart line. Nothing to remove
+        // here — this product was never added — so it just means "never mind".
+        if (pendingProduct && qty >= 1) addProduct(pendingProduct, qty);
+        cancelPending();
+    }, [pendingProduct, addProduct, cancelPending]);
+
+    // Haggling still starts from the quantity box rather than costing the
+    // cashier a trip through the cart: the line goes in at the quantity
+    // typed, and the price modal opens on it. addProduct has already pointed
+    // selectedIdx at it by the time this renders.
+    const negotiatePending = useCallback((qty) => {
+        if (! pendingProduct) return;
+
+        addProduct(pendingProduct, qty);
+        setPendingProduct(null);
+        setModal('price');
+    }, [pendingProduct, addProduct]);
 
     const updateQty = (idx, qty) => {
         if (qty < 1) { removeItem(idx); return; }
@@ -532,7 +567,18 @@ export default function POS({ user, vendorId, onLogout }) {
                         </div>
                     </div>
                     <div className="px-4 pb-3 flex items-center gap-2">
-                        <SearchBar vendorId={vendorId} onSelect={(p) => addProduct(p, true)} autoFocus={false} />
+                        {/* No autoHighlight on the phone. Its keyboard has no
+                            Enter, it has Go, and Go is how the cashier puts
+                            the keyboard away — see searchSelection.js for the
+                            charger that got sold that way. A scan is still a
+                            scan here: an exact barcode means one product and
+                            cannot mean anything else. */}
+                        <SearchBar
+                            vendorId={vendorId}
+                            onSelect={askQuantityFor}
+                            onScan={addProduct}
+                            autoFocus={false}
+                        />
                         <BarcodeScanner vendorId={vendorId} onProductFound={addProduct} />
                     </div>
                 </div>
@@ -544,7 +590,17 @@ export default function POS({ user, vendorId, onLogout }) {
                         less than that — and the space is worth more spent on
                         getting held sales back in reach. */}
                     <div className="flex flex-1 max-w-md">
-                        <SearchBar ref={searchRef} vendorId={vendorId} onSelect={(p) => addProduct(p, true)} />
+                        {/* The counter's till, on a real keyboard: the closest
+                            match highlights itself so the loop is type →
+                            Enter → quantity → Enter, with no arrow key in it
+                            and no hand off the keyboard. */}
+                        <SearchBar
+                            ref={searchRef}
+                            vendorId={vendorId}
+                            onSelect={askQuantityFor}
+                            onScan={addProduct}
+                            autoHighlight
+                        />
                     </div>
                     <BarcodeScanner vendorId={vendorId} onProductFound={addProduct} />
                     <button
@@ -910,12 +966,26 @@ export default function POS({ user, vendorId, onLogout }) {
                     onClose={() => setModal(null)}
                 />
             )}
+            {/* Correcting a line that is already in the sale: the number
+                replaces what is there, and 0 takes the line out. */}
             {modal === 'quantity' && selectedIdx !== null && (
                 <QuantityModal
                     item={cart[selectedIdx]}
                     onConfirm={(qty) => { updateQty(selectedIdx, qty); setModal(null); }}
                     onClose={() => setModal(null)}
                     onNegotiate={() => setModal('price')}
+                />
+            )}
+            {/* Saying how many of a just-picked product to put in the sale:
+                the number is added, and Escape adds nothing at all. */}
+            {modal === 'addQuantity' && pendingProduct && (
+                <QuantityModal
+                    item={{ ...pendingProduct, qty: 1 }}
+                    title="Add to Sale"
+                    hint="Type the quantity and press Enter · Esc cancels"
+                    onConfirm={confirmPending}
+                    onClose={cancelPending}
+                    onNegotiate={negotiatePending}
                 />
             )}
             {modal === 'price' && selectedIdx !== null && (

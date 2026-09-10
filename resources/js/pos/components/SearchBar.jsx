@@ -2,22 +2,46 @@ import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHand
 import { db } from '../lib/db';
 import api from '../lib/api';
 import { createLatestSearch } from '../lib/latestSearch';
-import { selectionForEnter } from '../lib/searchSelection';
+import { highlightIndexFor, selectionForEnter } from '../lib/searchSelection';
+import { createBurstTracker, looksLikeBarcode, scanFor } from '../lib/scanSignal';
 
-const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect, autoFocus = true }, ref) {
+const SearchBar = forwardRef(function SearchBar({
+    vendorId,
+    onSelect,
+    autoFocus = true,
+    // Off by default. See searchSelection.js — highlighting a row nobody
+    // pointed at is only safe on a bar driven by a hardware keyboard, and
+    // POS turns it on for that one alone.
+    autoHighlight = false,
+    // Opt-in: without it this bar does no scan detection at all and Enter
+    // obeys the pick rules only. A bar with nowhere to put a scan should not
+    // be inventing one.
+    onScan = null,
+}, ref) {
     const [query, setQuery]     = useState('');
     const [results, setResults] = useState([]);
     const [open, setOpen]       = useState(false);
     const [searching, setSearching] = useState(false);
     const [activeIndex, setActiveIndex] = useState(-1);
+    const [scanMiss, setScanMiss]       = useState('');
     const inputRef              = useRef(null);
     const debounceRef           = useRef(null);
     const rootRef               = useRef(null);
+    const scanMissTimerRef      = useRef(null);
+
+    // The text that `results` is currently the answer to. Enter needs to know
+    // whether what is on screen describes what is in the box, because a
+    // scanner reaches the Enter key long before the search debounce does.
+    const settledRef            = useRef('');
 
     // See latestSearch.js — the local lookup and the network fallback take
     // unrelated amounts of time, so answers can come back in a different
     // order than the searches that asked for them started in.
     const latestSearch = useRef(createLatestSearch()).current;
+
+    // See scanSignal.js — measures how fast characters are arriving, which is
+    // what tells an alphanumeric scan from someone typing a product name.
+    const burst = useRef(createBurstTracker()).current;
 
     useImperativeHandle(ref, () => ({
         focus: () => inputRef.current?.focus(),
@@ -46,11 +70,25 @@ const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect, autoFocus 
         return () => document.removeEventListener('pointerdown', closeOnOutsideTap);
     }, []);
 
+    useEffect(() => () => {
+        clearTimeout(debounceRef.current);
+        clearTimeout(scanMissTimerRef.current);
+    }, []);
+
+    /**
+     * Returns the results it settled on, so Enter can act on them without
+     * waiting a render for the state to come back — or null if a newer
+     * search overtook this one, in which case its answer means nothing.
+     */
     const search = useCallback(async (q) => {
         const token = latestSearch.start();
         const trimmed = q.trim();
 
-        if (!trimmed) { setResults([]); setOpen(false); setActiveIndex(-1); setSearching(false); return; }
+        if (!trimmed) {
+            setResults([]); setOpen(false); setActiveIndex(-1); setSearching(false);
+            settledRef.current = '';
+            return [];
+        }
 
         // The panel comes down as soon as there is something being searched
         // for, and stays down until the cashier picks something, clears the
@@ -75,9 +113,11 @@ const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect, autoFocus 
         // A newer search has started since this one began — its answer is
         // no longer relevant to what's on screen, so it's dropped rather
         // than shown.
-        if (!latestSearch.isCurrent(token)) return;
+        if (!latestSearch.isCurrent(token)) return null;
 
         setResults(local);
+
+        let settled = local;
 
         // The local catalogue is only ever written at login and never
         // refreshed, so it goes stale the moment a product is added or
@@ -101,7 +141,7 @@ const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect, autoFocus 
                     params: { vendor_id: vendorId, q: trimmed },
                     timeout: 5000,
                 });
-                if (!latestSearch.isCurrent(token)) return;
+                if (!latestSearch.isCurrent(token)) return null;
 
                 // The server's answer replaces the local one rather than
                 // merging into it: it is the authority on what this branch
@@ -111,19 +151,34 @@ const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect, autoFocus 
                 // stale copy exists on the device.
                 setResults(data);
                 setActiveIndex(-1);
+                settled = data;
             } catch { /* offline or too slow — whatever the device knows is already showing */ }
             finally {
                 if (latestSearch.isCurrent(token)) setSearching(false);
             }
         }
+
+        settledRef.current = trimmed;
+
+        return settled;
     }, [vendorId, latestSearch]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const pick = (product) => {
-        onSelect(product);
+    // Everything Enter does ends here: the box empty and ready for the next
+    // product, with no stale debounced search still in flight to reopen the
+    // panel a moment later behind whatever just opened.
+    const reset = () => {
+        clearTimeout(debounceRef.current);
+        burst.reset();
+        settledRef.current = '';
         setQuery('');
         setResults([]);
         setOpen(false);
         setActiveIndex(-1);
+    };
+
+    const pick = (product) => {
+        reset();
+        onSelect(product);
 
         // Deliberately does NOT grab focus back. Picking a product opens the
         // quantity box, and this used to steal the caret out of it a tick
@@ -133,38 +188,128 @@ const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect, autoFocus 
         // which includes the moment the quantity box closes.
     };
 
+    // A scan is one action. Nothing opens, nothing has to be confirmed, and
+    // the caret never leaves this box — so the next scan just goes.
+    const takeScan = (product) => {
+        reset();
+        onScan(product);
+        inputRef.current?.focus();
+    };
+
+    const reportUnknownBarcode = (barcode) => {
+        // Cleared, not left in the box: a scanner sends its payload and an
+        // Enter with no regard for what is already there, so leaving the
+        // missed barcode behind means the next scan arrives concatenated
+        // onto it and misses too. The message carries the digits instead.
+        reset();
+        setScanMiss(barcode);
+        inputRef.current?.focus();
+
+        // Brief, because it is a note and not a decision. It also clears on
+        // the next keystroke — whichever comes first.
+        clearTimeout(scanMissTimerRef.current);
+        scanMissTimerRef.current = setTimeout(() => setScanMiss(''), 4000);
+    };
+
     const onChange = (e) => {
         const q = e.target.value;
+        burst.record(Date.now());
         setQuery(q);
+        setScanMiss('');
         clearTimeout(debounceRef.current);
         debounceRef.current = setTimeout(() => search(q), 120);
     };
 
+    const commit = async () => {
+        const trimmed = query.trim();
+
+        if (!trimmed) return;
+
+        // Read before anything is awaited — by the time the network answers,
+        // the rhythm that identified this as a machine is long past.
+        const arrivedInABurst = burst.isBurst(Date.now());
+
+        let list = results;
+
+        // A scanner types its whole payload and hits Enter well inside the
+        // 120ms this box waits before searching at all, so what is on screen
+        // is still the answer to a half-typed barcode, or to nothing. Enter
+        // therefore finishes the search it interrupted before judging it,
+        // rather than reading a list that does not describe the box.
+        //
+        // This is the same search the debounce would have run, not a second
+        // lookup path — so the server still gets asked, and a scan is priced
+        // off today's catalogue rather than whatever the device cached at
+        // login. Offline it is the Dexie read alone, and instant.
+        if (settledRef.current !== trimmed) {
+            clearTimeout(debounceRef.current);
+            const fresh = await search(trimmed);
+
+            // Overtaken by a newer search: the cashier kept typing, and what
+            // they are looking at now is not this.
+            if (fresh === null) return;
+
+            list = fresh;
+        }
+
+        // More characters landed while the network was answering. Acting on
+        // this Enter now would ring up a match for text the box no longer
+        // contains.
+        if (inputRef.current && inputRef.current.value.trim() !== trimmed) return;
+
+        if (onScan) {
+            const scanned = scanFor({ query: trimmed, results: list, burst: arrivedInABurst });
+
+            if (scanned) { takeScan(scanned); return; }
+
+            // Shaped like a barcode, and nothing carries it. Say so and stop:
+            // falling through here would offer a quantity of whatever product
+            // merely happened to contain those digits somewhere in its name.
+            if (looksLikeBarcode(trimmed)) { reportUnknownBarcode(trimmed); return; }
+        }
+
+        // Only ever adds the row that is highlighted on screen. See
+        // lib/searchSelection for the two softer rules that were tried here
+        // and what each of them rang up by mistake.
+        const chosen = selectionForEnter({ results: list, activeIndex, autoHighlight, query: trimmed });
+
+        if (chosen) pick(chosen);
+    };
+
     const onKeyDown = (e) => {
-        if (e.key === 'Escape') { setOpen(false); setQuery(''); setActiveIndex(-1); }
+        if (e.key === 'Escape') { setOpen(false); setQuery(''); setActiveIndex(-1); setScanMiss(''); }
         if (e.key === 'ArrowDown') {
             e.preventDefault();
             if (open && results.length > 0) {
-                setActiveIndex((prev) => (prev < results.length - 1 ? prev + 1 : prev));
+                // Steps from whatever is highlighted, not from whatever was
+                // arrowed to. Otherwise the first ArrowDown on a list that is
+                // already auto-highlighting row 0 moves the stored index from
+                // -1 to 0 and appears to do nothing at all.
+                setActiveIndex((prev) => {
+                    const from = highlightIndexFor({ results, activeIndex: prev, autoHighlight, query });
+                    return from < results.length - 1 ? from + 1 : from;
+                });
             }
         }
         if (e.key === 'ArrowUp') {
             e.preventDefault();
             if (open && results.length > 0) {
-                setActiveIndex((prev) => (prev > 0 ? prev - 1 : 0));
+                setActiveIndex((prev) => {
+                    const from = highlightIndexFor({ results, activeIndex: prev, autoHighlight, query });
+                    return from > 0 ? from - 1 : 0;
+                });
             }
         }
         if (e.key === 'Enter') {
             e.preventDefault();
-
-            // Only ever adds the row the cashier arrowed onto. See
-            // lib/searchSelection for the two softer rules that were tried
-            // here and what each of them rang up by mistake.
-            const chosen = selectionForEnter({ results, activeIndex });
-
-            if (chosen) pick(chosen);
+            commit();
         }
     };
+
+    // Derived rather than stored, so the row the cashier can see highlighted
+    // and the row Enter takes are the same row by construction — including in
+    // the tick after the server's results replace the device's.
+    const highlighted = highlightIndexFor({ results, activeIndex, autoHighlight, query });
 
     return (
         <div className="relative flex-1" ref={rootRef}>
@@ -193,6 +338,12 @@ const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect, autoFocus 
                     className="flex-1 bg-transparent text-sm outline-none placeholder-gray-400 dark:placeholder-gray-500 text-gray-800 dark:text-gray-100"
                 />
             </div>
+
+            {scanMiss && (
+                <div role="status" className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-900 border border-amber-200 dark:border-amber-700 rounded-xl shadow-lg z-50 px-4 py-3">
+                    <p className="text-xs text-amber-700 dark:text-amber-400">No product for barcode {scanMiss}.</p>
+                </div>
+            )}
 
             {open && results.length === 0 && query.trim() && searching && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg z-50 px-4 py-3">
@@ -224,7 +375,8 @@ const SearchBar = forwardRef(function SearchBar({ vendorId, onSelect, autoFocus 
                             // handler to avoid.
                             onMouseDown={(e) => e.preventDefault()}
                             onClick={() => pick(p)}
-                            className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 text-left border-b border-gray-50 dark:border-gray-800 last:border-0 ${activeIndex === index ? 'bg-gray-100 dark:bg-gray-800' : ''}`}
+                            aria-selected={highlighted === index}
+                            className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 text-left border-b border-gray-50 dark:border-gray-800 last:border-0 ${highlighted === index ? 'bg-gray-100 dark:bg-gray-800' : ''}`}
                         >
                             {p.image
                                 ? <img src={p.image} className="w-10 h-10 rounded-lg object-cover shrink-0" />

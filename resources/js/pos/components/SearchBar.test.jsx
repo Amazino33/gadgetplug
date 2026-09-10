@@ -194,6 +194,10 @@ describe('nothing is chosen until the cashier says which one', () => {
     });
 
     it('adds nothing on Enter for a full barcode either — pointing at it is the only way in', async () => {
+        // True of a bar with no onScan, which is what this whole file tests.
+        // POS gives both of its bars one, and there a full barcode IS a scan
+        // — see SearchBar.fastLoop.test.jsx for why that is narrow enough to
+        // be safe when the reverted "barcode or SKU" rule was not.
         const onSelect = vi.fn();
         render(<SearchBar vendorId={1} onSelect={onSelect} />);
 
