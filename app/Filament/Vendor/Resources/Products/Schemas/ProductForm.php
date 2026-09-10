@@ -86,7 +86,9 @@ class ProductForm
                                             // other field here is describing.
                                             TextInput::make('name')
                                                 ->required()
-                                                ->columnSpanFull(),
+                                                ->columnSpanFull()
+                                                // Tour hook ("Add a product").
+                                                ->extraFieldWrapperAttributes(['data-tour' => 'product-name']),
 
                                             // What it is.
                                             Select::make('category_id')
@@ -301,6 +303,8 @@ class ProductForm
                             // first decision an owner makes about a product,
                             // and the one most likely to change after saving.
                             Section::make('Status')
+                                // Tour hook ("Add a product").
+                                ->extraAttributes(['data-tour' => 'product-status'])
                                 ->schema([
                                     // Two states only. Archiving is a deliberate,
                                     // confirmed header action on the edit page
@@ -367,6 +371,10 @@ class ProductForm
                             // wrap to four or five lines each and make the section
                             // TALLER than the single-column version it replaced.
                             Section::make('Pricing')
+                                // Tour hook: the tour talks about cost and price
+                                // together, so it highlights the section rather
+                                // than either field on its own.
+                                ->extraAttributes(['data-tour' => 'product-cost-price'])
                                 ->schema([
                                     TextInput::make('cost_price')
                                         ->numeric()
@@ -375,6 +383,13 @@ class ProductForm
                                         ->helperText('Optional — shown as "—" in reports until set.')
                                         ->live()
                                         ->hidden(fn () => ! self::canSeeCostPrice()),
+
+                                    Toggle::make('has_custom_price')
+                                        ->label('Override Linked Price')
+                                        ->helperText('Turn on to set a custom selling price, ignoring the general percentage markup from the supplier.')
+                                        ->default(false)
+                                        ->live()
+                                        ->visible(fn ($record) => $record?->isLinked()),
 
                                     TextInput::make('price')
                                         ->numeric()
@@ -393,7 +408,9 @@ class ProductForm
                                             fn (Get $get): string => 'gt:' . $get('cost_price'),
                                             fn (Get $get): bool => filled($get('cost_price')),
                                         )
-                                        ->live(),
+                                        ->live()
+                                        ->disabled(fn ($record, Get $get) => $record?->isLinked() && ! $get('has_custom_price'))
+                                        ->helperText(fn ($record, Get $get) => ($record?->isLinked() && ! $get('has_custom_price')) ? 'Calculated automatically. Turn on "Override Linked Price" to change it manually.' : ''),
 
                                     Placeholder::make('margin_preview')
                                         ->label('')

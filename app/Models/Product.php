@@ -85,6 +85,7 @@ class Product extends Model implements HasMedia
     protected $casts = [
         'price'           => 'decimal:2',
         'cost_price'      => 'decimal:2',
+        'has_custom_price' => 'boolean',
         'allow_pos_price_override' => 'boolean',
         'specifications'  => 'array',
         'stock_quantity'  => 'integer',
@@ -192,7 +193,7 @@ class Product extends Model implements HasMedia
         // decimal:2 cast on this column, so returning $value straight would
         // quietly change the type every reader has always seen — which is
         // exactly what it did, and what broke the catalogue export's CSV.
-        if (! $this->isLinked()) {
+        if (! $this->isLinked() || $this->has_custom_price) {
             return $this->castAttribute('price', $value);
         }
 

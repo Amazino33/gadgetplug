@@ -118,11 +118,16 @@ class PublishLinkedListingAction
      */
     private function refresh(Product $listing, Product $source, SupplierLink $link): void
     {
-        $listing->update([
+        $data = [
             'supplier_link_id' => $link->id,
-            'price'            => $this->retailPrice($source, $link),
             'cost_price'       => $source->price,
-        ]);
+        ];
+
+        if (! $listing->has_custom_price) {
+            $data['price'] = $this->retailPrice($source, $link);
+        }
+
+        $listing->update($data);
     }
 
     /** Supplier price plus the link's markup, tidied by the link's rounding rule. */
