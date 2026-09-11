@@ -11,7 +11,7 @@
     whole component's state back and forth on a mobile connection, and the JSON
     endpoint already returns exactly what a post needs.
 --}}
-<div class="lg:hidden" x-data="feed(@js($firstPage), @js($categories), @js($categoryId), @js($search))" x-cloak>
+<div class="bg-gray-100 lg:hidden" x-data="feed(@js($firstPage), @js($categories), @js($categoryId), @js($search))" x-cloak>
 
     <x-feed.splash />
 
@@ -47,28 +47,32 @@
         </div>
     </div>
 
-    {{-- Posts. --}}
-    <template x-for="post in posts" :key="post.id">
-        <x-feed.post />
-    </template>
+    {{-- Posts. The gray ground and the gap between cards live here rather
+         than on the card, because the separation between two posts is a
+         property of the list. --}}
+    <div class="space-y-3 px-3 pb-3">
+        <template x-for="post in posts" :key="post.id">
+            <x-feed.post />
+        </template>
 
-    {{-- Skeletons while a page is in flight. Sized like a real post so the
-         scroll position does not lurch when they are replaced. --}}
-    <template x-if="loading">
-        <div>
-            <template x-for="n in 2" :key="n">
-                <div class="border-b border-brand-border bg-white p-4">
-                    <div class="mb-3 flex items-center gap-2.5">
-                        <div class="h-8 w-8 animate-pulse rounded-full bg-brand-bg"></div>
-                        <div class="h-3 w-28 animate-pulse rounded bg-brand-bg"></div>
+        {{-- Skeletons while a page is in flight. Sized like a real post so the
+             scroll position does not lurch when they are replaced. --}}
+        <template x-if="loading">
+            <div class="space-y-3">
+                <template x-for="n in 2" :key="n">
+                    <div class="rounded-2xl bg-white p-3.5 shadow-sm">
+                        <div class="mb-3 flex items-center gap-2.5">
+                            <div class="h-10 w-10 animate-pulse rounded-full bg-brand-bg"></div>
+                            <div class="h-3 w-28 animate-pulse rounded bg-brand-bg"></div>
+                        </div>
+                        <div class="aspect-square w-full animate-pulse rounded-xl bg-brand-bg"></div>
+                        <div class="mt-3 h-4 w-24 animate-pulse rounded bg-brand-bg"></div>
+                        <div class="mt-2 h-3 w-3/4 animate-pulse rounded bg-brand-bg"></div>
                     </div>
-                    <div class="aspect-square w-full animate-pulse rounded bg-brand-bg"></div>
-                    <div class="mt-3 h-4 w-24 animate-pulse rounded bg-brand-bg"></div>
-                    <div class="mt-2 h-3 w-3/4 animate-pulse rounded bg-brand-bg"></div>
-                </div>
-            </template>
-        </div>
-    </template>
+                </template>
+            </div>
+        </template>
+    </div>
 
     {{-- Nothing matched the chip or the search. --}}
     <template x-if="! loading && posts.length === 0">

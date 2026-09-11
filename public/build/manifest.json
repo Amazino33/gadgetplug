@@ -1,6 +1,6 @@
 {
   "resources/css/app.css": {
-    "file": "assets/app-DuoHoTcd.css",
+    "file": "assets/app-AsQalT_l.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "name": "app",
@@ -9,7 +9,7 @@
     ]
   },
   "resources/css/filament/vendor/theme.css": {
-    "file": "assets/theme-BZC9HQDO.css",
+    "file": "assets/theme-DlGgzkiw.css",
     "src": "resources/css/filament/vendor/theme.css",
     "isEntry": true,
     "name": "theme",
@@ -24,12 +24,12 @@
     "isEntry": true
   },
   "resources/js/pos/main.jsx": {
-    "file": "assets/main-DUAtxohs.js",
+    "file": "assets/main-BzvllHdi.js",
     "name": "main",
     "src": "resources/js/pos/main.jsx",
     "isEntry": true,
     "css": [
-      "assets/main-CIJgqS7J.css"
+      "assets/main-B4Jf0D7Y.css"
     ]
   },
   "resources/js/pwa.js": {
@@ -37,5 +37,14 @@
     "name": "pwa",
     "src": "resources/js/pwa.js",
     "isEntry": true
+  },
+  "resources/js/vendor-tours.js": {
+    "file": "assets/vendor-tours-rhjmPiN5.js",
+    "name": "vendor-tours",
+    "src": "resources/js/vendor-tours.js",
+    "isEntry": true,
+    "css": [
+      "assets/vendor-tours-CTZuBZOi.css"
+    ]
   }
 }
