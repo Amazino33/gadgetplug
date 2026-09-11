@@ -38,6 +38,28 @@ export async function recordSale(sale, cashierId) {
         vat_amount:      sale.vat_amount ?? 0,
         payment_method:  sale.payment_method ?? null,
         items:           sale.items ?? [],
+
+        // Everything below exists so a reprint from this device is the same
+        // receipt the customer got the first time.
+        //
+        // These were not kept before, which did not show while the offline
+        // print was the screen modal — it had no tender or change line to
+        // leave blank. Now that the till builds the real 80mm document, a
+        // reprint with no connection would have come out missing exactly the
+        // figures a customer comes back to argue about.
+        amount_tendered: sale.amount_tendered ?? null,
+        change_given:    sale.change_given ?? null,
+        payments:        sale.payments ?? null,
+        bank_transfer_reference: sale.bank_transfer_reference ?? null,
+        // Name and phone only, matching what the customer cache keeps: a
+        // receipt names its customer, and a stale balance is worse than none.
+        customer:        sale.customer
+            ? { name: sale.customer.name ?? null, phone: sale.customer.phone ?? null }
+            : null,
+        // The rate this sale was computed with, so a reprint cannot invent one.
+        vat_rate:        sale.vat_rate ?? null,
+        vat_enabled:     sale.vat_enabled ?? null,
+        cashier_name:    sale.cashier_name ?? null,
         // Local rows are always "completed": a void or a refund happens on the
         // server, and the device cannot know about one it never saw. The server
         // copy overrides this whenever the till is online, which is why status

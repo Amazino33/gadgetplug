@@ -38,10 +38,10 @@ class PosAuthController extends Controller
                 'id'   => $user->id,
                 'name' => $user->name,
             ],
-            'vendor' => [
-                'vat_enabled' => (bool) ($vendor->pos_vat_enabled ?? true),
-                'vat_rate'    => (float) ($vendor->pos_vat_rate ?? 7.5),
-            ],
+            // Everything the till needs to print a receipt without asking
+            // the server for one. See TillProfile — it is sent again when a
+            // session is opened, so a layout change does not wait for a logout.
+            'vendor' => \App\Support\Pos\TillProfile::for($user, $vendor),
         ]);
     }
 

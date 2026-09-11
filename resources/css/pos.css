@@ -12,38 +12,18 @@ body {
     -webkit-font-smoothing: antialiased;
 }
 
-/* Thermal receipt print — 80mm.
-   FALLBACK ONLY. The real receipt is a server-rendered document printed from a
-   hidden iframe; this prints the modal instead, and applies only while the till
-   has deliberately asked for it by putting .printing-receipt-fallback on <body>.
-   Left unscoped, these rules fired on any print of this page and put the old
-   receipt on paper alongside the new one. */
+/* Nothing on this page is ever printed.
+   Both the receipt and the Z report are built as standalone 80mm documents and
+   printed from a hidden iframe (see lib/receiptDocument.js and lib/printDocument.js).
+   The rules that used to print the receipt MODAL as a fallback are gone with it:
+   they hid the app with `visibility: hidden` and pinned the receipt with
+   `position: fixed`, which cannot paginate, so a long sale was cut off at one
+   page — and the modal's screen styling (proportional font, grey text, dashed
+   rules, truncated item names) was what made the offline print look broken. */
 @media print {
-    body.printing-receipt-fallback * { visibility: hidden !important; }
-    body.printing-receipt-fallback .print-receipt,
-    body.printing-receipt-fallback .print-receipt * { visibility: visible !important; }
-    body.printing-receipt-fallback .print-receipt {
-        position: fixed;
-        top: 0; left: 0;
-        width: 80mm;
-        font-size: 11px;
-        line-height: 1.4;
-    }
-    @page { size: 80mm auto; margin: 4mm; }
-
-    /* The receipt iframe is parked off-screen and stays in the DOM after
-       printing. It is a whole document of its own, so leaving it printable
-       meant a stray Ctrl+P — or the fallback — could put a second receipt, or
-       a run of blank pages, after the first. */
+    /* The print iframe is parked off-screen and stays in the DOM afterwards. It
+       is a whole document of its own, so leaving it printable meant a stray
+       Ctrl+P could put a second receipt, or a run of blank pages, after the
+       first. This is the one print rule the page still needs. */
     #receipt-print-frame { display: none !important; }
-
-    /* The modal now caps its height and scrolls its middle so the Print button
-       stays reachable on a long sale. That cap must not follow the receipt onto
-       paper — the offline fallback prints this modal, and a clipped container
-       would print only the visible part of the item list. */
-    body.printing-receipt-fallback .receipt-card,
-    body.printing-receipt-fallback .receipt-scroll {
-        max-height: none !important;
-        overflow: visible !important;
-    }
 }

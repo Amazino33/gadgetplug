@@ -8,6 +8,7 @@ use App\Models\PosSale;
 use App\Models\PosSession;
 use App\Models\PosSuspendedSale;
 use App\Models\PosZReport;
+use App\Support\Pos\TillProfile;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -42,7 +43,18 @@ class PosSessionController extends Controller
             ->tap(fn ($a) => $a->vendor_id = $session->vendor_id)
             ->log('Opened POS session');
 
-        return response()->json($session, 201);
+        // The till caches its vendor's receipt layout so it can print with no
+        // connection, and login was the only thing that refreshed it — but a
+        // cashier stays signed in on a shared till for days, so a vendor who
+        // changed their receipt would not see it on paper until somebody
+        // happened to log out. Opening a session is the once-a-shift moment
+        // that costs nothing, so it is sent again here.
+        return response()->json(
+            $session->toArray() + [
+                'vendor_settings' => TillProfile::for($request->user(), $session->vendor),
+            ],
+            201
+        );
     }
 
     public function active(Request $request): JsonResponse

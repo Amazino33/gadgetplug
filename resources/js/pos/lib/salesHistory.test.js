@@ -215,3 +215,58 @@ describe('the receipt kept on the device', () => {
         expect(await cachedReceipt(90)).toBe('<html>synced</html>');
     });
 });
+
+describe('what a reprint needs, kept on the device', () => {
+    // These were not stored before, which did not show while the offline print
+    // was the screen modal — it had no tender or change line to leave blank.
+    // Now the till builds the real 80mm document, so a reprint with no
+    // connection would come out missing exactly the figures a customer comes
+    // back to argue about.
+    it('keeps the tender, the change and the split breakdown', async () => {
+        await recordSale(aSale({
+            offline_id: 'off-9',
+            amount_tendered: 5000,
+            change_given: 1200,
+            payments: [{ method: 'cash', amount: 3800, reference: null }],
+            bank_transfer_reference: 'TRF-7',
+        }), 7);
+
+        const row = await db.sales.where('offline_id').equals('off-9').first();
+
+        expect(row.amount_tendered).toBe(5000);
+        expect(row.change_given).toBe(1200);
+        expect(row.payments).toEqual([{ method: 'cash', amount: 3800, reference: null }]);
+        expect(row.bank_transfer_reference).toBe('TRF-7');
+    });
+
+    it('keeps the cashier and the VAT rate the sale was rung at', async () => {
+        await recordSale(aSale({ offline_id: 'off-10', cashier_name: 'Ada Okafor', vat_rate: 5, vat_enabled: true }), 7);
+
+        const row = await db.sales.where('offline_id').equals('off-10').first();
+
+        expect(row.cashier_name).toBe('Ada Okafor');
+        expect(row.vat_rate).toBe(5);
+        expect(row.vat_enabled).toBe(true);
+    });
+
+    it('keeps the customer by name and phone only, never a balance', async () => {
+        await recordSale(aSale({
+            offline_id: 'off-11',
+            customer: { id: 3, name: 'Chike Buyer', phone: '08031234567', balance: 45000 },
+        }), 7);
+
+        const row = await db.sales.where('offline_id').equals('off-11').first();
+
+        // A stale figure about money owed is worse than no figure at all.
+        expect(row.customer).toEqual({ name: 'Chike Buyer', phone: '08031234567' });
+    });
+
+    it('records a walk-in with no customer at all', async () => {
+        await recordSale(aSale({ offline_id: 'off-12' }), 7);
+
+        const row = await db.sales.where('offline_id').equals('off-12').first();
+
+        expect(row.customer).toBeNull();
+        expect(row.amount_tendered).toBeNull();
+    });
+});

@@ -24,12 +24,12 @@
     "isEntry": true
   },
   "resources/js/pos/main.jsx": {
-    "file": "assets/main-WUuqDqTY.js",
+    "file": "assets/main-G94uTHOc.js",
     "name": "main",
     "src": "resources/js/pos/main.jsx",
     "isEntry": true,
     "css": [
-      "assets/main-B4Jf0D7Y.css"
+      "assets/main-nkG_5n0F.css"
     ]
   },
   "resources/js/pwa.js": {

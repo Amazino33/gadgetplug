@@ -112,8 +112,21 @@ export default function POS({ user, vendorId, onLogout }) {
     const openSession = async () => {
         try {
             const { data } = await api.post('/sessions/open', { vendor_id: vendorId, opening_float: 0 });
-            setSession(data);
-            localStorage.setItem('pos_session', JSON.stringify(data));
+
+            // Split out rather than left on the session: the session is what
+            // this shift is, and the receipt settings are what the shop is.
+            // Opening a session is just the once-a-shift moment we get to
+            // refresh them, so a vendor who changed their receipt layout is not
+            // waiting for a cashier to happen to log out before it reaches the
+            // paper. Login is the other, rarer, moment.
+            const { vendor_settings: settings, ...opened } = data;
+
+            setSession(opened);
+            localStorage.setItem('pos_session', JSON.stringify(opened));
+
+            if (settings) {
+                localStorage.setItem('pos_vendor_settings', JSON.stringify(settings));
+            }
         } catch { /* offline — continue */ }
     };
 
@@ -351,6 +364,16 @@ export default function POS({ user, vendorId, onLogout }) {
 
         let savedSale = { ...payload };
 
+        // What the device keeps but the server is never sent, because it
+        // already knows it: the customer record rather than just an id, who
+        // rang the sale, and whether VAT applied. The till needs all three to
+        // reprint this receipt with no connection.
+        const localOnly = {
+            customer,
+            cashier_name: user.name,
+            vat_enabled:  VAT_ENABLED,
+        };
+
         // A recovered sale goes back through the offline queue even when the
         // till is online, because that is the only path that keeps the date it
         // carries: the live endpoint stamps the moment the sale reaches it, so
@@ -364,7 +387,7 @@ export default function POS({ user, vendorId, onLogout }) {
                 // getting a sale uploaded; this is so the cashier can still
                 // look it up afterwards, which the server cannot answer when
                 // the connection is gone.
-                await recordSale(savedSale, user.id);
+                await recordSale({ ...savedSale, ...localOnly }, user.id);
             } catch (err) {
                 if (err.response) {
                     // The server was reached and refused the sale (insufficient
@@ -377,24 +400,35 @@ export default function POS({ user, vendorId, onLogout }) {
                 }
                 // No response at all reached us — genuine network failure, safe to queue.
                 await db.offlineSales.add({ ...payload, synced: 0 });
-                await recordSale(payload, user.id);
+                await recordSale({ ...payload, ...localOnly }, user.id);
             }
         } else {
             await db.offlineSales.add({ ...payload, synced: 0 });
-            await recordSale(payload, user.id);
+            await recordSale({ ...payload, ...localOnly }, user.id);
         }
 
         const receiptSale = {
-            // Carried through so the receipt can be printed from its own
-            // server-rendered document. Without it ReceiptModal falls back to
-            // printing this modal, which has no QR and no vendor settings on it.
-            // Null while offline — the sale has no server id until it syncs.
+            // Carried through so the receipt can be printed from the server's
+            // own document, which is the only one that carries the QR. Null
+            // while offline — the sale has no server id until it syncs, and the
+            // till then builds the same 80mm receipt itself, minus that code.
             id:                      savedSale.id ?? null,
             reference:               savedSale.reference ?? payload.offline_id,
+            // The sale's own time, so a receipt reprinted later is stamped when
+            // it was rung rather than when it was reprinted.
+            completed_at:            payload.completed_at,
+            // Printed on the receipt, and only knowable here — the modal has no
+            // access to the signed-in user.
+            cashier_name:            user.name,
             items:                   payload.items,
             subtotal,
             discount_amount:         discountAmount,
             vat_amount:              vatAmount,
+            // The rate this sale was actually computed with, not a constant
+            // baked into the receipt. The old receipt printed "VAT (7.5%)"
+            // whatever the store charged, and printed it even with VAT off.
+            vat_rate:                VAT_RATE,
+            vat_enabled:             VAT_ENABLED,
             total,
             payment_method:          paymentMethod,
             amount_tendered:         amountTendered,

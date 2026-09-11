@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { fmt } from '../lib/format';
 import api from '../lib/api';
 import { cacheReceipt, cachedReceipt } from '../lib/salesHistory';
-import { printFallback } from '../lib/printFallback';
+import { printDocument } from '../lib/printDocument';
+import { receiptHtml } from '../lib/receiptDocument';
+import { vendorSettings } from '../lib/vendorSettings';
 
 const CONFIG = window.POS_CONFIG ?? {};
 
@@ -11,8 +13,6 @@ export default function ReceiptModal({ sale, onNewSale, isReprint = false }) {
             subtotal, discount_amount, vat_amount, reference,
             customer, bank_transfer_reference, payments } = sale;
     const isSplit = payment_method === 'split';
-
-    const printRef = useRef(null);
 
     // Surfaced on screen when the receipt document could not be fetched, so a
     // failing printer path is visible at the till instead of silently degrading.
@@ -24,67 +24,38 @@ export default function ReceiptModal({ sale, onNewSale, isReprint = false }) {
         setTimeout(() => newSaleRef.current?.focus(), 100);
     }, []);
 
-    // Prints the server-rendered 80mm document rather than this modal.
+    // Prints an 80mm document, never this modal.
     //
     // Printing the modal meant hiding the whole app with `visibility: hidden`
     // and pinning the receipt with `position: fixed`, which cannot paginate —
     // a long sale was silently cut off at one page and the modal's own padding
-    // leaked onto the paper. The standalone page also carries the vendor's
-    // receipt settings, the cashier's name and the store address, none of which
-    // exist in the browser here.
+    // leaked onto the paper. Its screen styling made the rest of the damage: a
+    // proportional font that threw the money column out of line, grey text and
+    // dashed rules that a 1-bit thermal head dithers into speckle, and item
+    // names truncated to an ellipsis.
     //
-    // A sale queued offline has no server id yet, so that case still falls back
-    // to printing this modal.
+    // There are now three sources for that document, in order of how much they
+    // know, and all three are the same 80mm layout. Only the QR distinguishes
+    // them — it addresses a copy the customer can open online, which does not
+    // exist until the sale has synced.
     const print = async () => {
+        // A sale queued offline has no server id, so there is nothing to fetch.
+        // It is built here instead, from the receipt settings and branch details
+        // cached at login — which is the whole reason the offline receipt used
+        // to come out looking like a different shop's.
         if (!sale?.id) {
-            // Offline this is expected — the sale has no server id until it
-            // syncs. Online it means whoever built this sale object dropped the
-            // id, and the till quietly prints the wrong thing. That mistake has
-            // now been made twice (new sale, then reprint), so it says so.
+            // Offline this is expected. Online it means whoever built this sale
+            // object dropped the id, so the customer silently loses the QR —
+            // worth saying, since the paper itself looks right either way.
             if (navigator.onLine) {
-                console.warn('Receipt has no sale id — printing the fallback copy instead of the receipt document.');
-                setPrintWarning('Printed a basic copy — this receipt was not linked to a saved sale.');
+                console.warn('Receipt has no sale id — printing the locally built document, which carries no QR.');
+                setPrintWarning('Printed without the scan code — this receipt was not linked to a saved sale.');
             }
-            printFallback();
+
+            printDocument(receiptHtml(sale, vendorSettings()));
+
             return;
         }
-
-        const existing = document.getElementById('receipt-print-frame');
-        if (existing) existing.remove();
-
-        const frame = document.createElement('iframe');
-        frame.id = 'receipt-print-frame';
-        frame.setAttribute('aria-hidden', 'true');
-        // Sized to the paper and parked off-screen rather than collapsed to
-        // 0x0. A zero-width frame gives the receipt a zero-width containing
-        // block to lay out against, and the printer then scales whatever it got
-        // to fit the roll — which is what made the print blurry.
-        frame.style.cssText = 'position:fixed;left:-10000px;top:0;width:80mm;height:297mm;border:0;';
-        document.body.appendChild(frame);
-
-        const writeToFrame = (html) => {
-            frame.contentWindow.document.open();
-            frame.contentWindow.document.write(html);
-            frame.contentWindow.document.close();
-        };
-
-        // Printed from the parent, after the document has settled. The old
-        // in-document script did this on a 250ms timer; driving it here means
-        // the print happens once, when we say, and never races the fetch.
-        const printFrame = () => {
-            const run = () => {
-                frame.contentWindow.focus();
-                frame.contentWindow.print();
-            };
-
-            // Images and the QR need to be laid out or the thermal head gets a
-            // half-rendered receipt.
-            if (frame.contentWindow.document.readyState === 'complete') {
-                setTimeout(run, 50);
-            } else {
-                frame.contentWindow.addEventListener('load', () => setTimeout(run, 50), { once: true });
-            }
-        };
 
         try {
             // Fetched WITHOUT ?print=1 on purpose. That flag makes the document
@@ -93,8 +64,7 @@ export default function ReceiptModal({ sale, onNewSale, isReprint = false }) {
             // parent's @media print rules that still render this modal. One
             // trigger, owned here, is the only way that cannot double.
             const { data: html } = await api.get(`/sales/${sale.id}/receipt`);
-            writeToFrame(html);
-            printFrame();
+            printDocument(html);
 
             // Kept for next time. A customer coming back tomorrow, on a till
             // with no signal, is exactly when the real receipt is wanted and
@@ -104,31 +74,42 @@ export default function ReceiptModal({ sale, onNewSale, isReprint = false }) {
             const status = err?.response?.status;
             const detail = status ? `HTTP ${status}` : (err?.message ?? 'network error');
 
-            // The stored copy is the real document, QR and store details
-            // included — worth trying before falling back to printing the modal.
+            // The stored copy is the server's own document, QR included — worth
+            // trying before rebuilding one without it.
             const stored = await cachedReceipt(sale.id).catch(() => null);
 
             if (stored) {
-                writeToFrame(stored);
-                printFrame();
+                printDocument(stored);
                 setPrintWarning("Printed from this device's saved copy — the server could not be reached.");
 
                 return;
             }
 
-            // Falling back silently is how this stayed hidden: the till printed
-            // the modal — no QR, no store details, wrong paper size — and looked
-            // like the receipt was simply badly designed rather than failing.
-            // Say so, then still give the cashier paper.
-            console.error(`Receipt document failed (${detail}) — printing the fallback copy.`, err);
-            setPrintWarning(`Printed a basic copy — the full receipt could not be loaded (${detail}).`);
-            printFallback();
+            // Still a proper 80mm receipt, just without the QR. The warning
+            // stays: falling back silently is how the old modal print stayed
+            // hidden for so long.
+            console.error(`Receipt document failed (${detail}) — printing the locally built copy.`, err);
+            setPrintWarning(`Printed without the scan code — the full receipt could not be loaded (${detail}).`);
+            printDocument(receiptHtml(sale, vendorSettings()));
         }
     };
 
-    const now = new Date();
-    const dateStr = now.toLocaleDateString('en-NG', { day: '2-digit', month: 'short', year: 'numeric' });
-    const timeStr = now.toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit' });
+    // The sale's own time, not the clock. Reading `new Date()` here meant a
+    // reprint of yesterday's sale was stamped, on screen and on paper, today.
+    const soldAt = (() => {
+        const parsed = new Date(sale.completed_at ?? Date.now());
+
+        return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+    })();
+    const dateStr = soldAt.toLocaleDateString('en-NG', { day: '2-digit', month: 'short', year: 'numeric' });
+    const timeStr = soldAt.toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit' });
+
+    // VAT is a per-vendor setting. This line read a hardcoded 7.5% and printed
+    // it whether or not the store charges VAT at all, or charges it at another
+    // rate — a wrong tax figure on a customer's receipt.
+    const vatEnabled = sale.vat_enabled ?? vendorSettings().vat_enabled ?? true;
+    const vatRate    = sale.vat_rate ?? vendorSettings().vat_rate ?? 7.5;
+    const showVat    = vatEnabled && Number(vat_amount) > 0;
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -137,7 +118,7 @@ export default function ReceiptModal({ sale, onNewSale, isReprint = false }) {
                 the card simply grew with the item list, so on a long sale the
                 Print and New Sale buttons sat below the bottom of the screen
                 with nothing to scroll — the till looked frozen. */}
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 max-h-[90dvh] flex flex-col overflow-hidden receipt-card">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 max-h-[90dvh] flex flex-col overflow-hidden">
 
                 {/* Success / reprint header */}
                 <div className={`shrink-0 px-6 py-6 text-center ${isReprint ? 'bg-gray-700' : 'bg-[#068B03]'}`}>
@@ -159,7 +140,7 @@ export default function ReceiptModal({ sale, onNewSale, isReprint = false }) {
 
                 {/* The scrolling middle. min-h-0 is what actually lets a flex
                     child shrink below its content and scroll. */}
-                <div className="receipt-scroll flex-1 min-h-0 overflow-y-auto">
+                <div className="flex-1 min-h-0 overflow-y-auto">
 
                 {/* Change due — cash single payment */}
                 {payment_method === 'cash' && change_given > 0 && (
@@ -191,8 +172,9 @@ export default function ReceiptModal({ sale, onNewSale, isReprint = false }) {
                     </div>
                 )}
 
-                {/* Receipt body — also used for printing */}
-                <div ref={printRef} className="print-receipt px-6 py-4">
+                {/* Receipt body. On screen only — the paper is a separate 80mm
+                    document, see lib/receiptDocument.js. */}
+                <div className="px-6 py-4">
 
                     {/* Store / date */}
                     <div className="flex justify-between items-start mb-4">
@@ -233,9 +215,11 @@ export default function ReceiptModal({ sale, onNewSale, isReprint = false }) {
                                 <span>Discount</span><span>−{fmt(discount_amount)}</span>
                             </div>
                         )}
-                        <div className="flex justify-between text-xs text-gray-500">
-                            <span>VAT (7.5%)</span><span>{fmt(vat_amount)}</span>
-                        </div>
+                        {showVat && (
+                            <div className="flex justify-between text-xs text-gray-500">
+                                <span>VAT ({vatRate}%)</span><span>{fmt(vat_amount)}</span>
+                            </div>
+                        )}
                         <div className="flex justify-between text-sm font-bold text-gray-800 pt-1 border-t border-gray-200">
                             <span>TOTAL</span><span>{fmt(total)}</span>
                         </div>

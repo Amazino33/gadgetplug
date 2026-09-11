@@ -51,6 +51,12 @@ export default function SalesHistoryModal({ vendorId, cashierId, onClose, onRepr
         onReprint({
             id:                      sale.id,
             reference:               sale.reference,
+            // Without this the receipt fell back to the current clock, so a
+            // reprint of an older sale was stamped with today's date and time.
+            completed_at:            sale.completed_at,
+            cashier_name:            sale.cashier_name ?? null,
+            vat_rate:                sale.vat_rate ?? null,
+            vat_enabled:             sale.vat_enabled ?? null,
             items:                   sale.items,
             subtotal:                sale.subtotal,
             discount_amount:         sale.discount_amount,
@@ -61,7 +67,10 @@ export default function SalesHistoryModal({ vendorId, cashierId, onClose, onRepr
             change_given:            sale.change_given,
             bank_transfer_reference: sale.bank_transfer_reference,
             payments:                sale.payments,
-            customer:                null,
+            // The device now keeps the customer's name with the sale, so a
+            // reprint names them exactly as the first copy did. It was pinned
+            // to null because nothing local had one to give.
+            customer:                sale.customer ?? null,
         });
     };
 

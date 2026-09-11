@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { printFallback } from '../lib/printFallback';
+import { printDocument } from '../lib/printDocument';
+import { zReportHtml } from '../lib/receiptDocument';
+import { vendorSettings, cashierName } from '../lib/vendorSettings';
 import { fmt } from '../lib/format';
 import api from '../lib/api';
 
@@ -21,12 +23,20 @@ export default function ZReportModal({ session, onClose, onCloseSession }) {
         }
     };
 
-    // Was a bare window.print(). The receipt print rules are global in print
-    // media, so `body * { visibility: hidden }` applied here too and the Z
-    // report came out BLANK — nothing on this modal carried the class that
-    // made anything visible again. It now opts into the same scoped mechanism
-    // the receipt fallback uses, and marks what should actually appear.
-    const printReport = () => printFallback();
+    // Goes to the same thermal printer as the receipt, so it gets the same
+    // treatment: a real 80mm document rather than this modal.
+    //
+    // Printing the modal put its own heading, its Cash-in-Drawer input box and
+    // both of its buttons on the paper, in a proportional screen font with grey
+    // labels — the colour-coded figures in particular (green cash, blue card,
+    // purple transfer) are dithered by a 1-bit head into something barely
+    // legible. The report is also what gets signed and filed, so it now carries
+    // the store header and a signature block.
+    const printReport = () => {
+        if (!report) return;
+
+        printDocument(zReportHtml(report, session, { ...vendorSettings(), cashier_name: cashierName() }));
+    };
 
     if (!session) {
         return (
@@ -41,9 +51,9 @@ export default function ZReportModal({ session, onClose, onCloseSession }) {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-            {/* print-receipt marks what actually goes on paper; receipt-card lifts
-                the height cap so a long report is not clipped to one screenful. */}
-            <div className="print-receipt receipt-card bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+            {/* On screen only. What goes on paper is built by zReportHtml and
+                printed from its own frame, so nothing here has to survive a print. */}
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white z-10">
                     <h2 className="font-bold text-gray-800">Z-Report — Close Session</h2>
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
