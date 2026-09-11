@@ -97,6 +97,45 @@ test('the chips endpoint offers only categories with something buyable', functio
         ->and($names)->not->toContain($empty->name);
 });
 
+test('a chip is dropped when the search leaves nothing in it', function () {
+    $vendor = pageVendor();
+
+    $matching = Category::create(['name' => 'Matching '.uniqid(), 'slug' => 'matching-'.uniqid()]);
+    $other = Category::create(['name' => 'Other '.uniqid(), 'slug' => 'other-'.uniqid()]);
+
+    pageProduct($vendor, ['category_id' => $matching->id, 'name' => 'Rugged Torchlight']);
+    pageProduct($vendor, ['category_id' => $other->id, 'name' => 'Plain Kettle']);
+
+    $names = collect($this->getJson(route('feed.categories', ['search' => 'Torchlight']))
+        ->assertOk()->json('categories'))->pluck('name');
+
+    // The category is not empty — it just holds nothing the customer asked for,
+    // which opens exactly the same empty feed.
+    expect($names)->toContain($matching->name)
+        ->and($names)->not->toContain($other->name);
+});
+
+test('every chip offered opens a feed with something in it', function () {
+    $vendor = pageVendor();
+
+    $stocked = Category::create(['name' => 'Stocked '.uniqid(), 'slug' => 'stocked-'.uniqid()]);
+    $soldOut = Category::create(['name' => 'Sold Out '.uniqid(), 'slug' => 'sold-out-'.uniqid()]);
+
+    pageProduct($vendor, ['category_id' => $stocked->id, 'name' => 'Sturdy Powerbank']);
+    pageProduct($vendor, ['category_id' => $soldOut->id, 'name' => 'Sturdy Charger', 'stock_quantity' => 0]);
+
+    $chips = $this->getJson(route('feed.categories', ['search' => 'Sturdy']))->assertOk()->json('categories');
+
+    expect($chips)->not->toBeEmpty();
+
+    foreach ($chips as $chip) {
+        $posts = $this->getJson(route('feed.posts', ['category' => $chip['id'], 'search' => 'Sturdy']))
+            ->assertOk()->json('posts');
+
+        expect($posts)->not->toBeEmpty("Chip \"{$chip['name']}\" opens an empty feed.");
+    }
+});
+
 test('a post carries only what it renders, not a whole product', function () {
     pageProduct(pageVendor());
 

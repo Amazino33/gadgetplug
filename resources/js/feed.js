@@ -158,6 +158,14 @@ document.addEventListener('alpine:init', () => {
         searchOpen: false,
         loading: false,
 
+        // How far down the chip bar has to sit to clear the storefront
+        // header. Measured rather than hard-coded: the header is sticky at
+        // top-0 too, and it changes height when its own search row collapses
+        // on scroll. A fixed number would be wrong half the time, and the
+        // chip bar would hide underneath the header — taking its search
+        // button and every chip with it.
+        headerOffset: 0,
+
         init() {
             // The splash asks for this before it is dismissed, so the feed is
             // already warm when the reader taps through.
@@ -166,6 +174,24 @@ document.addEventListener('alpine:init', () => {
             });
 
             this.watchSentinel();
+            this.followHeader();
+        },
+
+        /** Keep the chip bar parked directly under the storefront header. */
+        followHeader() {
+            const header = document.querySelector('header');
+
+            if (! header) return;
+
+            const measure = () => { this.headerOffset = header.offsetHeight; };
+
+            measure();
+
+            if (window.ResizeObserver) {
+                new ResizeObserver(measure).observe(header);
+            } else {
+                window.addEventListener('resize', measure);
+            }
         },
 
         /**
@@ -231,6 +257,52 @@ document.addEventListener('alpine:init', () => {
             window.scrollTo({ top: 0, behavior: 'instant' });
 
             this.loadMore();
+            this.refreshCategories();
+        },
+
+        /**
+         * Re-read the chips for the search now in force.
+         *
+         * The chips the page was rendered with describe the whole catalogue.
+         * Once a search narrows the feed, some of them no longer hold anything
+         * — tapping one opens an empty feed, which reads as the shop being
+         * broken rather than the search being specific. So the chips are asked
+         * for again whenever the filter changes, and only whenever it changes:
+         * this must not ride along with every page of an infinite scroll.
+         *
+         * A failed request leaves the existing chips alone. Stale chips are a
+         * far smaller problem than a feed that suddenly has no way to filter.
+         */
+        async refreshCategories() {
+            try {
+                const params = new URLSearchParams();
+                if (this.search) params.set('search', this.search);
+
+                const res = await fetch(`/feed/categories?${params}`, {
+                    headers: { Accept: 'application/json' },
+                });
+
+                if (! res.ok) return;
+
+                const { categories } = await res.json();
+
+                this.categories = categories ?? [];
+
+                // The chip the reader is standing on may have just been the one
+                // that emptied out. Fall back to All rather than leaving them
+                // filtered by something no longer offered.
+                const stillThere = this.categories.some((c) => c.id === this.categoryId);
+
+                if (this.categoryId !== null && ! stillThere) {
+                    this.categoryId = null;
+                    this.posts = [];
+                    this.cursor = null;
+                    this.hasMore = true;
+                    this.loadMore();
+                }
+            } catch {
+                // Keep the chips that are already on screen.
+            }
         },
     }));
 });

@@ -15,10 +15,17 @@
 
     <x-feed.splash />
 
-    {{-- Chips. Sticky so the reader can change their mind without scrolling back. --}}
-    <div class="sticky top-0 z-30 border-b border-brand-border bg-white/95 backdrop-blur">
+    {{-- Chips. Sticky so the reader can change their mind without scrolling back.
+
+         Parked under the storefront header rather than at top-0: the header is
+         sticky at top-0 as well and sits above this on z, so a chip bar at the
+         same offset scrolls straight underneath it and takes its own search
+         button with it. The offset is measured at runtime because the header
+         collapses its search row on scroll. --}}
+    <div class="sticky z-30 border-b border-brand-border bg-white/95 backdrop-blur"
+         :style="'top: ' + headerOffset + 'px'">
         <div class="flex items-center gap-2 px-4 py-2.5">
-            <button type="button" @click="searchOpen = ! searchOpen" aria-label="Search"
+            <button type="button" @click="searchOpen = ! searchOpen; if (searchOpen) $nextTick(() => $refs.searchInput?.focus())" aria-label="Search"
                     class="shrink-0 rounded-full border border-brand-border p-2 text-brand-dark">
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
@@ -41,7 +48,12 @@
         </div>
 
         <div x-show="searchOpen" x-collapse class="px-4 pb-3">
-            <input type="search" x-model.debounce.400ms="search" @input="filterBy(categoryId)"
+            {{-- The model updates on every keystroke so the box stays responsive;
+                 only the request that follows is debounced. Debouncing the model
+                 instead fired filterBy() on each keystroke against a search term
+                 that had not caught up yet — a request per letter, every one of
+                 them for the previous letter. --}}
+            <input type="search" x-ref="searchInput" x-model="search" @input.debounce.400ms="filterBy(categoryId)"
                    placeholder="Search phones, laptops, gadgets…"
                    class="w-full rounded-full border border-brand-border bg-brand-bg px-4 py-2.5 text-[14px] outline-none focus:border-brand" />
         </div>

@@ -4,6 +4,7 @@ use App\Models\Product;
 use App\Models\Category;
 use App\Models\Wishlist;
 use App\Services\CartService;
+use App\Services\Feed\FeedCategories;
 use App\Services\Feed\FeedCursor;
 use App\Services\Feed\FeedQuery;
 use Livewire\Volt\Component;
@@ -118,22 +119,15 @@ new class extends Component {
     /**
      * Chips for categories that actually have something in them.
      *
-     * A chip that opens an empty feed reads as the shop being broken rather
-     * than the category being quiet, so an empty one is never offered.
+     * Narrowed by the search as well, so a chip can never open an empty feed:
+     * with a term in force, a category that holds nothing matching it is no
+     * more useful than one that holds nothing at all.
      */
     public function feedCategories(): array
     {
-        return Category::query()
-            ->where('is_active', true)
-            // whereHas for "has any", not HAVING on the withCount alias: that
-            // alias is a subquery rather than an aggregate, which SQLite
-            // rejects outright — and the suite runs on SQLite.
-            ->whereHas('products', fn ($q) => $q->visibleOnline()->inStockForSale())
-            ->withCount(['products' => fn ($q) => $q->visibleOnline()->inStockForSale()])
-            ->orderByDesc('products_count')
-            ->get(['id', 'name', 'slug'])
-            ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name, 'slug' => $c->slug])
-            ->all();
+        return app(FeedCategories::class)->forSearch(
+            $this->search !== '' ? $this->search : null,
+        );
     }
 
     public function filterCategory(?int $categoryId): void

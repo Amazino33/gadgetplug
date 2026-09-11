@@ -141,14 +141,7 @@ class FeedQuery
             ->inStockForSale()
             ->with(['vendor:id,name,slug,logo,city,state', 'media'])
             ->when($categoryId, fn (Builder $q) => $q->where('products.category_id', $categoryId))
-            ->when($search, function (Builder $q, string $term) {
-                $like = '%'.str_replace(['%', '_'], ['\%', '\_'], $term).'%';
-
-                $q->where(function (Builder $inner) use ($like) {
-                    $inner->where('products.name', 'like', $like)
-                        ->orWhere('products.description', 'like', $like);
-                });
-            })
+            ->tap(fn (Builder $q) => self::applySearch($q, $search))
             ->select([
                 'products.id', 'products.vendor_id', 'products.category_id', 'products.name',
                 'products.slug', 'products.description', 'products.price', 'products.stock_quantity',
@@ -156,6 +149,30 @@ class FeedQuery
                 'products.like_count', 'products.share_count', 'products.feed_bucket',
                 'products.published_at',
             ]);
+    }
+
+    /**
+     * The feed's idea of what a search matches.
+     *
+     * Public and static because the chips have to be built from the same rule:
+     * a category counted as non-empty under a looser match would still open an
+     * empty feed, which is the whole thing the chips are meant to prevent.
+     *
+     * The wildcards in the term itself are escaped — a customer searching for
+     * "50%" means those two characters, not "anything".
+     */
+    public static function applySearch(Builder $query, ?string $search): Builder
+    {
+        if ($search === null || $search === '') {
+            return $query;
+        }
+
+        $like = '%'.str_replace(['%', '_'], ['\%', '\_'], $search).'%';
+
+        return $query->where(function (Builder $inner) use ($like) {
+            $inner->where('products.name', 'like', $like)
+                ->orWhere('products.description', 'like', $like);
+        });
     }
 
     /**

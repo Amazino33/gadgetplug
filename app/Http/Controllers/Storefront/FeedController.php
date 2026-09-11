@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Storefront;
 
 use App\Http\Controllers\Controller;
-use App\Models\Category;
+use App\Services\Feed\FeedCategories;
 use App\Services\Feed\FeedCursor;
 use App\Services\Feed\FeedQuery;
 use Illuminate\Http\JsonResponse;
@@ -17,8 +17,10 @@ use Illuminate\Http\Request;
  */
 class FeedController extends Controller
 {
-    public function __construct(private readonly FeedQuery $feed)
-    {
+    public function __construct(
+        private readonly FeedQuery $feed,
+        private readonly FeedCategories $categories,
+    ) {
     }
 
     public function index(Request $request): JsonResponse
@@ -40,30 +42,21 @@ class FeedController extends Controller
     }
 
     /**
-     * The chips above the feed.
+     * The chips above the feed, for the search now in force.
      *
-     * Only categories that actually have something buyable in them, busiest
-     * first — a chip that opens an empty feed is worse than no chip, because it
-     * reads as the shop being broken rather than the category being quiet.
+     * Re-asked whenever the reader changes the filter, not on every page of the
+     * scroll — the chips only go stale when the thing they describe changes.
      */
-    public function categories(): JsonResponse
+    public function categories(Request $request): JsonResponse
     {
-        $categories = Category::query()
-            ->where('is_active', true)
-            // whereHas for "has any", not HAVING on the withCount alias: that
-            // alias is a subquery rather than an aggregate, which SQLite
-            // rejects outright — and the suite runs on SQLite.
-            ->whereHas('products', fn ($q) => $q->visibleOnline()->inStockForSale())
-            ->withCount(['products' => fn ($q) => $q->visibleOnline()->inStockForSale()])
-            ->orderByDesc('products_count')
-            ->get(['id', 'name', 'slug'])
-            ->map(fn (Category $c) => [
-                'id'    => $c->id,
-                'name'  => $c->name,
-                'slug'  => $c->slug,
-                'count' => $c->products_count,
-            ]);
+        $request->validate([
+            'search' => 'nullable|string|max:100',
+        ]);
 
-        return response()->json(['categories' => $categories]);
+        return response()->json([
+            'categories' => $this->categories->forSearch(
+                $request->string('search')->trim()->value() ?: null,
+            ),
+        ]);
     }
 }
