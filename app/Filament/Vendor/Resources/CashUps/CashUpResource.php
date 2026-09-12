@@ -3,7 +3,7 @@
 namespace App\Filament\Vendor\Resources\CashUps;
 
 use App\Filament\Vendor\Resources\CashUps\Pages\ListCashUps;
-use App\Models\CashUpSession;
+use App\Models\PosSession;
 use App\Services\ActiveStore;
 use BackedEnum;
 use Filament\Resources\Resource;
@@ -24,7 +24,7 @@ use UnitEnum;
  */
 class CashUpResource extends Resource
 {
-    protected static ?string $model = CashUpSession::class;
+    protected static ?string $model = PosSession::class;
 
     protected static ?string $tenantOwnershipRelationshipName = 'vendor';
 
@@ -55,7 +55,7 @@ class CashUpResource extends Resource
         }
 
         $waiting = static::scopeToActiveStore(
-            CashUpSession::query()->forVendor($vendor->id)->pendingReview()
+            PosSession::query()->forVendor($vendor->id)->pendingReview()
         )->count();
 
         return $waiting > 0 ? (string) $waiting : null;
@@ -117,7 +117,7 @@ class CashUpResource extends Resource
         return $user->isSuperAdmin()
             || $vendor->isOwner($user)
             || $user->hasVendorPermission($vendor->id, 'receive_cash')
-            || CashUpSession::query()->forVendor($vendor->id)->forCashier($user->id)->exists();
+            || PosSession::query()->forVendor($vendor->id)->forCashier($user->id)->exists();
     }
 
     public static function canCreate(): bool

@@ -258,42 +258,59 @@ export async function rejectedShiftFor(cashierId) {
 }
 
 /**
- * Open the POS session that sales are stamped with.
+ * Tell the server the day has started, and cache what it sends back.
  *
- * Kept alongside the cash-up rather than replaced by it: this is also the
- * once-a-shift moment the till refreshes the vendor's receipt layout, so a shop
- * that changed its receipt is not waiting for a cashier to happen to log out.
+ * There is one session now, not two: the same call that opens the cash-up opens
+ * the record every sale is stamped with. It used to be a separate request made
+ * automatically with a float of zero, which is how every Z-report variance came
+ * to be wrong by whatever was in the drawer when the cashier arrived.
  *
- * It now opens with the float the cashier actually counted. It used to be
- * called automatically with a float of zero and no UI at all, which made every
- * Z-report variance wrong by whatever was in the drawer at the start.
+ * It is also the once-a-shift moment the till refreshes the vendor receipt
+ * layout, so a shop that changed its receipt is not waiting for a cashier to
+ * happen to log out before it reaches the paper.
  */
-export async function ensurePosSession(vendorId, openingFloat, terminalId = null) {
-    const stored = localStorage.getItem('pos_session');
-
-    if (stored) {
-        try {
-            return JSON.parse(stored);
-        } catch {
-            localStorage.removeItem('pos_session');
-        }
-    }
-
+export async function announceShift(shift) {
     const { data } = await api.post('/sessions/open', {
-        vendor_id: vendorId,
-        opening_float: Number(openingFloat) || 0,
-        ...(terminalId ? { terminal_id: terminalId } : {}),
+        vendor_id: shift.vendor_id,
+        opening_float: shift.opening_float,
+        ...(shift.terminal_id ? { terminal_id: shift.terminal_id } : {}),
+        idempotency_key: shift.open_key,
     });
 
-    const { vendor_settings: settings, ...session } = data;
+    cacheSession(data);
 
-    localStorage.setItem('pos_session', JSON.stringify(session));
+    return data?.session ?? null;
+}
+
+/** Keep what the till needs offline: the session id, and the receipt layout. */
+export function cacheSession(payload) {
+    const session = payload?.session ?? null;
+    const settings = payload?.vendor_settings ?? null;
+
+    if (session) {
+        localStorage.setItem('pos_session', JSON.stringify(session));
+    }
 
     if (settings) {
         localStorage.setItem('pos_vendor_settings', JSON.stringify(settings));
     }
 
     return session;
+}
+
+/** The session this till is stamping sales with, if it has heard of one. */
+export function cachedSession() {
+    const stored = localStorage.getItem('pos_session');
+
+    if (!stored) return null;
+
+    try {
+        return JSON.parse(stored);
+    } catch {
+        localStorage.removeItem('pos_session');
+
+        return null;
+    }
 }
 
 /** A key that survives retries, so a replayed request is recognised as one. */

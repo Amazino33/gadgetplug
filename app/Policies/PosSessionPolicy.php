@@ -2,7 +2,7 @@
 
 namespace App\Policies;
 
-use App\Models\CashUpSession;
+use App\Models\PosSession;
 use App\Models\User;
 
 /**
@@ -19,7 +19,7 @@ use App\Models\User;
  * precisely the line a cash-up review has to draw. Inventing a second permission
  * meaning the same thing would only create a way for the two to disagree.
  */
-class CashUpSessionPolicy
+class PosSessionPolicy
 {
     public function viewAny(User $user): bool
     {
@@ -28,7 +28,7 @@ class CashUpSessionPolicy
         return $vendor !== null && $this->reviews($user, (int) $vendor->id);
     }
 
-    public function view(User $user, CashUpSession $session): bool
+    public function view(User $user, PosSession $session): bool
     {
         // A cashier may always see their own day, whether or not they may review
         // anyone else's. Being told you are short without being allowed to look
@@ -44,7 +44,7 @@ class CashUpSessionPolicy
      * purpose, because an owner who also stands at the counter is exactly the
      * case this exists to catch.
      */
-    public function rectify(User $user, CashUpSession $session): bool
+    public function rectify(User $user, PosSession $session): bool
     {
         if ((int) $session->cashier_id === $user->id) {
             return false;
@@ -55,7 +55,7 @@ class CashUpSessionPolicy
     }
 
     /** Signing the day off, which is what makes the remaining difference real. */
-    public function approve(User $user, CashUpSession $session): bool
+    public function approve(User $user, PosSession $session): bool
     {
         if ((int) $session->cashier_id === $user->id) {
             return false;
@@ -75,12 +75,12 @@ class CashUpSessionPolicy
         return false;
     }
 
-    public function update(User $user, CashUpSession $session): bool
+    public function update(User $user, PosSession $session): bool
     {
         return false;
     }
 
-    public function delete(User $user, CashUpSession $session): bool
+    public function delete(User $user, PosSession $session): bool
     {
         return false;
     }

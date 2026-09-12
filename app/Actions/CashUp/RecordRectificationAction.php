@@ -6,7 +6,7 @@ namespace App\Actions\CashUp;
 
 use App\Actions\Pos\RecordCustomerPaymentAction;
 use App\Models\CashUpRectification;
-use App\Models\CashUpSession;
+use App\Models\PosSession;
 use App\Models\PosSale;
 use App\Models\User;
 use App\Services\Pos\CustomerDebtService;
@@ -38,7 +38,7 @@ class RecordRectificationAction
     ) {}
 
     public function execute(
-        CashUpSession $session,
+        PosSession $session,
         User $manager,
         string $kind,
         float $amount,
@@ -79,7 +79,7 @@ class RecordRectificationAction
             }
 
             $entry = CashUpRectification::create([
-                'cash_up_session_id' => $session->id,
+                'pos_session_id' => $session->id,
                 'vendor_id'          => $session->vendor_id,
                 'kind'               => $kind,
                 'amount'             => round($amount, 2),
@@ -114,7 +114,7 @@ class RecordRectificationAction
      * The sale must be this cashier's, at this branch, or the correction is
      * being aimed at somebody else's day.
      */
-    private function resolveSale(CashUpSession $session, int $saleId): PosSale
+    private function resolveSale(PosSession $session, int $saleId): PosSale
     {
         $sale = PosSale::find($saleId);
 
@@ -141,7 +141,7 @@ class RecordRectificationAction
         CashUpRectification $entry,
         ?PosSale $sale,
         User $manager,
-        CashUpSession $session,
+        PosSession $session,
     ): void {
         if (! $sale?->customer_id) {
             throw new RuntimeException('That sale has no customer, so there is no debt on it to settle.');

@@ -183,7 +183,7 @@ class CashUpRectification extends Model
 
     public function session(): BelongsTo
     {
-        return $this->belongsTo(CashUpSession::class, 'cash_up_session_id');
+        return $this->belongsTo(PosSession::class, 'pos_session_id');
     }
 
     public function vendor(): BelongsTo

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\CashUp;
 
 use App\Models\AccountabilityLedgerEntry;
-use App\Models\CashUpSession;
+use App\Models\PosSession;
 use App\Models\User;
 use App\Services\AccountabilityLedger;
 use Illuminate\Support\Facades\DB;
@@ -34,7 +34,7 @@ class ApproveCashUpAction
 {
     public function __construct(private readonly AccountabilityLedger $ledger) {}
 
-    public function execute(CashUpSession $session, User $reviewer, ?string $notes = null): CashUpSession
+    public function execute(PosSession $session, User $reviewer, ?string $notes = null): PosSession
     {
         if ($session->isApproved()) {
             // Not an error. A double-clicked button should leave the day
@@ -65,14 +65,14 @@ class ApproveCashUpAction
                 variance: $session->resolvedCashVariance(),
                 naturalKey: self::naturalKeyFor($session),
                 storeId: (int) $session->store_id,
-                sourceType: CashUpSession::class,
+                sourceType: PosSession::class,
                 sourceId: (int) $session->id,
                 createdBy: $reviewer->id,
                 note: $this->note($session),
             );
 
             $session->update([
-                'status'      => CashUpSession::STATUS_APPROVED,
+                'status'      => PosSession::STATUS_APPROVED,
                 'reviewed_by' => $reviewer->id,
                 'reviewed_at' => now(),
                 'notes'       => $notes ?? $session->notes,
@@ -93,18 +93,18 @@ class ApproveCashUpAction
     }
 
     /** One posting per cash-up, forever. */
-    public static function naturalKeyFor(CashUpSession $session): string
+    public static function naturalKeyFor(PosSession $session): string
     {
         return "cashup:{$session->id}:cash";
     }
 
     /** The ledger row already posted for this cash-up, if any. */
-    public static function postingFor(CashUpSession $session): ?AccountabilityLedgerEntry
+    public static function postingFor(PosSession $session): ?AccountabilityLedgerEntry
     {
         return AccountabilityLedgerEntry::where('idempotency_key', self::naturalKeyFor($session))->first();
     }
 
-    private function note(CashUpSession $session): string
+    private function note(PosSession $session): string
     {
         return sprintf(
             'Cash-up %s — drawer counted %s against %s expected',

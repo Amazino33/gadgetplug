@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace App\Services\Cash;
 
 use App\Models\CashUpRectification;
-use App\Models\CashUpSession;
+use App\Models\Expense;
+use App\Models\PosSession;
 use App\Models\PosReturn;
 use App\Models\PosSale;
 use App\Models\PosSalePayment;
@@ -43,7 +44,7 @@ class CashUpExpectation
     private const TERMINAL_METHODS = ['card', 'bank_transfer'];
 
     /** Recompute a session's figures from its own opening float and rectifications. */
-    public function for(CashUpSession $session): CashUpBreakdown
+    public function for(PosSession $session): CashUpBreakdown
     {
         return $this->compute(
             vendorId: (int) $session->vendor_id,
@@ -130,6 +131,20 @@ class CashUpExpectation
             ];
         }
 
+        // Money the cashier paid out of the drawer and recorded at the time.
+        // It physically left, so the drawer should hold less — without this the
+        // cashier would be told they were short by exactly what they had just
+        // paid out and written down.
+        $paidOut = $this->drawerPayouts($vendorId, $storeId, $cashierId, $businessDate);
+
+        if ($paidOut > 0.009) {
+            $cashLines[] = [
+                'key'    => 'drawer_payouts',
+                'label'  => 'Paid out of the drawer',
+                'amount' => round(-$paidOut, 2),
+            ];
+        }
+
         $cashLines = array_merge($cashLines, $this->rectificationLines($entries, CashUpRectification::LEG_CASH));
 
         // ── Terminal leg ─────────────────────────────────────────────────────
@@ -167,6 +182,28 @@ class CashUpExpectation
             terminalLines: $terminalLines,
             context: $this->context($vendorId, $storeId, $cashierId, $from, $to, $scope),
         );
+    }
+
+    /**
+     * Expenses this cashier paid out of this drawer on this day.
+     *
+     * Scoped to the person who recorded it, the branch and the trading day —
+     * the same three facts the reconciliation itself is keyed on, so one till's
+     * payout can never lower another till's expected cash.
+     *
+     * Only posted expenses count. An unposted one is a note that money will be
+     * spent rather than a record that it has been, and the drawer has not lost
+     * anything yet.
+     */
+    private function drawerPayouts(int $vendorId, int $storeId, int $cashierId, string $businessDate): float
+    {
+        return round((float) Expense::query()
+            ->where('vendor_id', $vendorId)
+            ->where('store_id', $storeId)
+            ->where('created_by', $cashierId)
+            ->whereNotNull('posted_at')
+            ->whereDate('incurred_at', $businessDate)
+            ->sum('amount'), 2);
     }
 
     /**

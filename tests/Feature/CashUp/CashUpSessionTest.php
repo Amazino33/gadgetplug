@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\CashUpSession;
+use App\Models\PosSession;
 use App\Models\User;
 use App\Support\Pos\BusinessDate;
 use Illuminate\Database\QueryException;
@@ -53,13 +53,13 @@ test('openFor finds only the day still in progress', function () {
     $ctx = cashUpContext();
     $session = openCashUp($ctx);
 
-    expect(CashUpSession::openFor($ctx['cashier']->id, $ctx['store']->id, '2026-09-11')?->id)
+    expect(PosSession::openFor($ctx['cashier']->id, $ctx['store']->id, '2026-09-11')?->id)
         ->toBe($session->id);
 
     closeCashUp($session);
 
-    expect(CashUpSession::openFor($ctx['cashier']->id, $ctx['store']->id, '2026-09-11'))->toBeNull();
-    expect(CashUpSession::forDay($ctx['cashier']->id, $ctx['store']->id, '2026-09-11')?->id)->toBe($session->id);
+    expect(PosSession::openFor($ctx['cashier']->id, $ctx['store']->id, '2026-09-11'))->toBeNull();
+    expect(PosSession::forDay($ctx['cashier']->id, $ctx['store']->id, '2026-09-11')?->id)->toBe($session->id);
 });
 
 // ── Blind entry (locked decision 3) ──────────────────────────────────────────
@@ -119,7 +119,7 @@ test('review may still be recorded on a closed session', function () {
     $session = closeCashUp(openCashUp($ctx));
 
     $session->update([
-        'status'      => CashUpSession::STATUS_APPROVED,
+        'status'      => PosSession::STATUS_APPROVED,
         'reviewed_by' => $ctx['owner']->id,
         'reviewed_at' => now(),
         'notes'       => 'Counted with me present.',
@@ -131,9 +131,9 @@ test('review may still be recorded on a closed session', function () {
 test('an approved cash-up cannot be reopened', function () {
     $ctx = cashUpContext();
     $session = closeCashUp(openCashUp($ctx));
-    $session->update(['status' => CashUpSession::STATUS_APPROVED, 'reviewed_by' => $ctx['owner']->id]);
+    $session->update(['status' => PosSession::STATUS_APPROVED, 'reviewed_by' => $ctx['owner']->id]);
 
-    expect(fn () => $session->update(['status' => CashUpSession::STATUS_OPEN]))
+    expect(fn () => $session->update(['status' => PosSession::STATUS_OPEN]))
         ->toThrow(LogicException::class, 'cannot be reopened');
 });
 

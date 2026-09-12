@@ -256,11 +256,11 @@ test('money spent out of the drawer lowers what should be in it', function () {
     cashUpSale($ctx, ['total' => 80000]);
 
     CashUpRectification::create([
-        'cash_up_session_id' => $session->id, 'vendor_id' => $ctx['vendor']->id,
+        'pos_session_id' => $session->id, 'vendor_id' => $ctx['vendor']->id,
         'kind' => 'expense', 'amount' => 3000, 'note' => 'Transport',
     ]);
     CashUpRectification::create([
-        'cash_up_session_id' => $session->id, 'vendor_id' => $ctx['vendor']->id,
+        'pos_session_id' => $session->id, 'vendor_id' => $ctx['vendor']->id,
         'kind' => 'cash_out', 'amount' => 50000, 'note' => 'Given to Oga',
     ]);
 
@@ -279,7 +279,7 @@ test('a wrong-tender correction moves money between the legs', function () {
     $s = cashUpSale($ctx, ['total' => 15000]);
 
     CashUpRectification::create([
-        'cash_up_session_id' => $session->id, 'vendor_id' => $ctx['vendor']->id,
+        'pos_session_id' => $session->id, 'vendor_id' => $ctx['vendor']->id,
         'kind' => 'tender_reclass', 'amount' => 15000,
         'from_tender' => 'cash', 'to_tender' => 'card', 'related_sale_id' => $s->id,
     ]);
@@ -301,7 +301,7 @@ test('a credit sale that was actually paid raises the leg it was paid on', funct
     PosSalePayment::create(['pos_sale_id' => $debt->id, 'method' => 'debt', 'amount' => 20000]);
 
     CashUpRectification::create([
-        'cash_up_session_id' => $session->id, 'vendor_id' => $ctx['vendor']->id,
+        'pos_session_id' => $session->id, 'vendor_id' => $ctx['vendor']->id,
         'kind' => 'debt_paid', 'amount' => 20000,
         'to_tender' => 'bank_transfer', 'related_sale_id' => $debt->id,
     ]);

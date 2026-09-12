@@ -17,13 +17,13 @@ uses(RefreshDatabase::class);
 function rectify(array $ctx, array $attrs): CashUpRectification
 {
     $session = $attrs['session']
-        ?? App\Models\CashUpSession::forDay($ctx['cashier']->id, $ctx['store']->id, '2026-09-11')
+        ?? App\Models\PosSession::forDay($ctx['cashier']->id, $ctx['store']->id, '2026-09-11')
         ?? openCashUp($ctx);
 
     unset($attrs['session']);
 
     return CashUpRectification::create(array_merge([
-        'cash_up_session_id' => $session->id,
+        'pos_session_id' => $session->id,
         'vendor_id'          => $ctx['vendor']->id,
         'created_by'         => $ctx['cashier']->id,
     ], $attrs));

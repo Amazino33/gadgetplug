@@ -1,171 +1,174 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { printDocument } from '../lib/printDocument';
 import { zReportHtml } from '../lib/receiptDocument';
 import { vendorSettings, cashierName } from '../lib/vendorSettings';
 import { fmt } from '../lib/format';
 import api from '../lib/api';
 
-export default function ZReportModal({ session, onClose, onCloseSession }) {
-    const [cashCounted, setCashCounted] = useState('');
-    const [report, setReport]           = useState(null);
-    const [loading, setLoading]         = useState(false);
+/**
+ * The signed slip for a day that has been cashed up.
+ *
+ * It no longer generates anything. Closing the day is what produces the report,
+ * because the report is the reconciliation — counting the drawer here as well
+ * would have been the same question asked twice, and two answers to "how much
+ * was in the till" is worse than one.
+ *
+ * So this fetches the slip the close already wrote and puts it on paper. Before
+ * the day is counted there is nothing to show, and it says so rather than
+ * offering a button that would produce a report of half the money.
+ */
+export default function ZReportModal({ session, onClose }) {
+    const [report, setReport] = useState(null);
+    const [state, setState] = useState('loading');
 
-    const generate = async () => {
-        if (!session) return;
-        setLoading(true);
-        try {
-            const { data } = await api.post(`/sessions/${session.id}/close`, {
-                cash_counted: cashCounted ? parseFloat(cashCounted) : null,
-            });
-            setReport(data);
-        } catch { /* handle */ } finally {
-            setLoading(false);
+    useEffect(() => {
+        if (!session?.id) {
+            setState('none');
+
+            return;
         }
-    };
 
-    // Goes to the same thermal printer as the receipt, so it gets the same
-    // treatment: a real 80mm document rather than this modal.
-    //
-    // Printing the modal put its own heading, its Cash-in-Drawer input box and
-    // both of its buttons on the paper, in a proportional screen font with grey
-    // labels — the colour-coded figures in particular (green cash, blue card,
-    // purple transfer) are dithered by a 1-bit head into something barely
-    // legible. The report is also what gets signed and filed, so it now carries
-    // the store header and a signature block.
+        let cancelled = false;
+
+        api.get(`/sessions/${session.id}/z-report`)
+            .then(({ data }) => {
+                if (cancelled) return;
+                setReport(data);
+                setState('ready');
+            })
+            .catch((e) => {
+                if (cancelled) return;
+                // 404 is the ordinary case, not a failure: the day is still
+                // being traded and has not been counted yet.
+                setState(e?.response?.status === 404 ? 'not-yet' : 'error');
+            });
+
+        return () => { cancelled = true; };
+    }, [session?.id]);
+
     const printReport = () => {
         if (!report) return;
 
         printDocument(zReportHtml(report, session, { ...vendorSettings(), cashier_name: cashierName() }));
     };
 
-    if (!session) {
-        return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-                <div className="bg-white rounded-2xl shadow-2xl w-80 mx-4 p-6 text-center">
-                    <p className="text-gray-500 text-sm mb-4">No active session found.</p>
-                    <button onClick={onClose} className="w-full py-2.5 bg-gray-900 text-white rounded-xl text-sm font-semibold">Close</button>
-                </div>
-            </div>
-        );
-    }
-
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-            {/* On screen only. What goes on paper is built by zReportHtml and
-                printed from its own frame, so nothing here has to survive a print. */}
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
-                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white z-10">
-                    <h2 className="font-bold text-gray-800">Z-Report — Close Session</h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
+            <div className="mx-4 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-2xl">
+                <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white px-6 py-4">
+                    <h2 className="font-bold text-gray-800">Z-Report</h2>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600" aria-label="Close">✕</button>
                 </div>
 
                 <div className="p-6">
-                    {!report ? (
-                        <>
-                            <div className="bg-gray-50 rounded-xl px-4 py-3 mb-4">
-                                <p className="text-xs text-gray-400">Session opened at</p>
-                                <p className="text-sm font-semibold text-gray-700">{session.opened_at}</p>
-                                <p className="text-xs text-gray-400 mt-1">Opening float</p>
-                                <p className="text-sm font-semibold text-gray-700">{fmt(session.opening_float)}</p>
-                            </div>
-                            <div className="mb-4">
-                                <label className="text-xs font-semibold text-gray-500 mb-1 block">
-                                    Cash in Drawer (counted physically)
-                                </label>
-                                <input
-                                    type="number"
-                                    value={cashCounted}
-                                    onChange={(e) => setCashCounted(e.target.value)}
-                                    placeholder="₦0.00"
-                                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-2xl font-bold text-gray-800 text-center focus:outline-none focus:border-[#068B03]"
-                                />
-                            </div>
-                            <div className="flex gap-3">
-                                <button onClick={onClose}
-                                    className="flex-1 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-gray-500">
-                                    Cancel
-                                </button>
-                                <button onClick={generate} disabled={loading}
-                                    className="flex-1 py-3 rounded-xl bg-[#068B03] text-white text-sm font-bold disabled:opacity-40">
-                                    {loading ? 'Generating…' : 'Generate Z-Report'}
-                                </button>
-                            </div>
-                        </>
-                    ) : (
-                        <>
-                            <div className="space-y-3 mb-6 print:text-sm">
-                                <p className="text-center text-xs text-gray-400 mb-4">
-                                    {new Date(report.generated_at).toLocaleString('en-NG')}
-                                </p>
+                    {state === 'loading' && (
+                        <p className="py-8 text-center text-sm text-gray-400">Fetching the slip…</p>
+                    )}
 
+                    {(state === 'none' || state === 'not-yet') && (
+                        <div className="py-6 text-center">
+                            <p className="text-sm text-gray-500">
+                                Nothing to print yet. The Z-report is produced when you cash up.
+                            </p>
+                            <button onClick={onClose} className="mt-5 w-full rounded-xl bg-gray-900 py-2.5 text-sm font-semibold text-white">
+                                Close
+                            </button>
+                        </div>
+                    )}
+
+                    {state === 'error' && (
+                        <div className="py-6 text-center">
+                            <p className="text-sm text-gray-500">
+                                Could not reach the server for the slip. Try again when you have a signal.
+                            </p>
+                            <button onClick={onClose} className="mt-5 w-full rounded-xl bg-gray-900 py-2.5 text-sm font-semibold text-white">
+                                Close
+                            </button>
+                        </div>
+                    )}
+
+                    {state === 'ready' && report && (
+                        <>
+                            <p className="mb-4 text-center text-xs text-gray-400">
+                                {new Date(report.generated_at).toLocaleString('en-NG')}
+                            </p>
+
+                            <div className="space-y-3">
                                 {[
-                                    { label: 'Cash Sales',          value: report.cash_sales,          color: '#068B03' },
-                                    { label: 'POS / Card Sales',    value: report.card_sales,          color: '#3B82F6' },
+                                    { label: 'Cash Sales', value: report.cash_sales, color: '#068B03' },
+                                    { label: 'POS / Card Sales', value: report.card_sales, color: '#3B82F6' },
                                     { label: 'Bank Transfer Sales', value: report.bank_transfer_sales, color: '#8B5CF6' },
-                                ].map((row) => (
-                                    <div key={row.label} className="flex justify-between items-center py-2 border-b border-gray-50">
-                                        <span className="text-sm text-gray-600">{row.label}</span>
-                                        <span className="text-sm font-bold" style={{ color: row.color }}>{fmt(row.value)}</span>
+                                ].map((r) => (
+                                    <div key={r.label} className="flex items-center justify-between border-b border-gray-50 py-2">
+                                        <span className="text-sm text-gray-600">{r.label}</span>
+                                        <span className="text-sm font-bold" style={{ color: r.color }}>{fmt(r.value)}</span>
                                     </div>
                                 ))}
 
-                                <div className="flex justify-between items-center py-2 border-b-2 border-gray-200">
+                                <div className="flex items-center justify-between border-b-2 border-gray-200 py-2">
                                     <span className="text-sm font-bold text-gray-800">Gross Sales</span>
                                     <span className="text-lg font-extrabold text-gray-900">{fmt(report.total_sales)}</span>
                                 </div>
 
-                                {[
-                                    { label: 'VAT Collected',   value: report.total_vat,       negative: false },
-                                    { label: 'Discounts Given', value: report.total_discounts,  negative: true  },
-                                    { label: 'Returns',         value: report.total_returns,    negative: true  },
-                                ].map((row) => (
-                                    <div key={row.label} className="flex justify-between items-center py-1">
-                                        <span className="text-xs text-gray-400">{row.label}</span>
-                                        <span className={`text-xs font-semibold ${row.negative ? 'text-red-500' : 'text-gray-600'}`}>
-                                            {row.negative ? '−' : ''}{fmt(row.value)}
-                                        </span>
-                                    </div>
-                                ))}
+                                <Leg
+                                    title="Cash drawer"
+                                    expected={report.cash_expected}
+                                    counted={report.cash_counted}
+                                    variance={report.cash_variance}
+                                />
 
-                                <div className="border-t border-gray-200 pt-3">
-                                    <div className="flex justify-between items-center py-1">
-                                        <span className="text-xs text-gray-400">Transactions</span>
-                                        <span className="text-xs font-semibold text-gray-600">{report.transaction_count}</span>
+                                {/* The half the old slip stayed silent about. */}
+                                <Leg
+                                    title="Moniepoint terminal"
+                                    expected={report.terminal_expected}
+                                    counted={report.terminal_counted}
+                                    variance={report.terminal_variance}
+                                />
+
+                                {report.notes && (
+                                    <div className="rounded-xl bg-gray-50 px-4 py-3">
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Cashier note</p>
+                                        <p className="mt-1 text-xs text-gray-600">{report.notes}</p>
                                     </div>
-                                    <div className="flex justify-between items-center py-1">
-                                        <span className="text-xs text-gray-400">Cash Expected in Drawer</span>
-                                        <span className="text-xs font-semibold text-gray-600">{fmt(report.cash_expected)}</span>
-                                    </div>
-                                    {report.cash_counted !== null && (
-                                        <>
-                                            <div className="flex justify-between items-center py-1">
-                                                <span className="text-xs text-gray-400">Cash Counted</span>
-                                                <span className="text-xs font-semibold text-gray-600">{fmt(report.cash_counted)}</span>
-                                            </div>
-                                            <div className="flex justify-between items-center py-1">
-                                                <span className="text-xs font-bold text-gray-700">Cash Variance</span>
-                                                <span className={`text-sm font-extrabold ${Math.abs(report.cash_variance) < 0.01 ? 'text-[#068B03]' : 'text-red-500'}`}>
-                                                    {report.cash_variance >= 0 ? '+' : ''}{fmt(report.cash_variance)}
-                                                </span>
-                                            </div>
-                                        </>
-                                    )}
-                                </div>
+                                )}
                             </div>
 
-                            <div className="flex gap-3">
-                                <button onClick={printReport}
-                                    className="flex-1 py-3 rounded-xl border-2 border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50">
-                                    Print Report
-                                </button>
-                                <button onClick={onCloseSession}
-                                    className="flex-1 py-3 rounded-xl bg-gray-900 text-white text-sm font-bold">
-                                    Close Session
-                                </button>
-                            </div>
+                            <button
+                                onClick={printReport}
+                                className="mt-6 w-full rounded-xl border-2 border-gray-200 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                            >
+                                Print Report
+                            </button>
                         </>
                     )}
                 </div>
+            </div>
+        </div>
+    );
+}
+
+function Leg({ title, expected, counted, variance }) {
+    if (counted == null) return null;
+
+    const value = Number(variance ?? 0);
+    const balanced = Math.abs(value) < 0.01;
+
+    return (
+        <div className="border-t border-gray-200 pt-3">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">{title}</p>
+            <div className="flex items-center justify-between py-1">
+                <span className="text-xs text-gray-400">Expected</span>
+                <span className="text-xs font-semibold text-gray-600">{fmt(expected)}</span>
+            </div>
+            <div className="flex items-center justify-between py-1">
+                <span className="text-xs text-gray-400">Counted</span>
+                <span className="text-xs font-semibold text-gray-600">{fmt(counted)}</span>
+            </div>
+            <div className="flex items-center justify-between py-1">
+                <span className="text-xs font-bold text-gray-700">Variance</span>
+                <span className={`text-sm font-extrabold ${balanced ? 'text-[#068B03]' : 'text-red-500'}`}>
+                    {value >= 0 ? '+' : ''}{fmt(value)}
+                </span>
             </div>
         </div>
     );

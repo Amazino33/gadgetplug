@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import AmountKeypad from '../components/AmountKeypad';
 import CashUpModal from '../components/CashUpModal';
 import { closeShift } from '../lib/shift';
-import { businessDate, ensurePosSession, openShift, unclosedShiftsFor } from '../lib/shift';
+import { announceShift, businessDate, openShift, unclosedShiftsFor } from '../lib/shift';
 
 /**
  * The start of a cashier's day.
@@ -62,11 +62,10 @@ export default function StartShift({ user, vendorId, onStarted, onLogout }) {
                 openingFloat: value,
             });
 
-            // Both halves of the day open on the same counted float: the
-            // cash-up the cashier is measured against, and the POS session each
-            // sale is stamped with. Fire-and-forget — a till with no signal
-            // still opens, and the sync picks the shift up later.
-            ensurePosSession(vendorId, value).catch(() => {});
+            // One session, one float, one open. Fire-and-forget: a till with no
+            // signal still opens, and the sync keeps offering the day to the
+            // server until it lands.
+            announceShift(shift).catch(() => {});
             onStarted(shift);
         } catch (e) {
             setError(e?.message ?? 'Could not start the shift.');
@@ -142,6 +141,7 @@ export default function StartShift({ user, vendorId, onStarted, onLogout }) {
                                 value={amount}
                                 onChange={(next) => { setAmount(next); setError(null); }}
                                 autoFocusLabel="Opening float"
+                                onSubmit={() => { if (amount !== '' && !busy) start(); }}
                             />
                         </div>
 

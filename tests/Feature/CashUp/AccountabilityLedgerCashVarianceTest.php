@@ -94,12 +94,12 @@ test('a variance is traceable to the branch and the session that produced it', f
     $row = ledgerRow($ctx, [
         'entry_type'  => 'cash_shortage',
         'amount'      => 5000,
-        'source_type' => App\Models\CashUpSession::class,
+        'source_type' => App\Models\PosSession::class,
         'source_id'   => $session->id,
     ]);
 
     expect($row->store->id)->toBe($ctx['store']->id)
-        ->and(AccountabilityLedgerEntry::forSource(App\Models\CashUpSession::class, $session->id)->count())
+        ->and(AccountabilityLedgerEntry::forSource(App\Models\PosSession::class, $session->id)->count())
         ->toBe(1)
         ->and(AccountabilityLedgerEntry::query()->forStore($ctx['store']->id)->cashVariances()->count())
         ->toBe(1);

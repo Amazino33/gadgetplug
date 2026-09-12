@@ -149,7 +149,12 @@ it('still returns the session itself, which the till reads for the shift', funct
         'opening_float' => 5000,
     ])->assertCreated();
 
-    expect($opened->json('id'))->not->toBeNull()
-        ->and($opened->json('status'))->toBe('open')
-        ->and((float) $opened->json('opening_float'))->toBe(5000.0);
+    // Nested under `session` since the session became the cash-up: open, close
+    // and active all answer in the same shape, and close has a breakdown and a
+    // report to carry alongside it.
+    expect($opened->json('session.id'))->not->toBeNull()
+        ->and($opened->json('session.status'))->toBe('open')
+        ->and((float) $opened->json('session.opening_float'))->toBe(5000.0)
+        // Blind entry: nothing about what the day should come to, until counted.
+        ->and($opened->json('session'))->not->toHaveKey('expected_cash');
 });

@@ -1,7 +1,14 @@
-# Cash-up sync contract
+# Till session / cash-up sync contract
 
-What the React POS talks to for the end-of-day cash-up. This is the server side's
-promise: the till implements against this, not against the server's internals.
+What the React POS talks to for the cashier's trading day. This is the server
+side's promise: the till implements against this, not against the server's
+internals.
+
+**One session is the whole shift.** `PosSession` is the single primitive — it is
+opened with a counted float, it is what every sale is stamped with, it is what
+gets counted at the end, and it is what the Z-report is written from. There is no
+separate cash-up record and no second set of endpoints. A day has one open, one
+close, and one cash count.
 
 All routes sit under `/api/pos/`, behind `auth:sanctum` and `EnsurePosVendorAccess`.
 Every request carries `vendor_id`; a vendor the token does not belong to is `403`.
@@ -24,7 +31,12 @@ transport paid out of the drawer, a sale rung on the wrong button — says so in
 person a shortage names is never the person who writes it off.
 
 **One open, one close, per cashier per branch per trading day.** Enforced by a
-unique database key, not merely checked. Retries are safe.
+unique database key on (cashier, store, business_date), not merely checked.
+Retries are safe.
+
+**A second device joins the day, it does not end it.** `open` returns the session
+already running rather than closing it and starting another — which is what it
+used to do, silently, to whichever till opened first.
 
 **The trading day is the store's wall clock** (`config('reporting.timezone')`,
 Africa/Lagos), not UTC. A sale at 00:30 Lagos belongs to the day the shopkeeper
@@ -33,7 +45,7 @@ returns rather than computing its own.
 
 ---
 
-## `GET /api/pos/cash-up`
+## `GET /api/pos/sessions/active`
 
 The day in progress, plus anything left open behind it.
 
@@ -52,7 +64,7 @@ The day in progress, plus anything left open behind it.
 days this cashier opened and never closed — offer to close them rather than
 letting them hang.
 
-## `POST /api/pos/cash-up/open`
+## `POST /api/pos/sessions/open`
 
 | Field | Rules |
 |---|---|
@@ -61,16 +73,18 @@ letting them hang.
 | `terminal_id` | optional, string ≤ 100 — the cashier's Moniepoint terminal |
 | `idempotency_key` | optional, string ≤ 120 |
 
-`201` with `{ "session": {...} }` on success.
+`201` with `{ "session": {...}, "vendor_settings": {...} }` on success. Opening is
+also the once-a-shift moment the receipt layout is refreshed, so cache
+`vendor_settings` when it comes back.
 
-`200` with the existing session if the day is already open — a retry gets the
-same day, never a second one.
+`200` with the running session if the day is already open — a retry, or a second
+till, gets the same day rather than a second one.
 
-`409` if the day has already been closed.
+`409` if the day has already been cashed up.
 
 `422` if the till is assigned to no branch. The message is displayable as-is.
 
-## `POST /api/pos/cash-up/{session}/close`
+## `POST /api/pos/sessions/{session}/close`
 
 | Field | Rules |
 |---|---|
@@ -104,9 +118,15 @@ no permission — it is the job — but emphatically not somebody else's.
     "context": { "debt_rung": 40000, "gross_sales": 140000, "sales_count": 12 },
     "warnings": []
   },
-  "warnings": []
+  "warnings": [],
+  "report": { "terminal_counted": "48000.00", "terminal_variance": "-2000.00", "...": "" }
 }
 ```
+
+`report` is the Z-report, written by this call. It carries both legs and the
+cashier's note, and it is the slip that gets signed — so the paper record is the
+reconciliation rather than a list of system sales. Printing it later is
+`GET /api/pos/sessions/{session}/z-report`; it is not generated anywhere else.
 
 **Show the lines, not just the answer.** `cash_lines` and `terminal_lines` sum to
 their leg's expected figure, in the order applied. A cashier told only "you are
@@ -123,7 +143,7 @@ result. A *different* close against an already-closed day returns `409` with the
 session as it stands. The offline queue can therefore replay safely and should
 treat `409` as "done, stop retrying".
 
-## `GET /api/pos/cash-up/history`
+## `GET /api/pos/sessions/history`
 
 **Query:** `vendor_id`. Last 14 cash-ups for this cashier at this branch.
 

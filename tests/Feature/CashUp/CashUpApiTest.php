@@ -1,6 +1,6 @@
 <?php
 
-use App\Models\CashUpSession;
+use App\Models\PosSession;
 use App\Models\PosSale;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -44,7 +44,7 @@ function apiSale(array $ctx, array $over = []): PosSale
 
 function openViaApi(array $ctx, array $payload = [])
 {
-    return test()->postJson('/api/pos/cash-up/open', array_merge([
+    return test()->postJson('/api/pos/sessions/open', array_merge([
         'vendor_id'     => $ctx['vendor']->id,
         'opening_float' => 20000,
         'terminal_id'   => 'MPT-001',
@@ -81,7 +81,7 @@ test('a retried open returns the same day rather than starting a second', functi
     $second = openViaApi($ctx)->assertOk();
 
     expect($second->json('session.id'))->toBe($first->json('session.id'))
-        ->and(CashUpSession::count())->toBe(1);
+        ->and(PosSession::count())->toBe(1);
 });
 
 test('a till standing in no branch is told plainly', function () {
@@ -92,11 +92,11 @@ test('a till standing in no branch is told plainly', function () {
 
     openViaApi($ctx)->assertStatus(422)->assertJsonPath(
         'message',
-        'This till is not assigned to a branch, so it cannot run a cash-up. Ask your manager to assign you to a store.'
+        'This till is not assigned to a branch, so it cannot open a session. Ask your manager to assign you to a store.'
     );
 });
 
-test('a cashier cannot open a cash-up in another vendor books', function () {
+test('a cashier cannot open a session in another vendor books', function () {
     $ctx = tillContext();
     $stranger = App\Models\Vendor::create([
         'user_id' => User::factory()->create()->id, 'name' => 'Someone Else',
@@ -112,7 +112,7 @@ test('the till is told nothing about expected figures before counting', function
     apiSale($ctx, ['total' => 80000]);
     openViaApi($ctx);
 
-    $response = test()->getJson('/api/pos/cash-up?vendor_id='.$ctx['vendor']->id)->assertOk();
+    $response = test()->getJson('/api/pos/sessions/active?vendor_id='.$ctx['vendor']->id)->assertOk();
 
     // Every one of these would let a cashier count backwards from the answer.
     foreach (['expected_cash', 'expected_terminal', 'cash_variance', 'terminal_variance', 'breakdown'] as $field) {
@@ -141,7 +141,7 @@ test('closing computes the variance and shows the working', function () {
     $id = openViaApi($ctx)->json('session.id');
 
     // Float 20,000 + 80,000 sales = 100,000 expected. Drawer has 97,000.
-    $response = test()->postJson("/api/pos/cash-up/{$id}/close", [
+    $response = test()->postJson("/api/pos/sessions/{$id}/close", [
         'vendor_id' => $ctx['vendor']->id,
         'counted_cash' => 97000, 'counted_terminal' => 0,
     ])->assertOk();
@@ -159,7 +159,7 @@ test('both counts are required so neither can be tuned to the other', function (
     $ctx = tillContext();
     $id = openViaApi($ctx)->json('session.id');
 
-    test()->postJson("/api/pos/cash-up/{$id}/close", [
+    test()->postJson("/api/pos/sessions/{$id}/close", [
         'vendor_id' => $ctx['vendor']->id, 'counted_cash' => 97000,
     ])->assertStatus(422);
 });
@@ -169,7 +169,7 @@ test('the terminal leg is reconciled separately', function () {
     apiSale($ctx, ['total' => 50000, 'payment_method' => 'card', 'amount_tendered' => 0]);
     $id = openViaApi($ctx, ['opening_float' => 0])->json('session.id');
 
-    $response = test()->postJson("/api/pos/cash-up/{$id}/close", [
+    $response = test()->postJson("/api/pos/sessions/{$id}/close", [
         'vendor_id' => $ctx['vendor']->id,
         'counted_cash' => 0, 'counted_terminal' => 48000,
     ])->assertOk();
@@ -182,7 +182,7 @@ test('a cashier may explain the day in words but not rectify it', function () {
     $ctx = tillContext();
     $id = openViaApi($ctx, ['opening_float' => 0])->json('session.id');
 
-    test()->postJson("/api/pos/cash-up/{$id}/close", [
+    test()->postJson("/api/pos/sessions/{$id}/close", [
         'vendor_id' => $ctx['vendor']->id,
         'counted_cash' => 0, 'counted_terminal' => 0,
         'notes' => 'Gave 3,000 to the driver for transport.',
@@ -190,22 +190,22 @@ test('a cashier may explain the day in words but not rectify it', function () {
 
     // The note reaches the manager, who decides whether it becomes a
     // rectification. The cashier never writes off their own shortage.
-    expect(CashUpSession::find($id)->notes)->toContain('transport');
+    expect(PosSession::find($id)->notes)->toContain('transport');
 });
 
 test('a second close is refused and the first answer stands', function () {
     $ctx = tillContext();
     $id = openViaApi($ctx, ['opening_float' => 0])->json('session.id');
 
-    test()->postJson("/api/pos/cash-up/{$id}/close", [
+    test()->postJson("/api/pos/sessions/{$id}/close", [
         'vendor_id' => $ctx['vendor']->id, 'counted_cash' => 5000, 'counted_terminal' => 0,
     ])->assertOk();
 
-    test()->postJson("/api/pos/cash-up/{$id}/close", [
+    test()->postJson("/api/pos/sessions/{$id}/close", [
         'vendor_id' => $ctx['vendor']->id, 'counted_cash' => 99999, 'counted_terminal' => 0,
     ])->assertStatus(409);
 
-    expect((float) CashUpSession::find($id)->counted_cash)->toBe(5000.0);
+    expect((float) PosSession::find($id)->counted_cash)->toBe(5000.0);
 });
 
 test('a retried close with the same key is accepted quietly', function () {
@@ -217,13 +217,13 @@ test('a retried close with the same key is accepted quietly', function () {
         'counted_terminal' => 0, 'idempotency_key' => 'close-abc',
     ];
 
-    test()->postJson("/api/pos/cash-up/{$id}/close", $payload)->assertOk();
+    test()->postJson("/api/pos/sessions/{$id}/close", $payload)->assertOk();
 
     // The offline queue replays. It must not be met with an error it will keep
     // retrying, nor post a second time.
-    test()->postJson("/api/pos/cash-up/{$id}/close", $payload)->assertOk();
+    test()->postJson("/api/pos/sessions/{$id}/close", $payload)->assertOk();
 
-    expect((float) CashUpSession::find($id)->counted_cash)->toBe(5000.0);
+    expect((float) PosSession::find($id)->counted_cash)->toBe(5000.0);
 });
 
 test('a cashier cannot close somebody else drawer', function () {
@@ -234,7 +234,7 @@ test('a cashier cannot close somebody else drawer', function () {
 
     $theirs = openCashUp($ctx, ['cashier_id' => $mate->id, 'business_date' => now()->toDateString()]);
 
-    test()->postJson("/api/pos/cash-up/{$theirs->id}/close", [
+    test()->postJson("/api/pos/sessions/{$theirs->id}/close", [
         'vendor_id' => $ctx['vendor']->id, 'counted_cash' => 0, 'counted_terminal' => 0,
     ])->assertNotFound();
 });
@@ -245,7 +245,7 @@ test('a day left open yesterday is offered back rather than hanging forever', fu
     $ctx = tillContext();
     openCashUp($ctx, ['business_date' => now()->subDay()->toDateString()]);
 
-    $response = test()->getJson('/api/pos/cash-up?vendor_id='.$ctx['vendor']->id)->assertOk();
+    $response = test()->getJson('/api/pos/sessions/active?vendor_id='.$ctx['vendor']->id)->assertOk();
 
     expect($response->json('unclosed'))->toHaveCount(1)
         ->and($response->json('session'))->toBeNull();
@@ -257,7 +257,7 @@ test('an unclosed earlier day can still be closed', function () {
         'business_date' => now()->subDay()->toDateString(), 'opening_float' => 0,
     ]);
 
-    test()->postJson("/api/pos/cash-up/{$yesterday->id}/close", [
+    test()->postJson("/api/pos/sessions/{$yesterday->id}/close", [
         'vendor_id' => $ctx['vendor']->id, 'counted_cash' => 1000, 'counted_terminal' => 0,
     ])->assertOk();
 
@@ -275,11 +275,11 @@ test('history shows what is still unexplained, not only what was frozen', functi
 
     // The manager later accounts for 3,000 of it.
     App\Models\CashUpRectification::create([
-        'cash_up_session_id' => $session->id, 'vendor_id' => $ctx['vendor']->id,
+        'pos_session_id' => $session->id, 'vendor_id' => $ctx['vendor']->id,
         'kind' => 'expense', 'amount' => 3000, 'created_by' => $ctx['owner']->id,
     ]);
 
-    $response = test()->getJson('/api/pos/cash-up/history?vendor_id='.$ctx['vendor']->id)->assertOk();
+    $response = test()->getJson('/api/pos/sessions/history?vendor_id='.$ctx['vendor']->id)->assertOk();
 
     expect((float) $response->json('sessions.0.cash_variance'))->toBe(-5000.0)
         ->and((float) $response->json('sessions.0.resolved_cash_variance'))->toBe(-2000.0);
@@ -288,7 +288,7 @@ test('history shows what is still unexplained, not only what was frozen', functi
 test('the endpoints refuse a caller with no token', function () {
     $ctx = cashUpContext();
 
-    test()->postJson('/api/pos/cash-up/open', [
+    test()->postJson('/api/pos/sessions/open', [
         'vendor_id' => $ctx['vendor']->id, 'opening_float' => 1000,
     ])->assertUnauthorized();
 });

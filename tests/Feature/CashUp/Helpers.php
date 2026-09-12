@@ -7,7 +7,7 @@
 // in a sibling test only exists when that sibling happens to load too, and
 // running a file on its own then fails.
 
-use App\Models\CashUpSession;
+use App\Models\PosSession;
 use App\Models\Store;
 use App\Models\User;
 use App\Models\Vendor;
@@ -31,9 +31,9 @@ function cashUpContext(): array
 }
 
 /** An open session, exactly as the open endpoint will write one. */
-function openCashUp(array $ctx, array $over = []): CashUpSession
+function openCashUp(array $ctx, array $over = []): PosSession
 {
-    return CashUpSession::create(array_merge([
+    return PosSession::create(array_merge([
         'vendor_id'     => $ctx['vendor']->id,
         'store_id'      => $ctx['store']->id,
         'cashier_id'    => $ctx['cashier']->id,
@@ -41,7 +41,7 @@ function openCashUp(array $ctx, array $over = []): CashUpSession
         'business_date' => '2026-09-11',
         'opening_float' => 20000,
         'opened_at'     => now(),
-        'status'        => CashUpSession::STATUS_OPEN,
+        'status'        => PosSession::STATUS_OPEN,
     ], $over));
 }
 
@@ -49,7 +49,7 @@ function openCashUp(array $ctx, array $over = []): CashUpSession
  * Close a session the way Phase 3 will: counts and the figures they were
  * measured against land together, in the one update that leaves 'open'.
  */
-function closeCashUp(CashUpSession $session, array $over = []): CashUpSession
+function closeCashUp(PosSession $session, array $over = []): PosSession
 {
     $session->update(array_merge([
         'counted_cash'      => 100000,
@@ -59,7 +59,7 @@ function closeCashUp(CashUpSession $session, array $over = []): CashUpSession
         'cash_variance'     => 0,
         'terminal_variance' => 0,
         'breakdown'         => ['cash_sales' => 80000],
-        'status'            => CashUpSession::STATUS_PENDING_REVIEW,
+        'status'            => PosSession::STATUS_PENDING_REVIEW,
         'closed_at'         => now(),
     ], $over));
 

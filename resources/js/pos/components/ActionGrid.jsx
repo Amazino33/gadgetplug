@@ -33,7 +33,7 @@ export default function ActionGrid({
     onDiscount, onCustomer,
     onQuickCash, onQuickPOS, onQuickTransfer, onSuspend, onPayment, onVoid,
     onZReport,
-    onCashUp, onReturn,
+    onCashUp, onExpense, onReturn,
     pendingSales = [], onViewPending, pendingError,
 }) {
     return (
@@ -61,6 +61,11 @@ export default function ActionGrid({
                         "cable". */}
                     <Btn label="Customer"        hotkey="F6"                          onClick={onCustomer} />
                     <Btn label="Return"          hotkey=""    color="gray"            onClick={onReturn} />
+                    {/* The paid-out slip that used to live in the till. Here
+                        rather than on the dashboard because it has to be
+                        recorded while the money is leaving, not remembered
+                        afterwards. */}
+                    <Btn label="Expense"         hotkey=""    color="gray"            onClick={onExpense} />
                     <Btn label="Z-Report"        hotkey=""    color="gray"            onClick={onZReport} />
                     {/* The end of the day, not just a printout: the drawer and
                         the terminal counted against what was actually rung.

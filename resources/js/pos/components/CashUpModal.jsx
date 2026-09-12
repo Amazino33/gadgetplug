@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import AmountKeypad from './AmountKeypad';
+import ModalShell from './ModalShell';
 import { fmt } from '../lib/format';
 import { describeVariance, provisionalFor, varianceAgainst } from '../lib/cashUp';
 
@@ -48,112 +49,148 @@ export default function CashUpModal({ shift, onClose, onComplete }) {
     const counts = { cash: Number(cash) || 0, terminal: Number(terminal) || 0 };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-            <div className="mx-4 max-h-[92vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white shadow-2xl dark:bg-gray-900">
-                <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white px-6 py-4 dark:border-gray-800 dark:bg-gray-900">
-                    <h2 className="font-bold text-gray-800 dark:text-gray-100">
-                        {{ review: 'Where you stand', note: 'Before you finish' }[step] ?? 'Cash up'}
-                    </h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600" aria-label="Close">✕</button>
-                </div>
+        <ModalShell
+            title={{ review: 'Where you stand', note: 'Before you finish' }[step] ?? 'Cash up'}
+            onClose={onClose}
+            footer={footerFor({
+                step, cash, terminal, expectation, counts, note, finishing,
+                setStep,
+                onFinish: async (text) => {
+                    setFinishing(true);
 
-                <div className="p-6">
-                    {step === 'cash' && (
-                        <CountStep
-                            title="How much cash have you counted?"
-                            hint="Count everything in the drawer, including the float you started with."
-                            value={cash}
-                            onChange={setCash}
-                            onNext={() => setStep('terminal')}
-                            nextLabel="Next"
-                        />
-                    )}
+                    try {
+                        await onComplete({
+                            countedCash: counts.cash,
+                            countedTerminal: counts.terminal,
+                            notes: text?.trim() ? text.trim() : null,
+                            // Frozen with the counts, so a sale syncing later
+                            // cannot change what the cashier was shown.
+                            expectation,
+                        });
+                    } catch {
+                        setFinishing(false);
+                    }
+                },
+            })}
+        >
+            {step === 'cash' && (
+                <CountStep
+                    title="How much cash have you counted?"
+                    hint="Everything in the drawer, including the float you started with."
+                    value={cash}
+                    onChange={setCash}
+                    onNext={() => setStep('terminal')}
+                />
+            )}
 
-                    {step === 'terminal' && (
-                        <CountStep
-                            title="What's the total on your Moniepoint machine?"
-                            hint="Read the day's total off the terminal screen. Card and transfer together."
-                            value={terminal}
-                            onChange={setTerminal}
-                            onNext={() => setStep('review')}
-                            onBack={() => setStep('cash')}
-                            nextLabel="See how you did"
-                        />
-                    )}
+            {step === 'terminal' && (
+                <CountStep
+                    title="What is the total on your Moniepoint machine?"
+                    hint="The day total off the terminal screen. Card and transfer together."
+                    value={terminal}
+                    onChange={setTerminal}
+                    onNext={() => setStep('review')}
+                />
+            )}
 
-                    {step === 'note' && expectation && (
-                        <NoteStep
-                            note={note}
-                            onNote={setNote}
-                            busy={finishing}
-                            balanced={isBalanced(expectation, counts)}
-                            onFinish={async (text) => {
-                                setFinishing(true);
+            {step === 'review' && (
+                busy || !expectation
+                    ? <p className="py-10 text-center text-sm text-gray-400">Working it out…</p>
+                    : <Review expectation={expectation} counts={counts} />
+            )}
 
-                                try {
-                                    await onComplete({
-                                        countedCash: counts.cash,
-                                        countedTerminal: counts.terminal,
-                                        notes: text?.trim() ? text.trim() : null,
-                                        // Frozen with the counts, so a sale
-                                        // syncing later cannot change what the
-                                        // cashier was shown as they finished.
-                                        expectation,
-                                    });
-                                } catch {
-                                    setFinishing(false);
-                                }
-                            }}
-                            onBack={() => setStep('review')}
-                        />
-                    )}
-
-                    {step === 'review' && (
-                        busy || !expectation
-                            ? <p className="py-10 text-center text-sm text-gray-400">Working it out…</p>
-                            : (
-                                <Review
-                                    expectation={expectation}
-                                    counts={counts}
-                                    onContinue={() => setStep('note')}
-                                />
-                            )
-                    )}
-                </div>
-            </div>
-        </div>
+            {step === 'note' && expectation && (
+                <NoteStep
+                    note={note}
+                    onNote={setNote}
+                    balanced={isBalanced(expectation, counts)}
+                />
+            )}
+        </ModalShell>
     );
 }
 
-function CountStep({ title, hint, value, onChange, onNext, onBack, nextLabel }) {
+/**
+ * The way out of each step, pinned to the bottom of the panel.
+ *
+ * It used to sit under the keypad, which put it below the fold on a 768-pixel
+ * laptop — so finishing a cash-up meant scrolling to find the way to finish it.
+ * The figures above may scroll; the action never does.
+ */
+function footerFor({ step, cash, terminal, expectation, counts, note, finishing, setStep, onFinish }) {
+    const primary = 'w-full rounded-xl bg-[#068B03] py-3.5 text-base font-bold text-white transition-all active:scale-95 disabled:opacity-40';
+    const quiet = 'w-full py-2 text-xs font-semibold text-gray-400 transition-colors hover:text-gray-600 disabled:opacity-40 dark:hover:text-gray-300';
+
+    if (step === 'cash') {
+        return (
+            <button onClick={() => setStep('terminal')} disabled={cash === ''} className={primary}>
+                Next
+            </button>
+        );
+    }
+
+    if (step === 'terminal') {
+        return (
+            <>
+                <button onClick={() => setStep('review')} disabled={terminal === ''} className={primary}>
+                    See how you did
+                </button>
+                <button onClick={() => setStep('cash')} className={quiet}>Back</button>
+            </>
+        );
+    }
+
+    if (step === 'review') {
+        return (
+            <button onClick={() => setStep('note')} disabled={!expectation} className={primary}>
+                Continue
+            </button>
+        );
+    }
+
+    const balanced = expectation ? isBalanced(expectation, counts) : true;
+    const written = note.trim().length > 0;
+
     return (
-        <div>
-            <h3 className="text-center text-lg font-extrabold text-gray-900 dark:text-gray-50">{title}</h3>
-            <p className="mt-2 mb-5 text-center text-xs text-gray-500 dark:text-gray-400">{hint}</p>
-
-            <AmountKeypad value={value} onChange={onChange} autoFocusLabel={title} />
-
+        <>
             <button
-                onClick={onNext}
-                disabled={value === ''}
-                className="mt-5 w-full rounded-2xl bg-[#068B03] py-4 text-base font-bold text-white transition-all active:scale-95 disabled:opacity-40"
+                onClick={() => onFinish(note)}
+                disabled={finishing || (!balanced && !written)}
+                className={primary}
             >
-                {nextLabel}
+                {finishing ? 'Finishing…' : balanced ? 'Finish cash-up' : 'Send this and finish'}
             </button>
 
-            {onBack && (
-                <button
-                    onClick={onBack}
-                    className="mt-3 w-full py-2 text-xs font-semibold text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                >
-                    Back
+            {!balanced && (
+                <button onClick={() => onFinish('')} disabled={finishing} className={quiet}>
+                    I cannot explain it — finish anyway
                 </button>
             )}
+
+            <button onClick={() => setStep('review')} disabled={finishing} className={quiet}>
+                Back to the figures
+            </button>
+        </>
+    );
+}
+
+function CountStep({ title, hint, value, onChange, onNext }) {
+    return (
+        <div>
+            <h3 className="text-center text-base font-extrabold text-gray-900 dark:text-gray-50">{title}</h3>
+            <p className="mb-3 mt-1.5 text-center text-xs leading-snug text-gray-500 dark:text-gray-400">{hint}</p>
+
+            <AmountKeypad
+                value={value}
+                onChange={onChange}
+                autoFocusLabel={title}
+                onSubmit={() => { if (value !== '') onNext(); }}
+            />
         </div>
     );
 }
 
-function Review({ expectation, counts, onContinue }) {
+function Review({ expectation, counts }) {
     const cash = varianceAgainst(counts.cash, expectation.expectedCash);
     const terminal = varianceAgainst(counts.terminal, expectation.expectedTerminal);
     const { context } = expectation;
@@ -202,12 +239,6 @@ function Review({ expectation, counts, onContinue }) {
                 )}
             </p>
 
-            <button
-                onClick={onContinue}
-                className="w-full rounded-2xl bg-[#068B03] py-4 text-base font-bold text-white transition-all active:scale-95"
-            >
-                Continue
-            </button>
         </div>
     );
 }
@@ -226,15 +257,13 @@ function Review({ expectation, counts, onContinue }) {
  * them finish would only teach them to type anything at all, and an invented
  * explanation is worse than an honest blank.
  */
-function NoteStep({ note, onNote, onFinish, onBack, busy, balanced }) {
-    const written = note.trim().length > 0;
-
+function NoteStep({ note, onNote, balanced }) {
     return (
         <div>
-            <h3 className="text-center text-lg font-extrabold text-gray-900 dark:text-gray-50">
+            <h3 className="text-center text-base font-extrabold text-gray-900 dark:text-gray-50">
                 {balanced ? 'Anything to add?' : 'What happened?'}
             </h3>
-            <p className="mt-2 mb-4 text-center text-xs text-gray-500 dark:text-gray-400">
+            <p className="mb-3 mt-1.5 text-center text-xs leading-snug text-gray-500 dark:text-gray-400">
                 {balanced
                     ? 'Your day balances. Add a note if there is anything your manager should know.'
                     : 'Your manager decides what accounts for a difference — this is how you tell them. Money spent out of the drawer, cash you handed over, a sale rung on the wrong button.'}
@@ -243,37 +272,12 @@ function NoteStep({ note, onNote, onFinish, onBack, busy, balanced }) {
             <textarea
                 value={note}
                 onChange={(e) => onNote(e.target.value)}
-                rows={4}
+                rows={5}
+                autoFocus
                 aria-label="Note for your manager"
                 placeholder="e.g. Gave ₦3,000 to the driver for transport"
                 className="w-full rounded-xl border-2 border-gray-200 px-4 py-3 text-sm text-gray-800 focus:border-[#068B03] focus:outline-none dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
             />
-
-            <button
-                onClick={() => onFinish(note)}
-                disabled={busy || (!balanced && !written)}
-                className="mt-4 w-full rounded-2xl bg-[#068B03] py-4 text-base font-bold text-white transition-all active:scale-95 disabled:opacity-40"
-            >
-                {busy ? 'Finishing…' : balanced ? 'Finish cash-up' : 'Send this and finish'}
-            </button>
-
-            {!balanced && (
-                <button
-                    onClick={() => onFinish('')}
-                    disabled={busy}
-                    className="mt-3 w-full py-2 text-xs font-semibold text-gray-400 hover:text-gray-600 disabled:opacity-40 dark:hover:text-gray-300"
-                >
-                    I cannot explain it — finish anyway
-                </button>
-            )}
-
-            <button
-                onClick={onBack}
-                disabled={busy}
-                className="mt-1 w-full py-2 text-xs font-semibold text-gray-400 hover:text-gray-600 disabled:opacity-40 dark:hover:text-gray-300"
-            >
-                Back to the figures
-            </button>
         </div>
     );
 }

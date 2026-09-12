@@ -28,6 +28,27 @@ final class BusinessDate
     }
 
     /**
+     * The trading day a stored timestamp falls on.
+     *
+     * Timestamps are kept in the app timezone, so this is a conversion and not a
+     * formatting choice: 23:30 UTC is already half past midnight in Lagos, and
+     * reading the date straight off the column would file that sale under
+     * yesterday.
+     */
+    public static function of(string|CarbonInterface|null $timestamp): ?string
+    {
+        if (blank($timestamp)) {
+            return null;
+        }
+
+        $at = $timestamp instanceof CarbonInterface
+            ? CarbonImmutable::parse($timestamp)
+            : CarbonImmutable::parse($timestamp, config('app.timezone', 'UTC'));
+
+        return $at->setTimezone(self::timezone())->toDateString();
+    }
+
+    /**
      * The half-open-feeling inclusive window a business date covers, converted to
      * the app timezone so it can be compared against stored timestamps directly.
      *

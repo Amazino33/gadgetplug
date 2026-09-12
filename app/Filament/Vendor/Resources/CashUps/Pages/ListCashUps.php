@@ -6,7 +6,7 @@ use App\Actions\CashUp\ApproveCashUpAction;
 use App\Actions\CashUp\RecordRectificationAction;
 use App\Filament\Vendor\Resources\CashUps\CashUpResource;
 use App\Models\CashUpRectification;
-use App\Models\CashUpSession;
+use App\Models\PosSession;
 use App\Models\PosSale;
 use App\Services\ActiveStore;
 use App\Support\Pos\BusinessDate;
@@ -61,7 +61,7 @@ class ListCashUps extends ListRecords
         }
 
         $waiting = CashUpResource::getEloquentQuery()
-            ->where('status', CashUpSession::STATUS_PENDING_REVIEW)
+            ->where('status', PosSession::STATUS_PENDING_REVIEW)
             ->count();
 
         return new HtmlString(
@@ -85,7 +85,7 @@ class ListCashUps extends ListRecords
                 Tables\Columns\TextColumn::make('cashier.name')
                     ->label('Cashier')
                     ->searchable()
-                    ->description(fn (CashUpSession $r) => $r->terminal_id ? 'Terminal '.$r->terminal_id : null),
+                    ->description(fn (PosSession $r) => $r->terminal_id ? 'Terminal '.$r->terminal_id : null),
 
                 Tables\Columns\TextColumn::make('store.name')
                     ->label('Branch')
@@ -96,7 +96,7 @@ class ListCashUps extends ListRecords
                 Tables\Columns\TextColumn::make('counted_cash')
                     ->label('Drawer counted')
                     ->money('NGN')
-                    ->description(fn (CashUpSession $r) => $r->expected_cash !== null
+                    ->description(fn (PosSession $r) => $r->expected_cash !== null
                         ? 'Expected ₦'.number_format((float) $r->expected_cash, 2)
                         : null),
 
@@ -108,7 +108,7 @@ class ListCashUps extends ListRecords
                     // What is STILL missing, once the manager has accounted for
                     // part of it. The frozen figure above stays as the record of
                     // what was first put to the cashier.
-                    ->description(fn (CashUpSession $r) => $r->countsSubmitted()
+                    ->description(fn (PosSession $r) => $r->countsSubmitted()
                         && abs($r->resolvedCashVariance() - (float) $r->cash_variance) > 0.009
                             ? 'Still unexplained: ₦'.number_format($r->resolvedCashVariance(), 2)
                             : null),
@@ -117,7 +117,7 @@ class ListCashUps extends ListRecords
                     ->label('Terminal difference')
                     ->money('NGN')
                     ->color(fn ($state) => static::varianceColour((float) $state))
-                    ->description(fn (CashUpSession $r) => $r->countsSubmitted()
+                    ->description(fn (PosSession $r) => $r->countsSubmitted()
                         && abs($r->resolvedTerminalVariance() - (float) $r->terminal_variance) > 0.009
                             ? 'Still unexplained: ₦'.number_format($r->resolvedTerminalVariance(), 2)
                             : null),
@@ -125,28 +125,28 @@ class ListCashUps extends ListRecords
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
                     ->formatStateUsing(fn (string $state) => match ($state) {
-                        CashUpSession::STATUS_OPEN            => 'Still open',
-                        CashUpSession::STATUS_PENDING_REVIEW  => 'Waiting for review',
-                        CashUpSession::STATUS_APPROVED        => 'Approved',
+                        PosSession::STATUS_OPEN            => 'Still open',
+                        PosSession::STATUS_PENDING_REVIEW  => 'Waiting for review',
+                        PosSession::STATUS_APPROVED        => 'Approved',
                         default                               => $state,
                     })
                     ->color(fn (string $state) => match ($state) {
-                        CashUpSession::STATUS_APPROVED       => 'success',
-                        CashUpSession::STATUS_PENDING_REVIEW => 'warning',
+                        PosSession::STATUS_APPROVED       => 'success',
+                        PosSession::STATUS_PENDING_REVIEW => 'warning',
                         default                              => 'gray',
                     })
-                    ->description(fn (CashUpSession $r) => $r->reviewer?->name
+                    ->description(fn (PosSession $r) => $r->reviewer?->name
                         ? 'by '.$r->reviewer->name
                         : null),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('status')
                     ->options([
-                        CashUpSession::STATUS_PENDING_REVIEW => 'Waiting for review',
-                        CashUpSession::STATUS_APPROVED       => 'Approved',
-                        CashUpSession::STATUS_OPEN           => 'Still open',
+                        PosSession::STATUS_PENDING_REVIEW => 'Waiting for review',
+                        PosSession::STATUS_APPROVED       => 'Approved',
+                        PosSession::STATUS_OPEN           => 'Still open',
                     ])
-                    ->default(CashUpSession::STATUS_PENDING_REVIEW),
+                    ->default(PosSession::STATUS_PENDING_REVIEW),
 
                 Tables\Filters\SelectFilter::make('cashier_id')
                     ->label('Cashier')
@@ -184,13 +184,13 @@ class ListCashUps extends ListRecords
             ->label('See working')
             ->icon('heroicon-o-document-magnifying-glass')
             ->color('gray')
-            ->modalHeading(fn (CashUpSession $record) => $record->cashier->name.' — '
+            ->modalHeading(fn (PosSession $record) => $record->cashier->name.' — '
                 .$record->business_date->format('d M Y'))
             ->modalSubmitAction(false)
             ->modalCancelActionLabel('Close')
-            ->visible(fn (CashUpSession $record) => $record->countsSubmitted())
-            ->authorize(fn (CashUpSession $record) => auth()->user()->can('view', $record))
-            ->modalContent(fn (CashUpSession $record) => view(
+            ->visible(fn (PosSession $record) => $record->countsSubmitted())
+            ->authorize(fn (PosSession $record) => auth()->user()->can('view', $record))
+            ->modalContent(fn (PosSession $record) => view(
                 'filament.vendor.cash-up-breakdown',
                 ['session' => $record->load('rectifications.creator', 'rectifications.relatedSale')],
             ));
@@ -203,11 +203,11 @@ class ListCashUps extends ListRecords
             ->label('Explain a difference')
             ->icon('heroicon-o-pencil-square')
             ->color('warning')
-            ->visible(fn (CashUpSession $record) => $record->acceptsRectifications())
+            ->visible(fn (PosSession $record) => $record->acceptsRectifications())
             // The real gate. ->visible() only hides a button.
-            ->authorize(fn (CashUpSession $record) => auth()->user()->can('rectify', $record))
+            ->authorize(fn (PosSession $record) => auth()->user()->can('rectify', $record))
             ->modalHeading('What accounts for this difference?')
-            ->modalDescription(fn (CashUpSession $record) => $this->gapSummary($record))
+            ->modalDescription(fn (PosSession $record) => $this->gapSummary($record))
             ->schema([
                 Select::make('kind')
                     ->label('What happened')
@@ -244,7 +244,7 @@ class ListCashUps extends ListRecords
 
                 Select::make('related_sale_id')
                     ->label('Which sale')
-                    ->options(fn (CashUpSession $record, Get $get) => $this->saleOptions($record, $get('kind')))
+                    ->options(fn (PosSession $record, Get $get) => $this->saleOptions($record, $get('kind')))
                     ->searchable()
                     ->required()
                     ->helperText('The sale is flagged for correction. It is never rewritten — it keeps saying what it was rung as.')
@@ -258,7 +258,7 @@ class ListCashUps extends ListRecords
                     ->rows(2)
                     ->helperText('What the cashier said, or what you found.'),
             ])
-            ->action(function (CashUpSession $record, array $data) {
+            ->action(function (PosSession $record, array $data) {
                 try {
                     app(RecordRectificationAction::class)->execute(
                         session: $record,
@@ -295,15 +295,15 @@ class ListCashUps extends ListRecords
             ->label('Approve')
             ->icon('heroicon-o-check-circle')
             ->color('success')
-            ->visible(fn (CashUpSession $record) => $record->isPendingReview())
-            ->authorize(fn (CashUpSession $record) => auth()->user()->can('approve', $record))
+            ->visible(fn (PosSession $record) => $record->isPendingReview())
+            ->authorize(fn (PosSession $record) => auth()->user()->can('approve', $record))
             ->requiresConfirmation()
             ->modalHeading('Approve this cash-up?')
-            ->modalDescription(fn (CashUpSession $record) => new HtmlString($this->approvalWarning($record)))
+            ->modalDescription(fn (PosSession $record) => new HtmlString($this->approvalWarning($record)))
             ->schema([
                 Textarea::make('notes')->label('Anything to add')->rows(2),
             ])
-            ->action(function (CashUpSession $record, array $data) {
+            ->action(function (PosSession $record, array $data) {
                 try {
                     app(ApproveCashUpAction::class)->execute(
                         $record,
@@ -328,7 +328,7 @@ class ListCashUps extends ListRecords
      * button, and approving it as-is would charge a cashier for money sitting on
      * the terminal.
      */
-    private function approvalWarning(CashUpSession $record): string
+    private function approvalWarning(PosSession $record): string
     {
         $record->loadMissing('rectifications');
         $cash = $record->resolvedCashVariance();
@@ -350,7 +350,7 @@ class ListCashUps extends ListRecords
                 .e($record->cashier->name).'.';
     }
 
-    private function gapSummary(CashUpSession $record): string
+    private function gapSummary(PosSession $record): string
     {
         $record->loadMissing('rectifications');
 
@@ -371,7 +371,7 @@ class ListCashUps extends ListRecords
      * aimed at somebody else's sale. The action re-checks this; a tampered
      * select must not be the only thing standing in the way.
      */
-    private function saleOptions(CashUpSession $record, ?string $kind): array
+    private function saleOptions(PosSession $record, ?string $kind): array
     {
         [$from, $to] = BusinessDate::boundsFor($record->business_date->toDateString());
 

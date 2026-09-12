@@ -109,7 +109,7 @@ export function useSync(vendorId, onStuckSalesChange) {
 
     const pushOpen = async (shift) => {
         try {
-            const { data } = await api.post('/cash-up/open', {
+            const { data } = await api.post('/sessions/open', {
                 vendor_id: shift.vendor_id,
                 opening_float: shift.opening_float,
                 terminal_id: shift.terminal_id ?? undefined,
@@ -157,7 +157,7 @@ export function useSync(vendorId, onStuckSalesChange) {
         if (!shift.server_id) return;
 
         try {
-            const { data } = await api.post(`/cash-up/${shift.server_id}/close`, {
+            const { data } = await api.post(`/sessions/${shift.server_id}/close`, {
                 vendor_id: shift.vendor_id,
                 counted_cash: shift.counted_cash,
                 counted_terminal: shift.counted_terminal,

@@ -3,7 +3,7 @@
 use App\Filament\Vendor\Resources\CashUps\CashUpResource;
 use App\Filament\Vendor\Resources\CashUps\Pages\ListCashUps;
 use App\Models\AccountabilityLedgerEntry;
-use App\Models\CashUpSession;
+use App\Models\PosSession;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -36,7 +36,7 @@ function cashUpManager(array $ctx): User
     return $manager;
 }
 
-function reviewable(array $ctx, array $over = []): CashUpSession
+function reviewable(array $ctx, array $over = []): PosSession
 {
     return closeCashUp(
         openCashUp($ctx, ['business_date' => now()->toDateString()]),
@@ -285,7 +285,7 @@ test('an approved day offers nothing further to do', function () {
 // job and is covered by the action existing, whereas what actually has to be
 // right is that this template shows a cashier the arithmetic they are held to.
 
-function renderWorking(CashUpSession $session): string
+function renderWorking(PosSession $session): string
 {
     return view('filament.vendor.cash-up-breakdown', [
         'session' => $session->load('rectifications.creator', 'rectifications.relatedSale'),

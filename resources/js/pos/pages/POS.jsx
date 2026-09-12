@@ -8,7 +8,7 @@ import { addToCart } from '../lib/cartAdd';
 import { shouldRedirectTypingToSearch } from '../lib/typeAhead';
 import { db } from '../lib/db';
 import { pruneOldSales, recordSale } from '../lib/salesHistory';
-import { closeShift, ensurePosSession } from '../lib/shift';
+import { announceShift, cachedSession, closeShift } from '../lib/shift';
 import api from '../lib/api';
 import Cart from '../components/Cart';
 import SearchBar from '../components/SearchBar';
@@ -23,6 +23,7 @@ import PriceModal from '../components/PriceModal';
 import ReturnModal from '../components/ReturnModal';
 import ZReportModal from '../components/ZReportModal';
 import CashUpModal from '../components/CashUpModal';
+import ExpenseModal from '../components/ExpenseModal';
 import ReceiptModal from '../components/ReceiptModal';
 import StuckSalesModal from '../components/StuckSalesModal';
 import SalesHistoryModal from '../components/SalesHistoryModal';
@@ -68,10 +69,7 @@ export default function POS({ user, vendorId, shift, onShiftClosed, onLogout }) 
     // recorded on the day the goods actually left rather than the day it was
     // put right. Null for an ordinary sale.
     const [recoveredAt, setRecoveredAt]   = useState(null);
-    const [session, setSession]           = useState(() => {
-        const s = localStorage.getItem('pos_session');
-        return s ? JSON.parse(s) : null;
-    });
+    const [session, setSession]           = useState(() => cachedSession());
     const [isOnline, setIsOnline]         = useState(navigator.onLine);
     const [modal, setModal]               = useState(null);
     const [lastSale, setLastSale]         = useState(null);
@@ -107,21 +105,17 @@ export default function POS({ user, vendorId, shift, onShiftClosed, onLogout }) 
         return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
     }, []);
 
-    // The shift opened the POS session with the float the cashier actually
-    // counted (see lib/shift.js). This only covers the case where that call
-    // could not reach the server at the time — a till that started the day
-    // offline and has since come back.
-    //
-    // It used to open the session itself, automatically, with a float of zero
-    // and no screen at all, which made every Z-report variance wrong by
-    // whatever was in the drawer when the cashier arrived.
+    // A till that started the day with no signal has no server session id yet,
+    // so its sales cannot be stamped with one. This asks again once, when the
+    // component has a shift but no session — the background sync keeps trying
+    // regardless, and the sale queue does not depend on the answer.
     useEffect(() => {
         if (session || !shift) return;
 
-        ensurePosSession(vendorId, shift.opening_float)
-            .then(setSession)
+        announceShift(shift)
+            .then((opened) => setSession(opened ?? cachedSession()))
             .catch(() => { /* still offline — the till sells regardless */ });
-    }, [session, shift, vendorId]);
+    }, [session, shift]);
 
     // ── Pending (suspended) sales ────────────────────────────────────
     // No slots, no popup: any held sale just shows up in the sidebar for
@@ -865,6 +859,7 @@ export default function POS({ user, vendorId, shift, onShiftClosed, onLogout }) 
                     onVoid={clearCart}
                     onZReport={() => setModal('zreport')}
                     onCashUp={() => setModal('cashup')}
+                    onExpense={() => setModal('expense')}
                     pendingSales={pendingSales}
                     onViewPending={() => setModal('suspendedSales')}
                     pendingError={pendingError}
@@ -1030,6 +1025,12 @@ export default function POS({ user, vendorId, shift, onShiftClosed, onLogout }) 
                     onClose={() => setModal(null)}
                 />
             )}
+            {modal === 'expense' && (
+                <ExpenseModal
+                    vendorId={vendorId}
+                    onClose={() => setModal(null)}
+                />
+            )}
             {modal === 'cashup' && shift && (
                 <CashUpModal
                     shift={shift}
@@ -1052,11 +1053,6 @@ export default function POS({ user, vendorId, shift, onShiftClosed, onLogout }) 
                 <ZReportModal
                     session={session}
                     onClose={() => setModal(null)}
-                    onCloseSession={() => {
-                        localStorage.removeItem('pos_session');
-                        setSession(null);
-                        setModal(null);
-                    }}
                 />
             )}
             {lastSale && (

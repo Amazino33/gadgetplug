@@ -3,7 +3,7 @@
 use App\Actions\CashUp\ApproveCashUpAction;
 use App\Actions\CashUp\RecordRectificationAction;
 use App\Models\AccountabilityLedgerEntry;
-use App\Models\CashUpSession;
+use App\Models\PosSession;
 use App\Models\FinancialAccount;
 use App\Models\PosCustomer;
 use App\Models\PosCustomerLedgerEntry;
@@ -40,7 +40,7 @@ function postingSale(array $ctx, array $over = []): PosSale
 }
 
 /** A submitted cash-up with a difference on it, awaiting review. */
-function pendingCashUp(array $ctx, array $over = []): CashUpSession
+function pendingCashUp(array $ctx, array $over = []): PosSession
 {
     return closeCashUp(
         openCashUp($ctx, ['business_date' => now()->toDateString()]),
@@ -51,7 +51,7 @@ function pendingCashUp(array $ctx, array $over = []): CashUpSession
     );
 }
 
-function rectifyAs(CashUpSession $session, User $manager, array $args): App\Models\CashUpRectification
+function rectifyAs(PosSession $session, User $manager, array $args): App\Models\CashUpRectification
 {
     return app(RecordRectificationAction::class)->execute(
         session: $session,
@@ -66,7 +66,7 @@ function rectifyAs(CashUpSession $session, User $manager, array $args): App\Mode
     );
 }
 
-function approveAs(CashUpSession $session, User $reviewer): CashUpSession
+function approveAs(PosSession $session, User $reviewer): PosSession
 {
     return app(ApproveCashUpAction::class)->execute($session, $reviewer);
 }
@@ -265,7 +265,7 @@ test('approval charges only what is still unexplained', function () {
     $row = ApproveCashUpAction::postingFor($session);
     expect($row->entry_type)->toBe('cash_shortage')
         ->and($row->store_id)->toBe($ctx['store']->id)
-        ->and($row->source_type)->toBe(CashUpSession::class)
+        ->and($row->source_type)->toBe(PosSession::class)
         ->and((int) $row->source_id)->toBe($session->id);
 });
 

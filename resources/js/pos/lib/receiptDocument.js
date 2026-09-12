@@ -441,6 +441,27 @@ export function zReportHtml(report, session = {}, config = {}) {
 
     parts.push(`<div class="totals">\n${drawer.join('\n')}\n</div>`);
 
+    // The terminal leg. The slip used to show the drawer and say nothing about
+    // the machine, so a cashier was signing for half the money — and the half
+    // that is easiest to move without anybody noticing.
+    if (report.terminal_counted != null) {
+        const tv = Number(report.terminal_variance ?? 0);
+
+        const terminal = [
+            row('Terminal Expected', money(report.terminal_expected)),
+            row('Terminal Counted', money(report.terminal_counted)),
+            row('Terminal Variance', `${tv >= 0 ? '+' : '-'}${money(Math.abs(tv))}`),
+        ];
+
+        parts.push('<hr>', `<div class="totals">\n${terminal.join('\n')}\n</div>`);
+    }
+
+    // What the cashier said happened, on the paper the manager reads. Their only
+    // say in a difference, so it belongs on the record they both sign.
+    if (report.notes) {
+        parts.push('<hr>', `<div class="footer al-left">Cashier note:\n${escapeHtml(report.notes)}</div>`);
+    }
+
     // Somebody signs for the drawer. On the screen version there was nowhere to.
     parts.push('<hr>', '<div class="footer al-left">Cashier signature:\n\n\nSupervisor:\n\n</div>');
 

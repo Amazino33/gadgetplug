@@ -86,7 +86,8 @@ describe('counting the float in', () => {
             await userEvent.click(screen.getByRole('button', { name: key }));
         }
 
-        expect(screen.getByText(/20,000/)).toBeTruthy();
+        // The display is a real field now — tapped or typed, same box.
+        expect(screen.getByLabelText(/opening float/i).value).toBe('20,000');
     });
 
     it('deletes the last digit', async () => {
@@ -97,8 +98,7 @@ describe('counting the float in', () => {
         await userEvent.click(screen.getByRole('button', { name: '0' }));
         await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
 
-        // The formatted display, not the keypad button that also reads "5".
-        expect(screen.getByText('₦5.00')).toBeTruthy();
+        expect(screen.getByLabelText(/opening float/i).value).toBe('5');
     });
 
     it('opens the day and hands the shift back', async () => {
