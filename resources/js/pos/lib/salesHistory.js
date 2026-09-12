@@ -158,6 +158,48 @@ export function mergeSales(local, server) {
 }
 
 /**
+ * Record money handed back out of this drawer.
+ *
+ * The till kept no local record of a refund at all: ReturnModal posted to the
+ * server and wrote nothing here. That did not show while the device only ever
+ * listed what it sold, but a cash-up counts the drawer — and a refund the
+ * device does not know about is money it still believes is in there. The
+ * cashier would have been told they were short by exactly what they handed
+ * back, on the one day they could least afford a false accusation.
+ *
+ * Attributed to whoever processed the refund, not whoever made the sale: it is
+ * their drawer the notes came out of. Same rule the server applies.
+ */
+export async function recordRefund(refund, cashierId) {
+    if (!cashierId) return null;
+
+    const amount = Number(refund?.refund_amount ?? 0);
+
+    if (!Number.isFinite(amount) || amount <= 0) return null;
+
+    return db.refunds.add({
+        cashier_id:     cashierId,
+        server_id:      refund.id ?? null,
+        reference:      refund.reference ?? null,
+        original_sale:  refund.original_sale_id ?? null,
+        refund_amount:  amount,
+        // cash | card | bank_transfer | store_credit. Store credit moves no
+        // money at all, so the drawer figure has to be able to tell them apart.
+        refund_method:  refund.refund_method ?? null,
+        created_at:     refund.created_at ?? new Date().toISOString(),
+    });
+}
+
+/** Refunds this cashier paid out, held on the device. */
+export async function localRefunds(cashierId) {
+    if (!cashierId) return [];
+
+    const rows = await db.refunds.where('cashier_id').equals(cashierId).toArray();
+
+    return rows.sort((a, b) => toMillis(b.created_at) - toMillis(a.created_at));
+}
+
+/**
  * Drop anything past the retention window.
  *
  * Deliberately not scoped to one cashier: a device shared by staff who have
@@ -168,11 +210,17 @@ export async function pruneOldSales() {
     const rows = await db.sales.toArray();
     const stale = rows.filter((row) => toMillis(row.completed_at) < cutoff()).map((row) => row.id);
 
-    if (stale.length === 0) return 0;
+    const refunds = await db.refunds.toArray();
+    const staleRefunds = refunds
+        .filter((row) => toMillis(row.created_at) < cutoff())
+        .map((row) => row.id);
+
+    if (staleRefunds.length > 0) await db.refunds.bulkDelete(staleRefunds);
+    if (stale.length === 0) return staleRefunds.length;
 
     await db.sales.bulkDelete(stale);
 
-    return stale.length;
+    return stale.length + staleRefunds.length;
 }
 
 /**

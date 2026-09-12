@@ -3,6 +3,10 @@ import { db } from '../lib/db';
 import api from '../lib/api';
 import { markSaleSynced } from '../lib/salesHistory';
 import { markPickingPaymentSynced, pendingPickingPayments, prunePickingPayments } from '../lib/pickings';
+import {
+    applyServerShift, clearSyncFailure, markCloseSynced, markOpenSynced,
+    noteSyncFailure, pendingShifts, STATUS_PENDING_REVIEW,
+} from '../lib/shift';
 
 /**
  * Background sync: every 30s, push any unsynced IndexedDB sales to the server.
@@ -66,7 +70,132 @@ export function useSync(vendorId, onStuckSalesChange) {
         }
 
         await syncPickingPayments();
+        await syncShifts();
         await reportStuck();
+    };
+
+    /**
+     * The cashier's day: the float they opened with, and the counts they closed
+     * with.
+     *
+     * Sent one shift at a time, each carrying the key it was created with, so a
+     * request that went up but whose answer never came back is recognised on the
+     * retry rather than opening a second day or posting a second count.
+     *
+     * The open is sent before the close, always: the server has nothing to
+     * attach a count to otherwise. A shift that has not managed to open yet
+     * therefore waits, rather than having its close rejected and marked refused.
+     *
+     * Sales go first (they are earlier in sync()), which matters: the server
+     * computes what the drawer should hold from the sales it has, so a close
+     * that overtook its own day's sales would be measured against a day that had
+     * barely happened and would read as an enormous shortage.
+     */
+    const syncShifts = async () => {
+        const pending = await pendingShifts();
+
+        for (const shift of pending) {
+            if (shift.open_synced !== 1) {
+                const opened = await pushOpen(shift);
+
+                if (!opened) continue;
+            }
+
+            if (shift.status === STATUS_PENDING_REVIEW && shift.close_synced !== 1) {
+                await pushClose(shift);
+            }
+        }
+    };
+
+    const pushOpen = async (shift) => {
+        try {
+            const { data } = await api.post('/cash-up/open', {
+                vendor_id: shift.vendor_id,
+                opening_float: shift.opening_float,
+                terminal_id: shift.terminal_id ?? undefined,
+                idempotency_key: shift.open_key,
+            });
+
+            await markOpenSynced(shift.id, data?.session);
+            await clearSyncFailure(shift.id);
+
+            return true;
+        } catch (e) {
+            const status = e?.response?.status;
+
+            // 409 means the server already has this day closed. Nothing this
+            // device can do will change that, and retrying for ever would only
+            // hide it — so the local row adopts the server's copy and stops.
+            if (status === 409) {
+                await markOpenSynced(shift.id, e.response?.data?.session);
+                await clearSyncFailure(shift.id);
+
+                return true;
+            }
+
+            // 422 is a refusal the till cannot fix by asking again — no branch
+            // assigned, most likely. Marked so it stops, and left visible.
+            if (status === 422) {
+                await db.shifts.update(shift.id, {
+                    open_synced: 1,
+                    sync_status: 'rejected',
+                    sync_message: e?.response?.data?.message ?? null,
+                });
+
+                return false;
+            }
+
+            // Network, or the server having a bad moment. Backs off rather than
+            // asking again in thirty seconds for the rest of the afternoon.
+            await noteSyncFailure(shift.id);
+
+            return false;
+        }
+    };
+
+    const pushClose = async (shift) => {
+        if (!shift.server_id) return;
+
+        try {
+            const { data } = await api.post(`/cash-up/${shift.server_id}/close`, {
+                vendor_id: shift.vendor_id,
+                counted_cash: shift.counted_cash,
+                counted_terminal: shift.counted_terminal,
+                notes: shift.notes ?? undefined,
+                idempotency_key: shift.close_key,
+            });
+
+            // The authoritative figures, which replace this device's provisional
+            // ones on screen. The server saw sales this till never did.
+            await applyServerShift(shift.id, data?.session, data?.breakdown ?? null);
+            await markCloseSynced(shift.id);
+            await clearSyncFailure(shift.id);
+        } catch (e) {
+            const status = e?.response?.status;
+
+            // Already closed there. Whatever the server holds is the record, so
+            // take it rather than keep offering a second count.
+            if (status === 409) {
+                await applyServerShift(shift.id, e.response?.data?.session);
+                await markCloseSynced(shift.id);
+                await clearSyncFailure(shift.id);
+
+                return;
+            }
+
+            // A refused count is not something the till can put right by
+            // sending it again — the cashier is shown it instead.
+            if (status === 422 || status === 404) {
+                await db.shifts.update(shift.id, {
+                    sync_status: 'rejected',
+                    sync_message: e?.response?.data?.message ?? null,
+                });
+
+                return;
+            }
+
+            await noteSyncFailure(shift.id);
+        }
     };
 
     /**

@@ -57,4 +57,23 @@ db.version(4).stores({
     customers: 'id, vendor_id, name, phone',
 });
 
+// v5 adds the cashier's day: the shift they opened, and the refunds they paid
+// back out of it.
+//
+// shifts is both the local record and its own queue, the way pickingPayments
+// is — one row per cashier per trading day, carrying its own sync flags for the
+// open and the close separately. A shift has exactly one of each (the server
+// enforces it on a unique key), so a separate queue table would only be a
+// second place for the same row to disagree with itself.
+//
+// refunds exists because the till kept no record of one. ReturnModal posted to
+// the server and wrote nothing locally, so a day's provisional cash figure
+// counted every refund as money still in the drawer and would have told a
+// cashier they were short by exactly what they had handed back. Only what the
+// drawer needs: how much, on which tender, by whom, when.
+db.version(5).stores({
+    shifts:  '++id, business_date, cashier_id, status, [cashier_id+business_date]',
+    refunds: '++id, cashier_id, created_at, offline_id',
+});
+
 export default db;

@@ -32,7 +32,8 @@ export default function ActionGrid({
     onDeleteItem, onSearch, onChangeQty, onNewSale,
     onDiscount, onCustomer,
     onQuickCash, onQuickPOS, onQuickTransfer, onSuspend, onPayment, onVoid,
-    onZReport, onReturn,
+    onZReport,
+    onCashUp, onReturn,
     pendingSales = [], onViewPending, pendingError,
 }) {
     return (
@@ -61,6 +62,11 @@ export default function ActionGrid({
                     <Btn label="Customer"        hotkey="F6"                          onClick={onCustomer} />
                     <Btn label="Return"          hotkey=""    color="gray"            onClick={onReturn} />
                     <Btn label="Z-Report"        hotkey=""    color="gray"            onClick={onZReport} />
+                    {/* The end of the day, not just a printout: the drawer and
+                        the terminal counted against what was actually rung.
+                        Wide because it is the one action here a cashier has to
+                        find without being shown twice. */}
+                    <Btn label="Cash Up"         hotkey=""    color="gray"            onClick={onCashUp} wide={true} />
                 </div>
             </div>
 

@@ -8,6 +8,7 @@ import { addToCart } from '../lib/cartAdd';
 import { shouldRedirectTypingToSearch } from '../lib/typeAhead';
 import { db } from '../lib/db';
 import { pruneOldSales, recordSale } from '../lib/salesHistory';
+import { closeShift, ensurePosSession } from '../lib/shift';
 import api from '../lib/api';
 import Cart from '../components/Cart';
 import SearchBar from '../components/SearchBar';
@@ -21,6 +22,7 @@ import QuantityModal from '../components/QuantityModal';
 import PriceModal from '../components/PriceModal';
 import ReturnModal from '../components/ReturnModal';
 import ZReportModal from '../components/ZReportModal';
+import CashUpModal from '../components/CashUpModal';
 import ReceiptModal from '../components/ReceiptModal';
 import StuckSalesModal from '../components/StuckSalesModal';
 import SalesHistoryModal from '../components/SalesHistoryModal';
@@ -50,7 +52,7 @@ const SheetBtn = ({ label, onClick, disabled = false, color = 'gray' }) => {
     );
 };
 
-export default function POS({ user, vendorId, onLogout }) {
+export default function POS({ user, vendorId, shift, onShiftClosed, onLogout }) {
     const vendorSettings = JSON.parse(localStorage.getItem('pos_vendor_settings') ?? '{}');
     const VAT_ENABLED = vendorSettings.vat_enabled ?? true;
     const VAT_RATE    = vendorSettings.vat_rate    ?? 7.5;
@@ -105,30 +107,21 @@ export default function POS({ user, vendorId, onLogout }) {
         return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); };
     }, []);
 
+    // The shift opened the POS session with the float the cashier actually
+    // counted (see lib/shift.js). This only covers the case where that call
+    // could not reach the server at the time — a till that started the day
+    // offline and has since come back.
+    //
+    // It used to open the session itself, automatically, with a float of zero
+    // and no screen at all, which made every Z-report variance wrong by
+    // whatever was in the drawer when the cashier arrived.
     useEffect(() => {
-        if (!session) openSession();
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+        if (session || !shift) return;
 
-    const openSession = async () => {
-        try {
-            const { data } = await api.post('/sessions/open', { vendor_id: vendorId, opening_float: 0 });
-
-            // Split out rather than left on the session: the session is what
-            // this shift is, and the receipt settings are what the shop is.
-            // Opening a session is just the once-a-shift moment we get to
-            // refresh them, so a vendor who changed their receipt layout is not
-            // waiting for a cashier to happen to log out before it reaches the
-            // paper. Login is the other, rarer, moment.
-            const { vendor_settings: settings, ...opened } = data;
-
-            setSession(opened);
-            localStorage.setItem('pos_session', JSON.stringify(opened));
-
-            if (settings) {
-                localStorage.setItem('pos_vendor_settings', JSON.stringify(settings));
-            }
-        } catch { /* offline — continue */ }
-    };
+        ensurePosSession(vendorId, shift.opening_float)
+            .then(setSession)
+            .catch(() => { /* still offline — the till sells regardless */ });
+    }, [session, shift, vendorId]);
 
     // ── Pending (suspended) sales ────────────────────────────────────
     // No slots, no popup: any held sale just shows up in the sidebar for
@@ -871,6 +864,7 @@ export default function POS({ user, vendorId, onLogout }) {
                     onPayment={() => !cartEmpty && setModal('payment')}
                     onVoid={clearCart}
                     onZReport={() => setModal('zreport')}
+                    onCashUp={() => setModal('cashup')}
                     pendingSales={pendingSales}
                     onViewPending={() => setModal('suspendedSales')}
                     pendingError={pendingError}
@@ -1034,6 +1028,24 @@ export default function POS({ user, vendorId, onLogout }) {
                     vendorId={vendorId}
                     cashierId={user.id}
                     onClose={() => setModal(null)}
+                />
+            )}
+            {modal === 'cashup' && shift && (
+                <CashUpModal
+                    shift={shift}
+                    onClose={() => setModal(null)}
+                    onComplete={async ({ countedCash, countedTerminal, notes, expectation }) => {
+                        const closed = await closeShift(shift.id, {
+                            countedCash, countedTerminal, notes, expectation,
+                        });
+
+                        setModal(null);
+                        // Nudged rather than waited on: the day is finished on
+                        // this device whether or not the server hears about it
+                        // now, and the queue will keep trying.
+                        syncNow().catch(() => {});
+                        onShiftClosed?.(closed);
+                    }}
                 />
             )}
             {modal === 'zreport' && (
