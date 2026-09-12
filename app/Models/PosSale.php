@@ -105,6 +105,27 @@ class PosSale extends Model
         return $this->hasMany(PosSalePayment::class);
     }
 
+    /**
+     * Cash-up corrections aimed at this sale.
+     *
+     * The flag is these rows existing, not a column here. A sale rung on the
+     * wrong tender keeps saying exactly what it was rung as — rewriting it would
+     * destroy the only honest record of what happened at the counter — so the
+     * correction sits beside it and "needs correcting" is derived, the same way
+     * every balance in this codebase is.
+     */
+    public function correctionFlags(): HasMany
+    {
+        return $this->hasMany(CashUpRectification::class, 'related_sale_id')
+            ->whereIn('kind', CashUpRectification::SALE_CORRECTING_KINDS);
+    }
+
+    /** Whether a cash-up has flagged this sale as rung wrongly. */
+    public function isFlaggedForCorrection(): bool
+    {
+        return $this->correctionFlags()->exists();
+    }
+
     public function isSplit(): bool
     {
         return $this->payment_method === 'split';

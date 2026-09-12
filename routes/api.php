@@ -7,6 +7,7 @@ use App\Http\Controllers\Pos\PosSaleController;
 use App\Http\Controllers\Pos\PosReceiptController;
 use App\Http\Controllers\Pos\PosSessionController;
 use App\Http\Controllers\Pos\PosCashController;
+use App\Http\Controllers\Pos\PosCashUpController;
 use App\Http\Controllers\Pos\PosPickingController;
 use App\Http\Controllers\Pos\PosSyncController;
 use App\Http\Middleware\EnsurePosVendorAccess;
@@ -70,6 +71,15 @@ Route::prefix('pos')->middleware(NoStoreApiResponse::class)->group(function () {
         // Handing the day's takings over. Online only — see the controller.
         Route::get('cash',        [PosCashController::class, 'index']);
         Route::post('cash/submit', [PosCashController::class, 'submit']);
+
+        // End-of-day cash-up: prove the drawer and the terminal against what was
+        // rung. Open and close only — rectifying a difference is a manager's
+        // job, done from the panel, so the person a shortage names is never the
+        // person who explains it away.
+        Route::get('cash-up',                   [PosCashUpController::class, 'current']);
+        Route::get('cash-up/history',           [PosCashUpController::class, 'history']);
+        Route::post('cash-up/open',             [PosCashUpController::class, 'open']);
+        Route::post('cash-up/{session}/close',  [PosCashUpController::class, 'close']);
 
         Route::post('sync', [PosSyncController::class, 'sync']);
     });
