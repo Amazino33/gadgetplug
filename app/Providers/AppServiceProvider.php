@@ -46,6 +46,12 @@ class AppServiceProvider extends ServiceProvider
         // Hands a guest's feed likes to the account they just signed into, and
         // replays a save the login gate interrupted.
         Event::listen(Login::class, ClaimGuestFeedActivity::class);
+
+        // Register Global System Announcement Modal for all Filament panels
+        \Filament\Support\Facades\FilamentView::registerRenderHook(
+            \Filament\View\PanelsRenderHook::BODY_END,
+            fn (): string => \Illuminate\Support\Facades\Blade::render('<livewire:system-announcement-modal />')
+        );
         // Your existing HTTPS force code
         if (config('app.env') === 'production') {
             URL::forceScheme('https');

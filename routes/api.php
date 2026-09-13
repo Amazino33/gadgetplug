@@ -7,6 +7,7 @@ use App\Http\Controllers\Pos\PosSaleController;
 use App\Http\Controllers\Pos\PosReceiptController;
 use App\Http\Controllers\Pos\PosSessionController;
 use App\Http\Controllers\Pos\PosCashController;
+use App\Http\Controllers\Pos\PosExpenseController;
 use App\Http\Controllers\Pos\PosPickingController;
 use App\Http\Controllers\Pos\PosSyncController;
 use App\Http\Middleware\EnsurePosVendorAccess;
@@ -47,11 +48,18 @@ Route::prefix('pos')->middleware(NoStoreApiResponse::class)->group(function () {
         // Discounts — manager PIN approval
         Route::post('discounts/approve', [PosSaleController::class, 'approveDiscount']);
 
-        // Sessions
+        // The cashier's trading day. One session per cashier per branch per
+        // day: opened with a counted float, closed with a counted drawer and a
+        // Moniepoint reading. The session IS the cash-up — there is no second
+        // record and no second set of endpoints.
+        //
+        // Rectifying a difference is deliberately absent: only a manager may
+        // explain a gap, and they do it from the panel.
         Route::post('sessions/open',               [PosSessionController::class, 'open']);
         Route::post('sessions/{session}/close',    [PosSessionController::class, 'close']);
         Route::get('sessions/{session}/z-report',  [PosSessionController::class, 'zReport']);
         Route::get('sessions/active',              [PosSessionController::class, 'active']);
+        Route::get('sessions/history',             [PosSessionController::class, 'history']);
 
         // Suspended sales
         Route::get('suspended',                          [PosSessionController::class, 'listSuspended']);
@@ -66,10 +74,18 @@ Route::prefix('pos')->middleware(NoStoreApiResponse::class)->group(function () {
         Route::get('pickings',          [PosPickingController::class, 'index']);
         Route::post('pickings/payment', [PosPickingController::class, 'pay']);
         Route::post('pickings/release', [PosPickingController::class, 'release']);
+        Route::post('pickings/return',  [PosPickingController::class, 'returnItems']);
+
+        // Money paid out of the drawer, recorded when it happens rather than
+        // reconstructed at the end of the day. Lands on the same expenses
+        // dashboard the panel writes to, and lowers what the drawer should hold.
+        Route::get('expenses',  [PosExpenseController::class, 'index']);
+        Route::post('expenses', [PosExpenseController::class, 'store']);
 
         // Handing the day's takings over. Online only — see the controller.
         Route::get('cash',        [PosCashController::class, 'index']);
         Route::post('cash/submit', [PosCashController::class, 'submit']);
+
 
         Route::post('sync', [PosSyncController::class, 'sync']);
     });

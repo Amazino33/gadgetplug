@@ -2,6 +2,7 @@
 
 namespace App\Filament\Vendor\Resources\Procurements\Pages;
 
+use App\Filament\Vendor\Pages\HelpCenter;
 use App\Filament\Vendor\Resources\Procurements\ProcurementResource;
 use Filament\Actions\Action;
 use Filament\Resources\Pages\ListRecords;
@@ -17,7 +18,14 @@ class ListProcurements extends ListRecords
                 ->label('New Procurement')
                 ->icon('heroicon-o-plus')
                 ->url(route('procurement.create'))
-                ->color('warning'),
+                ->color('warning')
+                // Tour hook. The guided tour tells the vendor to press this
+                // exact button, so it needs a name that survives restyling.
+                ->extraAttributes(['data-tour' => 'new-procurement']),
+
+            HelpCenter::tourAction('record-procurement'),
+
+            HelpCenter::helpAction('how-do-i-record-a-procurement'),
         ];
     }
 }

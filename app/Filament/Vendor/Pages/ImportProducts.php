@@ -127,9 +127,46 @@ class ImportProducts extends Page
     public static function canAccess(): bool
     {
         $vendor = filament()->getTenant();
+        $user   = auth()->user();
 
-        return $vendor !== null
-            && auth()->user()?->hasVendorPermission($vendor->id, 'import_products') === true;
+        if ($vendor === null || $user === null) {
+            return false;
+        }
+
+        // Platform staff onboard catalogues for vendors who send us a
+        // spreadsheet rather than typing three hundred products in themselves.
+        // Spelled out rather than left to hasVendorPermission(): with Spatie
+        // teams the global super_admin role is pivot-scoped to team_id NULL,
+        // so a team-scoped permission check silently excludes it and an admin
+        // is locked out of the one screen onboarding runs through. Every other
+        // vendor-panel screen carries this same branch for the same reason.
+        if ($user->isSuperAdmin()) {
+            return true;
+        }
+
+        return $user->hasVendorPermission($vendor->id, 'import_products') === true;
+    }
+
+    /**
+     * Whether this run is us acting for the vendor rather than the vendor
+     * acting for themselves.
+     *
+     * Membership is the test, not the role: a platform admin who also owns a
+     * shop on the marketplace is importing their own catalogue when they are
+     * in their own panel, and labelling that "GadgetPlug support" in their
+     * history would be a lie about who is accountable for it.
+     */
+    public function actingAsAdmin(): bool
+    {
+        $vendor = filament()->getTenant();
+        $user   = auth()->user();
+
+        if ($vendor === null || $user === null || ! $user->isSuperAdmin()) {
+            return false;
+        }
+
+        return ! $vendor->isOwner($user)
+            && ! $vendor->users()->where('user_id', $user->id)->exists();
     }
 
     /**
@@ -373,9 +410,14 @@ class ImportProducts extends Page
             }
 
             $log = ImportLog::create([
-                'vendor_id'     => filament()->getTenant()->id,
-                'user_id'       => auth()->id(),
-                'file_name'     => $this->originalName ?? 'import.csv',
+                'vendor_id' => filament()->getTenant()->id,
+                'user_id'   => auth()->id(),
+                // Stamped at the moment of the run, not worked out later from
+                // whoever user_id turns out to be. Roles and memberships both
+                // change; what this run was does not.
+                'performed_by_admin' => $this->actingAsAdmin(),
+                'store_id'           => $this->activeStore()?->id,
+                'file_name'          => $this->originalName ?? 'import.csv',
                 'total_rows'    => $rows->count(),
                 'skipped_count' => $skipped->count(),
                 'status'        => 'running',

@@ -35,6 +35,26 @@
         @endforeach
     </ol>
 
+    {{-- Platform staff onboarding a catalogue on the vendor's behalf. Shown
+         before anything else because it is the one thing on this screen an
+         admin can get wrong without noticing: the tenant switcher is a small
+         control in the topbar, and importing six hundred products into the
+         wrong vendor's catalogue looks exactly like importing them into the
+         right one until the vendor calls. Naming the vendor here makes the
+         switcher's current value impossible to miss at the moment it counts. --}}
+    @if ($this->actingAsAdmin())
+        <div class="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm dark:border-amber-500/30 dark:bg-amber-500/10">
+            <p class="font-semibold text-amber-900 dark:text-amber-200">
+                You are importing as {{ config('app.name') }} staff, for {{ filament()->getTenant()->name }}.
+            </p>
+            <p class="mt-1 text-amber-800 dark:text-amber-300">
+                These products will belong to that vendor, and their import history will
+                record this run as done by {{ config('app.name') }} support. Check the vendor
+                in the switcher above before you upload.
+            </p>
+        </div>
+    @endif
+
     {{-- Which store this import lands in is decided entirely by whichever
          store is active in the panel, not by anything in the file — brand,
          category, none of it has any say. A vendor importing an Oraimo
@@ -375,7 +395,8 @@
             @if ($log)
                 <p class="text-lg font-semibold text-gray-900 dark:text-white">{{ $log->summary() }}</p>
                 <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                    From <strong>{{ $log->file_name }}</strong> on {{ $log->created_at->format('d M Y, g:ia') }}.
+                    From <strong>{{ $log->file_name }}</strong> on {{ $log->created_at->format('d M Y, g:ia') }}@if ($log->store), into <strong>{{ $log->store->name }}</strong>@endif.
+                    Recorded in the import history as run by <strong>{{ $log->actorLabel() }}</strong>.
                 </p>
 
                 @if ($log->skipped_count > 0)
@@ -401,6 +422,16 @@
                     @endif
 
                     <x-filament::button color="gray" outlined wire:click="startOver">Import another file</x-filament::button>
+
+                    @if (\App\Filament\Vendor\Resources\ImportLogs\ImportLogResource::canAccess())
+                        <x-filament::button
+                            tag="a"
+                            color="gray"
+                            outlined
+                            href="{{ \App\Filament\Vendor\Resources\ImportLogs\ImportLogResource::getUrl('index') }}">
+                            Import history
+                        </x-filament::button>
+                    @endif
                 </div>
             @endif
         </x-filament::section>

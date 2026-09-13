@@ -52,7 +52,7 @@
                 <span class="bg-[#e7e8e9] dark:bg-zinc-700 text-[#191c1d] dark:text-zinc-100 px-2 py-0.5 rounded-full text-xs font-bold" id="itemCount">0</span>
             </div>
             <div class="flex gap-2">
-                <button type="button" onclick="addItem()"
+                <button type="button" onclick="addItem()" data-tour="procurement-add-item"
                     class="flex items-center gap-1.5 px-4 py-2 border border-[#becab5] dark:border-zinc-600 rounded-lg text-[#016c00] dark:text-green-400 text-sm font-semibold hover:bg-[#f3f4f5] dark:hover:bg-zinc-700 transition-colors">
                     <span class="material-symbols-outlined text-sm">add_circle</span> Add Item manually
                 </button>
@@ -86,7 +86,7 @@
                     <p class="text-[10px] font-bold text-[#6f7b68] dark:text-zinc-500 uppercase tracking-wider">Subtotal</p>
                     <p class="text-base font-bold text-[#191c1d] dark:text-zinc-100" style="font-family:'Montserrat',sans-serif;" id="subtotalDisplay">₦ 0.00</p>
                 </div>
-                <button type="submit"
+                <button type="submit" data-tour="procurement-items-continue"
                     class="flex items-center gap-2 px-6 py-2.5 bg-[#016c00] text-white text-sm font-bold rounded-lg hover:bg-green-800 transition-colors"
                     style="font-family:'Montserrat',sans-serif;">
                     Next: Transport Cost <span class="material-symbols-outlined text-sm">arrow_forward</span>

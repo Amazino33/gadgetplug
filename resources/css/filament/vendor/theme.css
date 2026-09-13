@@ -82,3 +82,114 @@
     color: var(--gray-200);
     background-color: var(--gray-700);
 }
+
+/* ── Help centre article body ──────────────────────────────────────────────
+   Author-written HTML from the Filament rich editor, so the styling has to be
+   element-based rather than utility classes: the admin writing the guide never
+   sees a class name. Plain CSS for the same reason as the sidebar filter above
+   — this markup is not in a Blade file Tailwind scans. */
+.gp-help-body {
+    font-size: 0.9375rem;
+    line-height: 1.7;
+    color: var(--gray-700);
+}
+
+:where(.dark) .gp-help-body { color: var(--gray-300); }
+
+.gp-help-body > * + * { margin-top: 1rem; }
+
+.gp-help-body h2,
+.gp-help-body h3 {
+    margin-top: 1.75rem;
+    font-weight: 700;
+    color: var(--gray-950);
+}
+
+.gp-help-body h2 { font-size: 1.125rem; }
+.gp-help-body h3 { font-size: 1rem; }
+
+:where(.dark) .gp-help-body h2,
+:where(.dark) .gp-help-body h3 { color: white; }
+
+/* Numbered steps are the shape almost every guide takes, so the counter has to
+   stay legible next to a screenshot rather than collapsing against it. */
+.gp-help-body ol,
+.gp-help-body ul {
+    padding-inline-start: 1.5rem;
+}
+
+.gp-help-body ol { list-style: decimal; }
+.gp-help-body ul { list-style: disc; }
+.gp-help-body li { margin-top: 0.5rem; }
+.gp-help-body li > p { margin: 0; }
+
+.gp-help-body a {
+    color: var(--primary-600);
+    text-decoration: underline;
+}
+
+.gp-help-body strong { font-weight: 600; color: var(--gray-950); }
+:where(.dark) .gp-help-body strong { color: white; }
+
+.gp-help-body code {
+    padding: 0.1rem 0.3rem;
+    font-size: 0.85em;
+    background-color: var(--gray-100);
+    border-radius: 0.25rem;
+}
+
+:where(.dark) .gp-help-body code { background-color: var(--gray-800); }
+
+.gp-help-body blockquote {
+    padding-inline-start: 0.875rem;
+    border-inline-start: 3px solid var(--primary-500);
+    color: var(--gray-500);
+}
+
+/* Screenshots and GIFs. A fixed aspect box is deliberately not used: the
+   images are screen captures of wildly different shapes, and boxing them would
+   crop the very thing being pointed at. The border is what stops a screenshot
+   of a white page from bleeding into the page it is sitting on. */
+.gp-help-body img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin: 1.25rem 0;
+    border: 1px solid var(--gray-200);
+    border-radius: 0.5rem;
+}
+
+:where(.dark) .gp-help-body img { border-color: var(--gray-700); }
+
+/* ── Guided tours (driver.js) ──────────────────────────────────────────────
+   Only the popover is themed; driver's own overlay and stage are left alone. */
+.gp-tour-popover {
+    max-width: 22rem;
+    font-size: 0.875rem;
+    border-radius: 0.75rem;
+}
+
+.gp-tour-popover .driver-popover-title {
+    font-size: 0.9375rem;
+    font-weight: 700;
+}
+
+.gp-tour-popover .driver-popover-description {
+    line-height: 1.6;
+}
+
+.gp-tour-popover .driver-popover-next-btn {
+    color: white;
+    text-shadow: none;
+    background-color: var(--primary-600);
+    border-color: var(--primary-600);
+}
+
+.gp-tour-popover .driver-popover-next-btn:hover {
+    background-color: var(--primary-700);
+    border-color: var(--primary-700);
+}
+
+/* The first-visit offer is a centred modal with nothing highlighted behind it,
+   so it needs a little more room than a step pointing at one button. */
+.gp-tour-offer { max-width: 26rem; }

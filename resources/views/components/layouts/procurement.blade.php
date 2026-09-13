@@ -40,5 +40,10 @@
     </main>
 
     @livewireScripts
+
+    {{-- The procurement tour finishes in this wizard, so the tour engine has
+         to be here as well as in the panel. --}}
+    <x-vendor-tours />
+
 </body>
 </html>

@@ -158,6 +158,59 @@ class AccountabilityLedger
     }
 
     /**
+     * A cashier's end-of-day drawer difference.
+     *
+     * Lands in the same ledger as a stock shortage because it is the same
+     * statement: a named member of staff is holding less than they should be. An
+     * owner asking "what does this person owe me?" must get one answer, and a
+     * second cash-only ledger beside this one would give two.
+     *
+     * The caller passes the variance with its own sign — negative is short — and
+     * the entry type is chosen here, so no caller has to remember which way round
+     * a shortage goes. A difference of nothing posts nothing: a zero-amount row
+     * would say a cashier was accused of an amount, which is not what a clean
+     * cash-up means.
+     *
+     * None of the stock-shaped columns apply. shortage_qty and the cost snapshots
+     * stay null, which is what lets a cash-up review screen show these rows to a
+     * manager who may not see product costs.
+     */
+    public function postCashVariance(
+        int $vendorId,
+        int $cashierId,
+        float $variance,
+        string $naturalKey,
+        ?int $storeId = null,
+        ?string $sourceType = null,
+        ?int $sourceId = null,
+        ?int $createdBy = null,
+        ?string $note = null,
+    ): ?AccountabilityLedgerEntry {
+        if (abs($variance) < 0.01) {
+            return null;
+        }
+
+        $short = $variance < 0;
+
+        return $this->post(
+            naturalKey: $naturalKey,
+            attributes: [
+                'vendor_id'      => $vendorId,
+                'store_id'       => $storeId,
+                'storekeeper_id' => $cashierId,
+                'entry_type'     => $short ? 'cash_shortage' : 'cash_overage',
+                // A shortage increases what is owed, an overage reduces it. The
+                // model enforces both signs on the way in.
+                'amount'         => $short ? round(abs($variance), 2) : -1 * round($variance, 2),
+                'source_type'    => $sourceType,
+                'source_id'      => $sourceId,
+                'note'           => $note,
+                'created_by'     => $createdBy,
+            ],
+        );
+    }
+
+    /**
      * @param  array<string, mixed>  $attributes
      */
     private function post(string $naturalKey, array $attributes): AccountabilityLedgerEntry

@@ -21,7 +21,6 @@ const SearchBar = forwardRef(function SearchBar({
     const [query, setQuery]     = useState('');
     const [results, setResults] = useState([]);
     const [open, setOpen]       = useState(false);
-    const [searching, setSearching] = useState(false);
     const [activeIndex, setActiveIndex] = useState(-1);
     const [scanMiss, setScanMiss]       = useState('');
     const inputRef              = useRef(null);
@@ -85,7 +84,7 @@ const SearchBar = forwardRef(function SearchBar({
         const trimmed = q.trim();
 
         if (!trimmed) {
-            setResults([]); setOpen(false); setActiveIndex(-1); setSearching(false);
+            setResults([]); setOpen(false); setActiveIndex(-1);
             settledRef.current = '';
             return [];
         }
@@ -116,52 +115,10 @@ const SearchBar = forwardRef(function SearchBar({
         if (!latestSearch.isCurrent(token)) return null;
 
         setResults(local);
-
-        let settled = local;
-
-        // The local catalogue is only ever written at login and never
-        // refreshed, so it goes stale the moment a product is added or
-        // restocked mid-shift. The server is therefore asked on every
-        // search, not just when the cache came up empty: skipping it
-        // whenever the cache had *any* match meant a cashier typing "TECNO"
-        // saw yesterday's TECNOs and never the one added this morning.
-        //
-        // Local results are already on screen by now, so this costs the
-        // cashier nothing — it only ever adds what the device did not know
-        // about. Out-of-order answers are handled by the guard below rather
-        // than by not asking.
-        if (navigator.onLine) {
-            setSearching(true);
-            try {
-                // Short timeout on top of the client's generous default — a
-                // cashier waiting on a search result needs an answer in
-                // seconds, not whatever the slowest thing on the till can
-                // tolerate. Local results (if any) are already showing.
-                const { data } = await api.get('/products/search', {
-                    params: { vendor_id: vendorId, q: trimmed },
-                    timeout: 5000,
-                });
-                if (!latestSearch.isCurrent(token)) return null;
-
-                // The server's answer replaces the local one rather than
-                // merging into it: it is the authority on what this branch
-                // may sell right now. A product the cache still lists but
-                // the server no longer returns — unpublished, moved branch,
-                // sold out — must stop being offered, not linger because a
-                // stale copy exists on the device.
-                setResults(data);
-                setActiveIndex(-1);
-                settled = data;
-            } catch { /* offline or too slow — whatever the device knows is already showing */ }
-            finally {
-                if (latestSearch.isCurrent(token)) setSearching(false);
-            }
-        }
-
         settledRef.current = trimmed;
 
-        return settled;
-    }, [vendorId, latestSearch]); // eslint-disable-line react-hooks/exhaustive-deps
+        return local;
+    }, [latestSearch]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Everything Enter does ends here: the box empty and ready for the next
     // product, with no stale debounced search still in flight to reopen the
@@ -313,18 +270,11 @@ const SearchBar = forwardRef(function SearchBar({
 
     return (
         <div className="relative flex-1" ref={rootRef}>
-            <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5">
-                {searching ? (
-                    <svg className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-                    </svg>
-                ) : (
-                    <svg className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                            d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                )}
+            <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 focus-within:ring-2 focus-within:ring-[#068B03] focus-within:border-[#068B03] transition-all">
+                <svg className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
                 <input
                     ref={inputRef}
                     type="text"
@@ -345,13 +295,7 @@ const SearchBar = forwardRef(function SearchBar({
                 </div>
             )}
 
-            {open && results.length === 0 && query.trim() && searching && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg z-50 px-4 py-3">
-                    <p className="text-xs text-gray-400 dark:text-gray-500">Searching…</p>
-                </div>
-            )}
-
-            {open && results.length === 0 && query.trim() && !searching && (
+            {open && results.length === 0 && query.trim() && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg z-50 px-4 py-3">
                     <p className="text-xs text-gray-400 dark:text-gray-500">No product matches "{query.trim()}".</p>
                 </div>

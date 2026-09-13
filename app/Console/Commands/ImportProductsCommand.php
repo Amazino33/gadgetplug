@@ -144,6 +144,10 @@ class ImportProductsCommand extends Command
                 null,
                 basename($path),
                 fn (int $done) => $bar->setProgress($done),
+                // Reaching this command means shell access to the server,
+                // which no vendor has. Whoever ran it, they ran it from our
+                // end, and the vendor's history should say so.
+                performedByAdmin: true,
             );
         } catch (Throwable $e) {
             $bar->finish();

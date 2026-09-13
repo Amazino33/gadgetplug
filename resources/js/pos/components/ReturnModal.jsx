@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { fmt } from '../lib/format';
 import api from '../lib/api';
+import { recordRefund } from '../lib/salesHistory';
 
-export default function ReturnModal({ vendorId, onClose }) {
+export default function ReturnModal({ vendorId, cashierId, onClose }) {
     const [step, setStep]         = useState('lookup');
     const [ref, setRef]           = useState('');
     const [sale, setSale]         = useState(null);
@@ -52,11 +53,24 @@ export default function ReturnModal({ vendorId, onClose }) {
         setLoading(true);
         setError('');
         try {
-            await api.post(`/sales/${sale.id}/return`, {
+            const { data } = await api.post(`/sales/${sale.id}/return`, {
                 items:         returnItems,
                 refund_method: method,
                 reason,
             });
+
+            // The till's own record of money handed back. Without it the
+            // end-of-day drawer figure counts a refund as cash still in the
+            // drawer, and tells the cashier they are short by exactly what they
+            // just paid out.
+            await recordRefund({
+                id:               data?.id ?? null,
+                reference:        data?.reference ?? null,
+                original_sale_id: sale.id,
+                refund_amount:    refundTotal,
+                refund_method:    method,
+            }, cashierId).catch(() => {});
+
             setSuccess(`Return processed. Refund of ${fmt(refundTotal)} via ${method.replace('_', ' ')}.`);
             setTimeout(onClose, 2000);
         } catch (err) {

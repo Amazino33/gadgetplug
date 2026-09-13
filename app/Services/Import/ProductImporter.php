@@ -43,6 +43,8 @@ class ProductImporter
     /**
      * @param  Collection<int, ParsedRow>  $rows
      * @param  Closure(int, int): void|null  $onProgress  (processed, total)
+     * @param  bool  $performedByAdmin  platform staff ran this for the vendor
+     * @param  int|null  $storeId  the branch new products are homed in
      */
     public function commit(
         Collection $rows,
@@ -50,14 +52,21 @@ class ProductImporter
         ?int $userId,
         string $fileName,
         ?Closure $onProgress = null,
+        bool $performedByAdmin = false,
+        ?int $storeId = null,
     ): ImportLog {
         $importable = $rows->filter(fn (ParsedRow $row) => $row->isImportable())->values();
         $skipped    = $rows->reject(fn (ParsedRow $row) => $row->isImportable())->values();
 
         $log = ImportLog::create([
-            'vendor_id'     => $vendor->id,
-            'user_id'       => $userId,
-            'file_name'     => $fileName,
+            'vendor_id' => $vendor->id,
+            'user_id'   => $userId,
+            // Carried by the caller rather than inferred here: this service is
+            // driven by the panel, the console and tests alike, and only the
+            // caller knows whose hand was on it.
+            'performed_by_admin' => $performedByAdmin,
+            'store_id'           => $storeId,
+            'file_name'          => $fileName,
             'total_rows'    => $rows->count(),
             'skipped_count' => $skipped->count(),
             'status'        => 'running',

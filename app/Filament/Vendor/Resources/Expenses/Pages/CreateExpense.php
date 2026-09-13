@@ -2,9 +2,9 @@
 
 namespace App\Filament\Vendor\Resources\Expenses\Pages;
 
+use App\Actions\Finance\RecordExpenseAction;
 use App\Filament\Vendor\Resources\Expenses\ExpenseResource;
 use App\Models\FinancialAccount;
-use App\Services\FinancialLedger;
 use Filament\Resources\Pages\CreateRecord;
 
 class CreateExpense extends CreateRecord
@@ -19,28 +19,26 @@ class CreateExpense extends CreateRecord
         return $data;
     }
 
-    // Choosing an account and saving is what "records this expense as paid"
-    // — no separate action, per how this form is scoped (unlike the
-    // procurement-leg/order-delivery payment actions in the cost-capture
-    // work, which deliberately kept the account picker out of the form).
+    /**
+     * Choosing an account and saving is what "records this expense as paid" —
+     * no separate action, per how this form is scoped.
+     *
+     * The posting itself lives in RecordExpenseAction, which the till uses too.
+     * It used to be written out here, and a second copy at the counter would
+     * have been a second chance to forget the ledger.
+     */
     protected function afterCreate(): void
     {
         $expense = $this->record;
 
-        if ($expense->financial_account_id && ! $expense->isPosted()) {
-            $account = FinancialAccount::findOrFail($expense->financial_account_id);
-
-            FinancialLedger::postEntry(
-                account: $account,
-                direction: 'out',
-                amount: (float) $expense->amount,
-                source: $expense,
-                description: "Expense — {$expense->category}" . ($expense->description ? ": {$expense->description}" : ''),
-                occurredAt: $expense->incurred_at,
-                createdBy: auth()->id(),
-            );
-
-            $expense->update(['posted_at' => now()]);
+        if (! $expense->financial_account_id || $expense->isPosted()) {
+            return;
         }
+
+        app(RecordExpenseAction::class)->postToLedger(
+            $expense,
+            FinancialAccount::findOrFail($expense->financial_account_id),
+            auth()->user(),
+        );
     }
 }

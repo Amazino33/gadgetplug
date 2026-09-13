@@ -7,8 +7,6 @@ use App\Models\AffiliateLevel;
 use App\Models\AffiliateSetting;
 use App\Services\Affiliate\AffiliateLevelProgressionService;
 use Carbon\CarbonInterface;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
 
 // Daily. Drops an affiliate exactly one level when they've gone quiet — no
@@ -20,10 +18,8 @@ use Illuminate\Support\Facades\Log;
 // another full window has elapsed since the last drop) leaves them alone —
 // otherwise every run between the first missed sale and the next one would
 // re-demote them off the strength of the same stale inactivity fact.
-class DemoteInactiveAffiliatesJob implements ShouldQueue
+class DemoteInactiveAffiliatesJob
 {
-    use Queueable;
-
     public function handle(AffiliateLevelProgressionService $progression): void
     {
         $cutoff = now()->subDays((int) AffiliateSetting::current()->inactivity_demotion_days);
@@ -67,7 +63,7 @@ class DemoteInactiveAffiliatesJob implements ShouldQueue
 
         $affiliate->update([
             'affiliate_level_id' => $nextLevel->id,
-            'level_achieved_at'  => now(),
+            'level_achieved_at' => now(),
         ]);
 
         activity()

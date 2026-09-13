@@ -6,8 +6,6 @@ use App\Models\AffiliateCommission;
 use App\Models\AffiliateSetting;
 use App\Services\Affiliate\AffiliateLevelProgressionService;
 use App\Services\Affiliate\AffiliateTaskService;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -16,10 +14,8 @@ use Illuminate\Support\Facades\Log;
 // and safe to re-run: it only ever selects rows still in 'return_window', so
 // an already-cleared commission is never touched twice, and a mid-run failure
 // on one commission doesn't affect the others (each is its own transaction).
-class ClearAffiliateHoldsJob implements ShouldQueue
+class ClearAffiliateHoldsJob
 {
-    use Queueable;
-
     public function handle(): void
     {
         $cutoff = now()->subDays((int) AffiliateSetting::current()->return_window_days);
@@ -50,15 +46,15 @@ class ClearAffiliateHoldsJob implements ShouldQueue
                 }
 
                 $locked->update([
-                    'status'       => 'available',
+                    'status' => 'available',
                     'available_at' => now(),
                 ]);
 
                 $locked->walletTransactions()->create([
                     'affiliate_id' => $locked->affiliate_id,
-                    'type'         => 'credit',
-                    'amount'       => $locked->amount,
-                    'description'  => "Commission #{$locked->id} cleared hold — order #{$locked->order_id}.",
+                    'type' => 'credit',
+                    'amount' => $locked->amount,
+                    'description' => "Commission #{$locked->id} cleared hold — order #{$locked->order_id}.",
                 ]);
 
                 app(AffiliateLevelProgressionService::class)->recompute($locked->affiliate);
@@ -69,7 +65,7 @@ class ClearAffiliateHoldsJob implements ShouldQueue
                 app(AffiliateTaskService::class)->evaluateAuto($locked->affiliate);
             });
         } catch (\Throwable $e) {
-            Log::error("Failed to clear affiliate commission #{$commission->id}: " . $e->getMessage());
+            Log::error("Failed to clear affiliate commission #{$commission->id}: ".$e->getMessage());
         }
     }
 }

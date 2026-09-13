@@ -86,21 +86,21 @@ function MobileCartRow({ item, idx, isSelected, onSelect, onRemove }) {
                 }
                 <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">{item.name}</p>
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                        {item.sku && `${item.sku} · `}{fmt(item.price)}
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 font-mono tabular-nums">
+                        {item.sku && <span className="font-sans">{item.sku} · </span>}{fmt(item.price)}
                         {item.listPrice > item.price && (
                             <span className="line-through ml-1.5 opacity-70">{fmt(item.listPrice)}</span>
                         )}
                     </p>
                     {item.lineDiscount > 0 && (
-                        <span className="inline-block mt-1 text-xs bg-orange-50 text-orange-600 font-semibold px-2 py-0.5 rounded-full">
+                        <span className="inline-block mt-1 text-xs bg-orange-50 text-orange-600 font-semibold px-2 py-0.5 rounded-full font-mono tabular-nums">
                             −{fmt(item.lineDiscount)}
                         </span>
                     )}
                 </div>
                 <div className="text-right shrink-0">
-                    <p className="text-xs text-gray-400 dark:text-gray-500">×{item.qty}</p>
-                    <p className="text-sm font-bold text-gray-800 dark:text-gray-100">{fmt(lineTotal)}</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 font-mono tabular-nums">×{item.qty}</p>
+                    <p className="text-sm font-bold text-gray-800 dark:text-gray-100 font-mono tabular-nums">{fmt(lineTotal)}</p>
                 </div>
             </div>
         </div>
@@ -116,7 +116,7 @@ export default function Cart({ items, selectedIdx, onSelect, onQtyChange, onRemo
                         d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-1.5 6M7 13l-1.5 6m0 0h9m-9 0a1.5 1.5 0 103 0m6 0a1.5 1.5 0 103 0" />
                 </svg>
                 <p className="text-sm">Cart is empty</p>
-                <p className="text-xs mt-1 hidden md:block">Scan a barcode or press F3 to search</p>
+                <p className="text-xs mt-1 hidden md:block">Scan a barcode or press <kbd className="px-1.5 py-0.5 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 font-mono shadow-sm mx-1">F3</kbd> to search</p>
                 <p className="text-xs mt-1 md:hidden">Search above to add products</p>
             </div>
         );
@@ -172,7 +172,7 @@ export default function Cart({ items, selectedIdx, onSelect, onQtyChange, onRemo
                                             <p className="text-sm font-medium text-gray-800 dark:text-gray-100">{item.name}</p>
                                             {item.sku && <p className="text-xs text-gray-400 dark:text-gray-500">{item.sku}</p>}
                                             {item.lineDiscount > 0 && (
-                                                <p className="text-xs text-brand-orange">Discount: −{fmt(item.lineDiscount)}</p>
+                                                <p className="text-xs text-brand-orange font-mono tabular-nums">Discount: −{fmt(item.lineDiscount)}</p>
                                             )}
                                         </div>
                                     </div>
@@ -183,7 +183,7 @@ export default function Cart({ items, selectedIdx, onSelect, onQtyChange, onRemo
                                             onClick={(e) => { e.stopPropagation(); onQtyChange(idx, item.qty - 1); }}
                                             className="w-7 h-7 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 font-bold text-sm flex items-center justify-center"
                                         >−</button>
-                                        <span className="w-8 text-center text-sm font-semibold dark:text-gray-200">{item.qty}</span>
+                                        <span className="w-8 text-center text-sm font-semibold dark:text-gray-200 font-mono tabular-nums">{item.qty}</span>
                                         <button
                                             onClick={(e) => { e.stopPropagation(); onQtyChange(idx, item.qty + 1); }}
                                             className="w-7 h-7 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 font-bold text-sm flex items-center justify-center"
@@ -195,18 +195,18 @@ export default function Cart({ items, selectedIdx, onSelect, onQtyChange, onRemo
                                         <button
                                             onClick={(e) => { e.stopPropagation(); onPriceEdit(idx); }}
                                             title="Click to negotiate this price"
-                                            className="text-sm text-gray-600 dark:text-gray-400 underline decoration-dotted underline-offset-4 hover:text-[#068B03] dark:hover:text-green-400"
+                                            className="text-sm text-gray-600 dark:text-gray-400 underline decoration-dotted underline-offset-4 hover:text-[#068B03] dark:hover:text-green-400 font-mono tabular-nums"
                                         >
                                             {fmt(item.price)}
                                         </button>
                                     ) : (
-                                        <span className="text-sm text-gray-600 dark:text-gray-400">{fmt(item.price)}</span>
+                                        <span className="text-sm text-gray-600 dark:text-gray-400 font-mono tabular-nums">{fmt(item.price)}</span>
                                     )}
                                     {item.listPrice > item.price && (
-                                        <p className="text-xs text-gray-400 dark:text-gray-500 line-through">{fmt(item.listPrice)}</p>
+                                        <p className="text-xs text-gray-400 dark:text-gray-500 line-through font-mono tabular-nums">{fmt(item.listPrice)}</p>
                                     )}
                                 </td>
-                                <td className="px-4 py-4 text-right text-sm font-semibold text-gray-800 dark:text-gray-100">{fmt(lineTotal)}</td>
+                                <td className="px-4 py-4 text-right text-sm font-semibold text-gray-800 dark:text-gray-100 font-mono tabular-nums">{fmt(lineTotal)}</td>
                                 <td className="px-4 py-4 text-center">
                                     <button
                                         onClick={(e) => { e.stopPropagation(); onRemove(idx); }}
