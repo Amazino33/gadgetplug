@@ -19,6 +19,12 @@ new class extends Component {
     public string $search = '';
     public string $sort = 'latest';
     public ?string $cartError = null;
+    public int $perPage = 9;
+
+    public function loadMore(): void
+    {
+        $this->perPage += 9;
+    }
 
     public function mount(): void
     {
@@ -95,7 +101,7 @@ new class extends Component {
         });
 
         return [
-            'products'   => $query->paginate(9),
+            'products'   => $query->paginate($this->perPage),
             'categories' => $categories,
 
             // The mobile feed's opening page and chips, handed to Alpine as
@@ -422,9 +428,9 @@ $cardBgs = [
                 {{-- Image + wishlist overlay --}}
                 <div class="relative">
                     <a href="{{ route('product.show', $product) }}" class="block">
-                        <div class="gp-card-img h-[140px] flex items-center justify-center relative" style="{{ $bg }}">
+                        <div class="gp-card-img h-[180px] bg-white dark:bg-transparent flex items-center justify-center relative p-4">
                             @if ($isNew)
-                            <div class="absolute top-2.5 left-2.5 bg-brand-lime text-brand-dark text-[9px] font-bold font-montserrat px-2 py-0.5 rounded-full tracking-[0.3px]">NEW</div>
+                            <div class="absolute top-2.5 left-2.5 bg-brand-lime text-brand-dark text-[9px] font-bold font-montserrat px-2 py-0.5 rounded-full tracking-[0.3px] z-10">NEW</div>
                             @endif
                             @if ($thumbUrl)
                             {{-- Explicit dimensions reserve the box before the
@@ -435,7 +441,7 @@ $cardBgs = [
                                 loading="{{ $aboveFold ? 'eager' : 'lazy' }}"
                                 decoding="async"
                                 fetchpriority="{{ $aboveFold ? 'high' : 'auto' }}"
-                                class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105">
+                                class="w-full h-full object-contain transition-transform duration-300 group-hover:scale-110">
                             @else
                             <x-gp-icon :name="$categoryIcon" class="w-12 h-12 text-brand opacity-40" />
                             @endif
@@ -448,7 +454,7 @@ $cardBgs = [
                     <button wire:click="toggleWishlist({{ $product->id }})"
                         aria-label="{{ in_array($product->id, $wishlistIds) ? 'Remove ' . $product->name . ' from wishlist' : 'Add ' . $product->name . ' to wishlist' }}"
                         aria-pressed="{{ in_array($product->id, $wishlistIds) ? 'true' : 'false' }}"
-                        class="absolute top-0.5 right-0.5 w-11 h-11 rounded-full flex items-center justify-center transition-all duration-200
+                        class="absolute top-0.5 right-0.5 w-11 h-11 rounded-full flex items-center justify-center transition-all duration-200 z-10
                             {{ in_array($product->id, $wishlistIds)
                                 ? 'text-red-500'
                                 : 'text-[#aaa] hover:text-red-400 opacity-70 group-hover:opacity-100 focus-visible:opacity-100' }}">
@@ -461,7 +467,7 @@ $cardBgs = [
                 </div>
 
                 {{-- Info --}}
-                <div class="p-3">
+                <div class="p-3 bg-[#fdfdfd] dark:bg-[#162016] border-t border-brand-border dark:border-[#2a3a2a]">
                     <div class="flex items-center gap-1 mb-1">
                         <span class="text-[10px] text-[#7a9e7c] font-medium">{{ $product->vendor->name ?? 'Unknown Vendor' }}</span>
                         <div class="w-[13px] h-[13px] bg-brand rounded-full inline-flex items-center justify-center flex-shrink-0">
@@ -487,7 +493,7 @@ $cardBgs = [
                     <div class="flex gap-1.5">
                         <button wire:click="addToCart({{ $product->id }})"
                             aria-label="Add {{ $product->name }} to cart"
-                            class="flex-1 flex items-center justify-center gap-1 min-h-[44px] px-2 bg-brand hover:bg-[#055002] text-white border-0 rounded-lg text-[10px] font-semibold font-montserrat cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            class="flex-1 flex items-center justify-center gap-1 min-h-[44px] px-2 bg-[#f0f8f0] dark:bg-[#1a2a1a] hover:bg-[#e8f5e9] dark:hover:bg-[#2a3a2a] text-brand border border-[#c8e6c9] dark:border-[#2a3a2a] rounded-lg text-[10px] font-semibold font-montserrat cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             @disabled($product->available_stock < 1)>
                             <x-gp-icon name="cart" class="w-3 h-3 flex-shrink-0" />
                             Cart
@@ -505,10 +511,12 @@ $cardBgs = [
             @endforeach
         </div>
 
-        {{-- Pagination --}}
-        <div class="mt-8">
-            {{ $products->links() }}
-        </div>
+        {{-- Infinite Scroll Trigger --}}
+        @if($products->hasMorePages())
+            <div x-intersect="$wire.loadMore()" class="mt-8 flex justify-center pb-8">
+                <div class="w-8 h-8 border-4 border-brand border-t-transparent rounded-full animate-spin"></div>
+            </div>
+        @endif
 
         @else
         <div class="text-center py-20">
