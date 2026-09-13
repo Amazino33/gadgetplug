@@ -1,5 +1,6 @@
 import { db } from './db';
 import { businessDate } from './shift';
+import api from './api';
 
 /**
  * What this device believes the drawer and the terminal should hold.
@@ -28,7 +29,7 @@ export const TERMINAL_TENDERS = ['card', 'bank_transfer'];
  * Pure, so it can be reasoned about and tested without a database: the caller
  * hands it the day's rows.
  */
-export function computeExpectation({ sales = [], refunds = [], openingFloat = 0 }) {
+export function computeExpectation({ sales = [], refunds = [], openingFloat = 0, expenses = [] }) {
     const live = sales.filter((sale) => sale.status !== 'voided');
 
     // ── Cash ─────────────────────────────────────────────────────────────────
@@ -61,6 +62,11 @@ export function computeExpectation({ sales = [], refunds = [], openingFloat = 0 
 
     if (cashRefunds > 0.009) {
         cashLines.push({ key: 'cash_refunds', label: 'Refunds paid in cash', amount: round2(-cashRefunds) });
+    }
+
+    const totalExpenses = sum(expenses, (e) => num(e.amount));
+    if (totalExpenses > 0.009) {
+        cashLines.push({ key: 'drawer_payouts', label: 'Paid out of the drawer', amount: round2(-totalExpenses) });
     }
 
     // ── Terminal ─────────────────────────────────────────────────────────────
@@ -146,10 +152,21 @@ export async function dayRows(cashierId, date) {
 export async function provisionalFor(shift) {
     const { sales, refunds } = await dayRows(shift.cashier_id, shift.business_date);
 
+    let expenses = [];
+    try {
+        const { data } = await api.get('/expenses', { params: { vendor_id: shift.vendor_id } });
+        expenses = data?.expenses || [];
+    } catch (e) {
+        // If offline, we can't fetch expenses. The device has no local record
+        // since expenses are online-only.
+        console.warn('Could not fetch expenses for cash-up', e);
+    }
+
     return computeExpectation({
         sales,
         refunds,
         openingFloat: num(shift.opening_float),
+        expenses,
     });
 }
 
