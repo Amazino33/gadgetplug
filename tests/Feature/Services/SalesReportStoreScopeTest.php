@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 
 use App\Models\Category;
 use App\Models\PosReturn;
@@ -36,7 +36,7 @@ function salesScopeVendor(): array
     return compact('owner', 'vendor', 'branch', 'product');
 }
 
-function tillSale(array $ctx, Store $store, float $unitPrice, int $qty): PosSale
+function reportTillSale(array $ctx, Store $store, float $unitPrice, int $qty): PosSale
 {
     $subtotal = $unitPrice * $qty;
 
@@ -74,8 +74,8 @@ function reportRange(): array
 
 test('a branch reports only what it sold', function () {
     $ctx = salesScopeVendor();
-    tillSale($ctx, $ctx['vendor']->defaultStore, 1000, 3);
-    tillSale($ctx, $ctx['branch'], 1000, 2);
+    reportTillSale($ctx, $ctx['vendor']->defaultStore, 1000, 3);
+    reportTillSale($ctx, $ctx['branch'], 1000, 2);
 
     [$from, $to] = reportRange();
     $reports = app(SalesReportService::class);
@@ -86,8 +86,8 @@ test('a branch reports only what it sold', function () {
 
 test('no branch given still reports the whole vendor, as it always did', function () {
     $ctx = salesScopeVendor();
-    tillSale($ctx, $ctx['vendor']->defaultStore, 1000, 3);
-    tillSale($ctx, $ctx['branch'], 1000, 2);
+    reportTillSale($ctx, $ctx['vendor']->defaultStore, 1000, 3);
+    reportTillSale($ctx, $ctx['branch'], 1000, 2);
 
     [$from, $to] = reportRange();
 
@@ -96,7 +96,7 @@ test('no branch given still reports the whole vendor, as it always did', functio
 
 test('a refund is netted off the branch that made the sale, not spread across all', function () {
     $ctx = salesScopeVendor();
-    $sale = tillSale($ctx, $ctx['branch'], 1000, 2);
+    $sale = reportTillSale($ctx, $ctx['branch'], 1000, 2);
 
     PosReturn::create([
         'reference'        => 'RET-'.Str::random(6),
@@ -118,8 +118,8 @@ test('a refund is netted off the branch that made the sale, not spread across al
 
 test('the per-store breakdown lists every branch, biggest first', function () {
     $ctx = salesScopeVendor();
-    tillSale($ctx, $ctx['vendor']->defaultStore, 1000, 1);
-    tillSale($ctx, $ctx['branch'], 1000, 4);
+    reportTillSale($ctx, $ctx['vendor']->defaultStore, 1000, 1);
+    reportTillSale($ctx, $ctx['branch'], 1000, 4);
 
     [$from, $to] = reportRange();
     $rows = app(SalesReportService::class)->storeBreakdown($ctx['vendor']->id, $from, $to);
@@ -134,8 +134,8 @@ test('the per-store breakdown lists every branch, biggest first', function () {
 
 test('the cashier and top-product tables narrow to the branch too', function () {
     $ctx = salesScopeVendor();
-    tillSale($ctx, $ctx['vendor']->defaultStore, 1000, 3);
-    tillSale($ctx, $ctx['branch'], 1000, 2);
+    reportTillSale($ctx, $ctx['vendor']->defaultStore, 1000, 3);
+    reportTillSale($ctx, $ctx['branch'], 1000, 2);
 
     [$from, $to] = reportRange();
     $reports = app(SalesReportService::class);
