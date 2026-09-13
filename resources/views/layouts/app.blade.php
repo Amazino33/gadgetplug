@@ -7,5 +7,7 @@
             @endif
         @endauth
         
+        <livewire:system-announcement-modal />
+        
         @livewireScripts
 </x-layouts::app.sidebar>
