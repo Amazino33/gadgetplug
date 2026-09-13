@@ -67,6 +67,14 @@ class ReturnFromPickerAction
                 store: $picking->store_id,
             );
 
+            activity()
+                ->performedOn($product)
+                ->causedBy($userId ? \App\Models\User::find($userId) : null)
+                ->tap(fn ($activity) => $activity->store_id = $picking->store_id)
+                ->event('picking_returned')
+                ->withProperties(['picker' => $picking->picker->name, 'quantity' => $quantity])
+                ->log('Returned from picker');
+
             return PickingLedgerEntry::create([
                 'vendor_id'       => $picking->vendor_id,
                 'picking_item_id' => $item->id,

@@ -88,6 +88,14 @@ class ReleaseToPickerAction
                     store: $store->id,
                 );
 
+                activity()
+                    ->performedOn($product)
+                    ->causedBy($userId ? \App\Models\User::find($userId) : null)
+                    ->tap(fn ($activity) => $activity->store_id = $store->id)
+                    ->event('picking_released')
+                    ->withProperties(['picker' => $picker->name, 'quantity' => $quantity])
+                    ->log('Released to picker');
+
                 // What these units actually cost, drawn from the cost layers as
                 // they left. Null only when the product has no cost recorded at
                 // all, in which case profit on the eventual sale is as unknown

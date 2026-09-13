@@ -53,22 +53,100 @@ const SheetBtn = ({ label, onClick, disabled = false, color = 'gray' }) => {
     );
 };
 
+const TopMenu = ({ setModal, panelUrl }) => {
+    const [open, setOpen] = useState(false);
+    const menuRef = useRef(null);
+
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (menuRef.current && !menuRef.current.contains(e.target)) {
+                setOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const handleAction = (action) => {
+        setOpen(false);
+        if (action === 'dashboard') {
+            window.location.href = panelUrl;
+        } else {
+            setModal(action);
+        }
+    };
+
+    return (
+        <div className="relative" ref={menuRef}>
+            <button 
+                onClick={() => setOpen(!open)}
+                className={`flex items-center gap-1.5 text-xs font-medium px-2 py-1.5 rounded-lg transition-colors ${open ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400 hover:text-[#068B03]'}`}
+            >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+                Menu
+            </button>
+
+            {open && (
+                <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 py-1.5 z-50">
+                    <div className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">General</div>
+                    {panelUrl && (
+                        <button onClick={() => handleAction('dashboard')} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2">
+                            <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+                            Dashboard
+                        </button>
+                    )}
+                    <button onClick={() => handleAction('salesHistory')} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2">
+                        <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                        My Sales
+                    </button>
+
+                    <div className="h-px bg-gray-100 dark:bg-gray-700 my-1.5"></div>
+                    <div className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Shift & Admin</div>
+                    
+                    <button onClick={() => handleAction('expense')} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2">
+                        Expense
+                    </button>
+                    <button onClick={() => handleAction('submitCash')} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2">
+                        Submit Cash
+                    </button>
+                    <button onClick={() => handleAction('zreport')} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2">
+                        Z-Report
+                    </button>
+                    <button onClick={() => handleAction('cashup')} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2">
+                        Cash Up
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+};
+
 export default function POS({ user, vendorId, shift, onShiftClosed, onLogout }) {
     const vendorSettings = JSON.parse(localStorage.getItem('pos_vendor_settings') ?? '{}');
     const VAT_ENABLED = vendorSettings.vat_enabled ?? true;
     const VAT_RATE    = vendorSettings.vat_rate    ?? 7.5;
 
-    const [cart, setCart]                 = useState([]);
+    const [cart, setCart]                 = useState(() => {
+        try { return JSON.parse(localStorage.getItem('pos_cart')) || []; } catch { return []; }
+    });
     const [selectedIdx, setSelectedIdx]   = useState(null);
     // Picked from the search box, not yet in the sale. Held here rather than
     // added so that Escape at the quantity box means nothing happened.
     const [pendingProduct, setPendingProduct] = useState(null);
-    const [customer, setCustomer]         = useState(null);
-    const [cartDiscount, setCartDiscount] = useState({ amount: 0, type: 'fixed', approvedBy: null });
+    const [customer, setCustomer]         = useState(() => {
+        try { return JSON.parse(localStorage.getItem('pos_customer')) || null; } catch { return null; }
+    });
+    const [cartDiscount, setCartDiscount] = useState(() => {
+        try { return JSON.parse(localStorage.getItem('pos_cartDiscount')) || { amount: 0, type: 'fixed', approvedBy: null }; } catch { return { amount: 0, type: 'fixed', approvedBy: null }; }
+    });
     // Set when a refused sale is pulled back in, so the corrected sale is
     // recorded on the day the goods actually left rather than the day it was
     // put right. Null for an ordinary sale.
-    const [recoveredAt, setRecoveredAt]   = useState(null);
+    const [recoveredAt, setRecoveredAt]   = useState(() => {
+        try { return localStorage.getItem('pos_recoveredAt') || null; } catch { return null; }
+    });
     const [session, setSession]           = useState(() => cachedSession());
     const [isOnline, setIsOnline]         = useState(navigator.onLine);
     const [modal, setModal]               = useState(null);
@@ -87,6 +165,17 @@ export default function POS({ user, vendorId, shift, onShiftClosed, onLogout }) 
         localStorage.setItem('darkMode', String(next));
         document.documentElement.classList.toggle('dark', next);
     };
+
+    useEffect(() => {
+        localStorage.setItem('pos_cart', JSON.stringify(cart));
+        localStorage.setItem('pos_customer', JSON.stringify(customer));
+        localStorage.setItem('pos_cartDiscount', JSON.stringify(cartDiscount));
+        if (recoveredAt) {
+            localStorage.setItem('pos_recoveredAt', recoveredAt);
+        } else {
+            localStorage.removeItem('pos_recoveredAt');
+        }
+    }, [cart, customer, cartDiscount, recoveredAt]);
 
     const searchRef = useRef(null);
 
@@ -652,36 +741,18 @@ export default function POS({ user, vendorId, shift, onShiftClosed, onLogout }) 
                         </button>
                     )}
                     <span className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-25">{user.name}</span>
-                    <div className="ml-auto flex items-center gap-3">
-                        <button onClick={() => setModal('submitCash')}
-                            className="text-xs text-gray-400 dark:text-gray-500 hover:text-[#068B03] transition-colors shrink-0">
-                            Submit Cash
-                        </button>
-                        <button onClick={() => setModal('pickings')}
-                            className="text-xs text-gray-400 dark:text-gray-500 hover:text-[#068B03] transition-colors shrink-0">
-                            Pickings
-                        </button>
-                        <button onClick={() => setModal('salesHistory')}
-                            className="text-xs text-gray-400 dark:text-gray-500 hover:text-[#068B03] transition-colors shrink-0">
-                            My Sales
-                        </button>
-                        {CONFIG.panelUrl && (
-                            <a href={CONFIG.panelUrl}
-                                className="flex items-center gap-1 text-xs text-gray-400 dark:text-gray-500 hover:text-[#068B03] transition-colors">
-                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                                </svg>
-                                Dashboard
-                            </a>
-                        )}
+                    <div className="ml-auto flex items-center gap-4">
+                        <TopMenu setModal={setModal} panelUrl={CONFIG.panelUrl} />
+                        <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-1"></div>
                         <button
                             onClick={toggleDark}
-                            className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 shrink-0"
+                            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 shrink-0 transition-colors"
                             aria-label="Toggle dark mode"
                         >
                             {isDark ? '☀' : '☾'}
                         </button>
-                        <button onClick={onLogout} className="text-xs text-gray-400 dark:text-gray-500 hover:text-red-500 shrink-0">
+                        <button onClick={onLogout} className="flex items-center gap-1.5 text-xs font-medium text-red-500 hover:text-red-600 shrink-0">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
                             Logout
                         </button>
                     </div>
@@ -709,27 +780,28 @@ export default function POS({ user, vendorId, shift, onShiftClosed, onLogout }) 
                 </div>
 
                 {/* ── DESKTOP totals footer ─────────────────────────── */}
-                <div className="hidden md:block bg-white dark:bg-gray-900 border-t-2 border-gray-100 dark:border-gray-800 px-6 py-4 shrink-0">
+                <div className="hidden md:flex flex-col bg-white dark:bg-gray-900 border-t-2 border-gray-100 dark:border-gray-800 px-6 py-4 shrink-0">
                     <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400 mb-1">
-                        <span>Subtotal</span><span>{fmt(subtotal)}</span>
+                        <span>Subtotal</span><span className="font-mono tabular-nums">{fmt(subtotal)}</span>
                     </div>
                     {discountAmount > 0 && (
                         <div className="flex justify-between text-sm text-[#F97316] mb-1">
-                            <span>Discount</span><span>− {fmt(discountAmount)}</span>
+                            <span>Discount</span><span className="font-mono tabular-nums">− {fmt(discountAmount)}</span>
                         </div>
                     )}
                     {VAT_ENABLED && (
                         <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400 mb-3">
-                            <span>VAT ({VAT_RATE}%)</span><span>{fmt(vatAmount)}</span>
+                            <span>VAT ({VAT_RATE}%)</span><span className="font-mono tabular-nums">{fmt(vatAmount)}</span>
                         </div>
                     )}
-                    <div className="flex justify-between items-baseline">
-                        <span className="text-lg font-bold text-gray-700 dark:text-gray-300" style={{ fontFamily: 'Montserrat, sans-serif' }}>TOTAL</span>
-                        <span className="text-4xl font-extrabold text-gray-900 dark:text-gray-100" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+                    <div className="flex justify-between items-baseline pt-2 border-t border-gray-50 dark:border-gray-800">
+                        <span className="text-xl font-bold text-gray-700 dark:text-gray-300" style={{ fontFamily: 'Montserrat, sans-serif' }}>TOTAL</span>
+                        <span className="text-4xl font-extrabold text-gray-900 dark:text-gray-100 font-mono tabular-nums tracking-tight">
                             {fmt(total)}
                         </span>
                     </div>
                 </div>
+
 
                 {/* ── MOBILE bottom bar ─────────────────────────────── */}
                 <div className="md:hidden bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-gray-800 shrink-0">
@@ -841,7 +913,7 @@ export default function POS({ user, vendorId, shift, onShiftClosed, onLogout }) 
             </div>
 
             {/* ── Right: Action grid (desktop only) ────────────────── */}
-            <div className="hidden md:block">
+            <div className="hidden md:block h-full">
                 <ActionGrid
                     cartEmpty={cartEmpty}
                     noSelection={selectedIdx === null}
@@ -860,10 +932,18 @@ export default function POS({ user, vendorId, shift, onShiftClosed, onLogout }) 
                     onZReport={() => setModal('zreport')}
                     onCashUp={() => setModal('cashup')}
                     onExpense={() => setModal('expense')}
+                    onSubmitCash={() => setModal('submitCash')}
                     pendingSales={pendingSales}
                     onViewPending={() => setModal('suspendedSales')}
                     pendingError={pendingError}
                     onReturn={() => setModal('return')}
+                    onPickings={() => setModal('pickings')}
+                    subtotal={subtotal}
+                    discountAmount={discountAmount}
+                    vatAmount={vatAmount}
+                    total={total}
+                    VAT_ENABLED={VAT_ENABLED}
+                    VAT_RATE={VAT_RATE}
                 />
             </div>
 

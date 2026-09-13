@@ -122,4 +122,10 @@ Route::middleware(['auth'])->prefix('procurement')->name('procurement.')->group(
 });
 
 
+// Guided tours: the browser telling us this person has now been shown one, so
+// the auto-offer never asks the same person twice.
+Route::middleware(['auth'])
+    ->post('/tours/progress', [App\Http\Controllers\TourProgressController::class, 'store'])
+    ->name('tours.progress');
+
 require __DIR__.'/settings.php';

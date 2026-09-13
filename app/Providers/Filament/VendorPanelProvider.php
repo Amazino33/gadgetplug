@@ -130,6 +130,13 @@ class VendorPanelProvider extends PanelProvider
                 PanelsRenderHook::BODY_END,
                 fn() => Blade::render('<x-barcode-scanner />'),
             )
+            // driver.js and the tour registry, scoped to this panel. Deliberately
+            // not in resources/js/app.js: that bundle is shared with the
+            // storefront, and shoppers have no use for a staff tour engine.
+            ->renderHook(
+                PanelsRenderHook::BODY_END,
+                fn() => Blade::render('<x-vendor-tours />'),
+            )
             // Replaces the global search removed above: filters the sidebar itself
             // so staff can jump to a page without scrolling the whole menu.
             ->renderHook(

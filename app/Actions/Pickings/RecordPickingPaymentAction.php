@@ -177,6 +177,18 @@ class RecordPickingPaymentAction
                 ? null
                 : $this->recordSale($picker, $storeId, $settled, $userId, $paymentMethod);
 
+            activity()
+                ->performedOn($picker)
+                ->causedBy($userId ? \App\Models\User::find($userId) : null)
+                ->tap(fn ($activity) => $activity->store_id = $storeId)
+                ->event('picking_payment')
+                ->withProperties([
+                    'amount'         => $amount,
+                    'allocated'      => round($amount - $remaining, 2),
+                    'payment_method' => $paymentMethod,
+                ])
+                ->log("Payment of ₦" . number_format($amount, 2) . " received");
+
             return [
                 'sale'          => $sale,
                 'allocated'     => round($amount - $remaining, 2),

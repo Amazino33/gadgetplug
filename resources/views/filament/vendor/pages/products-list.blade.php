@@ -14,6 +14,7 @@
                     <x-heroicon-o-magnifying-glass class="h-4 w-4 text-gray-400"/>
                 </div>
                 <input type="text" wire:model.live.debounce.300ms="search"
+                    data-tour="products-search"
                     aria-label="Search products by name or SKU"
                     placeholder="Search products by name or SKU…"
                     class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 py-2 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500">

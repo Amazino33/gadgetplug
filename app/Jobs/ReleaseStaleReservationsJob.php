@@ -5,8 +5,6 @@ namespace App\Jobs;
 use App\Actions\Inventory\ReleaseReservationAction;
 use App\Models\Order;
 use Filament\Notifications\Notification;
-use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -20,10 +18,8 @@ use Illuminate\Support\Facades\Log;
 // It only lifts the online hold so the stock becomes sellable again (POS or
 // another online order); the vendor is notified so a human decides what
 // happens to the original order next.
-class ReleaseStaleReservationsJob implements ShouldQueue
+class ReleaseStaleReservationsJob
 {
-    use Queueable;
-
     public const STALE_AFTER_HOURS = 24;
 
     public function handle(): void

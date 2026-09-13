@@ -20,14 +20,14 @@ class AffiliateTaskSubmission extends Model implements HasMedia
     protected $guarded = [];
 
     protected $casts = [
-        'submitted_at'          => 'datetime',
-        'reviewed_at'           => 'datetime',
-        'level_progress_value'  => 'decimal:2',
-        'share_date'            => 'date',
-        'reported_reach'        => 'integer',
-        'points_awarded'        => 'integer',
-        'streak_day'            => 'integer',
-        'streak_bonus_points'   => 'integer',
+        'submitted_at' => 'datetime',
+        'reviewed_at' => 'datetime',
+        'level_progress_value' => 'decimal:2',
+        'share_date' => 'date',
+        'reported_reach' => 'integer',
+        'points_awarded' => 'integer',
+        'streak_day' => 'integer',
+        'streak_bonus_points' => 'integer',
     ];
 
     public function registerMediaCollections(): void
@@ -37,7 +37,7 @@ class AffiliateTaskSubmission extends Model implements HasMedia
             ->singleFile();
     }
 
-    public function registerMediaConversions(Media $media = null): void
+    public function registerMediaConversions(?Media $media = null): void
     {
         $this->addMediaConversion('thumb')
             ->fit(Fit::Crop, 300, 300)

@@ -48,7 +48,7 @@ class WriteOffPickingAction
             $picking = $item->picking()->firstOrFail();
             $price = (float) $item->product()->value('price');
 
-            return PickingLedgerEntry::create([
+            $entry = PickingLedgerEntry::create([
                 'vendor_id'       => $picking->vendor_id,
                 'picking_item_id' => $item->id,
                 'direction'       => PickingLedgerEntry::DIRECTION_WRITEOFF,
@@ -58,6 +58,18 @@ class WriteOffPickingAction
                 'user_id'         => $userId,
                 'note'            => $note,
             ]);
+
+            $product = $item->product()->first();
+
+            activity()
+                ->performedOn($picking->picker)
+                ->causedBy($userId ? \App\Models\User::find($userId) : null)
+                ->tap(fn ($activity) => $activity->store_id = $picking->store_id)
+                ->event('picking_write_off')
+                ->withProperties(['quantity' => $quantity, 'product' => $product?->name])
+                ->log("Wrote off {$quantity} unit(s) for picker");
+
+            return $entry;
         });
     }
 }

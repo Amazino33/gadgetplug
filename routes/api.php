@@ -74,6 +74,7 @@ Route::prefix('pos')->middleware(NoStoreApiResponse::class)->group(function () {
         Route::get('pickings',          [PosPickingController::class, 'index']);
         Route::post('pickings/payment', [PosPickingController::class, 'pay']);
         Route::post('pickings/release', [PosPickingController::class, 'release']);
+        Route::post('pickings/return',  [PosPickingController::class, 'returnItems']);
 
         // Money paid out of the drawer, recorded when it happens rather than
         // reconstructed at the end of the day. Lands on the same expenses

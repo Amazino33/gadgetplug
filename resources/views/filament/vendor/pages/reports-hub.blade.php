@@ -4,7 +4,8 @@
         Everything below is today's snapshot — tap a card for the full report.
     </p>
 
-    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+    {{-- data-tour: hooks for the "Read your daily report" guided tour. --}}
+    <div data-tour="reports-cards" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
         @foreach ($this->getCards() as $card)
             @php
                 $borderClasses = match ($card->color()) {
@@ -23,7 +24,7 @@
                  than making the card itself an <a> — keeps this valid for both
                  the linked and unlinked (no detail page yet) cases without a
                  dynamic tag name. --}}
-            <div @class([
+            <div @if ($loop->first) data-tour="report-card-first" @endif @class([
                 'relative rounded-xl border bg-white p-5 shadow-sm dark:bg-gray-900',
                 $borderClasses,
                 'transition-all hover:shadow-md hover:-translate-y-0.5' => $card->hasLink(),

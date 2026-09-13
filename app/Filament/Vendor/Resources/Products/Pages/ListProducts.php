@@ -2,6 +2,7 @@
 
 namespace App\Filament\Vendor\Resources\Products\Pages;
 
+use App\Filament\Vendor\Pages\HelpCenter;
 use App\Filament\Vendor\Pages\ImportProducts;
 use App\Filament\Vendor\Resources\Products\ProductResource;
 use App\Filament\Vendor\Resources\Products\Schemas\ProductForm;
@@ -223,7 +224,13 @@ class ListProducts extends ListRecords
                 ->visible(fn (): bool => static::canBulkMove('import_products'))
                 ->url(fn (): string => ImportProducts::getUrl()),
 
-            CreateAction::make(),
+            CreateAction::make()
+                // Tour hook: the "Add a product" tour points a vendor here.
+                ->extraAttributes(['data-tour' => 'new-product']),
+
+            HelpCenter::tourAction('add-product'),
+
+            HelpCenter::helpAction('how-do-i-add-a-product'),
         ];
     }
 

@@ -185,6 +185,35 @@ export default function PickingsModal({ vendorId, isOnline, cart = [], onClose, 
         }
     };
 
+    const returnItems = async () => {
+        if (!picker || ticked.length === 0 || !isOnline) return;
+
+        setBusy(true);
+        setError(null);
+
+        try {
+            const { data } = await api.post('/pickings/return', {
+                vendor_id: vendorId,
+                picker_id: picker.id,
+                item_ids: ticked,
+            });
+
+            setResult({ returned: true, units: data.returned_units });
+
+            const refreshed = await api.get('/pickings', { params: { vendor_id: vendorId } });
+
+            setPickers(refreshed.data.pickers ?? []);
+            setAvailablePickers(refreshed.data.available_pickers ?? []);
+            await cachePickings(vendorId, refreshed.data);
+            setTicked([]);
+            setAmount('');
+        } catch (e) {
+            setError(e?.response?.data?.message ?? 'Failed to return items.');
+        } finally {
+            setBusy(false);
+        }
+    };
+
     return (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center" onClick={onClose}>
             <div
@@ -299,7 +328,9 @@ export default function PickingsModal({ vendorId, isOnline, cart = [], onClose, 
 
                     {mode === 'pay' && result && (
                         <div className="mb-4 rounded-xl bg-green-50 p-4 text-sm text-green-800 dark:bg-green-500/10 dark:text-green-300">
-                            {result.queued ? (
+                            {result.returned ? (
+                                <>Returned {result.units} unit{result.units === 1 ? '' : 's'} to stock.</>
+                            ) : result.queued ? (
                                 <>Saved on this till: {naira(result.amount)}. It will be applied when the connection returns.</>
                             ) : (
                                 <>
@@ -396,6 +427,13 @@ export default function PickingsModal({ vendorId, isOnline, cart = [], onClose, 
                         </div>
 
                         <div className="flex gap-2">
+                            <button
+                                onClick={returnItems}
+                                disabled={busy || ticked.length === 0 || !isOnline}
+                                className="rounded-xl bg-gray-100 dark:bg-zinc-800 px-4 py-3 font-bold text-gray-700 dark:text-gray-300 disabled:opacity-40 hover:bg-gray-200 dark:hover:bg-zinc-700"
+                            >
+                                {busy && !amount ? '…' : 'Return item'}
+                            </button>
                             <input
                                 type="number"
                                 inputMode="decimal"
@@ -409,7 +447,7 @@ export default function PickingsModal({ vendorId, isOnline, cart = [], onClose, 
                                 disabled={busy || ticked.length === 0 || !(Number(amount) > 0)}
                                 className="rounded-xl bg-green-600 px-6 py-3 font-bold text-white disabled:opacity-40"
                             >
-                                {busy ? '…' : 'Take payment'}
+                                {busy && amount ? '…' : 'Take payment'}
                             </button>
                         </div>
 

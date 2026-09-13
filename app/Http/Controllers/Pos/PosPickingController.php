@@ -205,4 +205,59 @@ class PosPickingController extends Controller
             'reference'     => $result['sale']?->reference,
         ]);
     }
+
+    /**
+     * Accept goods returned by the picker unsold.
+     * All held units for the specified picking lines are returned to stock.
+     */
+    public function returnItems(Request $request, \App\Actions\Pickings\ReturnFromPickerAction $returnAction): JsonResponse
+    {
+        $request->validate([
+            'vendor_id' => 'required|integer',
+            'picker_id' => 'required|integer',
+            'item_ids'  => 'required|array|min:1',
+            'item_ids.*' => 'integer',
+        ]);
+
+        $vendorId = (int) $request->vendor_id;
+        $picker = Picker::where('vendor_id', $vendorId)->find($request->picker_id);
+
+        if (! $picker) {
+            return response()->json(['message' => 'That picker is not one of yours.'], 404);
+        }
+
+        $userId = $request->user()->id;
+        $returnedUnits = 0;
+
+        DB::beginTransaction();
+        try {
+            foreach ($request->item_ids as $itemId) {
+                $item = PickingItem::where('picking_items.id', $itemId)
+                    ->join('pickings', 'pickings.id', '=', 'picking_items.picking_id')
+                    ->where('pickings.vendor_id', $vendorId)
+                    ->where('pickings.picker_id', $picker->id)
+                    ->select('picking_items.*')
+                    ->firstOrFail();
+
+                $held = PickingLedger::heldQuantity($item);
+                if ($held > 0) {
+                    $returnAction->execute(
+                        item: $item,
+                        quantity: $held,
+                        userId: $userId,
+                        note: 'Returned at POS'
+                    );
+                    $returnedUnits += $held;
+                }
+            }
+            DB::commit();
+        } catch (Throwable $e) {
+            DB::rollBack();
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
+
+        return response()->json([
+            'returned_units' => $returnedUnits,
+        ]);
+    }
 }

@@ -19,9 +19,24 @@
 
 @php
     $sidebarCollapsible = $sidebarCollapsible && filament()->isSidebarCollapsibleOnDesktop();
+
+    // A stable hook for the guided tours (resources/js/vendor-tours.js) on every
+    // sidebar entry, named after the last segment of its URL: "nav-procurements",
+    // "nav-products", "nav-reports-hub". Derived rather than hand-placed so a new
+    // resource is tourable the day it is added, and so a tour never has to fall
+    // back to an nth-child selector that breaks when the menu is reordered.
+    //
+    // Published Filament view, so it applies to the admin sidebar too. Harmless
+    // there: the tour bundle is only loaded on the vendor panel.
+    $tourHandle = filled($url)
+        ? \Illuminate\Support\Str::slug(\Illuminate\Support\Str::afterLast(rtrim(parse_url($url, PHP_URL_PATH) ?? '', '/'), '/'))
+        : null;
 @endphp
 
 <li
+    @if (filled($tourHandle))
+        data-tour="nav-{{ $tourHandle }}"
+    @endif
     {{
         $attributes->class([
             'fi-sidebar-item',

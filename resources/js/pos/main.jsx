@@ -43,6 +43,10 @@ function App() {
         localStorage.removeItem('pos_user');
         localStorage.removeItem('pos_vendor_id');
         localStorage.removeItem('pos_session');
+        localStorage.removeItem('pos_cart');
+        localStorage.removeItem('pos_customer');
+        localStorage.removeItem('pos_cartDiscount');
+        localStorage.removeItem('pos_recoveredAt');
         setUser(null);
         setVendorId(null);
         // Deliberately NOT cleared from IndexedDB: the shift belongs to the

@@ -2,6 +2,8 @@
 
 @source '../js/pos/**/*.jsx';
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* POS-specific styles — thermal print layout */
 
 * { box-sizing: border-box; }

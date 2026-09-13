@@ -313,7 +313,7 @@ const SearchBar = forwardRef(function SearchBar({
 
     return (
         <div className="relative flex-1" ref={rootRef}>
-            <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5">
+            <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 focus-within:ring-2 focus-within:ring-[#068B03] focus-within:border-[#068B03] transition-all">
                 {searching ? (
                     <svg className="w-4 h-4 text-gray-400 dark:text-gray-500 shrink-0 animate-spin" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
