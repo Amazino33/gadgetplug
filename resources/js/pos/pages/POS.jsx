@@ -179,7 +179,7 @@ export default function POS({ user, vendorId, shift, onShiftClosed, onLogout }) 
 
     const searchRef = useRef(null);
 
-    const { syncNow } = useSync(vendorId, setStuckSales);
+    const { syncNow } = useSync(vendorId, user?.id, setStuckSales);
 
     // Older than the retention window is not this till's business to hold.
     useEffect(() => {

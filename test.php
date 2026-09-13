@@ -1,0 +1,1 @@
+<?php $u = App\Models\User::find(7); $req = request()->merge(["vendor_id" => 1, "opening_float" => 2000]); $req->setUserResolver(fn() => $u); try { $res = app(App\Http\Controllers\Pos\PosSessionController::class)->open($req); dump($res->getStatusCode(), $res->getContent()); } catch (\Exception $e) { dump($e->getMessage()); }

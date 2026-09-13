@@ -155,7 +155,7 @@ class PosSessionController extends Controller
         ]);
 
         if ((int) $session->cashier_id !== $request->user()->id) {
-            abort(404);
+            return response()->json(['message' => 'This session belongs to another cashier, or the server record was reset.'], 404);
         }
 
         if (! $session->isOpen()) {

@@ -63,7 +63,7 @@ export default function ShiftClosed({ shift, user, onLogout }) {
                             This could not be sent
                         </p>
                         <p className="mt-0.5 text-xs text-red-700 dark:text-red-300">
-                            {shift.sync_message ?? 'The server refused it. Show your manager.'}
+                            {shift.sync_message || 'The server refused it. Show your manager.'}
                         </p>
                     </div>
                 ) : (

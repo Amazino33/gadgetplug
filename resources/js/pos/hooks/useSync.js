@@ -15,7 +15,7 @@ import {
  * blindly forever — it's marked and reported via onStuckSalesChange so a
  * human can see it and fix the underlying cause.
  */
-export function useSync(vendorId, onStuckSalesChange) {
+export function useSync(vendorId, cashierId, onStuckSalesChange) {
     const timerRef = useRef(null);
     const catalogueTimerRef = useRef(null);
 
@@ -93,8 +93,9 @@ export function useSync(vendorId, onStuckSalesChange) {
      */
     const syncShifts = async () => {
         const pending = await pendingShifts();
+        const myPending = pending.filter((s) => s.cashier_id === cashierId);
 
-        for (const shift of pending) {
+        for (const shift of myPending) {
             if (shift.open_synced !== 1) {
                 const opened = await pushOpen(shift);
 
