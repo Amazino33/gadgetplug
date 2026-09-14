@@ -58,6 +58,32 @@ class ProcurementWizardController extends Controller
         return view('procurement.create', compact('vendor', 'suppliers', 'selectedSupplier', 'receiptImage', 'stores', 'selectedStore'));
     }
 
+    public function storeSupplierApi(Request $request)
+    {
+        $vendor = $this->resolveAuthorizedVendor($request);
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'phone' => 'nullable|string|max:20',
+            'address' => 'nullable|string',
+        ]);
+
+        $supplier = Supplier::create([
+            'vendor_id' => $vendor->id,
+            'name'      => $validated['name'],
+            'phone'     => $validated['phone'] ?? null,
+            'address'   => $validated['address'] ?? null,
+        ]);
+
+        return response()->json([
+            'id' => $supplier->id,
+            'name' => $supplier->name,
+            'location' => $supplier->address ?? 'N/A',
+            'rating' => 0,
+            'avg_delivery_days' => '—'
+        ]);
+    }
+
     public function storeSupplier(Request $request)
     {
         $vendor = $this->resolveAuthorizedVendor($request);
@@ -283,7 +309,11 @@ class ProcurementWizardController extends Controller
 
         session()->forget(['procurement.supplier_id', 'procurement.store_id', 'procurement.items', 'procurement.logistics', 'procurement.financials', 'procurement.receipt_image']);
 
-        return redirect()->route('procurement.create')
-            ->with('success', 'Procurement submitted successfully and is pending approval.');
+        \Filament\Notifications\Notification::make()
+            ->title('Procurement submitted successfully and is pending approval.')
+            ->success()
+            ->send();
+
+        return redirect(\App\Filament\Vendor\Resources\Procurements\ProcurementResource::getUrl('index', ['tenant' => $vendor->slug]));
     }
 }

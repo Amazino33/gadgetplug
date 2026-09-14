@@ -37,9 +37,46 @@
                     class="pl-9 pr-4 py-2.5 border border-[#becab5] dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-800 text-sm dark:text-zinc-100 focus:border-[#016c00] focus:ring-2 focus:ring-[#016c00]/20 outline-none w-64"
                     oninput="filterSuppliers(this.value)">
             </div>
-            <a href="/plug/{{ $vendor->slug }}/suppliers" data-tour="procurement-new-supplier" class="flex items-center gap-2 px-4 py-2.5 border border-[#becab5] dark:border-zinc-600 rounded-lg text-[#016c00] dark:text-green-400 text-sm font-semibold hover:bg-[#f3f4f5] dark:hover:bg-zinc-700 transition-colors whitespace-nowrap">
-                <span class="material-symbols-outlined text-sm">add</span> New Supplier
-            </a>
+            <div x-data="supplierModal()">
+                <button type="button" @click="open = true" data-tour="procurement-new-supplier" class="flex items-center gap-2 px-4 py-2.5 border border-[#becab5] dark:border-zinc-600 rounded-lg text-[#016c00] dark:text-green-400 text-sm font-semibold hover:bg-[#f3f4f5] dark:hover:bg-zinc-700 transition-colors whitespace-nowrap">
+                    <span class="material-symbols-outlined text-sm">add</span> New Supplier
+                </button>
+
+                <!-- Modal -->
+                <div x-show="open" style="display:none" class="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
+                    <div @click.away="open = false" class="bg-white dark:bg-zinc-800 rounded-xl w-full max-w-md shadow-2xl overflow-hidden">
+                        <div class="px-6 py-4 border-b border-[#becab5]/30 dark:border-zinc-700 flex items-center justify-between">
+                            <h3 class="font-bold text-lg text-[#191c1d] dark:text-white" style="font-family:'Montserrat',sans-serif;">Add New Supplier</h3>
+                            <button type="button" @click="open = false" class="text-[#6f7b68] dark:text-zinc-400 hover:text-[#191c1d] dark:hover:text-white transition-colors">
+                                <span class="material-symbols-outlined">close</span>
+                            </button>
+                        </div>
+                        <div class="p-6">
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-[#191c1d] dark:text-zinc-300 mb-1">Name <span class="text-red-500">*</span></label>
+                                    <input type="text" x-model="name" class="w-full rounded-lg border border-[#becab5] dark:border-zinc-600 bg-white dark:bg-zinc-900 px-4 py-2 text-sm text-[#191c1d] dark:text-white focus:border-[#016c00] focus:ring-1 focus:ring-[#016c00] outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-[#191c1d] dark:text-zinc-300 mb-1">Phone</label>
+                                    <input type="tel" x-model="phone" class="w-full rounded-lg border border-[#becab5] dark:border-zinc-600 bg-white dark:bg-zinc-900 px-4 py-2 text-sm text-[#191c1d] dark:text-white focus:border-[#016c00] focus:ring-1 focus:ring-[#016c00] outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-[#191c1d] dark:text-zinc-300 mb-1">Address</label>
+                                    <textarea x-model="address" rows="2" class="w-full rounded-lg border border-[#becab5] dark:border-zinc-600 bg-white dark:bg-zinc-900 px-4 py-2 text-sm text-[#191c1d] dark:text-white focus:border-[#016c00] focus:ring-1 focus:ring-[#016c00] outline-none"></textarea>
+                                </div>
+                            </div>
+                            <div class="mt-6 flex justify-end gap-3">
+                                <button type="button" @click="open = false" class="px-4 py-2 text-sm font-semibold text-[#6f7b68] dark:text-zinc-400 hover:text-[#191c1d] dark:hover:text-white transition-colors">Cancel</button>
+                                <button type="button" @click="submit" :disabled="loading || !name" class="px-4 py-2 bg-[#016c00] text-white text-sm font-semibold rounded-lg hover:bg-green-800 disabled:opacity-50 flex items-center gap-2 transition-colors">
+                                    <span x-show="loading" class="material-symbols-outlined animate-spin text-sm" style="display:none">progress_activity</span>
+                                    Save Supplier
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -223,5 +260,43 @@
             document.getElementById('receiptClear').style.display = 'none';
             document.getElementById('receiptDropzone').classList.remove('border-[#016c00]', 'bg-[#f3f4f5]');
         }
+
+        function supplierModal() {
+            return {
+                open: false,
+                name: '',
+                phone: '',
+                address: '',
+                loading: false,
+                async submit() {
+                    this.loading = true;
+                    try {
+                        const response = await fetch('{{ route('procurement.storeSupplierApi') }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                            },
+                            body: JSON.stringify({
+                                name: this.name,
+                                phone: this.phone,
+                                address: this.address
+                            })
+                        });
+                        
+                        if (response.ok) {
+                            window.location.reload();
+                        } else {
+                            alert('Failed to save supplier. Please check the inputs.');
+                        }
+                    } catch (e) {
+                        alert('Network error. Please try again.');
+                    } finally {
+                        this.loading = false;
+                    }
+                }
+            }
+        }
+
     </script>
 </x-layouts.procurement>

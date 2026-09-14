@@ -14,6 +14,19 @@ class Dashboard extends \Filament\Pages\Dashboard
 {
     use HasFiltersForm;
 
+    public function content(Schema $schema): Schema
+    {
+        return $schema
+            ->components([
+                \Filament\Schemas\Components\Livewire::make(\App\Livewire\Vendor\HomeDashboard::class),
+                \Filament\Schemas\Components\Section::make('Detailed Reports')
+                    ->schema([
+                        ...(method_exists($this, 'getFiltersForm') ? [$this->getFiltersFormContentComponent()] : []),
+                        $this->getWidgetsContentComponent(),
+                    ]),
+            ]);
+    }
+
     protected static string $routePath = '/dashboard';
 
     protected static ?string $slug = 'dashboard';

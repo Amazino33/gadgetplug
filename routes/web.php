@@ -110,6 +110,7 @@ Route::get('/pos', fn () => view('pos.index', [
 // Procurement Wizard
 Route::middleware(['auth'])->prefix('procurement')->name('procurement.')->group(function () {
     Route::get('/create',     [App\Http\Controllers\ProcurementWizardController::class, 'create'])->name('create');
+    Route::post('/supplier/api', [App\Http\Controllers\ProcurementWizardController::class, 'storeSupplierApi'])->name('storeSupplierApi');
     Route::post('/supplier',  [App\Http\Controllers\ProcurementWizardController::class, 'storeSupplier'])->name('storeSupplier');
     Route::get('/items',      [App\Http\Controllers\ProcurementWizardController::class, 'items'])->name('items');
     Route::post('/items',     [App\Http\Controllers\ProcurementWizardController::class, 'storeItems'])->name('storeItems');

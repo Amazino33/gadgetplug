@@ -245,7 +245,6 @@ class ProcurementResource extends Resource
     {
         return [
             'index'  => Pages\ListProcurements::route('/'),
-            'create' => Pages\CreateProcurement::route('/create'),
             'view'   => Pages\ViewProcurement::route('/{record}'),
         ];
     }
