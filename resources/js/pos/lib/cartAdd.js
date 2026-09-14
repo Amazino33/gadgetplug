@@ -17,7 +17,14 @@
  * highlights it and may open a price prompt on it next.
  */
 export function addToCart(cart = [], product, qty = 1) {
-    const index = cart.findIndex((i) => i.id === product.id);
+    // Match on both product ID and the current selling price.
+    // If a cashier discounted a line and then scans the product again,
+    // it will appear as a new row at full price rather than merging into
+    // the discounted one.
+    const index = cart.findIndex((i) => 
+        i.id === product.id && 
+        parseFloat(i.price) === parseFloat(product.price)
+    );
 
     if (index >= 0) {
         const items = [...cart];
