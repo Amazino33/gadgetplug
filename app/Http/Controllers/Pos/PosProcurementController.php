@@ -21,7 +21,10 @@ class PosProcurementController extends Controller
 
         $procurements = Procurement::with(['items.product', 'creator', 'supplier'])
             ->where('vendor_id', $vendorId)
-            ->where('store_id', $storeId)
+            ->where(function ($q) use ($storeId) {
+                $q->where('store_id', $storeId)
+                  ->orWhereNull('store_id');
+            })
             ->where('status', 'pending')
             ->orderBy('created_at', 'desc')
             ->get()
