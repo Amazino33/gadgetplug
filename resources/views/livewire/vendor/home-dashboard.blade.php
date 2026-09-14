@@ -1,4 +1,4 @@
-<div class="space-y-6">
+<div class="space-y-6" x-data="{ hideSales: localStorage.getItem('hideSales') === 'true' }" x-init="$watch('hideSales', val => localStorage.setItem('hideSales', val))">
     <!-- Greeting Header -->
     <div class="flex items-center justify-between">
         <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
@@ -22,9 +22,18 @@
     <!-- Live Stat Strip -->
     @if(isset($summary))
     <div class="grid grid-cols-3 gap-4">
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 text-center border border-gray-200 dark:border-gray-700">
-            <p class="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider">Sales</p>
-            <p class="mt-1 text-xl font-bold text-gray-900 dark:text-white">₦{{ number_format($summary['revenue']) }}</p>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 text-center border border-gray-200 dark:border-gray-700 relative">
+            <p class="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider flex items-center justify-center gap-1">
+                Sales
+                <button @click="hideSales = !hideSales" class="text-gray-400 hover:text-gray-600 focus:outline-none flex items-center justify-center">
+                    <span x-show="!hideSales" class="material-symbols-outlined text-[14px]">visibility</span>
+                    <span x-show="hideSales" class="material-symbols-outlined text-[14px]" style="display: none;">visibility_off</span>
+                </button>
+            </p>
+            <p class="mt-1 text-xl font-bold text-gray-900 dark:text-white">
+                <span x-show="!hideSales">₦{{ number_format($summary['revenue']) }}</span>
+                <span x-show="hideSales" style="display: none;">****</span>
+            </p>
         </div>
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 text-center border border-gray-200 dark:border-gray-700">
             <p class="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider">Orders</p>
@@ -71,10 +80,24 @@
                 @svg($tile['icon'], 'w-8 h-8 mb-2')
                 <span class="text-lg font-bold">{{ $tile['label'] }}</span>
                 @if(isset($tile['value']))
-                    <span class="text-xl font-extrabold mt-1">{{ $tile['value'] }}</span>
+                    @if($tile['id'] === 'today_sales')
+                        <span class="text-xl font-extrabold mt-1">
+                            <span x-show="!hideSales">{{ $tile['value'] }}</span>
+                            <span x-show="hideSales" style="display: none;">****</span>
+                        </span>
+                    @else
+                        <span class="text-xl font-extrabold mt-1">{{ $tile['value'] }}</span>
+                    @endif
                 @endif
                 @if(isset($tile['subtext']))
-                    <span class="text-sm font-medium opacity-90 mt-1">{{ $tile['subtext'] }}</span>
+                    @if($tile['id'] === 'today_sales')
+                        <span class="text-sm font-medium opacity-90 mt-1">
+                            <span x-show="!hideSales">{{ $tile['subtext'] }}</span>
+                            <span x-show="hideSales" style="display: none;">Profit: ****</span>
+                        </span>
+                    @else
+                        <span class="text-sm font-medium opacity-90 mt-1">{{ $tile['subtext'] }}</span>
+                    @endif
                 @endif
             </div>
 
@@ -89,12 +112,30 @@
     <!-- Quick Actions -->
     <div class="grid grid-cols-2 gap-4">
         @foreach($tiles->where('is_hero', false) as $tile)
-            <a href="{{ $tile['route'] }}" class="block">
+            @if($tile['route'])
+                <a href="{{ $tile['route'] }}" class="block">
+            @else
+                <div class="block">
+            @endif
                 <div class="flex flex-col items-center justify-center p-5 rounded-2xl shadow-sm h-28 {{ $tile['color'] }} transition transform active:scale-95 dark:bg-gray-800 dark:border-gray-700">
                     @svg($tile['icon'], 'w-7 h-7 mb-2 text-gray-700 dark:text-gray-300')
                     <span class="text-base font-semibold text-gray-900 dark:text-white text-center">{{ $tile['label'] }}</span>
+                    @if(isset($tile['value']))
+                        @if($tile['id'] === 'today_sales')
+                            <span class="text-lg font-extrabold mt-1 text-gray-900 dark:text-white">
+                                <span x-show="!hideSales">{{ $tile['value'] }}</span>
+                                <span x-show="hideSales" style="display: none;">****</span>
+                            </span>
+                        @else
+                            <span class="text-lg font-extrabold mt-1 text-gray-900 dark:text-white">{{ $tile['value'] }}</span>
+                        @endif
+                    @endif
                 </div>
-            </a>
+            @if($tile['route'])
+                </a>
+            @else
+                </div>
+            @endif
         @endforeach
     </div>
 </div>

@@ -40,9 +40,10 @@ class HomeDashboard extends Component
 
         // Stat strip figures
         $reports = app(SalesReportService::class);
-        $today = Carbon::today('Africa/Lagos');
+        $todayStart = Carbon::now('Africa/Lagos')->startOfDay();
+        $todayEnd = Carbon::now('Africa/Lagos')->endOfDay();
         
-        $summary = $reports->summary($vendor->id, $today, $today, $storeId);
+        $summary = $reports->summary($vendor->id, $todayStart, $todayEnd, $storeId);
         
         // Low stock count scoped to active store
         // We evaluate this by checking which products are low stock in the active store.
