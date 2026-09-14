@@ -50,7 +50,7 @@ export default function CashUpModal({ shift, onClose, onComplete }) {
 
     return (
         <ModalShell
-            title={{ review: 'Where you stand', note: 'Before you finish' }[step] ?? 'Cash up'}
+            title={{ review: 'Where you stand', note: 'Before you finish' }[step] ?? 'End of day'}
             onClose={onClose}
             footer={footerFor({
                 step, cash, terminal, expectation, counts, note, finishing,

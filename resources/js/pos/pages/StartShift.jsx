@@ -107,7 +107,7 @@ export default function StartShift({ user, vendorId, onStarted, onLogout }) {
                                         onClick={() => setCashingUp(stale)}
                                         className="mt-1 w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-left text-xs font-semibold text-amber-900 transition-all active:scale-95 dark:border-amber-800 dark:bg-amber-900/40 dark:text-amber-100"
                                     >
-                                        Cash up {stale.business_date}
+                                        End of day {stale.business_date}
                                     </button>
                                 ))}
                             </div>

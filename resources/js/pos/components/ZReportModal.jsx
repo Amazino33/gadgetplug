@@ -68,7 +68,7 @@ export default function ZReportModal({ session, onClose }) {
                     {(state === 'none' || state === 'not-yet') && (
                         <div className="py-6 text-center">
                             <p className="text-sm text-gray-500">
-                                Nothing to print yet. The Z-report is produced when you cash up.
+                                No sales data to print yet.
                             </p>
                             <button onClick={onClose} className="mt-5 w-full rounded-xl bg-gray-900 py-2.5 text-sm font-semibold text-white">
                                 Close

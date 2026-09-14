@@ -127,7 +127,7 @@ const TopMenu = ({ setModal, panelUrl, pendingProcurementsCount }) => {
                         Z-Report
                     </button>
                     <button onClick={() => handleAction('cashup')} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2">
-                        Cash Up
+                        End of Day
                     </button>
                 </div>
             )}

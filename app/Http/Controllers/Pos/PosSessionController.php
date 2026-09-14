@@ -257,7 +257,22 @@ class PosSessionController extends Controller
         $report = $session->zReport;
 
         if (! $report) {
-            return response()->json(['message' => 'Z-Report not yet generated. Cash up first.'], 404);
+            if ($session->isOpen()) {
+                $breakdown = app(CashUpExpectation::class)->for($session);
+                
+                // Pretend the expected amounts are what was counted so variance is 0
+                $session->expected_cash = $breakdown->expectedCash;
+                $session->counted_cash = $breakdown->expectedCash;
+                $session->cash_variance = 0;
+                
+                $session->expected_terminal = $breakdown->expectedTerminal;
+                $session->counted_terminal = $breakdown->expectedTerminal;
+                $session->terminal_variance = 0;
+
+                $report = $this->buildZReport($session);
+            } else {
+                return response()->json(['message' => 'Z-Report not yet generated. Cash up first.'], 404);
+            }
         }
 
         return response()->json($report->load('cashier:id,name'));
@@ -274,7 +289,7 @@ class PosSessionController extends Controller
      * replayed through the offline sync endpoint carry no session id at all, so
      * the old slip silently omitted every sale rung while the till was offline.
      */
-    private function writeZReport(PosSession $session, CashUpBreakdown $breakdown): PosZReport
+    private function buildZReport(PosSession $session): PosZReport
     {
         [$from, $to] = BusinessDate::boundsFor($session->business_date->toDateString());
 
@@ -292,31 +307,39 @@ class PosSessionController extends Controller
             ->whereBetween('created_at', [$from, $to])
             ->get();
 
+        return new PosZReport([
+            'pos_session_id'      => $session->id,
+            'vendor_id'           => $session->vendor_id,
+            'cashier_id'          => $session->cashier_id,
+            'report_date'         => $session->business_date->toDateString(),
+            'cash_sales'          => $sales->where('payment_method', 'cash')->sum('total'),
+            'card_sales'          => $sales->where('payment_method', 'card')->sum('total'),
+            'bank_transfer_sales' => $sales->where('payment_method', 'bank_transfer')->sum('total'),
+            'total_sales'         => $sales->sum('total'),
+            'total_vat'           => $sales->sum('vat_amount'),
+            'total_discounts'     => $sales->sum('discount_amount'),
+            'total_returns'       => $returns->sum('refund_amount'),
+            'transaction_count'   => $sales->count(),
+            'return_count'        => $returns->count(),
+            'opening_float'       => $session->opening_float,
+            'cash_expected'       => $session->expected_cash,
+            'cash_counted'        => $session->counted_cash,
+            'cash_variance'       => $session->cash_variance,
+            'terminal_expected'   => $session->expected_terminal,
+            'terminal_counted'    => $session->counted_terminal,
+            'terminal_variance'   => $session->terminal_variance,
+            'notes'               => $session->notes,
+            'generated_at'        => now(),
+        ]);
+    }
+
+    private function writeZReport(PosSession $session, CashUpBreakdown $breakdown): PosZReport
+    {
+        $report = $this->buildZReport($session);
+        
         return PosZReport::updateOrCreate(
-            ['pos_session_id' => $session->id],
-            [
-                'vendor_id'           => $session->vendor_id,
-                'cashier_id'          => $session->cashier_id,
-                'report_date'         => $session->business_date->toDateString(),
-                'cash_sales'          => $sales->where('payment_method', 'cash')->sum('total'),
-                'card_sales'          => $sales->where('payment_method', 'card')->sum('total'),
-                'bank_transfer_sales' => $sales->where('payment_method', 'bank_transfer')->sum('total'),
-                'total_sales'         => $sales->sum('total'),
-                'total_vat'           => $sales->sum('vat_amount'),
-                'total_discounts'     => $sales->sum('discount_amount'),
-                'total_returns'       => $returns->sum('refund_amount'),
-                'transaction_count'   => $sales->count(),
-                'return_count'        => $returns->count(),
-                'opening_float'       => $session->opening_float,
-                'cash_expected'       => $session->expected_cash,
-                'cash_counted'        => $session->counted_cash,
-                'cash_variance'       => $session->cash_variance,
-                'terminal_expected'   => $session->expected_terminal,
-                'terminal_counted'    => $session->counted_terminal,
-                'terminal_variance'   => $session->terminal_variance,
-                'notes'               => $session->notes,
-                'generated_at'        => now(),
-            ],
+            ['pos_session_id' => $report->pos_session_id],
+            $report->toArray()
         );
     }
 
