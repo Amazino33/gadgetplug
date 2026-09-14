@@ -54,7 +54,7 @@ const SheetBtn = ({ label, onClick, disabled = false, color = 'gray' }) => {
     );
 };
 
-const TopMenu = ({ setModal, panelUrl }) => {
+const TopMenu = ({ setModal, panelUrl, pendingProcurementsCount }) => {
     const [open, setOpen] = useState(false);
     const menuRef = useRef(null);
 
@@ -81,8 +81,11 @@ const TopMenu = ({ setModal, panelUrl }) => {
         <div className="relative" ref={menuRef}>
             <button 
                 onClick={() => setOpen(!open)}
-                className={`flex items-center gap-1.5 text-xs font-medium px-2 py-1.5 rounded-lg transition-colors ${open ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400 hover:text-[#068B03]'}`}
+                className={`relative flex items-center gap-1.5 text-xs font-medium px-2 py-1.5 rounded-lg transition-colors ${open ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100' : 'text-gray-500 dark:text-gray-400 hover:text-[#068B03]'}`}
             >
+                {pendingProcurementsCount > 0 && (
+                    <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500 border border-white dark:border-gray-900"></span>
+                )}
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
@@ -109,8 +112,13 @@ const TopMenu = ({ setModal, panelUrl }) => {
                     <button onClick={() => handleAction('expense')} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2">
                         Expense
                     </button>
-                    <button onClick={() => handleAction('procurements')} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2">
-                        Procurements
+                    <button onClick={() => handleAction('procurements')} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 justify-between">
+                        <span>Receive Stock</span>
+                        {pendingProcurementsCount > 0 && (
+                            <span className="bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400 py-0.5 px-2 rounded-full text-[10px] font-bold">
+                                {pendingProcurementsCount}
+                            </span>
+                        )}
                     </button>
                     <button onClick={() => handleAction('submitCash')} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2">
                         Submit Cash
@@ -222,11 +230,24 @@ export default function POS({ user, vendorId, shift, onShiftClosed, onLogout }) 
         } catch { /* offline — keep showing the last known list */ }
     }, [vendorId]);
 
+    const [pendingProcurementsCount, setPendingProcurementsCount] = useState(0);
+
+    const loadPendingProcurementsCount = useCallback(async () => {
+        try {
+            const { data } = await api.get('/procurements', { params: { vendor_id: vendorId } });
+            setPendingProcurementsCount(data.procurements?.length || 0);
+        } catch { /* offline */ }
+    }, [vendorId]);
+
     useEffect(() => {
         loadPendingSales();
-        const interval = setInterval(loadPendingSales, 20000);
+        loadPendingProcurementsCount();
+        const interval = setInterval(() => {
+            loadPendingSales();
+            loadPendingProcurementsCount();
+        }, 20000);
         return () => clearInterval(interval);
-    }, [loadPendingSales]);
+    }, [loadPendingSales, loadPendingProcurementsCount]);
 
     const suspendCurrentSale = async () => {
         if (cartEmpty) return;
@@ -746,7 +767,7 @@ export default function POS({ user, vendorId, shift, onShiftClosed, onLogout }) 
                     )}
                     <span className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-25">{user.name}</span>
                     <div className="ml-auto flex items-center gap-4">
-                        <TopMenu setModal={setModal} panelUrl={CONFIG.panelUrl} />
+                        <TopMenu setModal={setModal} panelUrl={CONFIG.panelUrl} pendingProcurementsCount={pendingProcurementsCount} />
                         <div className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-1"></div>
                         <button
                             onClick={toggleDark}

@@ -54,7 +54,7 @@ export default function ProcurementsModal({ isOpen, onClose, vendorId }) {
             
             <div className="relative w-full max-w-2xl bg-white dark:bg-gray-900 rounded-2xl shadow-2xl flex flex-col max-h-full overflow-hidden border border-gray-100 dark:border-gray-800">
                 <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
-                    <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">Incoming Procurements</h2>
+                    <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">Receive Stock</h2>
                     <button onClick={onClose} className="p-2 -mr-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                     </button>
