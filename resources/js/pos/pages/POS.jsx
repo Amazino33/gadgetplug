@@ -29,6 +29,7 @@ import StuckSalesModal from '../components/StuckSalesModal';
 import SalesHistoryModal from '../components/SalesHistoryModal';
 import PickingsModal from '../components/PickingsModal';
 import CashSubmitModal from '../components/CashSubmitModal';
+import ProcurementsModal from '../components/ProcurementsModal';
 
 const CONFIG = window.POS_CONFIG ?? {};
 
@@ -107,6 +108,9 @@ const TopMenu = ({ setModal, panelUrl }) => {
                     
                     <button onClick={() => handleAction('expense')} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2">
                         Expense
+                    </button>
+                    <button onClick={() => handleAction('procurements')} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2">
+                        Procurements
                     </button>
                     <button onClick={() => handleAction('submitCash')} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2">
                         Submit Cash
@@ -1160,6 +1164,14 @@ export default function POS({ user, vendorId, shift, onShiftClosed, onLogout }) 
                     isOnline={isOnline}
                     cart={cart}
                     onReleased={clearCart}
+                    onClose={() => setModal(null)}
+                />
+            )}
+
+            {modal === 'procurements' && (
+                <ProcurementsModal
+                    vendorId={vendorId}
+                    isOpen={true}
                     onClose={() => setModal(null)}
                 />
             )}

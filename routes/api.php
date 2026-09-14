@@ -10,6 +10,7 @@ use App\Http\Controllers\Pos\PosCashController;
 use App\Http\Controllers\Pos\PosExpenseController;
 use App\Http\Controllers\Pos\PosPickingController;
 use App\Http\Controllers\Pos\PosSyncController;
+use App\Http\Controllers\Pos\PosProcurementController;
 use App\Http\Middleware\EnsurePosVendorAccess;
 use App\Http\Middleware\NoStoreApiResponse;
 use Illuminate\Support\Facades\Route;
@@ -81,6 +82,10 @@ Route::prefix('pos')->middleware(NoStoreApiResponse::class)->group(function () {
         // dashboard the panel writes to, and lowers what the drawer should hold.
         Route::get('expenses',  [PosExpenseController::class, 'index']);
         Route::post('expenses', [PosExpenseController::class, 'store']);
+
+        // Procurements (Receiving Stock)
+        Route::get('procurements', [PosProcurementController::class, 'index']);
+        Route::post('procurements/{procurement}/approve', [PosProcurementController::class, 'approve']);
 
         // Handing the day's takings over. Online only — see the controller.
         Route::get('cash',        [PosCashController::class, 'index']);
