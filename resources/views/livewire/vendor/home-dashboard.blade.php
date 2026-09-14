@@ -26,8 +26,12 @@
             <p class="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider flex items-center justify-center gap-1">
                 Sales
                 <button @click="hideSales = !hideSales" class="text-gray-400 hover:text-gray-600 focus:outline-none flex items-center justify-center">
-                    <span x-show="!hideSales" class="material-symbols-outlined text-[14px]">visibility</span>
-                    <span x-show="hideSales" class="material-symbols-outlined text-[14px]" style="display: none;">visibility_off</span>
+                    <span x-show="!hideSales">
+                        @svg('heroicon-o-eye', 'w-4 h-4')
+                    </span>
+                    <span x-show="hideSales" style="display: none;">
+                        @svg('heroicon-o-eye-slash', 'w-4 h-4')
+                    </span>
                 </button>
             </p>
             <p class="mt-1 text-xl font-bold text-gray-900 dark:text-white">
