@@ -162,8 +162,10 @@ it('records a payment through the panel action, stamping the signed-in user', fu
 
     actAsDebtOwner($ctx);
 
+    $accountId = \App\Models\FinancialAccount::where('vendor_id', $ctx['vendor']->id)->where('type', 'cash')->value('id');
+
     Livewire::test(ListCustomerDebts::class)
-        ->callTableAction('recordPayment', $ctx['customer'], data: ['amount' => 4000, 'note' => 'Part payment'])
+        ->callTableAction('recordPayment', $ctx['customer'], data: ['amount' => 4000, 'note' => 'Part payment', 'account_id' => $accountId])
         ->assertHasNoTableActionErrors();
 
     expect(app(CustomerDebtService::class)->outstanding($ctx['customer']->id))->toBe(6000.0);

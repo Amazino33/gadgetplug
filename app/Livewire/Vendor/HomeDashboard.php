@@ -138,6 +138,16 @@ class HomeDashboard extends Component
                 'color' => 'bg-white text-gray-900 border border-gray-200',
             ],
             [
+                'id' => 'record_debt_payment',
+                'label' => 'Record Debt Payment',
+                'icon' => 'heroicon-o-banknotes',
+                'route' => \App\Filament\Vendor\Resources\CustomerDebts\CustomerDebtResource::getUrl('index'),
+                'permission' => 'view_customer_debts',
+                'owner_prominence' => 'hero',
+                'staff_prominence' => 'hidden',
+                'color' => 'bg-white text-gray-900 border border-gray-200',
+            ],
+            [
                 'id' => 'new_orders',
                 'label' => 'New Orders',
                 'icon' => 'heroicon-o-shopping-bag',

@@ -36,12 +36,13 @@ class RecordCustomerPaymentAction
         User $collectedBy,
         ?int $storeId = null,
         ?string $note = null,
+        ?int $accountId = null,
     ): PosCustomerLedgerEntry {
         if ($amount <= 0) {
             throw new RuntimeException('A repayment has to be more than nothing.');
         }
 
-        return DB::transaction(function () use ($customer, $amount, $collectedBy, $storeId, $note) {
+        return DB::transaction(function () use ($customer, $amount, $collectedBy, $storeId, $note, $accountId) {
             // Negative: the sign convention is what lets outstanding stay a
             // plain SUM, and the model enforces it on the way in.
             $payment = PosCustomerLedgerEntry::create([
@@ -55,7 +56,7 @@ class RecordCustomerPaymentAction
                 'description'     => $note ?: 'Debt repayment',
             ]);
 
-            $this->postCash($customer, $payment, round($amount, 2), $collectedBy, $storeId);
+            $this->postCash($customer, $payment, round($amount, 2), $collectedBy, $storeId, $accountId);
 
             return $payment;
         });
@@ -72,10 +73,13 @@ class RecordCustomerPaymentAction
         float $amount,
         User $collectedBy,
         ?int $storeId,
+        ?int $accountId,
     ): void {
-        $account = FinancialAccount::where('vendor_id', $customer->vendor_id)
-            ->where('type', 'cash')
-            ->first();
+        $account = $accountId 
+            ? FinancialAccount::find($accountId)
+            : FinancialAccount::where('vendor_id', $customer->vendor_id)
+                ->where('type', 'cash')
+                ->first();
 
         if (! $account) {
             // Thrown, not logged. A till sale swallows this because the customer

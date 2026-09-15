@@ -12,7 +12,9 @@ use App\Services\Pos\CustomerDebtService;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
+use App\Models\FinancialAccount;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Tables\Columns\TextColumn;
@@ -86,6 +88,18 @@ class ListCustomerDebts extends ListRecords
                             ->required()
                             ->helperText('Part payments are fine — record what actually changed hands.'),
 
+                        Select::make('account_id')
+                            ->label('Paid into')
+                            ->options(fn () => FinancialAccount::where('vendor_id', filament()->getTenant()?->id)
+                                ->pluck('name', 'id')
+                            )
+                            ->required()
+                            ->default(fn () => FinancialAccount::where('vendor_id', filament()->getTenant()?->id)
+                                ->where('type', 'cash')
+                                ->value('id')
+                            )
+                            ->helperText('Did they pay cash to the till, or directly to the bank?'),
+
                         Textarea::make('note')
                             ->label('Note')
                             ->rows(2)
@@ -102,6 +116,7 @@ class ListCustomerDebts extends ListRecords
                                 collectedBy: auth()->user(),
                                 storeId: ActiveStore::currentId(),
                                 note: $data['note'] ?: null,
+                                accountId: (int) $data['account_id'],
                             );
                         } catch (RuntimeException $e) {
                             Notification::make()->title('Payment not recorded')->body($e->getMessage())->danger()->send();
