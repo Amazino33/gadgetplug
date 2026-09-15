@@ -255,8 +255,12 @@ class HomeDashboard extends Component
     public function switchStore($storeId)
     {
         $vendor = filament()->getTenant();
-        if (ActiveStore::set($vendor, auth()->user(), $storeId)) {
-            // refresh happens automatically as Livewire re-renders
+        
+        if (empty($storeId) || $storeId === 'all') {
+            $this->storeId = null;
+        } else {
+            $this->storeId = $storeId;
+            ActiveStore::set($vendor, auth()->user(), $storeId);
         }
     }
 }

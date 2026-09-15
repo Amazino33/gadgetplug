@@ -172,8 +172,17 @@ class ListCashUps extends ListRecords
                             ->orWhere('terminal_variance', '!=', 0))),
             ])
             ->recordActions([
-                $this->detailsAction(),
-                $this->rectifyAction(),
+                Tables\Actions\ActionGroup::make([
+                    $this->detailsAction(),
+                    $this->rectifyAction(),
+                ])
+                ->label('Review')
+                ->button()
+                ->outlined()
+                ->color('gray')
+                ->icon('heroicon-m-chevron-down')
+                ->iconPosition('after'),
+
                 $this->approveAction(),
             ])
             ->emptyStateHeading('No End of Day records yet')
@@ -187,8 +196,6 @@ class ListCashUps extends ListRecords
             ->label('See working')
             ->icon('heroicon-o-document-magnifying-glass')
             ->color('gray')
-            ->button()
-            ->outlined()
             ->modalHeading(fn (PosSession $record) => $record->cashier->name.' — '
                 .$record->business_date->format('d M Y'))
             ->modalSubmitAction(false)
@@ -208,8 +215,6 @@ class ListCashUps extends ListRecords
             ->label('Explain')
             ->icon('heroicon-o-pencil-square')
             ->color('warning')
-            ->button()
-            ->outlined()
             ->visible(fn (PosSession $record) => $record->acceptsRectifications())
             // The real gate. ->visible() only hides a button.
             ->authorize(fn (PosSession $record) => auth()->user()->can('rectify', $record))
