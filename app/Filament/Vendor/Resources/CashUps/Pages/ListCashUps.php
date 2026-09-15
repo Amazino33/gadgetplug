@@ -65,7 +65,7 @@ class ListCashUps extends ListRecords
             ->count();
 
         return new HtmlString(
-            'Showing cash-ups for '.$scope.'. '
+            'Showing End of Day records for '.$scope.'. '
             .($waiting > 0
                 ? $waiting.' waiting to be reviewed.'
                 : 'Nothing waiting to be reviewed.')
@@ -76,68 +76,72 @@ class ListCashUps extends ListRecords
     {
         return $table
             ->defaultSort('business_date', 'desc')
+            ->contentGrid([
+                'md' => 2,
+                'xl' => 3,
+            ])
             ->columns([
-                Tables\Columns\TextColumn::make('business_date')
-                    ->label('Day')
-                    ->date('d M Y')
-                    ->sortable(),
+                Tables\Columns\Layout\Stack::make([
+                    Tables\Columns\Layout\Split::make([
+                        Tables\Columns\TextColumn::make('business_date')
+                            ->date('d M Y')
+                            ->weight('bold')
+                            ->size('lg'),
 
-                Tables\Columns\TextColumn::make('cashier.name')
-                    ->label('Cashier')
-                    ->searchable()
-                    ->description(fn (PosSession $r) => $r->terminal_id ? 'Terminal '.$r->terminal_id : null),
+                        Tables\Columns\TextColumn::make('status')
+                            ->badge()
+                            ->formatStateUsing(fn (string $state) => match ($state) {
+                                PosSession::STATUS_OPEN            => 'Still open',
+                                PosSession::STATUS_PENDING_REVIEW  => 'Waiting for review',
+                                PosSession::STATUS_APPROVED        => 'Approved',
+                                default                               => $state,
+                            })
+                            ->color(fn (string $state) => match ($state) {
+                                PosSession::STATUS_APPROVED       => 'success',
+                                PosSession::STATUS_PENDING_REVIEW => 'warning',
+                                default                              => 'gray',
+                            }),
+                    ]),
 
-                Tables\Columns\TextColumn::make('store.name')
-                    ->label('Branch')
-                    ->toggleable()
-                    // Only worth a column when more than one branch is in view.
-                    ->visible(fn () => ActiveStore::currentId() === null),
+                    Tables\Columns\TextColumn::make('cashier.name')
+                        ->icon('heroicon-m-user')
+                        ->description(fn (PosSession $r) => $r->terminal_id ? 'Terminal '.$r->terminal_id : null),
 
-                Tables\Columns\TextColumn::make('counted_cash')
-                    ->label('Drawer counted')
-                    ->money('NGN')
-                    ->description(fn (PosSession $r) => $r->expected_cash !== null
-                        ? 'Expected ₦'.number_format((float) $r->expected_cash, 2)
-                        : null),
+                    Tables\Columns\TextColumn::make('store.name')
+                        ->icon('heroicon-m-building-storefront')
+                        ->visible(fn () => ActiveStore::currentId() === null),
 
-                Tables\Columns\TextColumn::make('cash_variance')
-                    ->label('Cash difference')
-                    ->money('NGN')
-                    ->weight('bold')
-                    ->color(fn ($state) => static::varianceColour((float) $state))
-                    // What is STILL missing, once the manager has accounted for
-                    // part of it. The frozen figure above stays as the record of
-                    // what was first put to the cashier.
-                    ->description(fn (PosSession $r) => $r->countsSubmitted()
-                        && abs($r->resolvedCashVariance() - (float) $r->cash_variance) > 0.009
-                            ? 'Still unexplained: ₦'.number_format($r->resolvedCashVariance(), 2)
-                            : null),
+                    Tables\Columns\Layout\Stack::make([
+                        Tables\Columns\TextColumn::make('counted_cash')
+                            ->label('Cash Drawer')
+                            ->money('NGN')
+                            ->prefix('Counted: ')
+                            ->description(fn (PosSession $r) => $r->expected_cash !== null
+                                ? 'Expected ₦'.number_format((float) $r->expected_cash, 2)
+                                : null),
 
-                Tables\Columns\TextColumn::make('terminal_variance')
-                    ->label('Terminal difference')
-                    ->money('NGN')
-                    ->color(fn ($state) => static::varianceColour((float) $state))
-                    ->description(fn (PosSession $r) => $r->countsSubmitted()
-                        && abs($r->resolvedTerminalVariance() - (float) $r->terminal_variance) > 0.009
-                            ? 'Still unexplained: ₦'.number_format($r->resolvedTerminalVariance(), 2)
-                            : null),
+                        Tables\Columns\TextColumn::make('cash_variance')
+                            ->label('Cash difference')
+                            ->money('NGN')
+                            ->prefix('Cash diff: ')
+                            ->weight('bold')
+                            ->color(fn ($state) => static::varianceColour((float) $state))
+                            ->description(fn (PosSession $r) => $r->countsSubmitted()
+                                && abs($r->resolvedCashVariance() - (float) $r->cash_variance) > 0.009
+                                    ? 'Still unexplained: ₦'.number_format($r->resolvedCashVariance(), 2)
+                                    : null),
 
-                Tables\Columns\TextColumn::make('status')
-                    ->badge()
-                    ->formatStateUsing(fn (string $state) => match ($state) {
-                        PosSession::STATUS_OPEN            => 'Still open',
-                        PosSession::STATUS_PENDING_REVIEW  => 'Waiting for review',
-                        PosSession::STATUS_APPROVED        => 'Approved',
-                        default                               => $state,
-                    })
-                    ->color(fn (string $state) => match ($state) {
-                        PosSession::STATUS_APPROVED       => 'success',
-                        PosSession::STATUS_PENDING_REVIEW => 'warning',
-                        default                              => 'gray',
-                    })
-                    ->description(fn (PosSession $r) => $r->reviewer?->name
-                        ? 'by '.$r->reviewer->name
-                        : null),
+                        Tables\Columns\TextColumn::make('terminal_variance')
+                            ->label('Terminal difference')
+                            ->money('NGN')
+                            ->prefix('Term diff: ')
+                            ->color(fn ($state) => static::varianceColour((float) $state))
+                            ->description(fn (PosSession $r) => $r->countsSubmitted()
+                                && abs($r->resolvedTerminalVariance() - (float) $r->terminal_variance) > 0.009
+                                    ? 'Still unexplained: ₦'.number_format($r->resolvedTerminalVariance(), 2)
+                                    : null),
+                    ])->space(2)->extraAttributes(['class' => 'bg-gray-50 dark:bg-gray-900 rounded-lg p-4 mt-2 border border-gray-100 dark:border-gray-800']),
+                ])->space(3),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('status')
@@ -173,7 +177,7 @@ class ListCashUps extends ListRecords
                 $this->rectifyAction(),
                 $this->approveAction(),
             ])
-            ->emptyStateHeading('No cash-ups yet')
+            ->emptyStateHeading('No End of Day records yet')
             ->emptyStateDescription('When a cashier counts their drawer at the till, the day appears here for review.');
     }
 
@@ -298,7 +302,7 @@ class ListCashUps extends ListRecords
             ->visible(fn (PosSession $record) => $record->isPendingReview())
             ->authorize(fn (PosSession $record) => auth()->user()->can('approve', $record))
             ->requiresConfirmation()
-            ->modalHeading('Approve this cash-up?')
+            ->modalHeading('Approve this record?')
             ->modalDescription(fn (PosSession $record) => new HtmlString($this->approvalWarning($record)))
             ->schema([
                 Textarea::make('notes')->label('Anything to add')->rows(2),
