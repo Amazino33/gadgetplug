@@ -31,7 +31,15 @@
                     @endif
                 </span>
                 <div>
-                    <p class="text-sm font-semibold text-gray-800">Session #{{ $session->id }}</p>
+                    <p class="text-sm font-semibold text-gray-800">
+                        {{-- The branch leads when there is one: on a count day
+                             several of these are open at once, and "Session #12"
+                             does not say which shop is on the floor. --}}
+                        {{ $session->store?->name ?? 'Session #'.$session->id }}
+                        @if ($session->store)
+                            <span class="text-xs font-normal text-gray-400">#{{ $session->id }}</span>
+                        @endif
+                    </p>
                     <p class="text-xs text-gray-500">{{ $statusLabel }}</p>
                 </div>
             </div>

@@ -128,6 +128,17 @@ class BlindCountSession extends Model
         return $this->belongsTo(Vendor::class);
     }
 
+    /**
+     * The branch whose shelves this count walked.
+     *
+     * Nullable: a vendor with no branches at all counts without one, and
+     * sessions predating multi-store have none either.
+     */
+    public function store(): BelongsTo
+    {
+        return $this->belongsTo(Store::class);
+    }
+
     public function storekeeperA(): BelongsTo
     {
         return $this->belongsTo(User::class, 'storekeeper_a_id');
@@ -172,10 +183,23 @@ class BlindCountSession extends Model
 
     // The user's most recent completed count at this vendor, whichever side they
     // counted on. Null when they have never completed one.
-    public static function lastCompletedFor(int $userId, Vendor $vendor): ?self
+    /**
+     * This counter's last finished count — of one branch, when one is named.
+     *
+     * The cadence exists to stop somebody re-counting shelves they have just
+     * counted, and shelves belong to a branch. Counting Accessories on Monday
+     * says nothing about whether Phones is due, so a vendor-wide reading would
+     * block the whole count-everything-on-one-day exercise after the first
+     * shop.
+     *
+     * A null store keeps the old vendor-wide reading, which is what a vendor
+     * with no branches needs.
+     */
+    public static function lastCompletedFor(int $userId, Vendor $vendor, ?int $storeId = null): ?self
     {
         return static::where('vendor_id', $vendor->id)
             ->where('status', 'completed')
+            ->when($storeId, fn ($q) => $q->where('store_id', $storeId))
             ->where(fn ($q) => $q
                 ->where('storekeeper_a_id', $userId)
                 ->orWhere('storekeeper_b_id', $userId))
@@ -187,12 +211,12 @@ class BlindCountSession extends Model
     // cadence is off, or they have no recent completed count.
     // Dates are cast immutable app-wide, so this returns the CarbonInterface
     // contract rather than the concrete Carbon class.
-    public static function nextCountDueFor(int $userId, Vendor $vendor): ?CarbonInterface
+    public static function nextCountDueFor(int $userId, Vendor $vendor, ?int $storeId = null): ?CarbonInterface
     {
         $period = static::cadencePeriodFor($vendor);
         if ($period === null) return null;
 
-        $last = static::lastCompletedFor($userId, $vendor);
+        $last = static::lastCompletedFor($userId, $vendor, $storeId);
         if (! $last?->b_submitted_at) return null;
 
         $due = $last->b_submitted_at->copy()->add($period);
@@ -203,9 +227,9 @@ class BlindCountSession extends Model
     // Blocked when the cadence has not elapsed AND no manager has authorised an
     // early re-count. The authorisation is only consumed once a session actually
     // starts, so merely viewing the page does not burn it.
-    public static function isBlockedFor(int $userId, Vendor $vendor): bool
+    public static function isBlockedFor(int $userId, Vendor $vendor, ?int $storeId = null): bool
     {
-        if (static::nextCountDueFor($userId, $vendor) === null) return false;
+        if (static::nextCountDueFor($userId, $vendor, $storeId) === null) return false;
 
         return BlindCountAuthorization::unusedFor($userId, $vendor->id) === null;
     }

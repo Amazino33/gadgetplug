@@ -20,9 +20,12 @@ class BlindCountInProgressWidget extends Widget
         $vendor = filament()->getTenant();
         if (! $vendor) return collect();
 
+        // Every branch's open count, not just the one the viewer is standing
+        // in: on a count day the owner wants to see all the shops at once, and
+        // the branch each one belongs to is now named on the card.
         return BlindCountSession::where('vendor_id', $vendor->id)
             ->whereIn('status', ['a_counting', 'b_counting'])
-            ->with(['storekeeperA', 'storekeeperB'])
+            ->with(['storekeeperA', 'storekeeperB', 'store'])
             ->latest()
             ->get()
             ->map(function (BlindCountSession $session) {

@@ -156,7 +156,21 @@ class BlindCount extends Page
     public function mount(): void
     {
         $vendor  = filament()->getTenant();
+        $storeId = ActiveStore::currentId();
+
+        // Scoped to the branch you are standing in.
+        //
+        // Without this, opening the page picked up whichever count the vendor
+        // had most recently opened ANYWHERE — so once Accessories started,
+        // Phones was handed Accessories' session and its product order, could
+        // not start its own, and a Phones storekeeper could verify shelves they
+        // had never walked. Branches counting on the same day is the whole
+        // point of choosing one count day.
+        //
+        // A null store means this user reaches no branch at all, and the old
+        // vendor-wide reading is right for them.
         $session = BlindCountSession::where('vendor_id', $vendor->id)
+            ->when($storeId, fn ($q) => $q->where('store_id', $storeId))
             ->whereIn('status', ['a_counting', 'b_counting'])
             ->latest()
             ->first();
@@ -176,7 +190,10 @@ class BlindCount extends Page
 
         $vendor = filament()->getTenant();
 
-        if (BlindCountSession::isBlockedFor(auth()->id(), $vendor)) {
+        // A count is taken at one branch, so it walks that branch's shelves.
+        $storeId = ActiveStore::currentId();
+
+        if (BlindCountSession::isBlockedFor(auth()->id(), $vendor, $storeId)) {
             Notification::make()
                 ->title('Next count not due yet')
                 ->body($this->blockedMessage())
@@ -185,8 +202,22 @@ class BlindCount extends Page
             return;
         }
 
-        // A count is taken at one branch, so it walks that branch's shelves.
-        $storeId = ActiveStore::currentId();
+        // Someone else already has this branch open — join theirs rather than
+        // opening a second count of the same shelves. Two sessions over one
+        // branch would have two people counting the same stock into different
+        // records, and whichever finished last would silently win.
+        $open = BlindCountSession::where('vendor_id', $vendor->id)
+            ->when($storeId, fn ($q) => $q->where('store_id', $storeId))
+            ->whereIn('status', ['a_counting', 'b_counting'])
+            ->latest()
+            ->first();
+
+        if ($open) {
+            $this->sessionId = $open->id;
+
+            return;
+        }
+
         $productIds = $this->buildProductOrder($vendor->id, $storeId);
 
         if (empty($productIds)) {
@@ -215,12 +246,12 @@ class BlindCount extends Page
 
     public function nextCountDue(): ?\Carbon\CarbonInterface
     {
-        return BlindCountSession::nextCountDueFor(auth()->id(), filament()->getTenant());
+        return BlindCountSession::nextCountDueFor(auth()->id(), filament()->getTenant(), ActiveStore::currentId());
     }
 
     public function isBlockedByCadence(): bool
     {
-        return BlindCountSession::isBlockedFor(auth()->id(), filament()->getTenant());
+        return BlindCountSession::isBlockedFor(auth()->id(), filament()->getTenant(), ActiveStore::currentId());
     }
 
     public function hasRecountAuthorization(): bool
@@ -249,11 +280,16 @@ class BlindCount extends Page
 
         $vendor = filament()->getTenant();
 
+        // Held back for THIS branch. A counter who finished Accessories this
+        // morning is not blocked from Phones, and listing them here would send
+        // the manager chasing an authorisation nobody needs.
+        $storeId = ActiveStore::currentId();
+
         return $vendor->users
-            ->filter(fn (User $u) => BlindCountSession::nextCountDueFor($u->id, $vendor) !== null)
+            ->filter(fn (User $u) => BlindCountSession::nextCountDueFor($u->id, $vendor, $storeId) !== null)
             ->map(fn (User $u) => (object) [
                 'user'       => $u,
-                'due'        => BlindCountSession::nextCountDueFor($u->id, $vendor),
+                'due'        => BlindCountSession::nextCountDueFor($u->id, $vendor, $storeId),
                 'authorized' => BlindCountAuthorization::unusedFor($u->id, $vendor->id) !== null,
             ])
             ->values();
@@ -362,7 +398,7 @@ class BlindCount extends Page
 
         $vendor = filament()->getTenant();
 
-        if (BlindCountSession::isBlockedFor(auth()->id(), $vendor)) {
+        if (BlindCountSession::isBlockedFor(auth()->id(), $vendor, $session->store_id)) {
             Notification::make()
                 ->title('Next count not due yet')
                 ->body($this->blockedMessage())
