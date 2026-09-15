@@ -475,38 +475,9 @@ export default function POS({ user, vendorId, shift, onShiftClosed, onLogout }) 
             vat_enabled:  VAT_ENABLED,
         };
 
-        // A recovered sale goes back through the offline queue even when the
-        // till is online, because that is the only path that keeps the date it
-        // carries: the live endpoint stamps the moment the sale reaches it, so
-        // yesterday's goods would land in today's takings. The queue is drained
-        // immediately below, so it still goes up straight away.
-        if (isOnline && ! recoveredAt) {
-            try {
-                const { data } = await api.post('/sales', payload);
-                savedSale = { ...payload, id: data.id, reference: data.reference };
-                // Kept on the device too. offlineSales below is a queue for
-                // getting a sale uploaded; this is so the cashier can still
-                // look it up afterwards, which the server cannot answer when
-                // the connection is gone.
-                await recordSale({ ...savedSale, ...localOnly }, user.id);
-            } catch (err) {
-                if (err.response) {
-                    // The server was reached and refused the sale (insufficient
-                    // stock, a price below floor, etc.) — this is NOT a
-                    // connectivity problem. Queuing it "for later" would just
-                    // fail identically forever while the till shows a fake
-                    // success receipt. Stop here so the cashier can fix it now.
-                    setSaleError(err.response.data?.message || 'This sale was rejected by the server.');
-                    return;
-                }
-                // No response at all reached us — genuine network failure, safe to queue.
-                await db.offlineSales.add({ ...payload, synced: 0 });
-                await recordSale({ ...payload, ...localOnly }, user.id);
-            }
-        } else {
-            await db.offlineSales.add({ ...payload, synced: 0 });
-            await recordSale({ ...payload, ...localOnly }, user.id);
-        }
+        // Put everything in the sync queue for instant checkout, even when online.
+        await db.offlineSales.add({ ...payload, synced: 0 });
+        await recordSale({ ...payload, ...localOnly }, user.id);
 
         const receiptSale = {
             // Carried through so the receipt can be printed from the server's
@@ -546,8 +517,9 @@ export default function POS({ user, vendorId, shift, onShiftClosed, onLogout }) 
         // its next cycle — the cashier should not be left wondering.
         if (recoveredAt) {
             setRecoveredAt(null);
-            syncNow();
         }
+        
+        syncNow().catch(() => {});
 
         clearCart();
         setModal(null);
