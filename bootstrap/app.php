@@ -25,6 +25,8 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->redirectUsersTo(fn (Request $request) => \App\Http\Responses\LoginResponse::resolveDashboardUrl($request->user() ?? auth()->user()));
+
         $middleware->statefulApi();
 
         // Appended so it runs after the session is started and sees the final

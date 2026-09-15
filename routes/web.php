@@ -8,7 +8,9 @@ use App\Http\Controllers\Storefront\FeedActionController;
 use App\Http\Controllers\Storefront\FeedController;
 use Livewire\Volt\Volt;
 
-Volt::route('/', 'pages.product-catalog')->name('home');
+Volt::route('/', 'pages.product-catalog')
+    ->middleware(\App\Http\Middleware\RedirectVendorToDashboard::class)
+    ->name('home');
 Volt::route('/track', 'pages.track-order')->name('track-order');
 Route::view('/privacy-policy', 'pages.privacy-policy')->name('privacy-policy');
 Volt::route('/product/{product:slug}', 'pages.product-detail')->name('product.show');
