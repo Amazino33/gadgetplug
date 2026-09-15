@@ -151,4 +151,76 @@
             </table>
         </div>
     @endif
+
+    @php
+        $expenses = \App\Models\Expense::query()
+            ->where('vendor_id', $session->vendor_id)
+            ->where('store_id', $session->store_id)
+            ->where('created_by', $session->cashier_id)
+            ->whereNotNull('posted_at')
+            ->whereDate('incurred_at', $session->business_date)
+            ->get();
+
+        $pickingPayments = \App\Models\PickingLedgerEntry::query()
+            ->where('vendor_id', $session->vendor_id)
+            ->where('user_id', $session->cashier_id)
+            ->where('direction', 'payment')
+            ->whereDate('created_at', $session->business_date)
+            ->with('item.picking.picker', 'item.product')
+            ->get();
+    @endphp
+
+    @if ($expenses->isNotEmpty())
+        <div class="rounded-lg border border-gray-200 dark:border-gray-700">
+            <p class="border-b border-gray-200 bg-gray-50 px-3 py-2 font-semibold dark:border-gray-700 dark:bg-gray-800/50">
+                Expenses Paid Out of Drawer
+            </p>
+            <table class="w-full">
+                <tbody>
+                    @foreach ($expenses as $expense)
+                        <tr class="border-b border-gray-100 last:border-0 dark:border-gray-800">
+                            <td class="px-3 py-2">
+                                <span class="font-medium">{{ \Illuminate\Support\Str::headline($expense->category) }}</span>
+                                @if (filled($expense->description))
+                                    <p class="text-gray-500 dark:text-gray-400">{{ $expense->description }}</p>
+                                @endif
+                            </td>
+                            <td class="px-3 py-2 text-right align-top tabular-nums text-danger-600 dark:text-danger-400">
+                                {{ $signed(-$expense->amount) }}
+                            </td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    @endif
+
+    @if ($pickingPayments->isNotEmpty())
+        <div class="rounded-lg border border-gray-200 dark:border-gray-700">
+            <p class="border-b border-gray-200 bg-gray-50 px-3 py-2 font-semibold dark:border-gray-700 dark:bg-gray-800/50">
+                Picker Hand-overs (Payments Received)
+            </p>
+            <table class="w-full">
+                <tbody>
+                    @foreach ($pickingPayments as $payment)
+                        <tr class="border-b border-gray-100 last:border-0 dark:border-gray-800">
+                            <td class="px-3 py-2">
+                                <span class="font-medium">{{ $payment->item?->picking?->picker?->name ?? 'Unknown Picker' }}</span>
+                                <span class="text-gray-500">— {{ $payment->item?->product?->name ?? 'Unknown Product' }}</span>
+                                @if (filled($payment->note))
+                                    <p class="text-gray-500 dark:text-gray-400">{{ $payment->note }}</p>
+                                @endif
+                                <p class="text-xs text-gray-400">
+                                    {{ $payment->quantity }} unit(s) @ {{ $money($payment->unit_price) }}
+                                </p>
+                            </td>
+                            <td class="px-3 py-2 text-right align-top tabular-nums">
+                                {{ $money($payment->amount) }}
+                            </td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    @endif
 </div>
