@@ -172,7 +172,7 @@ class ListCashUps extends ListRecords
                             ->orWhere('terminal_variance', '!=', 0))),
             ])
             ->recordActions([
-                Tables\Actions\ActionGroup::make([
+                \Filament\Actions\ActionGroup::make([
                     $this->detailsAction(),
                     $this->rectifyAction(),
                 ])
