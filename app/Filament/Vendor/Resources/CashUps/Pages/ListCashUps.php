@@ -103,27 +103,27 @@ class ListCashUps extends ListRecords
                             }),
                     ]),
 
-                    Tables\Columns\TextColumn::make('cashier.name')
-                        ->icon('heroicon-m-user')
-                        ->description(fn (PosSession $r) => $r->terminal_id ? 'Terminal '.$r->terminal_id : null),
+                    Tables\Columns\Layout\Stack::make([
+                        Tables\Columns\TextColumn::make('cashier.name')
+                            ->icon('heroicon-m-user')
+                            ->description(fn (PosSession $r) => $r->terminal_id ? 'Terminal '.$r->terminal_id : null),
 
-                    Tables\Columns\TextColumn::make('store.name')
-                        ->icon('heroicon-m-building-storefront')
-                        ->visible(fn () => ActiveStore::currentId() === null),
+                        Tables\Columns\TextColumn::make('store.name')
+                            ->icon('heroicon-m-building-storefront')
+                            ->visible(fn () => ActiveStore::currentId() === null),
+                    ])->space(1),
 
                     Tables\Columns\Layout\Stack::make([
                         Tables\Columns\TextColumn::make('counted_cash')
                             ->label('Cash Drawer')
-                            ->money('NGN')
-                            ->prefix('Counted: ')
+                            ->formatStateUsing(fn ($state) => 'Counted: ₦' . number_format((float) $state, 2))
                             ->description(fn (PosSession $r) => $r->expected_cash !== null
                                 ? 'Expected ₦'.number_format((float) $r->expected_cash, 2)
                                 : null),
 
                         Tables\Columns\TextColumn::make('cash_variance')
                             ->label('Cash difference')
-                            ->money('NGN')
-                            ->prefix('Cash diff: ')
+                            ->formatStateUsing(fn ($state) => 'Cash diff: ₦' . number_format((float) $state, 2))
                             ->weight('bold')
                             ->color(fn ($state) => static::varianceColour((float) $state))
                             ->description(fn (PosSession $r) => $r->countsSubmitted()
@@ -133,14 +133,13 @@ class ListCashUps extends ListRecords
 
                         Tables\Columns\TextColumn::make('terminal_variance')
                             ->label('Terminal difference')
-                            ->money('NGN')
-                            ->prefix('Term diff: ')
+                            ->formatStateUsing(fn ($state) => 'Term diff: ₦' . number_format((float) $state, 2))
                             ->color(fn ($state) => static::varianceColour((float) $state))
                             ->description(fn (PosSession $r) => $r->countsSubmitted()
                                 && abs($r->resolvedTerminalVariance() - (float) $r->terminal_variance) > 0.009
                                     ? 'Still unexplained: ₦'.number_format($r->resolvedTerminalVariance(), 2)
                                     : null),
-                    ])->space(2)->extraAttributes(['class' => 'bg-gray-50 dark:bg-gray-900 rounded-lg p-4 mt-2 border border-gray-100 dark:border-gray-800']),
+                    ])->space(2)->extraAttributes(['class' => 'bg-gray-50 dark:bg-gray-900 rounded-lg p-4 mt-3 border border-gray-100 dark:border-gray-800']),
                 ])->space(3),
             ])
             ->filters([
@@ -188,6 +187,8 @@ class ListCashUps extends ListRecords
             ->label('See working')
             ->icon('heroicon-o-document-magnifying-glass')
             ->color('gray')
+            ->button()
+            ->outlined()
             ->modalHeading(fn (PosSession $record) => $record->cashier->name.' — '
                 .$record->business_date->format('d M Y'))
             ->modalSubmitAction(false)
@@ -204,9 +205,11 @@ class ListCashUps extends ListRecords
     private function rectifyAction(): Action
     {
         return Action::make('rectify')
-            ->label('Explain a difference')
+            ->label('Explain')
             ->icon('heroicon-o-pencil-square')
             ->color('warning')
+            ->button()
+            ->outlined()
             ->visible(fn (PosSession $record) => $record->acceptsRectifications())
             // The real gate. ->visible() only hides a button.
             ->authorize(fn (PosSession $record) => auth()->user()->can('rectify', $record))
@@ -299,6 +302,7 @@ class ListCashUps extends ListRecords
             ->label('Approve')
             ->icon('heroicon-o-check-circle')
             ->color('success')
+            ->button()
             ->visible(fn (PosSession $record) => $record->isPendingReview())
             ->authorize(fn (PosSession $record) => auth()->user()->can('approve', $record))
             ->requiresConfirmation()

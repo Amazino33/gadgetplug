@@ -66,6 +66,7 @@ class VendorPanelProvider extends PanelProvider
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
                 \App\Http\Middleware\EnsureUserBelongsToVendor::class,
+                \App\Http\Middleware\TrackStorePresence::class,
             ])
             ->authMiddleware([
                 Authenticate::class,

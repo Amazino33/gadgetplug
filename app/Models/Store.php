@@ -100,6 +100,17 @@ class Store extends Model
         });
     }
 
+    /**
+     * Whether any staff member has been active in this store within the last 5 minutes.
+     */
+    public function isOnline(): bool
+    {
+        return DB::table('store_user')
+            ->where('store_id', $this->id)
+            ->where('last_active_at', '>=', now()->subMinutes(5))
+            ->exists();
+    }
+
     public function scopeForVendor(Builder $query, int $vendorId): Builder
     {
         return $query->where('vendor_id', $vendorId);

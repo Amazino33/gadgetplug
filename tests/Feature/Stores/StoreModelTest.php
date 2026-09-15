@@ -133,3 +133,33 @@ test('store scopes filter by vendor and by active', function () {
     expect(Store::forVendor($vendorA->id)->count())->toBe(2)
         ->and(Store::forVendor($vendorA->id)->active()->pluck('id')->all())->toBe([$active->id]);
 });
+
+test('a store is online if a user had activity within 5 minutes', function () {
+    $vendor = makeModelVendor();
+    $store = Store::create(['vendor_id' => $vendor->id, 'name' => 'Main Store']);
+    $user = User::factory()->create();
+
+    $store->users()->attach($user->id, ['last_active_at' => now()->subMinutes(2)]);
+    expect($store->isOnline())->toBeTrue();
+});
+
+test('a store is offline if no user had activity within 5 minutes', function () {
+    $vendor = makeModelVendor();
+    $store = Store::create(['vendor_id' => $vendor->id, 'name' => 'Main Store']);
+    $user = User::factory()->create();
+
+    $store->users()->attach($user->id, ['last_active_at' => now()->subMinutes(6)]);
+    expect($store->isOnline())->toBeFalse();
+
+    $store2 = Store::create(['vendor_id' => $vendor->id, 'name' => 'Empty Store']);
+    expect($store2->isOnline())->toBeFalse();
+});
+
+test('a store is online at exactly the 5-minute boundary', function () {
+    $vendor = makeModelVendor();
+    $store = Store::create(['vendor_id' => $vendor->id, 'name' => 'Main Store']);
+    $user = User::factory()->create();
+
+    $store->users()->attach($user->id, ['last_active_at' => now()->subMinutes(5)]);
+    expect($store->isOnline())->toBeTrue();
+});
