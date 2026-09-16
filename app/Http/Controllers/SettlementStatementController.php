@@ -53,21 +53,29 @@ class SettlementStatementController extends Controller
     }
 
     /**
-     * Only somebody who belongs to the vendor the statement is about.
+     * Who may read a statement.
      *
-     * A settlement names people and states what they are short — it is not a
-     * document to leave reachable by anyone holding a link.
+     * Belonging to the business is not enough. A statement names people, says
+     * what they are short, and carries revenue, cost of goods and margin — the
+     * same things the settlement page is gated on. Checking only vendor
+     * membership here would have let anyone on the team read past the page
+     * guard simply by holding a link.
      */
     private function authorizeFor(Request $request, StoreSettlementStatement $statement): void
     {
         $user = $request->user();
+        $vendorId = (int) $statement->vendor_id;
 
-        if ($user->isSuperAdmin()) {
+        if ($user->isSuperAdmin() || $user->ownedVendors()->where('id', $vendorId)->exists()) {
             return;
         }
 
-        if (! $user->vendors()->contains(fn ($vendor) => (int) $vendor->id === (int) $statement->vendor_id)) {
+        if (! $user->vendors()->contains(fn ($vendor) => (int) $vendor->id === $vendorId)) {
             throw new AccessDeniedHttpException('That statement belongs to another business.');
+        }
+
+        if (! $user->hasVendorPermission($vendorId, 'view_store_settlement')) {
+            throw new AccessDeniedHttpException('You are not permitted to read settlement statements.');
         }
     }
 }

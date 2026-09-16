@@ -9,6 +9,7 @@ use App\Actions\Inventory\ApproveStockCountAction;
 use App\Actions\Inventory\RecordPhysicalCountAction;
 use App\Models\PhysicalStockCount;
 use App\Models\Product;
+use App\Models\SettlementResolution;
 use App\Models\Store;
 use App\Models\StoreSettlementStatement;
 use App\Models\User;
@@ -61,6 +62,34 @@ class StoreSettlement extends Page
 
     /** @var array<string, mixed> */
     public ?array $filters = [];
+
+    /**
+     * Who may open this page at all.
+     *
+     * Gated separately from the permissions that act on it, and deliberately
+     * tighter: the page carries revenue, cost of goods, margin and the branch's
+     * whole standing position. A cashier who may hand cash over — or count a
+     * shelf — has no business reading what the business makes on each sale.
+     *
+     * Same shape as FinancialReport and the other report pages.
+     */
+    public static function canAccess(): bool
+    {
+        $user = auth()->user();
+        $vendor = filament()->getTenant();
+
+        return $vendor && (
+            $user->isSuperAdmin() ||
+            $vendor->isOwner($user) ||
+            $user->hasVendorPermission($vendor->id, 'view_store_settlement')
+        );
+    }
+
+    /** Never in the sidebar for somebody who cannot open it. */
+    public static function shouldRegisterNavigation(): bool
+    {
+        return static::canAccess();
+    }
 
     public function mount(): void
     {
@@ -250,6 +279,115 @@ class StoreSettlement extends Page
                         ->body($data['outcome'] === PhysicalStockCount::OUTCOME_CHARGED
                             ? 'The shortage is now owed by the person named.'
                             : 'The shortage has been written off against the business.')
+                        ->success()
+                        ->send();
+                }),
+
+            // The other half of approving. A manager who does not believe a
+            // count needs somewhere to say so — without this their only options
+            // were to accept figures they doubt or leave them hanging.
+            Action::make('rejectCount')
+                ->label('Ask for a recount')
+                ->icon('heroicon-o-arrow-path')
+                ->color('gray')
+                ->visible(fn () => ($count = $this->stockCount()) !== null
+                    && $count->isSubmitted()
+                    && $this->canApproveCount($count))
+                ->modalHeading('Send it back for a recount')
+                ->modalDescription('The figures stay on the record — a count somebody questioned is evidence too. No stock is changed.')
+                ->schema([
+                    Textarea::make('note')
+                        ->label('Why it is not accepted')
+                        ->rows(2)
+                        ->required()
+                        ->placeholder('e.g. Count the back store as well, with me present'),
+                ])
+                ->action(function (array $data) {
+                    $count = $this->stockCount();
+
+                    try {
+                        app(ApproveStockCountAction::class)->reject($count, auth()->user(), $data['note']);
+                    } catch (Throwable $e) {
+                        Notification::make()->title($e->getMessage())->danger()->send();
+
+                        return;
+                    }
+
+                    Notification::make()->title('Sent back for a recount')->success()->send();
+                }),
+
+            // What was decided at the settlement, kept beside the frozen figures
+            // rather than written into them. The statement had a signoff section
+            // with no way to fill it in.
+            Action::make('recordResolution')
+                ->label('Record what was agreed')
+                ->icon('heroicon-o-pencil-square')
+                ->color('gray')
+                ->visible(fn () => $this->canSettle() && $this->statements()->isNotEmpty())
+                ->modalHeading('Record a settlement decision')
+                ->schema([
+                    Select::make('statement_id')
+                        ->label('Against which statement')
+                        ->options(fn () => $this->statements()
+                            ->mapWithKeys(fn ($s) => [
+                                $s->id => $s->reference.' — '.$s->period_start->format('d M').' to '.$s->period_end->format('d M Y'),
+                            ])->all())
+                        ->required()
+                        ->default(fn () => $this->statements()->first()?->id),
+
+                    Select::make('concerns')
+                        ->label('What it is about')
+                        ->options([
+                            'true_shortage' => 'The unexplained shortage',
+                            'disputed'      => 'A disputed handover',
+                            'unsubmitted'   => 'Cash not handed over',
+                            'stock'         => 'Missing stock',
+                            'unpaid_debt'   => 'Customer debt',
+                        ])
+                        ->required(),
+
+                    Select::make('outcome')
+                        ->label('What was decided')
+                        ->options([
+                            SettlementResolution::OUTCOME_REPAYMENT_PLAN     => 'Repayment plan agreed',
+                            SettlementResolution::OUTCOME_WRITE_OFF_REFERRAL => 'Referred for write-off',
+                            SettlementResolution::OUTCOME_RESOLVED_NO_ISSUE  => 'Looked into it — no issue',
+                            SettlementResolution::OUTCOME_RECOUNT            => 'Count or check it again',
+                            SettlementResolution::OUTCOME_OTHER              => 'Something else',
+                        ])
+                        ->required(),
+
+                    TextInput::make('amount')
+                        ->label('Amount it concerns')
+                        ->numeric()
+                        ->prefix('₦')
+                        ->helperText('Leave blank if it is not about a specific figure.'),
+
+                    Textarea::make('note')
+                        ->label('What was agreed')
+                        ->rows(3)
+                        ->required()
+                        ->placeholder('e.g. Ngozi to repay 25,000 a week for four weeks, starting Monday'),
+                ])
+                ->action(function (array $data) {
+                    try {
+                        SettlementResolution::create([
+                            'store_settlement_statement_id' => $data['statement_id'],
+                            'recorded_by' => auth()->id(),
+                            'outcome'     => $data['outcome'],
+                            'concerns'    => $data['concerns'],
+                            'amount'      => filled($data['amount'] ?? null) ? (float) $data['amount'] : null,
+                            'note'        => $data['note'],
+                        ]);
+                    } catch (Throwable $e) {
+                        Notification::make()->title($e->getMessage())->danger()->send();
+
+                        return;
+                    }
+
+                    Notification::make()
+                        ->title('Recorded')
+                        ->body('It now appears on that statement, and the figures stay as they were.')
                         ->success()
                         ->send();
                 }),

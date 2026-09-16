@@ -28,6 +28,7 @@ class VendorRoles
             'manage_pickings',
             'submit_cash', 'receive_cash',
             'count_stock', 'approve_stock_count',
+            'view_store_settlement',
         ],
         'product_manager' => [
             'view_products', 'view_any_products', 'create_products', 'edit_products', 'delete_products',
@@ -53,6 +54,7 @@ class VendorRoles
             'manage_pickings',
             'submit_cash', 'receive_cash',
             'count_stock', 'approve_stock_count',
+            'view_store_settlement',
         ],
         'storekeeper' => [
             'view_products', 'view_any_products',

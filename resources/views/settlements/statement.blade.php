@@ -148,6 +148,47 @@
         @endif
     </table>
 
+    @if (! empty($p['position']))
+        @php $pos = $p['position']; @endphp
+        <h2>Where the money is tied up</h2>
+        <table class="keep">
+            <tr class="row">
+                <td>Stock on hand <span class="muted">(at cost, {{ number_format($pos['stock_units'] ?? 0) }} units)</span></td>
+                <td class="num">{{ $money($pos['stock_at_cost'] ?? 0) }}</td>
+            </tr>
+            <tr class="row"><td>Cash still to be handed over</td><td class="num">{{ $money($pos['cash_outstanding'] ?? 0) }}</td></tr>
+            <tr class="row"><td>Owed by customers</td><td class="num">{{ $money($pos['customer_debt'] ?? 0) }}</td></tr>
+            <tr class="row">
+                {{-- Labelled, never silently mixed: this one line is at selling
+                     price while every other is at cost. --}}
+                <td>Pickings out on trust <span class="muted">(at selling price)</span></td>
+                <td class="num">{{ $money($pos['pickings_retail'] ?? 0) }}</td>
+            </tr>
+            <tr class="row"><td>Owed by staff</td><td class="num">{{ $money($pos['staff_debts'] ?? 0) }}</td></tr>
+            <tr class="total"><td>Total balance</td><td class="num">{{ $money($pos['total_balance'] ?? 0) }}</td></tr>
+        </table>
+
+        @if (($pos['stock_uncosted'] ?? 0) > 0)
+            <div class="warn">
+                {{ $pos['stock_uncosted'] }} product(s) on the shelf have no cost price recorded and are left out of the
+                stock value above, so the total is understated.
+            </div>
+        @endif
+
+        <h2>Trading in this period</h2>
+        <table class="keep">
+            <tr class="row"><td>Total sold</td><td class="num">{{ $money($pos['sold_in_range'] ?? 0) }}</td></tr>
+            <tr class="row"><td>Cost of what sold</td><td class="num">({{ $money($pos['cogs_in_range'] ?? 0) }})</td></tr>
+            <tr class="row"><td>Stock purchased</td><td class="num">{{ $money($pos['purchases'] ?? 0) }}</td></tr>
+            <tr class="row"><td>Expenses</td><td class="num">{{ $money($pos['expenses'] ?? 0) }}</td></tr>
+            <tr class="total"><td>Gross profit</td><td class="num">{{ $money($pos['profit_in_range'] ?? 0) }}</td></tr>
+        </table>
+        <p class="muted" style="margin-top:6px">
+            Gross profit is what sold less what it cost. Stock purchased and expenses sit beside it but are not taken
+            off it — buying stock moves money onto the shelf, it does not lose it.
+        </p>
+    @endif
+
     <h2>Who collected it</h2>
     @if (! empty($p['cashiers']))
         <table>

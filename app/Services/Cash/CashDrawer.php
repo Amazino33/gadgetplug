@@ -116,12 +116,16 @@ class CashDrawer
     /** What this person has already handed over here, disputes excluded. */
     public static function submitted(int $vendorId, int $storeId, int $userId): float
     {
+        // Summed on the effective amount, not the claimed one: a dispute
+        // settled against the submitter only credits them with what both
+        // parties agreed actually arrived.
         return round((float) CashSubmission::query()
             ->where('vendor_id', $vendorId)
             ->where('store_id', $storeId)
             ->where('submitted_by', $userId)
             ->againstBalance()
-            ->sum('amount'), 2);
+            ->selectRaw('COALESCE(SUM('.CashSubmission::EFFECTIVE_AMOUNT_SQL.'), 0) as handed')
+            ->value('handed'), 2);
     }
 
     /**
@@ -170,7 +174,8 @@ class CashDrawer
                     ->where('submitted_by', $userId)
                     ->when($from, fn ($q) => $q->whereBetween('created_at', [$from, $to]))
                     ->againstBalance()
-                    ->sum('amount'), 2);
+                    ->selectRaw('COALESCE(SUM('.CashSubmission::EFFECTIVE_AMOUNT_SQL.'), 0) as handed')
+                    ->value('handed'), 2);
 
                 return [
                     'user_id'     => $userId,

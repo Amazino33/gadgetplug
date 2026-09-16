@@ -14,6 +14,7 @@ use App\Services\Cash\CashDrawer;
 use App\Services\Cash\CashHandoffToken;
 use App\Services\QrCode;
 use Filament\Actions\Action;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -274,6 +275,62 @@ class ListCashSubmissions extends ListRecords
                         }
                     }),
 
+                // The conversation the statement flagged, finally recordable.
+                // Without this a contested handover sat as 'disputed' forever
+                // and the money stayed on the submitter with no way to close it.
+                Action::make('settle')
+                    ->label('Settle it')
+                    ->icon('heroicon-o-scale')
+                    ->color('warning')
+                    ->visible(fn (CashSubmission $record) => $record->isDisputed()
+                        && $this->maySettle($record))
+                    ->modalHeading(fn (CashSubmission $record) => 'Settle '.$record->reference)
+                    ->modalDescription(fn (CashSubmission $record) => sprintf(
+                        '%s says they handed over ₦%s. %s recorded ₦%s. The difference is ₦%s.',
+                        $record->submitter->name,
+                        number_format((float) $record->amount, 2),
+                        $record->receiver?->name ?? 'The receiver',
+                        number_format((float) ($record->disputed_amount ?? 0), 2),
+                        number_format($record->disputedGap(), 2),
+                    ))
+                    ->schema([
+                        Radio::make('outcome')
+                            ->label('What was agreed?')
+                            ->options([
+                                CashSubmission::OUTCOME_ACCEPTED     => 'The full amount did arrive — accept the claim',
+                                CashSubmission::OUTCOME_CHARGED      => 'The difference is down to the submitter — charge them',
+                                CashSubmission::OUTCOME_WRITTEN_OFF  => 'Write the difference off — nobody pays it',
+                            ])
+                            ->required(),
+
+                        Textarea::make('note')
+                            ->label('What was agreed, in words')
+                            ->rows(2)
+                            ->required()
+                            ->placeholder('e.g. Recounted together, two notes had stuck together'),
+                    ])
+                    ->action(function (CashSubmission $record, array $data) {
+                        try {
+                            app(ResolveCashSubmissionAction::class)->settle(
+                                $record, auth()->user(), $data['outcome'], $data['note'],
+                            );
+                        } catch (Throwable $e) {
+                            Notification::make()->title($e->getMessage())->danger()->send();
+
+                            return;
+                        }
+
+                        Notification::make()
+                            ->title('Settled')
+                            ->body(match ($data['outcome']) {
+                                CashSubmission::OUTCOME_CHARGED => 'The difference now sits on '.$record->submitter->name.'.',
+                                CashSubmission::OUTCOME_ACCEPTED => 'The full amount is credited to '.$record->submitter->name.'.',
+                                default => 'The difference has been written off.',
+                            })
+                            ->success()
+                            ->send();
+                    }),
+
                 Action::make('dispute')
                     ->label('Not what I got')
                     ->icon('heroicon-o-exclamation-triangle')
@@ -346,6 +403,29 @@ class ListCashSubmissions extends ListRecords
             (int) $record->store_id,
             'receive_cash',
         );
+    }
+
+    /**
+     * Whether the signed-in person may settle this disagreement.
+     *
+     * Not either party to it, unless they own the business — in a small shop
+     * the owner is often one of the two, and an unsettleable dispute is worse
+     * than one decided by the person whose money it is.
+     */
+    private function maySettle(CashSubmission $record): bool
+    {
+        $vendor = filament()->getTenant();
+        $user = auth()->user();
+
+        if ($user->isSuperAdmin() || $vendor?->isOwner($user)) {
+            return true;
+        }
+
+        if (in_array(auth()->id(), [(int) $record->submitted_by, (int) $record->received_by], true)) {
+            return false;
+        }
+
+        return StorePermission::allows($user, (int) $record->vendor_id, (int) $record->store_id, 'receive_cash');
     }
 
     private function canSubmit(): bool

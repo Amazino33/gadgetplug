@@ -97,6 +97,12 @@ class VendorPermissionsSeeder extends Seeder
             'count_stock',
             'approve_stock_count',
 
+            // Seeing the settlement itself. Separate from the permissions that
+            // act on it, because the page carries revenue, cost of goods,
+            // margin and the branch's whole standing position — a cashier who
+            // may hand cash over has no business reading any of that.
+            'view_store_settlement',
+
             // Reports Hub
             'view_reports_hub',
         ];

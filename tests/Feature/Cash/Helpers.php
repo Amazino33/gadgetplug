@@ -68,11 +68,16 @@ function handoffContext(): array
 
     $keeper = User::factory()->create();
     $keeper->stores()->attach($store->id);
+    // Attached to the vendor as well as the branch, the way TeamMembers does
+    // it. User::vendors() reads the membership pivot, not the store one, so a
+    // fixture that only attaches stores is not a real team member.
+    $vendor->users()->syncWithoutDetaching([$keeper->id]);
     setPermissionsTeamId($vendor->id);
     $keeper->assignRole('storekeeper');
 
     $collector = User::factory()->create();
     $collector->stores()->attach($store->id);
+    $vendor->users()->syncWithoutDetaching([$collector->id]);
     $collector->givePermissionTo('receive_cash');
 
     cashSale($vendor, $store, $keeper->id, ['total' => 50000]);

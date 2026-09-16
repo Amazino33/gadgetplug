@@ -44,6 +44,7 @@ class BackfillCashPermissionsCommand extends Command
         'receive_cash',
         'count_stock',
         'approve_stock_count',
+        'view_store_settlement',
     ];
 
     public function handle(): int

@@ -24,6 +24,7 @@ class CashSubmission extends Model
         'disputed_amount' => 'decimal:2',
         'confirmed_at'    => 'datetime',
         'disputed_at'     => 'datetime',
+        'resolved_at'     => 'datetime',
     ];
 
     /** Handed over, not yet acknowledged by the person named as receiving it. */
@@ -34,6 +35,34 @@ class CashSubmission extends Model
 
     /** The receiver says otherwise. The money is contested, not settled. */
     public const STATUS_DISPUTED = 'disputed';
+
+    /** The disagreement was talked through and somebody recorded the outcome. */
+    public const STATUS_RESOLVED = 'resolved';
+
+    /** The claimed amount was accepted after all — the submitter was right. */
+    public const OUTCOME_ACCEPTED = 'accepted';
+
+    /** The difference is the submitter's to answer for, and now sits on them. */
+    public const OUTCOME_CHARGED = 'charged';
+
+    /** The business absorbs the difference; nobody is asked to pay it. */
+    public const OUTCOME_WRITTEN_OFF = 'written_off';
+
+    /**
+     * What this handover actually put into the business's hands.
+     *
+     * Claimed while nobody disagrees; the receiver's figure once a dispute has
+     * been settled against the submitter. Written as SQL rather than PHP so the
+     * drawer balance stays one query — see scopeAgainstBalance.
+     */
+    public const EFFECTIVE_AMOUNT_SQL = "
+        CASE
+            WHEN status IN ('pending', 'confirmed') THEN amount
+            WHEN status = 'resolved' AND resolution_outcome = 'accepted' THEN amount
+            WHEN status = 'resolved' THEN COALESCE(disputed_amount, 0)
+            ELSE 0
+        END
+    ";
 
     protected static function booted(): void
     {
@@ -84,6 +113,27 @@ class CashSubmission extends Model
         return $this->status === self::STATUS_PENDING;
     }
 
+    public function isDisputed(): bool
+    {
+        return $this->status === self::STATUS_DISPUTED;
+    }
+
+    public function isResolved(): bool
+    {
+        return $this->status === self::STATUS_RESOLVED;
+    }
+
+    /** What the two parties disagree about, as a positive figure. */
+    public function disputedGap(): float
+    {
+        return round((float) $this->amount - (float) ($this->disputed_amount ?? 0), 2);
+    }
+
+    public function resolver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'resolved_by');
+    }
+
     /**
      * Handovers that have left the submitter's hands.
      *
@@ -94,7 +144,14 @@ class CashSubmission extends Model
      */
     public function scopeAgainstBalance(Builder $query): Builder
     {
-        return $query->whereIn('status', [self::STATUS_PENDING, self::STATUS_CONFIRMED]);
+        return $query->whereIn('status', [
+            self::STATUS_PENDING,
+            self::STATUS_CONFIRMED,
+            // A settled dispute counts again, but only for what was agreed to
+            // have arrived. While it is still contested it counts for nothing,
+            // so denying receipt can never be the easy way to clear a balance.
+            self::STATUS_RESOLVED,
+        ]);
     }
 
     public function scopeForVendor(Builder $query, int $vendorId): Builder

@@ -228,9 +228,22 @@ class StoreReconciliation
             ->whereBetween('created_at', [$from, $to])
             ->get();
 
-        $confirmed = $this->sum($submissions, CashSubmission::STATUS_CONFIRMED);
-        $pending   = $this->sum($submissions, CashSubmission::STATUS_PENDING);
-        $disputed  = $this->sum($submissions, CashSubmission::STATUS_DISPUTED);
+        $pending  = $this->sum($submissions, CashSubmission::STATUS_PENDING);
+        $disputed = $this->sum($submissions, CashSubmission::STATUS_DISPUTED);
+
+        $settled = $submissions->where('status', CashSubmission::STATUS_RESOLVED);
+
+        // A settled dispute stops being contested. It counts for whatever both
+        // parties agreed arrived — the full claim if the submitter was believed,
+        // the receiver's figure otherwise — and the shortfall, if anyone was
+        // charged for it, now lives on the accountability ledger instead.
+        $confirmed = round(
+            $this->sum($submissions, CashSubmission::STATUS_CONFIRMED)
+            + $settled->sum(fn (CashSubmission $s) => $s->resolution_outcome === CashSubmission::OUTCOME_ACCEPTED
+                ? (float) $s->amount
+                : (float) ($s->disputed_amount ?? 0)),
+            2,
+        );
 
         // On a dispute the two parties disagree about what arrived. The
         // receiver's figure is what the business can actually count; the
@@ -248,6 +261,8 @@ class StoreReconciliation
             'pending'          => $pending,
             'disputed_claimed' => $disputed,
             'disputed_received' => $disputedReceived,
+
+            'settled_disputes' => round((float) $settled->sum('amount'), 2),
 
             'submitted_total'  => round($confirmed + $pending + $disputed, 2),
 
