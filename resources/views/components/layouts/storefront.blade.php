@@ -606,7 +606,10 @@ $navCategories = \Illuminate\Support\Facades\Cache::remember(
         </a>
     </nav>
 
-    <div wire:loading class="fixed inset-0 z-[99999] flex items-center justify-center bg-white/50 dark:bg-black/50 backdrop-blur-sm transition-opacity">
+    {{-- wire:target.except skips background/auto-triggered requests (e.g. infinite-scroll
+         loadMore, which already has its own inline spinner) so this full-page blur only
+         shows for user-initiated actions that are actually worth blocking on. --}}
+    <div wire:loading wire:target.except="loadMore" class="fixed inset-0 z-[99999] flex items-center justify-center bg-white/50 dark:bg-black/50 backdrop-blur-sm transition-opacity">
         <div class="flex flex-col items-center bg-white dark:bg-[#162016] px-6 py-4 rounded-xl shadow-2xl border border-brand/20">
             <svg class="animate-spin h-8 w-8 text-brand mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
