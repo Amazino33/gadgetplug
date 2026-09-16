@@ -39,11 +39,12 @@ function actAsPosSalesVendor(array $data): void
     Filament::setTenant($data['vendor']);
 }
 
-function makePosSaleRecord(Vendor $vendor, Product $product, User $cashier, string $reference): PosSale
+function makePosSaleRecord(Vendor $vendor, Product $product, User $cashier, string $reference, ?int $storeId = null): PosSale
 {
     $sale = PosSale::create([
         'reference'       => $reference,
         'vendor_id'       => $vendor->id,
+        'store_id'        => $storeId,
         'cashier_id'      => $cashier->id,
         'subtotal'        => 5000,
         'vat_amount'      => 0,
@@ -150,8 +151,9 @@ test('voided stock goes back to the branch the sale was rung up at', function ()
         'is_default' => false,
     ]);
 
-    $sale = makePosSaleRecord($data['vendor'], $data['product'], $data['owner'], 'POS-VOIDSTORE');
-    $sale->forceFill(['store_id' => $branch->id])->save();
+    // Rung at the branch from the outset. It used to be rung anywhere and moved
+    // afterwards, which a sale no longer permits.
+    $sale = makePosSaleRecord($data['vendor'], $data['product'], $data['owner'], 'POS-VOIDSTORE', storeId: $branch->id);
 
     Livewire::test(ListPosSales::class)
         ->callTableAction('void', $sale, data: ['reason' => 'Duplicate sale']);

@@ -48,6 +48,25 @@ function something()
     // ..
 }
 
+/**
+ * Void a sale the way production does.
+ *
+ * Fixtures used to fake this with $sale->update(['status' => 'voided']), which
+ * the immutability guard now refuses. Routed through the real action rather
+ * than written round the guard, so a suite that needs a voided sale is also
+ * proving the only path that can produce one still works.
+ */
+function voidSaleInTest(App\Models\PosSale $sale, ?string $reason = null): App\Models\PosSale
+{
+    app(App\Actions\Pos\RecordSaleReversalAction::class)->void(
+        sale:   $sale,
+        actor:  App\Models\User::find($sale->cashier_id) ?? App\Models\User::factory()->create(),
+        reason: $reason ?? 'Voided by test fixture',
+    );
+
+    return $sale->refresh();
+}
+
 /*
 |--------------------------------------------------------------------------
 | Customer debt fixtures

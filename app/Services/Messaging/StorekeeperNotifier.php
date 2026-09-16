@@ -6,6 +6,7 @@ use App\Models\DeliveryMessage;
 use App\Models\MessageTemplate;
 use App\Models\Order;
 use App\Models\Product;
+use App\Models\Store;
 use App\Models\Vendor;
 use App\Models\VendorNotificationSetting;
 use Carbon\CarbonInterface;
@@ -136,6 +137,33 @@ class StorekeeperNotifier
                 'store_name'    => $vendor->name,
                 'product_count' => (string) $products->count(),
                 'product_list'  => $lines,
+            ],
+            order: null,
+        );
+    }
+
+    /**
+     * A branch has been holding takings for longer than it should have.
+     *
+     * Deliberately sent before the money becomes a shortage rather than after:
+     * the threshold is the same grace window the settlement uses, so this
+     * arrives at the moment unremitted cash would start being counted against
+     * somebody, and usually prevents that instead of reporting it.
+     *
+     * Addressed to the storekeeper holding it, not the owner. Nearly every
+     * instance is somebody who has not got round to it, and a question to them
+     * settles it; escalating first would turn a reminder into an accusation.
+     */
+    public function unremittedCashAlert(Vendor $vendor, Store $store, float $amount, int $days): ?DeliveryMessage
+    {
+        return $this->notify(
+            vendor: $vendor,
+            templateKey: 'storekeeper_unremitted_cash',
+            toggle: 'notify_unremitted_cash',
+            context: [
+                'store_name' => $store->name,
+                'amount'     => number_format($amount, 2),
+                'days'       => (string) $days,
             ],
             order: null,
         );

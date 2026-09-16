@@ -33,12 +33,26 @@ class PurgeStoreDataCommand extends Command
         {store : Store id or slug}
         {--pos-before= : Only delete POS sales completed on or before this date (Y-m-d)}
         {--keep-products : Leave the catalogue alone, remove trading data only}
-        {--force : Actually delete. Without it this is a dry run}';
+        {--force : Actually delete. Without it this is a dry run}
+        {--i-understand-this-is-production : Required to run against production at all}';
 
     protected $description = "Delete a store's products, POS sales, online order lines, reservations and matching financial entries";
 
     public function handle(): int
     {
+        // This is the one path that can erase completed sales outright, and the
+        // reconciliation is a sum over exactly those rows — a store's shortage
+        // can be made to vanish by deleting the sales that produced it. Left
+        // reachable for the test data it was written to clear, but not silently
+        // on a live shop.
+        if (app()->isProduction() && ! $this->option('i-understand-this-is-production')) {
+            $this->error('Refusing to purge on production.');
+            $this->line('Completed sales are what the settlement statements are calculated from.');
+            $this->line('If you really mean it, re-run with --i-understand-this-is-production.');
+
+            return self::FAILURE;
+        }
+
         $vendor = $this->resolveVendor();
         $store  = $vendor ? $this->resolveStore($vendor) : null;
 
@@ -209,6 +223,9 @@ class PurgeStoreDataCommand extends Command
             DB::table('pos_sale_items')->whereIn('pos_sale_id', $scope['pos_sales'])->delete();
             DB::table('pos_sale_payments')->whereIn('pos_sale_id', $scope['pos_sales'])->delete();
             DB::table('pos_returns')->whereIn('original_sale_id', $scope['pos_sales'])->delete();
+            // The withdrawal journal for these sales. Goes with them, and has to
+            // go first — it holds a foreign key to the rows below.
+            DB::table('pos_sale_reversals')->whereIn('pos_sale_id', $scope['pos_sales'])->delete();
             DB::table('pos_sales')->whereIn('id', $scope['pos_sales'])->delete();
         }
 

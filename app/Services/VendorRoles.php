@@ -27,6 +27,7 @@ class VendorRoles
             'approve_procurement', 'manage_procurement',
             'manage_pickings',
             'submit_cash', 'receive_cash',
+            'count_stock', 'approve_stock_count',
         ],
         'product_manager' => [
             'view_products', 'view_any_products', 'create_products', 'edit_products', 'delete_products',
@@ -51,6 +52,7 @@ class VendorRoles
             'approve_procurement', 'manage_procurement',
             'manage_pickings',
             'submit_cash', 'receive_cash',
+            'count_stock', 'approve_stock_count',
         ],
         'storekeeper' => [
             'view_products', 'view_any_products',
@@ -69,11 +71,33 @@ class VendorRoles
             // receive_cash is deliberately not here: the whole value of the
             // record is that the two names on it belong to different people.
             'submit_cash',
+            // Counting the shelf is the job too. approve_stock_count is
+            // withheld for the same reason receive_cash is — a shortage on a
+            // shelf you count is one you must not also sign off.
+            'count_stock',
         ],
         'member' => [
             'view_products', 'view_any_products',
         ],
     ];
+
+    /**
+     * Which default roles are supposed to hold a given permission.
+     *
+     * Exists so a targeted backfill can add one permission to the right roles
+     * without going through seedFor(), which syncs a role back to the canonical
+     * list and would throw away anything a vendor has deliberately changed on
+     * their own Roles screen.
+     *
+     * @return array<int, string>
+     */
+    public static function rolesWith(string $permission): array
+    {
+        return array_keys(array_filter(
+            self::ROLES,
+            fn (array $permissions) => in_array($permission, $permissions, true),
+        ));
+    }
 
     public static function seedFor(Vendor $vendor): void
     {

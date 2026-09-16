@@ -74,6 +74,18 @@ return Application::configure(basePath: dirname(__DIR__))
         // sitting stuck for up to a day longer than that window blocks real
         // stock from real buyers the whole time it waits.
         $schedule->job(new ReleaseStaleReservationsJob())->hourly();
+
+        // Daily, in the morning: the threshold is measured in days, and the
+        // action it asks for — walk the cash to somebody — can only happen in
+        // working hours anyway. The command keeps its own per-vendor clock so a
+        // branch sitting on money for a fortnight gets a few reminders rather
+        // than one every single day.
+        // Timezone stated explicitly: app.timezone is UTC, so an unqualified
+        // 09:00 here would reach a Lagos storekeeper at 10:00.
+        $schedule->command('cash:alert-unremitted')
+            ->dailyAt('09:00')
+            ->timezone('Africa/Lagos')
+            ->withoutOverlapping();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // Both handlers below exist for the same reason: an error page the user

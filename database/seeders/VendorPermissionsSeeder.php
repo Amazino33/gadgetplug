@@ -90,6 +90,13 @@ class VendorPermissionsSeeder extends Seeder
             'submit_cash',
             'receive_cash',
 
+            // Settlement stock counts. Split for the same reason the cash pair
+            // is: whoever counts the shelf is usually the person a shortage
+            // would be put to, so they must not also be the one who signs it
+            // off and corrects the books.
+            'count_stock',
+            'approve_stock_count',
+
             // Reports Hub
             'view_reports_hub',
         ];

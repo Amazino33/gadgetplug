@@ -69,6 +69,16 @@ class MessageTemplateSeeder extends Seeder
                 'channel'        => 'whatsapp',
                 'body'           => "📉 *Low stock — {{product_count}} product(s)*\n\n{{product_list}}\n\nPlease restock or raise a purchase order.\n— {{store_name}}",
             ],
+            // Worded as a reminder, not an allegation. It fires on cash simply
+            // not having been handed over yet, which is nearly always somebody
+            // who has not got round to it — and a message that reads as an
+            // accusation on day two would be wrong far more often than right.
+            [
+                'key'            => 'storekeeper_unremitted_cash',
+                'recipient_type' => 'storekeeper',
+                'channel'        => 'whatsapp',
+                'body'           => "💰 *Cash still to be handed over*\n\n{{store_name}} is holding ₦{{amount}}, going back {{days}} day(s).\n\nPlease arrange to hand it over and have the receiver scan your code.\n— {{store_name}}",
+            ],
             [
                 'key'            => 'storekeeper_cancelled',
                 'recipient_type' => 'storekeeper',

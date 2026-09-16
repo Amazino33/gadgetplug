@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Pos;
 
 use App\Actions\Finance\RecognizePosSaleRevenueAction;
 use App\Actions\Pos\ChargeCustomerDebtAction;
+use App\Actions\Pos\RecordSaleReversalAction;
 use App\Actions\Pos\ReverseCustomerDebtAction;
 use App\Actions\Inventory\AdjustStockAction;
 use App\Http\Controllers\Controller;
@@ -331,7 +332,17 @@ class PosSaleController extends Controller
                 );
             }
 
-            $sale->update(['status' => 'voided']);
+            // Written before the stock and revenue reversals are answered for,
+            // so the record of who withdrew this sale exists even if a later
+            // step in this transaction fails and takes them with it.
+            app(RecordSaleReversalAction::class)->void(
+                sale:   $sale,
+                actor:  $request->user(),
+                // The till has never sent one. Recorded plainly rather than left
+                // blank, so an unexplained void is visible on the statement as
+                // exactly that instead of looking like any other reversal.
+                reason: $request->input('reason') ?: 'No reason given',
+            );
 
             $revenue->reverseForVoid($sale);
 
@@ -449,7 +460,13 @@ class PosSaleController extends Controller
                 fn ($i) => ($totalReturned[$i->product_id] ?? 0) >= $i->quantity
             );
 
-            $sale->update(['status' => $fullyReturned ? 'refunded' : 'partial_refund']);
+            app(RecordSaleReversalAction::class)->forReturn(
+                sale:          $sale,
+                actor:         $request->user(),
+                return:        $posReturn,
+                fullyReturned: $fullyReturned,
+                reason:        $request->reason,
+            );
 
             $revenue->reverseForReturn($sale, $posReturn);
 

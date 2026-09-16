@@ -130,7 +130,7 @@ test('sales from another day are not counted', function () {
 test('a voided sale is excluded', function () {
     $data = setUpSummaryVendor();
     $sale = makeSummaryPosSale($data, $data['main']->id, 30000, 'cash', Carbon::yesterday()->setTime(11, 0));
-    $sale->update(['status' => 'voided']);
+    voidSaleInTest($sale);
 
     expect(summaryFor($data)['totals']['revenue'])->toBe(0.0);
 });

@@ -64,16 +64,26 @@ class AccountabilityLedger
         ?int $caseId = null,
         ?int $createdBy = null,
         ?string $note = null,
+        // Optional and defaulted, so existing callers are untouched. Charges
+        // raised from a branch settlement need to say which branch, or a
+        // per-branch view of what staff owe cannot see them — the same reason
+        // postCashVariance carries these.
+        ?int $storeId = null,
+        ?string $sourceType = null,
+        ?int $sourceId = null,
     ): AccountabilityLedgerEntry {
         return $this->post(
             naturalKey: $naturalKey,
             attributes: array_merge($snapshot->toLedgerColumns(), [
                 'vendor_id'      => $vendorId,
+                'store_id'       => $storeId,
                 'case_id'        => $caseId,
                 'storekeeper_id' => $storekeeperId,
                 'entry_type'     => 'charge',
                 // Positive: a charge increases what is owed.
                 'amount'         => $snapshot->chargeAmount,
+                'source_type'    => $sourceType,
+                'source_id'      => $sourceId,
                 'note'           => $note,
                 'created_by'     => $createdBy,
             ]),

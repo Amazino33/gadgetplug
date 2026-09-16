@@ -2,6 +2,7 @@
 
 namespace App\Filament\Vendor\Resources\PosSales;
 
+use App\Actions\Pos\ReverseCustomerDebtAction;
 use App\Models\PosSale;
 use App\Services\ActiveStore;
 use Filament\Actions\Action;
@@ -170,9 +171,23 @@ class PosSaleResource extends Resource
                                 );
                             }
 
-                            $record->update(['status' => 'voided']);
+                            // Written before stock and revenue are answered for,
+                            // so the record of who withdrew this sale survives
+                            // even if a later step here fails.
+                            app(\App\Actions\Pos\RecordSaleReversalAction::class)->void(
+                                sale:   $record,
+                                actor:  $user,
+                                reason: $data['reason'],
+                            );
 
                             $revenue->reverseForVoid($record);
+
+                            // The goods never left, so the customer cannot still
+                            // owe for them. The till's void endpoint has always
+                            // done this; voiding from here did not, which left a
+                            // credit sale voided by an owner sitting on the debt
+                            // list forever with nothing to collect against.
+                            app(ReverseCustomerDebtAction::class)->forVoid($record);
 
                             activity()->causedBy($user)
                                 ->performedOn($record)

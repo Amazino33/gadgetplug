@@ -146,7 +146,7 @@ it('excludes unpaid orders and voided POS sales', function () {
     $ctx = makeReportVendor('Unpaid Store');
 
     makeOnlineOrder($ctx, unitPrice: 5000, unitCost: 100, qty: 1, status: 'pending');
-    makePosSale($ctx, unitPrice: 4000, unitCost: 100, qty: 1)->update(['status' => 'voided']);
+    voidSaleInTest(makePosSale($ctx, unitPrice: 4000, unitCost: 100, qty: 1));
 
     $summary = app(SalesReportService::class)->summary(
         $ctx['vendor']->id,
@@ -249,7 +249,7 @@ it('breaks POS sales down by cashier, not just a store-wide total', function () 
 
 it('excludes voided sales from the cashier breakdown', function () {
     $ctx = makeReportVendor('Voided Cashier Store');
-    makePosSale($ctx, unitPrice: 1000, unitCost: 600, qty: 1)->update(['status' => 'voided']);
+    voidSaleInTest(makePosSale($ctx, unitPrice: 1000, unitCost: 600, qty: 1));
 
     $breakdown = app(SalesReportService::class)->cashierBreakdown(
         $ctx['vendor']->id,

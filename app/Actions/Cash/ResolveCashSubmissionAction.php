@@ -6,6 +6,7 @@ namespace App\Actions\Cash;
 
 use App\Models\CashSubmission;
 use App\Models\User;
+use App\Services\Auth\StorePermission;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -60,13 +61,38 @@ class ResolveCashSubmissionAction
         return DB::transaction(function () use ($submission, $receiver, $apply) {
             $row = CashSubmission::where('id', $submission->id)->lockForUpdate()->firstOrFail();
 
-            if ((int) $row->received_by !== (int) $receiver->id) {
-                throw new RuntimeException('Only the person it was handed to can answer for it.');
+            if ($row->received_by !== null) {
+                // Nominated in advance: only that person may answer. This also
+                // excludes the submitter, who can never be the nominee — a
+                // handover to oneself is refused when it is recorded.
+                if ((int) $row->received_by !== (int) $receiver->id) {
+                    throw new RuntimeException('Only the person it was handed to can answer for it.');
+                }
+            } else {
+                // Nobody was named, so the rules the name was carrying have to
+                // be stated outright.
+                //
+                // A person who can both hand the money over and sign for having
+                // received it is accountable to nobody, and the record would
+                // prove nothing at all.
+                if ((int) $row->submitted_by === (int) $receiver->id) {
+                    throw new RuntimeException('You cannot sign for cash you handed over yourself.');
+                }
+
+                // The authority to receive cash at this particular branch is
+                // what stands in for having been named.
+                if (! StorePermission::allows($receiver, (int) $row->vendor_id, (int) $row->store_id, 'receive_cash')) {
+                    throw new RuntimeException('You are not permitted to receive cash for this branch.');
+                }
             }
 
             if (! $row->isPending()) {
                 throw new RuntimeException('That handover has already been answered.');
             }
+
+            // Whoever actually answered is the receiver on the record, named in
+            // advance or not — the point of the row is two people on it.
+            $row->received_by = $receiver->id;
 
             $apply($row);
 

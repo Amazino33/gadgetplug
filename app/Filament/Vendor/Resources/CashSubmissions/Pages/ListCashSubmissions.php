@@ -2,13 +2,17 @@
 
 namespace App\Filament\Vendor\Resources\CashSubmissions\Pages;
 
+use App\Actions\Cash\LogTillExpenseAction;
 use App\Actions\Cash\ResolveCashSubmissionAction;
 use App\Actions\Cash\SubmitCashAction;
 use App\Filament\Vendor\Resources\CashSubmissions\CashSubmissionResource;
 use App\Models\CashSubmission;
 use App\Models\User;
 use App\Services\ActiveStore;
+use App\Services\Auth\StorePermission;
 use App\Services\Cash\CashDrawer;
+use App\Services\Cash\CashHandoffToken;
+use App\Services\QrCode;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -46,6 +50,55 @@ class ListCashSubmissions extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
+            // Sits beside submitting rather than in an accounts screen, because
+            // it has to be done at the moment the money leaves the till by the
+            // person who spent it. An expense declared later, once a shortage
+            // has already been put to somebody, is indistinguishable from an
+            // excuse.
+            Action::make('logExpense')
+                ->label('Log till spending')
+                ->icon('heroicon-o-banknotes')
+                ->color('gray')
+                ->visible(fn () => $this->canSubmit())
+                ->modalHeading('Money spent out of the till')
+                ->modalDescription('Declare it now and it comes off what you are expected to hand over. Undeclared, it shows up as a shortage.')
+                ->schema([
+                    TextInput::make('amount')
+                        ->label('Amount spent')
+                        ->numeric()
+                        ->required()
+                        ->minValue(0.01)
+                        ->prefix('₦'),
+
+                    Textarea::make('reason')
+                        ->label('What it went on')
+                        ->required()
+                        ->rows(2)
+                        ->placeholder('e.g. Diesel for the generator, data for the POS terminal'),
+                ])
+                ->action(function (array $data) {
+                    $vendor = filament()->getTenant();
+
+                    try {
+                        app(LogTillExpenseAction::class)->execute(
+                            loggedBy: auth()->user(),
+                            store:    ActiveStore::currentId() ?? $vendor->defaultStore->id,
+                            amount:   (float) $data['amount'],
+                            reason:   $data['reason'],
+                        );
+                    } catch (Throwable $e) {
+                        Notification::make()->title($e->getMessage())->danger()->send();
+
+                        return;
+                    }
+
+                    Notification::make()
+                        ->title('Spending recorded')
+                        ->body('₦' . number_format((float) $data['amount'], 2) . ' comes off what you owe.')
+                        ->success()
+                        ->send();
+                }),
+
             Action::make('submit')
                 ->label('Submit cash')
                 ->icon('heroicon-o-arrow-up-tray')
@@ -55,7 +108,12 @@ class ListCashSubmissions extends ListRecords
                     Select::make('received_by')
                         ->label('Handing it to')
                         ->options(fn () => $this->possibleReceivers())
-                        ->required()
+                        // Optional now. Naming somebody in advance means only
+                        // they can answer for it; leaving it blank produces a
+                        // code for whoever actually turns up to take the money,
+                        // which is how it usually happens.
+                        ->placeholder('Whoever scans the code')
+                        ->helperText('Leave blank to hand it to whoever comes for it. They scan your code to confirm.')
                         ->searchable(),
 
                     TextInput::make('amount')
@@ -82,7 +140,9 @@ class ListCashSubmissions extends ListRecords
                     try {
                         $submission = app(SubmitCashAction::class)->execute(
                             submitter: auth()->user(),
-                            receiver: User::findOrFail($data['received_by']),
+                            receiver: filled($data['received_by'] ?? null)
+                                ? User::findOrFail($data['received_by'])
+                                : null,
                             store: ActiveStore::currentId() ?? $vendor->defaultStore->id,
                             amount: (float) $data['amount'],
                             reason: $data['reason'] ?? null,
@@ -95,7 +155,9 @@ class ListCashSubmissions extends ListRecords
 
                     Notification::make()
                         ->title($submission->reference.' recorded')
-                        ->body('Waiting for '.$submission->receiver->name.' to confirm they got it.')
+                        ->body($submission->receiver
+                            ? 'Waiting for '.$submission->receiver->name.' to confirm they got it.'
+                            : 'Show your code to whoever takes the money, so they can confirm it.')
                         ->success()
                         ->send();
                 }),
@@ -165,6 +227,34 @@ class ListCashSubmissions extends ListRecords
                     ->query(fn ($query) => $query->whereColumn('amount', '<', 'expected_amount')),
             ])
             ->recordActions([
+                Action::make('showCode')
+                    ->label('Show code')
+                    ->icon('heroicon-o-qr-code')
+                    ->color('primary')
+                    // Only the person who handed it over, and only while it is
+                    // still unanswered. A code for a settled handover would
+                    // open nothing.
+                    ->visible(fn (CashSubmission $record) => $record->isPending()
+                        && (int) $record->submitted_by === auth()->id())
+                    ->modalHeading(fn (CashSubmission $record) => 'Handing over ₦'.number_format((float) $record->amount, 2))
+                    ->modalDescription('Let the person taking the money scan this. It expires in '
+                        .CashHandoffToken::TTL_MINUTES.' minutes and works once.')
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Done')
+                    ->modalContent(function (CashSubmission $record) {
+                        // A fresh code each time it is opened. They are
+                        // single-use and short-lived, and the handover itself
+                        // can only be answered once whichever code is used.
+                        $url = route('cash.handoff', CashHandoffToken::issue($record));
+
+                        return new HtmlString(
+                            '<div class="flex flex-col items-center gap-3 py-4">'
+                            .QrCode::svg($url, 240)
+                            .'<p class="text-sm text-gray-500">'.$record->reference.'</p>'
+                            .'</div>'
+                        );
+                    }),
+
                 Action::make('confirm')
                     ->label('I got this')
                     ->icon('heroicon-o-check-circle')
@@ -174,7 +264,7 @@ class ListCashSubmissions extends ListRecords
                         .' handed you ₦'.number_format((float) $record->amount, 2).'.')
                     // Only the person named as receiving, which is the control.
                     ->visible(fn (CashSubmission $record) => $record->isPending()
-                        && (int) $record->received_by === auth()->id())
+                        && $this->mayAnswerFor($record))
                     ->action(function (CashSubmission $record) {
                         try {
                             app(ResolveCashSubmissionAction::class)->confirm($record, auth()->user());
@@ -189,7 +279,7 @@ class ListCashSubmissions extends ListRecords
                     ->icon('heroicon-o-exclamation-triangle')
                     ->color('danger')
                     ->visible(fn (CashSubmission $record) => $record->isPending()
-                        && (int) $record->received_by === auth()->id())
+                        && $this->mayAnswerFor($record))
                     ->schema([
                         TextInput::make('disputed_amount')
                             ->label('What actually reached you')
@@ -230,6 +320,31 @@ class ListCashSubmissions extends ListRecords
             $vendor->id,
             ActiveStore::currentId() ?? $vendor->defaultStore?->id ?? 0,
             auth()->id(),
+        );
+    }
+
+    /**
+     * Whether the signed-in person may answer for this handover.
+     *
+     * Named in advance means only them. Otherwise it is whoever can receive
+     * cash at that particular branch — and never the person who handed it over,
+     * whatever else they hold.
+     */
+    private function mayAnswerFor(CashSubmission $record): bool
+    {
+        if ((int) $record->submitted_by === auth()->id()) {
+            return false;
+        }
+
+        if ($record->received_by !== null) {
+            return (int) $record->received_by === auth()->id();
+        }
+
+        return StorePermission::allows(
+            auth()->user(),
+            (int) $record->vendor_id,
+            (int) $record->store_id,
+            'receive_cash',
         );
     }
 

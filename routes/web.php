@@ -94,6 +94,26 @@ Route::get('/receipt/{token}/pdf', [App\Http\Controllers\PublicReceiptController
 Route::post('/receipt/{token}/loyalty', [App\Http\Controllers\PublicReceiptController::class, 'claimLoyalty'])
     ->name('receipt.public.loyalty');
 
+// Where a scanned cash-handover code lands. Authenticated, because the whole
+// point is that a named person with the authority to receive cash at that
+// branch is the one answering — an anonymous visitor confirming a handover
+// would defeat the entire arrangement.
+Route::middleware('auth')->group(function () {
+    Route::get('/cash/handoff/{token}', [App\Http\Controllers\CashHandoffController::class, 'show'])
+        ->name('cash.handoff');
+    Route::post('/cash/handoff/{token}/confirm', [App\Http\Controllers\CashHandoffController::class, 'confirm'])
+        ->name('cash.handoff.confirm');
+    Route::post('/cash/handoff/{token}/dispute', [App\Http\Controllers\CashHandoffController::class, 'dispute'])
+        ->name('cash.handoff.dispute');
+
+    // The settlement statement, on screen and as the printable copy. Both read
+    // the same frozen payload, so the two can never disagree.
+    Route::get('/settlement/{statement}', [App\Http\Controllers\SettlementStatementController::class, 'show'])
+        ->name('settlement.show');
+    Route::get('/settlement/{statement}/pdf', [App\Http\Controllers\SettlementStatementController::class, 'pdf'])
+        ->name('settlement.pdf');
+});
+
 // A sale rendered as an 80mm receipt document, printed from its own page rather
 // than out of the POS modal. Session-authenticated and vendor-scoped: it names
 // the cashier and customer, so it is not the customer-facing copy.

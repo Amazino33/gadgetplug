@@ -53,3 +53,42 @@ function cashRoles(Vendor $vendor): void
     App\Services\VendorRoles::seedFor($vendor);
     setPermissionsTeamId($vendor->id);
 }
+
+/**
+ * A branch with the two roles a handover needs kept apart: somebody who may
+ * hand cash over, and somebody else who may receive it.
+ */
+function handoffContext(): array
+{
+    $vendor = cashVendor();
+    $store  = $vendor->defaultStore;
+    $owner  = User::find($vendor->user_id);
+
+    cashRoles($vendor);
+
+    $keeper = User::factory()->create();
+    $keeper->stores()->attach($store->id);
+    setPermissionsTeamId($vendor->id);
+    $keeper->assignRole('storekeeper');
+
+    $collector = User::factory()->create();
+    $collector->stores()->attach($store->id);
+    $collector->givePermissionTo('receive_cash');
+
+    cashSale($vendor, $store, $keeper->id, ['total' => 50000]);
+
+    return compact('vendor', 'store', 'owner', 'keeper', 'collector');
+}
+
+/** @return array{0: App\Models\CashSubmission, 1: string} */
+function issueHandoff(array $ctx, float $amount = 50000): array
+{
+    $submission = app(App\Actions\Cash\SubmitCashAction::class)->execute(
+        submitter: $ctx['keeper'],
+        receiver:  null,
+        store:     $ctx['store'],
+        amount:    $amount,
+    );
+
+    return [$submission, App\Services\Cash\CashHandoffToken::issue($submission)];
+}

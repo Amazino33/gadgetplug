@@ -26,9 +26,14 @@ use RuntimeException;
  */
 class SubmitCashAction
 {
+    /**
+     * @param  User|null  $receiver  Nominated in advance, or null to let whoever
+     *                               scans the code answer for it. When named,
+     *                               only that person can.
+     */
     public function execute(
         User $submitter,
-        User $receiver,
+        ?User $receiver,
         Store|int $store,
         float $amount,
         ?string $reason = null,
@@ -37,7 +42,7 @@ class SubmitCashAction
             throw new RuntimeException('A handover has to be for some money.');
         }
 
-        if ($submitter->id === $receiver->id) {
+        if ($receiver && $submitter->id === $receiver->id) {
             // The entire value of this record is two names on it.
             throw new RuntimeException('Cash has to be handed to somebody else.');
         }
@@ -72,7 +77,7 @@ class SubmitCashAction
                 'vendor_id'       => $store->vendor_id,
                 'store_id'        => $store->id,
                 'submitted_by'    => $submitter->id,
-                'received_by'     => $receiver->id,
+                'received_by'     => $receiver?->id,
                 'amount'          => round($amount, 2),
                 'expected_amount' => $expected,
                 'reason'          => $reason,

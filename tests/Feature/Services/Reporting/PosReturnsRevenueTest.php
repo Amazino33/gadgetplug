@@ -13,24 +13,27 @@ uses(RefreshDatabase::class);
 // back on the shelf, so the books showed the same item both sold and held.
 // A return is now contra-revenue in the period it happened.
 
-function returnsContext(): array
+/** A completed cash sale of $quantity units at 10,000 each, costing 6,000 each. */
+function returnsContext(int $quantity = 1): array
 {
     $ctx = debtTenderContext();
+
+    $value = 10000 * $quantity;
 
     $ctx['sale'] = PosSale::create([
         'reference'       => 'POS-RET-' . uniqid(),
         'vendor_id'       => $ctx['vendor']->id,
         'store_id'        => $ctx['store']->id,
         'cashier_id'      => $ctx['owner']->id,
-        'subtotal'        => 10000, 'discount_amount' => 0, 'vat_amount' => 0, 'total' => 10000,
-        'payment_method'  => 'cash', 'amount_tendered' => 10000, 'change_given' => 0,
+        'subtotal'        => $value, 'discount_amount' => 0, 'vat_amount' => 0, 'total' => $value,
+        'payment_method'  => 'cash', 'amount_tendered' => $value, 'change_given' => 0,
         'status'          => 'completed', 'completed_at' => now(),
     ]);
 
     PosSaleItem::create([
         'pos_sale_id' => $ctx['sale']->id, 'product_id' => $ctx['product']->id,
         'product_name' => 'Credit Widget', 'unit_price' => 10000, 'unit_cost' => 6000,
-        'quantity' => 1, 'discount_amount' => 0, 'total' => 10000,
+        'quantity' => $quantity, 'discount_amount' => 0, 'total' => $value,
     ]);
 
     return $ctx;
@@ -85,9 +88,9 @@ test('a fully returned sale nets to no revenue and no cost', function () {
 });
 
 test('a partial return reverses only the units handed back', function () {
-    $ctx = returnsContext();
-    $ctx['sale']->items()->update(['quantity' => 2, 'total' => 20000]);
-    $ctx['sale']->update(['subtotal' => 20000, 'total' => 20000]);
+    // Rung as two units from the start. It used to be rung as one and edited
+    // into two afterwards, which a sale no longer permits.
+    $ctx = returnsContext(quantity: 2);
 
     recordReturn($ctx, 1, 10000.0);
 
@@ -136,7 +139,7 @@ test('a return lands in its own period and never rewrites the period of the sale
 
 test('a voided sale is still excluded outright, and is not double-reversed by a return', function () {
     $ctx = returnsContext();
-    $ctx['sale']->update(['status' => 'voided']);
+    voidSaleInTest($ctx['sale']);
 
     expect(reportFor($ctx)['revenue'])->toBe(0.0);
 });

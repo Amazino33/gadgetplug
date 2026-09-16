@@ -114,6 +114,121 @@ class CustomerDebtService
     }
 
     /**
+     * How old the money owed actually is, oldest charge first.
+     *
+     * Payments are not matched to a charge anywhere — the ledger stores signed
+     * rows and the balance is their sum — so the matching is done here, at read
+     * time, by applying every payment to the oldest unsettled charge first.
+     *
+     * Derived rather than stored, for the same reason every other balance in
+     * this service is: the rows are immutable and the order is total, so the
+     * same allocation falls out identically every time it is asked for, and a
+     * stored copy could only ever drift from them.
+     *
+     * Scoped to a branch by where the charge was rung, not where the payment
+     * was taken — a customer settling up at head office does not move the debt
+     * they ran up at a branch, it clears it.
+     *
+     * @return array{total: float, buckets: array<string, float>, debtors: Collection}
+     */
+    public function aged(int $vendorId, ?int $storeId = null, ?\DateTimeInterface $asOf = null): array
+    {
+        $asOf = $asOf ? \Illuminate\Support\Carbon::parse($asOf) : now();
+
+        $entries = PosCustomerLedgerEntry::forVendor($vendorId)
+            ->where('occurred_at', '<=', $asOf)
+            ->orderBy('occurred_at')
+            ->orderBy('id')
+            ->get()
+            ->groupBy('pos_customer_id');
+
+        $buckets = ['current' => 0.0, '8_30' => 0.0, '31_60' => 0.0, 'over_60' => 0.0];
+        $debtors = collect();
+
+        foreach ($entries as $customerId => $rows) {
+            $open = $this->applyPaymentsOldestFirst($rows);
+
+            if ($storeId !== null) {
+                $open = $open->where('store_id', $storeId);
+            }
+
+            $owed = round((float) $open->sum('amount'), 2);
+
+            if ($owed <= 0.009) {
+                continue;
+            }
+
+            $oldest = $open->min('occurred_at');
+
+            foreach ($open as $slice) {
+                $days = (int) \Illuminate\Support\Carbon::parse($slice['occurred_at'])->diffInDays($asOf);
+                $key = match (true) {
+                    $days <= 7  => 'current',
+                    $days <= 30 => '8_30',
+                    $days <= 60 => '31_60',
+                    default     => 'over_60',
+                };
+
+                $buckets[$key] = round($buckets[$key] + $slice['amount'], 2);
+            }
+
+            $debtors->push([
+                'customer_id'  => (int) $customerId,
+                'outstanding'  => $owed,
+                'oldest_at'    => $oldest,
+                'days_oldest'  => $oldest ? (int) \Illuminate\Support\Carbon::parse($oldest)->diffInDays($asOf) : 0,
+            ]);
+        }
+
+        return [
+            'total'   => round($debtors->sum('outstanding'), 2),
+            'buckets' => $buckets,
+            'debtors' => $debtors->sortByDesc('days_oldest')->values(),
+        ];
+    }
+
+    /**
+     * Draw every payment and write-off down against the oldest charges.
+     *
+     * @return Collection<int, array{amount: float, occurred_at: mixed, store_id: ?int}>
+     */
+    private function applyPaymentsOldestFirst(Collection $rows): Collection
+    {
+        $open = collect();
+        $credit = 0.0;
+
+        foreach ($rows as $row) {
+            $amount = (float) $row->amount;
+
+            if ($amount > 0) {
+                $open->push([
+                    'amount'      => $amount,
+                    'occurred_at' => $row->occurred_at,
+                    'store_id'    => $row->store_id,
+                ]);
+
+                continue;
+            }
+
+            // Payments and write-offs both reduce what is owed; neither is tied
+            // to a charge, so both land on the oldest one still open.
+            $credit += abs($amount);
+        }
+
+        return $open->map(function (array $slice) use (&$credit) {
+            if ($credit <= 0) {
+                return $slice;
+            }
+
+            $applied = min($credit, $slice['amount']);
+            $credit -= $applied;
+            $slice['amount'] = round($slice['amount'] - $applied, 2);
+
+            return $slice;
+        })->filter(fn (array $slice) => $slice['amount'] > 0.009)->values();
+    }
+
+    /**
      * One customer's history, oldest first, with the running balance after each
      * line — the order a person reads a statement in, and the only way a row's
      * effect is legible on its own.
