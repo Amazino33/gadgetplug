@@ -45,6 +45,25 @@ class SupplierLink extends Model
         return $this->belongsTo(Vendor::class, 'supplier_vendor_id');
     }
 
+    /**
+     * Safely resolve the supplier's name.
+     * 
+     * Eager loading the supplier relation occasionally drops the vendor model due
+     * to Filament's global tenant scoping bleeding across contexts, leaving the
+     * name blank in the UI. This falls back to a raw database query to guarantee
+     * the name is found.
+     */
+    public function supplierName(): string
+    {
+        if ($this->supplier && $this->supplier->name) {
+            return $this->supplier->name;
+        }
+
+        return \Illuminate\Support\Facades\DB::table('vendors')
+            ->where('id', $this->supplier_vendor_id)
+            ->value('name') ?? 'Unknown supplier';
+    }
+
     /** Listings the reseller has published from this supplier. */
     public function listings(): HasMany
     {

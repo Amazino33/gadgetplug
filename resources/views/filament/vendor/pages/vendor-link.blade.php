@@ -29,7 +29,7 @@
             <div class="mb-4 flex items-center gap-2 rounded-lg bg-primary-50 px-4 py-3 text-sm text-primary-700 ring-1 ring-primary-600/10 dark:bg-primary-500/10 dark:text-primary-300 dark:ring-primary-400/20">
                 <x-filament::icon icon="heroicon-m-information-circle" class="h-5 w-5 shrink-0" />
                 <span>
-                    Selling from <span class="font-semibold">{{ $link->supplier?->name }}</span> at
+                    Selling from <span class="font-semibold">{{ $link->supplierName() }}</span> at
                     <span class="font-semibold">{{ rtrim(rtrim(number_format((float) $link->markup_percent, 2), '0'), '.') }}%</span> markup.
                     Their pictures and words become yours on publish; their price and stock stay theirs.
                 </span>

@@ -67,7 +67,7 @@ class SupplierPayablePage extends Page implements HasTable
 
                 return [
                     'link'     => $link,
-                    'supplier' => $link->supplier?->name ?? 'Unknown supplier',
+                    'supplier' => $link->supplierName(),
                     'active'   => $link->is_active,
                     'charged'  => $summary['charged'],
                     'paid'     => $summary['paid'],
@@ -137,8 +137,9 @@ class SupplierPayablePage extends Page implements HasTable
                     ->dateTime('d M Y, g:ia')
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('supplierLink.supplier.name')
-                    ->label('Supplier'),
+                Tables\Columns\TextColumn::make('supplier_name')
+                    ->label('Supplier')
+                    ->state(fn (SupplierPayableEntry $record) => $record->supplierLink?->supplierName() ?? 'Unknown supplier'),
 
                 Tables\Columns\TextColumn::make('entry_type')
                     ->label('Entry')

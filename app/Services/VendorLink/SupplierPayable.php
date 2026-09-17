@@ -139,7 +139,7 @@ class SupplierPayable
             ->get()
             ->map(fn (SupplierLink $link) => [
                 'link'          => $link,
-                'supplier_name' => $link->supplier?->name ?? 'Unknown',
+                'supplier_name' => $link->supplierName(),
                 'balance'       => $this->balance($link),
             ])
             ->filter(fn (array $row) => abs($row['balance']) > 0.009)

@@ -67,11 +67,14 @@ class VendorLinkPage extends Page implements HasTable
     {
         $vendor = filament()->getTenant();
 
-        return SupplierLink::forReseller($vendor->id)
+        $links = SupplierLink::forReseller($vendor->id)
             ->active()
             ->with('supplier')
-            ->get()
-            ->mapWithKeys(fn (SupplierLink $link) => [$link->id => $link->supplier?->name ?? 'Unknown supplier']);
+            ->get();
+            
+        return $links->mapWithKeys(function (SupplierLink $link) {
+            return [$link->id => $link->supplierName()];
+        });
     }
 
     public function currentLink(): ?SupplierLink
