@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Models\Vendor;
 use App\Policies\SupplierLinkPolicy;
 use App\Services\VendorLink\Rounding\EndsIn990;
+use App\Services\VendorLink\Rounding\Nearest100;
 use App\Services\VendorLink\Rounding\RoundingRules;
 use App\Services\VendorLink\SupplierPayable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -29,7 +30,7 @@ describe('the link itself', function () {
         expect($link->reseller->id)->toBe($reseller->id)
             ->and($link->supplier->id)->toBe($supplier->id)
             ->and($link->is_active)->toBeTrue()
-            ->and($link->rounding_rule)->toBe('ends_990')
+            ->and($link->rounding_rule)->toBe('nearest_100')
             ->and($link->isUsable())->toBeTrue();
     });
 
@@ -128,10 +129,35 @@ describe('the rounding rule', function () {
         }
     });
 
-    test('the rule is swappable by name, and an unknown name falls back safely', function () {
+    test('rounds to the closest 100, which is what this shop quotes', function () {
+        $rule = new Nearest100();
+
+        expect($rule->apply(14000))->toBe(14000.0)
+            // Down by 40, which is noise on a marked-up price.
+            ->and($rule->apply(14040))->toBe(14000.0)
+            ->and($rule->apply(14060))->toBe(14100.0)
+            // A tie goes up, so the halfway case never costs the markup.
+            ->and($rule->apply(14050))->toBe(14100.0)
+            // Kobo never survive it.
+            ->and($rule->apply(13825.67))->toBe(13800.0);
+    });
+
+    test('the closest 100 never lands on a free product', function () {
+        $rule = new Nearest100();
+
+        // The nearest hundred to 30 is zero, and zero is free rather than cheap.
+        expect($rule->apply(30))->toBe(100.0)
+            ->and($rule->apply(0))->toBe(0.0)
+            ->and($rule->apply(-5))->toBe(0.0);
+    });
+
+    test('the rule is swappable by name, and an unknown name falls back to the default', function () {
         expect(RoundingRules::make('ends_990'))->toBeInstanceOf(EndsIn990::class)
+            ->and(RoundingRules::make('nearest_100'))->toBeInstanceOf(Nearest100::class)
             ->and(RoundingRules::make('none')->apply(14000.456))->toBe(14000.46)
-            ->and(RoundingRules::make('nonsense'))->toBeInstanceOf(EndsIn990::class);
+            // An unknown or absent name must never price at nothing.
+            ->and(RoundingRules::make('nonsense'))->toBeInstanceOf(Nearest100::class)
+            ->and(RoundingRules::make(null))->toBeInstanceOf(Nearest100::class);
     });
 });
 

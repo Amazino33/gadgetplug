@@ -33,6 +33,7 @@ function placeLinkedOrder(): Livewire\Features\SupportTesting\Testable
         ->set('email', 'jane@example.com')
         ->set('phone', '08040000000')
         ->set('lga', 'Uyo')
+        ->set('deliveryUrgency', 'today')
         ->set('address', '1 Test Street, enough characters')
         ->set('paymentMethod', 'pay_on_delivery')
         ->call('processCheckout');
@@ -52,7 +53,7 @@ test('a pay-on-delivery order for a resold listing survives, instead of being de
 
     expect($order)->not->toBeNull()
         ->and($order->items()->count())->toBe(1)
-        ->and((float) $order->total_amount)->toBe(14990.0);
+        ->and((float) $order->total_amount)->toBe(14000.0);
 });
 
 test('nothing is reserved anywhere for a resold line', function () {
@@ -78,7 +79,7 @@ test('the line carries no cost yet, because the supplier is paid at delivery', f
     // Null says honestly that no cost is recorded. Freezing today's figure
     // would book a cost for units that may never be delivered.
     expect(OrderItem::first()->unit_cost)->toBeNull()
-        ->and((float) OrderItem::first()->unit_price)->toBe(14990.0);
+        ->and((float) OrderItem::first()->unit_price)->toBe(14000.0);
 });
 
 test('an ordinary product in the same order still reserves as it always did', function () {

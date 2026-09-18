@@ -23,10 +23,19 @@ function published(float $price = 10000, int $stock = 5, float $markup = 40): ar
 }
 
 describe('price follows the supplier', function () {
-    test('the listing quotes his price plus the markup, rounded up to 990', function () {
+    test('the listing quotes his price plus the markup, rounded to the closest 100', function () {
         [$listing] = published(price: 10000, markup: 40);
 
-        expect((float) $listing->price)->toBe(14990.0);
+        expect((float) $listing->price)->toBe(14000.0);
+    });
+
+    test('an awkward supplier price still lands on a price a shop would quote', function () {
+        // 9,875 + 40% = 13,825, which the closest 100 takes DOWN to 13,800.
+        // The figure matters: 10,000 + 40% is already round and would pass
+        // whether or not any rounding happened at all.
+        [$listing] = published(price: 9875, markup: 40);
+
+        expect((float) $listing->price)->toBe(13800.0);
     });
 
     test('his price change moves the shelf price with nothing to run', function () {
@@ -35,7 +44,7 @@ describe('price follows the supplier', function () {
         $source->update(['price' => 20000]);
 
         // No sync, no job, no republish — the listing simply asks him.
-        expect((float) $listing->fresh()->price)->toBe(28990.0);
+        expect((float) $listing->fresh()->price)->toBe(28000.0);
     });
 
     test('a switched-off link stops quoting him and falls back to the last price', function () {
@@ -46,7 +55,7 @@ describe('price follows the supplier', function () {
 
         // Stale, but a real price somebody set — better than showing zero, and
         // it stops following a supplier the arrangement has ended with.
-        expect((float) $listing->fresh()->price)->toBe(14990.0);
+        expect((float) $listing->fresh()->price)->toBe(14000.0);
     });
 
     test('a deleted source falls back rather than pricing at nothing', function () {
@@ -54,7 +63,7 @@ describe('price follows the supplier', function () {
 
         $source->delete();
 
-        expect((float) $listing->fresh()->price)->toBe(14990.0);
+        expect((float) $listing->fresh()->price)->toBe(14000.0);
     });
 
     test('an ordinary product is untouched by any of this', function () {

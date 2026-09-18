@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\VendorLink\Rounding\RoundingRules;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -24,7 +25,7 @@ class SupplierLink extends Model
     // in the database, which is a trap for every caller.
     protected $attributes = [
         'markup_percent' => 0,
-        'rounding_rule'  => 'ends_990',
+        'rounding_rule'  => RoundingRules::DEFAULT,
         'is_active'      => true,
     ];
 

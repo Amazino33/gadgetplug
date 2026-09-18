@@ -64,7 +64,7 @@ class SupplierLinkResource extends Resource
             Select::make('rounding_rule')
                 ->label('Rounding')
                 ->options(RoundingRules::options())
-                ->default('ends_990')
+                ->default(RoundingRules::DEFAULT)
                 ->required(),
 
             Toggle::make('is_active')

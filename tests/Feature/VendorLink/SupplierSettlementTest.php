@@ -176,10 +176,10 @@ describe('cost of goods sold', function () {
             CarbonImmutable::now()->addDay(),
         );
 
-        // Sold at 14,990, owed 10,000 — the markup is the business.
-        expect($summary['revenue'])->toBe(14990.0)
+        // Sold at 14,000, owed 10,000 — the markup is the business.
+        expect($summary['revenue'])->toBe(14000.0)
             ->and($summary['cost'])->toBe(10000.0)
-            ->and($summary['profit'])->toBe(4990.0);
+            ->and($summary['profit'])->toBe(4000.0);
     });
 });
 

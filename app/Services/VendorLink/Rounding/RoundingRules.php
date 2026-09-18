@@ -14,13 +14,17 @@ class RoundingRules
 {
     /** @var array<string, class-string<RoundingRule>> */
     private const RULES = [
-        'ends_990' => EndsIn990::class,
-        'none'     => NoRounding::class,
+        'nearest_100' => Nearest100::class,
+        'ends_990'    => EndsIn990::class,
+        'none'        => NoRounding::class,
     ];
+
+    /** What a link falls back to when it names no rule, or names one that is gone. */
+    public const DEFAULT = 'nearest_100';
 
     public static function make(?string $key): RoundingRule
     {
-        $class = self::RULES[$key] ?? EndsIn990::class;
+        $class = self::RULES[$key] ?? self::RULES[self::DEFAULT];
 
         return new $class();
     }
@@ -29,8 +33,9 @@ class RoundingRules
     public static function options(): array
     {
         return [
-            'ends_990' => 'Round up to end in 990',
-            'none'     => 'No rounding — exact markup',
+            'nearest_100' => 'Round to the closest ₦100',
+            'ends_990'    => 'Round up to end in 990',
+            'none'        => 'No rounding — exact markup',
         ];
     }
 }

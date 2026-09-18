@@ -34,8 +34,8 @@ describe('publishing a supplier product', function () {
 
         $listing = Product::linked()->firstOrFail();
 
-        // 10,000 + 40% = 14,000, rounded up to the next 990.
-        expect((float) $listing->price)->toBe(14990.0)
+        // 10,000 + 40% = 14,000, rounded to the closest 100.
+        expect((float) $listing->price)->toBe(14000.0)
             ->and($listing->vendor_id)->toBe($reseller->id)
             ->and($listing->source_product_id)->toBe($source->id)
             ->and($listing->supplier_link_id)->toBe($link->id)
@@ -139,12 +139,12 @@ describe('publishing again', function () {
         $source = linkProduct($link->supplier, price: 10000);
 
         app(PublishLinkedListingAction::class)->execute($link, [$source->id]);
-        expect((float) Product::linked()->first()->price)->toBe(14990.0);
+        expect((float) Product::linked()->first()->price)->toBe(14000.0);
 
         $source->update(['price' => 20000]);
         app(PublishLinkedListingAction::class)->execute($link, [$source->id]);
 
-        expect((float) Product::linked()->first()->price)->toBe(28990.0)
+        expect((float) Product::linked()->first()->price)->toBe(28000.0)
             ->and((float) Product::linked()->first()->cost_price)->toBe(20000.0);
     });
 });
@@ -204,8 +204,8 @@ describe('the VendorLink page', function () {
             // His catalogue, read live across the tenant line the link opens.
             ->assertCanSeeTableRecords([$source]);
 
-        // And priced for this shop: 10,000 + 40%, rounded up to the next 990.
-        expect($page->instance()->retailFor($source))->toBe(14990.0);
+        // And priced for this shop: 10,000 + 40%, rounded to the closest 100.
+        expect($page->instance()->retailFor($source))->toBe(14000.0);
     });
 
     test('a vendor sees only catalogues linked to them', function () {
