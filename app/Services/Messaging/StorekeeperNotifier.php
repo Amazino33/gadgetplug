@@ -5,12 +5,14 @@ namespace App\Services\Messaging;
 use App\Models\DeliveryMessage;
 use App\Models\MessageTemplate;
 use App\Models\Order;
+use App\Models\PlatformMessagingSetting;
 use App\Models\Product;
 use App\Models\Store;
 use App\Models\Vendor;
 use App\Models\VendorNotificationSetting;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 
 // Sends the storekeeper's WhatsApp alerts. Storekeepers are usually on the shop
 // floor rather than in the admin panel, so WhatsApp — not an in-app notification
@@ -180,16 +182,33 @@ class StorekeeperNotifier
         ?Order $order,
     ): ?DeliveryMessage {
         $settings = VendorNotificationSetting::forVendor($vendor);
+        $locked   = MessageTemplate::isPlatformLocked($templateKey);
 
-        if (! $settings->{$toggle} || ! $settings->hasStorekeeperNumber()) {
+        // A locked alert ignores the vendor's toggle. While GadgetPlug is
+        // handling online orders, "was this order announced to the store?" must
+        // not depend on a switch the vendor can flip.
+        if (! $locked && ! $settings->{$toggle}) {
             return null;
         }
 
-        $template = MessageTemplate::query()
-            ->where('vendor_id', $vendor->id)
-            ->where('key', $templateKey)
-            ->where('is_active', true)
-            ->first();
+        $to = $this->recipientFor($settings, $locked);
+
+        if (blank($to)) {
+            // Only reachable for a locked alert with no vendor number AND no
+            // platform fallback — a configuration hole rather than a choice, so
+            // it is logged instead of passing silently like an opted-out alert.
+            if ($locked) {
+                Log::warning('Storekeeper alert had nowhere to go — no vendor number and no platform fallback.', [
+                    'vendor_id' => $vendor->id,
+                    'template'  => $templateKey,
+                    'order_id'  => $order?->id,
+                ]);
+            }
+
+            return null;
+        }
+
+        $template = MessageTemplate::resolveFor($vendor->id, $templateKey);
 
         if (! $template) {
             return null;
@@ -200,11 +219,28 @@ class StorekeeperNotifier
             'order_id'       => $order?->id,
             'recipient_type' => 'storekeeper',
             'channel'        => $template->channel,
-            'to_number'      => $settings->storekeeper_whatsapp,
+            'to_number'      => $to,
             'body'           => app(TemplateRenderer::class)->render($template->body, $context),
             'status'         => 'queued',
         ]);
 
         return $this->messaging->send($message);
+    }
+
+    // The vendor's own storekeeper when they have set one, otherwise GadgetPlug's
+    // fallback number. Only locked alerts fall back: an alert a vendor has opted
+    // into is theirs to receive, and routing it to the platform instead would
+    // send their order traffic somewhere they never agreed to.
+    private function recipientFor(VendorNotificationSetting $settings, bool $locked): ?string
+    {
+        if ($settings->hasStorekeeperNumber()) {
+            return $settings->storekeeper_whatsapp;
+        }
+
+        if (! $locked) {
+            return null;
+        }
+
+        return PlatformMessagingSetting::current()->fallback_storekeeper_whatsapp;
     }
 }

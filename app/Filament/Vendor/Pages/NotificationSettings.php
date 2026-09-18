@@ -105,9 +105,14 @@ class NotificationSettings extends Page
                 Section::make('Which alerts to send')
                     ->description('Each alert can be switched on or off independently. The wording of every one is editable under Message Templates.')
                     ->schema([
+                        // Locked rather than hidden: the vendor should be able to
+                        // see that this alert exists and is running, just not turn
+                        // it off. Enforcement is at send time, not here.
                         Toggle::make('notify_new_order')
                             ->label('New order to pack')
-                            ->helperText('Sent the moment an order is paid or confirmed, listing the items, customer and delivery address.'),
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->helperText('Always on while GadgetPlug is handling online orders. Sent the moment an order is paid or confirmed, listing the items, customer and delivery address. If you have not set a storekeeper number above, it goes to GadgetPlug instead.'),
 
                         Toggle::make('notify_undispatched')
                             ->label('Reminder: orders still awaiting dispatch')
@@ -290,7 +295,9 @@ class NotificationSettings extends Page
             'owner_whatsapp'           => $data['owner_whatsapp'] ?: null,
             'notify_daily_summary'     => (bool) ($data['notify_daily_summary'] ?? false),
             'daily_summary_time'       => $data['daily_summary_time'] ?? '07:00',
-            'notify_new_order'         => (bool) ($data['notify_new_order'] ?? false),
+            // notify_new_order is deliberately absent — the toggle is dehydrated,
+            // so a crafted request cannot switch off a platform-locked alert by
+            // posting the field this form no longer submits.
             'notify_undispatched'      => (bool) ($data['notify_undispatched'] ?? false),
             'notify_low_stock'         => (bool) ($data['notify_low_stock'] ?? false),
             'notify_cancelled'         => (bool) ($data['notify_cancelled'] ?? false),

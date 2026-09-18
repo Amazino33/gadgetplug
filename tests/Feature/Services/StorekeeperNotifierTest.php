@@ -108,22 +108,29 @@ test('no storekeeper number means no storekeeper alert', function () {
     expect(storekeeperMessages())->toBeEmpty();
 });
 
-test('the new-order toggle switched off suppresses the alert', function () {
+// The new-order alert is platform-locked while GadgetPlug handles online orders,
+// so the vendor's toggle no longer governs it. Toggle behaviour for alerts that
+// ARE still the vendor's own is covered below (cancellation) and in
+// PlatformControlledOrderAlertsTest.
+test('the new-order toggle no longer suppresses the alert once it is platform-locked', function () {
     $data = setUpStorekeeperVendor(['notify_new_order' => false]);
     $order = makeStorekeeperOrder($data);
 
     $order->update(['status' => 'paid']);
 
-    expect(storekeeperMessages())->toBeEmpty();
+    expect(storekeeperMessages())->toHaveCount(1);
 });
 
-test('an inactive storekeeper template suppresses the alert', function () {
-    $data = setUpStorekeeperVendor();
+test('an inactive template still suppresses an alert the vendor owns', function () {
+    $data = setUpStorekeeperVendor(['notify_cancelled' => true]);
     MessageTemplate::where('vendor_id', $data['vendor']->id)
-        ->where('key', 'storekeeper_new_order')
+        ->where('key', 'storekeeper_cancelled')
         ->update(['is_active' => false]);
 
-    makeStorekeeperOrder($data)->update(['status' => 'paid']);
+    $order = makeStorekeeperOrder($data, 'paid');
+    DeliveryMessage::truncate();
+
+    $order->update(['status' => 'cancelled']);
 
     expect(storekeeperMessages())->toBeEmpty();
 });

@@ -76,7 +76,13 @@ class MessageTemplateResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('key')->searchable()->sortable()->weight('bold'),
+                TextColumn::make('key')
+                    ->searchable()
+                    ->sortable()
+                    ->weight('bold')
+                    ->description(fn (MessageTemplate $record): ?string => $record->isLocked()
+                        ? 'Managed by GadgetPlug — always sent'
+                        : null),
                 TextColumn::make('recipient_type')->badge()->sortable(),
                 TextColumn::make('channel')->badge()->sortable(),
                 TextColumn::make('body')->limit(60)->wrap(),
@@ -91,7 +97,17 @@ class MessageTemplateResource extends Resource
                 ]),
                 SelectFilter::make('channel')->options(['whatsapp' => 'WhatsApp', 'sms' => 'SMS']),
             ])
-            ->recordActions([EditAction::make(), DeleteAction::make()])
+            ->recordActions([
+                // Platform-locked templates are GadgetPlug's promise about an
+                // online order, so a vendor cannot edit or delete them. The real
+                // guarantee is at send time (MessageTemplate::resolveFor), which
+                // ignores is_active for these keys — hiding the buttons is just
+                // honesty about that, not the enforcement itself.
+                EditAction::make()
+                    ->hidden(fn (MessageTemplate $record): bool => $record->isLocked()),
+                DeleteAction::make()
+                    ->hidden(fn (MessageTemplate $record): bool => $record->isLocked()),
+            ])
             ->defaultSort('key');
     }
 

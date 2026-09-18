@@ -397,14 +397,12 @@ class OrderObserver
             return;
         }
 
-        $template = MessageTemplate::query()
-            ->where('vendor_id', $vendorId)
-            ->where('key', $templateKey)
-            ->where('recipient_type', 'customer')
-            ->where('is_active', true)
-            ->first();
+        // resolveFor() rather than a direct query so the platform-locked
+        // confirmation cannot be switched off by deactivating its template, and
+        // still sends for a vendor whose row was never seeded.
+        $template = MessageTemplate::resolveFor($vendorId, $templateKey);
 
-        if (! $template) {
+        if (! $template || $template->recipient_type !== 'customer') {
             return;
         }
 
