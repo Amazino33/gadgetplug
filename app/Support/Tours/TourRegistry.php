@@ -187,8 +187,8 @@ class TourRegistry
                             ],
                             [
                                 'element' => '[data-tour="product-cost-price"]',
-                                'title' => 'Cost and selling price',
-                                'body' => 'Cost is what you pay; price is what the customer pays. The gap between them is the profit every report on this platform is built from, so it is worth getting right.',
+                                'title' => 'What the customer pays',
+                                'body' => 'The selling price. What you <em>paid</em> for it goes under <strong>Advanced settings</strong> — the gap between the two is the profit every report on this platform is built from, so it is worth filling in.',
                                 'side' => 'bottom',
                             ],
                             [

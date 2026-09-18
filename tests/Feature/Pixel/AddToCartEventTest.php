@@ -49,7 +49,7 @@ test('buying now also fires AddToCart before redirecting to checkout', function 
     $product = makeAddToCartPixelProduct(['price' => 2000]);
 
     Volt::test('pages.product-detail', ['product' => $product])
-        ->call('buyNow')
+        ->call('buyNow', 'pay_on_delivery')
         ->assertDispatched('pixel-add-to-cart')
         ->assertRedirect(route('checkout'));
 

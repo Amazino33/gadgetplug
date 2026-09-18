@@ -45,11 +45,21 @@
             Pick a product from the search results for every row — start typing in the Product field to see matches.
         </p>
 
+        {{-- Shown only when this page rebuilt itself from a draft, so the
+             person knows why there is already work on screen. --}}
+        <div id="draftRestored" class="hidden flex items-start gap-2 bg-brand-orange/10 border border-brand-orange/40 rounded-lg px-4 py-3 mb-4">
+            <span class="material-symbols-outlined text-brand-orange text-[18px]">history</span>
+            <p class="text-sm text-[#191c1d] dark:text-zinc-100">
+                We brought back what you had typed. Nothing is submitted yet — it stays a draft until you continue.
+            </p>
+        </div>
+
         {{-- Items Header --}}
         <div class="flex justify-between items-center mb-4">
             <div class="flex items-center gap-2">
                 <h3 class="text-base font-semibold text-[#191c1d] dark:text-zinc-100" style="font-family:'Montserrat',sans-serif;">Items Added</h3>
                 <span class="bg-[#e7e8e9] dark:bg-zinc-700 text-[#191c1d] dark:text-zinc-100 px-2 py-0.5 rounded-full text-xs font-bold" id="itemCount">0</span>
+                <span id="draftStatus" class="text-xs text-[#6f7b68] dark:text-zinc-400 opacity-0 transition-opacity"></span>
             </div>
             <div class="flex gap-2">
                 <button type="button" onclick="addItem()" data-tour="procurement-add-item"
@@ -67,13 +77,22 @@
         {{-- Items List --}}
         <div id="itemsList" class="space-y-3 mb-4"></div>
 
-        {{-- Add row placeholder --}}
-        <div onclick="addItem()" class="bg-white dark:bg-zinc-800 rounded-xl border-2 border-dashed border-[#becab5] dark:border-zinc-600 flex items-center justify-center h-20 hover:bg-[#f3f4f5] dark:hover:bg-zinc-700 transition-colors cursor-pointer group mb-6">
-            <div class="flex items-center gap-2 text-[#6f7b68] dark:text-zinc-400 group-hover:text-[#016c00] dark:group-hover:text-green-400 transition-colors">
+        {{-- Add row.
+             In the action orange rather than the muted grey it used to wear:
+             adding the next line is the thing a person does over and over on
+             this step, and it was the quietest thing on the page — a dashed
+             grey box that read as an empty placeholder rather than a control.
+
+             type="button" is load-bearing. This sits inside #itemsForm, and a
+             button with no type submits — so without it, "add a row" would post
+             the whole procurement step instead. --}}
+        <button type="button" onclick="addItem()"
+            class="w-full bg-brand-orange/5 dark:bg-brand-orange/10 rounded-xl border-2 border-dashed border-brand-orange flex items-center justify-center h-20 hover:bg-brand-orange focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange focus-visible:ring-offset-2 transition-colors cursor-pointer group mb-6">
+            <span class="flex items-center gap-2 text-brand-orange group-hover:text-white transition-colors">
                 <span class="material-symbols-outlined">add_box</span>
-                <span class="text-sm font-semibold">Click to add new item row</span>
-            </div>
-        </div>
+                <span class="text-sm font-semibold">Add more items</span>
+            </span>
+        </button>
 
         {{-- Bottom Bar --}}
         <div class="sticky bottom-0 bg-white dark:bg-zinc-800 border-t border-[#e1e3e4] dark:border-zinc-700 flex justify-between items-center px-6 py-4 -mx-6 shadow-[0px_-4px_20px_rgba(0,0,0,0.04)]">
@@ -113,7 +132,7 @@
                 <div class="flex-1 min-w-[180px] relative">
                     <label class="text-[10px] font-bold text-[#6f7b68] dark:text-zinc-500 uppercase tracking-wider block mb-1">Product</label>
                     <input type="text" id="productSearch_${idx}" placeholder="Type to search product…" autocomplete="off"
-                        value="${escapeHtml(prefillProduct?.name ?? '')}"
+                        value="${escapeHtml(prefillProduct?.name ?? prefill?.product_query ?? '')}"
                         oninput="onProductSearchInput(${idx})"
                         onfocus="onProductSearchFocus(${idx})"
                         onblur="onProductSearchBlur(${idx})"
@@ -122,7 +141,17 @@
                     <div id="productResults_${idx}" class="hidden absolute z-20 top-full left-0 right-0 mt-1 bg-white dark:bg-zinc-900 border border-[#becab5] dark:border-zinc-600 rounded-lg shadow-lg max-h-56 overflow-y-auto"></div>
                 </div>
 
-                <div class="w-full lg:w-44">
+                {{-- Barcode and quantity are one line, and so are cost and
+                     selling price below them. Stacked, a single item ran five
+                     labels deep and you could not see the cost and the price
+                     you were setting against it at the same time.
+
+                     lg:contents dissolves these pairing wrappers at desktop
+                     width, so their children become direct flex items of the
+                     row again and the wide layout is exactly what it was. --}}
+                <div class="flex gap-3 lg:contents">
+
+                <div class="flex-1 min-w-0 lg:w-44 lg:flex-none">
                     <label class="text-[10px] font-bold text-[#6f7b68] dark:text-zinc-500 uppercase tracking-wider block mb-1">IMEI / Serial</label>
                     <div class="relative">
                         <input type="text" name="items[${idx}][barcode]" placeholder="Scan or type..."
@@ -132,7 +161,7 @@
                     </div>
                 </div>
 
-                <div class="w-full lg:w-32">
+                <div class="w-[124px] shrink-0 lg:w-32">
                     <label class="text-[10px] font-bold text-[#6f7b68] dark:text-zinc-500 uppercase tracking-wider block mb-1">Qty</label>
                     <div class="flex items-center border border-[#becab5] dark:border-zinc-600 rounded-lg overflow-hidden h-9">
                         <button type="button" onclick="changeQty(${idx}, -1)" class="px-2 text-[#6f7b68] dark:text-zinc-400 hover:bg-[#e7e8e9] dark:hover:bg-zinc-700 h-full transition-colors">
@@ -147,7 +176,11 @@
                     </div>
                 </div>
 
-                <div class="w-full lg:w-36">
+                </div>
+
+                <div class="flex gap-3 lg:contents">
+
+                <div class="flex-1 min-w-0 lg:w-36 lg:flex-none">
                     <label class="text-[10px] font-bold text-[#6f7b68] dark:text-zinc-500 uppercase tracking-wider block mb-1">Unit Cost</label>
                     <div class="relative">
                         <span class="absolute left-2 top-2 text-[#6f7b68] dark:text-zinc-400 text-sm font-bold">₦</span>
@@ -158,7 +191,7 @@
                     </div>
                 </div>
 
-                <div class="w-full lg:w-36">
+                <div class="flex-1 min-w-0 lg:w-36 lg:flex-none">
                     <label class="text-[10px] font-bold text-[#6f7b68] dark:text-zinc-500 uppercase tracking-wider block mb-1">Selling Price</label>
                     <div class="relative">
                         <span class="absolute left-2 top-2 text-[#6f7b68] dark:text-zinc-400 text-sm font-bold">₦</span>
@@ -169,6 +202,8 @@
                     </div>
                 </div>
 
+                </div>
+
                 <button type="button" onclick="removeItem(${idx})"
                     class="shrink-0 p-2 text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors mb-0.5">
                     <span class="material-symbols-outlined text-[18px]">delete</span>
@@ -177,18 +212,133 @@
 
             list.insertAdjacentHTML('beforeend', html);
             updateCount();
+            saveDraft();
         }
 
         function removeItem(idx) {
             document.getElementById(`row_${idx}`)?.remove();
             updateCount();
             recalculate();
+            saveDraft();
+        }
+
+        // ── Draft ───────────────────────────────────────────────────────────
+        //
+        // Everything on this step used to live only in the DOM until the whole
+        // form was posted. A reload, a dropped connection, a phone killing the
+        // tab to reclaim memory — any of those and a purchase order typed line
+        // by line was simply gone, with nothing to show the person who typed
+        // it. Now every keystroke lands in localStorage and the step rebuilds
+        // itself from there.
+        //
+        // localStorage rather than a debounced POST to the session: this is
+        // used on a phone in a shop, and a draft that needs the network to
+        // survive is a draft that disappears exactly when the connection is
+        // worst. It also costs the server nothing.
+        //
+        // Stamped with the supplier and branch it was typed against, so a
+        // draft can never reappear inside a different procurement. Cleared for
+        // good when the procurement is finally submitted (see confirm.blade).
+        const DRAFT_KEY = 'gp.procurement.items-draft';
+        const DRAFT_STAMP = { supplier: {{ (int) $supplier->id }}, store: {{ (int) $destination->id }} };
+        const DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+        let draftTimer = null;
+
+        function collectItems() {
+            return [...document.querySelectorAll('.item-row')].map(row => ({
+                product_id:    row.querySelector('input[name*="[product_id]"]')?.value || '',
+                // What they typed but have not picked from the list yet. Kept
+                // so a half-finished row survives too — losing it would mean
+                // the draft only protects work that was already complete.
+                product_query: row.querySelector('.product-search')?.value || '',
+                barcode:       row.querySelector('[name*="[barcode]"]')?.value || '',
+                quantity:      row.querySelector('[name*="[quantity]"]')?.value || 1,
+                unit_cost:     row.querySelector('[name*="[unit_cost]"]')?.value || '',
+                selling_price: row.querySelector('[name*="[selling_price]"]')?.value || '',
+            }));
+        }
+
+        function hasContent(items) {
+            return items.some(i => i.product_id || i.product_query || i.barcode || i.unit_cost || i.selling_price);
+        }
+
+        function writeDraft() {
+            try {
+                const items = collectItems();
+
+                // An untouched empty row is not work worth restoring, and
+                // storing it would resurrect a blank form over a real one.
+                if (! hasContent(items)) {
+                    localStorage.removeItem(DRAFT_KEY);
+                    showDraftSaved(false);
+                    return;
+                }
+
+                localStorage.setItem(DRAFT_KEY, JSON.stringify({
+                    ...DRAFT_STAMP,
+                    items,
+                    savedAt: Date.now(),
+                }));
+                showDraftSaved(true);
+            } catch (e) {
+                // Private browsing, or storage full. The form still works —
+                // it just stops being recoverable, which is where it started.
+            }
+        }
+
+        // Debounced, for the letters arriving one after another while someone
+        // is still typing a word.
+        function saveDraft() {
+            clearTimeout(draftTimer);
+            draftTimer = setTimeout(writeDraft, 250);
+        }
+
+        // Not debounced. For every moment where the next thing that happens
+        // might be the page going away — a field losing focus, a tab being
+        // backgrounded, a navigation — the pending keystroke has to already be
+        // written, because there is no later.
+        function flushDraft() {
+            clearTimeout(draftTimer);
+            writeDraft();
+        }
+
+        function readDraft() {
+            try {
+                const raw = localStorage.getItem(DRAFT_KEY);
+                if (! raw) return null;
+
+                const draft = JSON.parse(raw);
+
+                // Belongs to a different supplier or branch, or is old enough
+                // that restoring it would be a surprise rather than a rescue.
+                if (draft.supplier !== DRAFT_STAMP.supplier) return null;
+                if (draft.store !== DRAFT_STAMP.store) return null;
+                if (! draft.savedAt || Date.now() - draft.savedAt > DRAFT_MAX_AGE_MS) return null;
+
+                return Array.isArray(draft.items) && draft.items.length ? draft.items : null;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function clearDraft() {
+            try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
+        }
+
+        function showDraftSaved(saved) {
+            const el = document.getElementById('draftStatus');
+            if (! el) return;
+
+            el.textContent = saved ? 'Draft saved' : '';
+            el.classList.toggle('opacity-0', ! saved);
         }
 
         function changeQty(idx, delta) {
             const input = document.getElementById(`qty_${idx}`);
             input.value = Math.max(1, parseInt(input.value || 1) + delta);
             recalculate();
+            saveDraft();
         }
 
         function escapeHtml(str) {
@@ -246,6 +396,7 @@
             if (priceInput && !priceInput.value) priceInput.value = product.price;
 
             recalculate();
+            saveDraft();
         }
 
         function validateItemsForm() {
@@ -281,10 +432,45 @@
             document.getElementById('itemCount').textContent = document.querySelectorAll('.item-row').length;
         }
 
-        // Restore saved items or add one empty row
-        if (savedItems.length > 0) {
-            savedItems.forEach(item => addItem(item));
+        // One listener for the whole list rather than handlers on every field:
+        // rows are built as HTML strings and inserted, so anything bound per
+        // field would have to be re-bound on each insert.
+        const itemsList = document.getElementById('itemsList');
+
+        itemsList.addEventListener('input', saveDraft);
+
+        // change fires the moment a field loses focus — which is precisely
+        // "clicking anywhere else". Flushed rather than debounced: a click that
+        // leaves a field is very often a click that leaves the page, and a
+        // quarter of a second is long enough to lose the number just typed.
+        itemsList.addEventListener('change', flushDraft);
+
+        // The page going away for any other reason: a link, the back button, a
+        // phone backgrounding the tab and the browser reclaiming it. pagehide
+        // and visibilitychange are the pair that actually fire on mobile, where
+        // beforeunload is unreliable and often ignored outright.
+        window.addEventListener('pagehide', flushDraft);
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden') flushDraft();
+        });
+
+        // Continuing to the next step: the session takes over from here, but
+        // the draft has to match what was sent in case they come back.
+        document.getElementById('itemsForm')?.addEventListener('submit', flushDraft);
+
+        // A draft beats the session copy: the session holds what was last
+        // submitted from this step, the draft holds what has been typed since.
+        const draftItems = readDraft();
+        const restore = draftItems ?? savedItems;
+
+        if (restore.length > 0) {
+            restore.forEach(item => addItem(item));
             recalculate();
+
+            if (draftItems) {
+                showDraftSaved(true);
+                document.getElementById('draftRestored')?.classList.remove('hidden');
+            }
         } else {
             addItem();
         }

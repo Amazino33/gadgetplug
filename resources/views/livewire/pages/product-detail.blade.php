@@ -1,6 +1,9 @@
 <?php
 
 use Illuminate\Support\Str;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
+use Livewire\Attributes\Computed;
 use Livewire\Volt\Component;
 use App\Models\Product;
 use App\Models\Wishlist;
@@ -8,10 +11,37 @@ use App\Services\CartService;
 use App\Services\Meta\MetaConversionsService;
 
 new class extends Component {
+    /**
+     * How many related products each rail shows at most.
+     *
+     * Ten is two full desktop rows' worth and about four flicks on a phone —
+     * past that nobody scrolls, and every extra card is another image on a
+     * connection that is usually mobile data.
+     */
+    private const RELATED_LIMIT = 10;
+
     public Product $product;
     public int $quantity = 1;
     public bool $wishlisted = false;
     public ?string $cartError = null;
+
+    /**
+     * InitiateCheckout fires when the payment screen opens, which a shopper can
+     * do more than once by dismissing it and tapping Buy Now again. Meta counts
+     * every send, so without this the funnel would report more checkouts
+     * started than there were shoppers.
+     */
+    public bool $initiateCheckoutFired = false;
+
+    /**
+     * The event_id the server-side ViewContent was sent with, so the browser
+     * copy rendered below can quote the same one. Until now ViewContent was
+     * dispatched to the Conversions API with no browser counterpart at all —
+     * the only event in the funnel with nothing to deduplicate against, and
+     * therefore the only one an ad blocker could not cost us but a Meta-side
+     * outage could.
+     */
+    public ?string $viewContentEventId = null;
 
     public function mount(Product $product): void
     {
@@ -49,9 +79,11 @@ new class extends Component {
 
     private function fireViewContent(): void
     {
+        $this->viewContentEventId = (string) Str::uuid();
+
         app(MetaConversionsService::class)->dispatchEvent(
             eventName: 'ViewContent',
-            eventId: (string) Str::uuid(),
+            eventId: $this->viewContentEventId,
             eventSourceUrl: url()->current(),
             userData: $this->currentUserData(),
             customData: [
@@ -61,6 +93,66 @@ new class extends Component {
                 'content_type' => 'product',
             ],
         );
+    }
+
+    /**
+     * Other things in this category from the same shop.
+     *
+     * Ordered so the first card is the obvious step up rather than whatever is
+     * cheapest: anything dearer than the product being viewed comes first,
+     * nearest price first within each group. On a shelf of power banks that
+     * puts the 30,000mAh directly beside the 20,000mAh being read about, then
+     * the 40,000mAh, and only then the smaller ones as peers.
+     *
+     * Sorted in SQL rather than PHP because the limit has to be applied by the
+     * database — sorting after the fact would mean fetching the vendor's whole
+     * category in order to throw most of it away.
+     */
+    #[Computed]
+    public function relatedFromVendor(): Collection
+    {
+        return $this->relatedQuery()
+            ->where('vendor_id', $this->product->vendor_id)
+            ->limit(self::RELATED_LIMIT)
+            ->get();
+    }
+
+    /**
+     * The same category across the rest of the marketplace.
+     *
+     * Its own rail under its own heading, never blended into the vendor's — a
+     * shopper reading one shop's product page should never be left unclear
+     * about whose goods they are looking at. Every card here names its vendor.
+     */
+    #[Computed]
+    public function relatedElsewhere(): Collection
+    {
+        return $this->relatedQuery()
+            ->where('vendor_id', '!=', $this->product->vendor_id)
+            ->limit(self::RELATED_LIMIT)
+            ->get();
+    }
+
+    /**
+     * What both rails have in common: same category, buyable right now, and not
+     * the product already on screen.
+     *
+     * inStockForSale() rather than a stock column comparison because a resold
+     * listing holds no stock of its own — its availability lives on the
+     * supplier's row and only that scope knows how to reach it.
+     */
+    private function relatedQuery(): Builder
+    {
+        $price = (float) $this->product->price;
+
+        return Product::query()
+            ->visibleOnline()
+            ->inStockForSale()
+            ->with(['vendor', 'category', 'media'])
+            ->where('category_id', $this->product->category_id)
+            ->whereKeyNot($this->product->id)
+            ->orderByRaw('CASE WHEN price > ? THEN 0 ELSE 1 END', [$price])
+            ->orderByRaw('ABS(price - ?)', [$price]);
     }
 
     public function toggleWishlist(): void
@@ -105,17 +197,100 @@ new class extends Component {
         $this->fireAddToCart();
     }
 
-    public function buyNow(): void
+    /**
+     * Buy Now was tapped and the payment screen is already on screen.
+     *
+     * The screen itself is opened by Alpine against markup that is already in
+     * the DOM, so it appears on the tap with no request in between. This runs
+     * afterwards, purely to record that checkout started — nothing the shopper
+     * is looking at waits for it.
+     */
+    public function openPaymentChoice(): void
     {
+        if ($this->initiateCheckoutFired) {
+            return;
+        }
+
+        $this->initiateCheckoutFired = true;
+
+        $eventId = (string) Str::uuid();
+        $value   = (float) $this->product->price * $this->quantity;
+
+        app(MetaConversionsService::class)->dispatchEvent(
+            eventName: 'InitiateCheckout',
+            eventId: $eventId,
+            eventSourceUrl: url()->current(),
+            userData: $this->currentUserData(),
+            customData: [
+                'currency'     => 'NGN',
+                'value'        => $value,
+                'content_ids'  => [$this->product->id],
+                'content_type' => 'product',
+            ],
+        );
+
+        $this->dispatch('pixel-initiate-checkout', eventId: $eventId, value: $value);
+    }
+
+    /**
+     * A payment method was chosen on that screen.
+     *
+     * The choice travels to checkout in the session rather than the URL: it
+     * decides what the customer is asked for next — email is required to pay
+     * online and optional otherwise — so it is not something a link handed to
+     * someone should be able to set.
+     */
+    public function buyNow(string $method): void
+    {
+        if (! in_array($method, ['paystack', 'pay_on_delivery'], true)) {
+            return;
+        }
+
         if (! app(CartService::class)->add($this->product, $this->quantity)) {
             $this->cartError = 'Sorry, this product is out of stock.';
+            // Nothing can be bought, so the payment screen has nothing left to
+            // ask — close it and let the error banner be what they see.
+            $this->dispatch('payment-choice-close');
             return;
         }
 
         $this->cartError = null;
         $this->dispatch('cart-updated');
         $this->fireAddToCart();
+        $this->fireAddPaymentInfo($method);
+
+        session()->put('checkout_payment_method', $method);
+
         $this->redirectRoute('checkout');
+    }
+
+    /**
+     * AddPaymentInfo — the step Meta was missing entirely.
+     *
+     * Browser and server copies share one event_id so Meta folds them into a
+     * single event. The server copy is the one that survives an ad blocker,
+     * which on this audience is a large minority of shoppers.
+     */
+    private function fireAddPaymentInfo(string $method): void
+    {
+        $eventId = (string) Str::uuid();
+        $value   = (float) $this->product->price * $this->quantity;
+
+        app(MetaConversionsService::class)->dispatchEvent(
+            eventName: 'AddPaymentInfo',
+            eventId: $eventId,
+            eventSourceUrl: url()->current(),
+            userData: $this->currentUserData(),
+            customData: [
+                'currency'       => 'NGN',
+                'value'          => $value,
+                'content_ids'    => [$this->product->id],
+                'content_type'   => 'product',
+                'payment_method' => $method,
+            ],
+        );
+
+        $this->dispatch('pixel-add-payment-info', eventId: $eventId, value: $value);
     }
 
     // Server CAPI copy dispatched right here (this method runs inside a real
@@ -170,6 +345,19 @@ $categoryIcon = \App\Support\CategoryIcon::for($product->category?->name);
     :url="$ogUrl"
 >
 
+{{-- Browser half of ViewContent, quoting the event_id its Conversions API
+copy was sent with in mount() so Meta folds the two into one event. --}}
+@if (config('services.meta.pixel_id') && $viewContentEventId)
+<script>
+fbq('track', 'ViewContent', {
+    value: {{ (float) $product->price }},
+    currency: 'NGN',
+    content_ids: @json([$product->id]),
+    content_type: 'product'
+}, {eventID: '{{ $viewContentEventId }}'});
+</script>
+@endif
+
 @if($cartError)
     <div class="fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-red-600 text-white text-sm font-medium px-4 py-2.5 rounded-lg shadow-lg"
         x-data x-init="setTimeout(() => $wire.set('cartError', null), 4000)">
@@ -177,7 +365,24 @@ $categoryIcon = \App\Support\CategoryIcon::for($product->category?->name);
     </div>
 @endif
 
-<div class="px-4 md:px-6 py-6 pb-52 md:pb-6 bg-[#f8fcf8] dark:bg-[#0d1a0d] min-h-screen">
+<div class="px-4 md:px-6 py-6 pb-52 md:pb-6 bg-[#f8fcf8] dark:bg-[#0d1a0d] min-h-screen"
+     x-data="{
+        payOpen: false,
+        open() {
+            this.payOpen = true
+            // Nothing is fetched here — the panel is already rendered below.
+            // This only stops the page behind it scrolling under the overlay,
+            // which on a phone is what makes an overlay feel like a screen
+            // rather than a box sitting on top of one.
+            document.body.style.overflow = 'hidden'
+        },
+        close() {
+            this.payOpen = false
+            document.body.style.overflow = ''
+        },
+     }"
+     x-on:payment-choice-close.window="close()"
+     x-on:keydown.escape.window="payOpen && close()">
 
     {{-- ─── BREADCRUMB ──────────────────────────────────────────────────────── --}}
     <nav class="flex items-center gap-1.5 text-[12px] text-brand-muted mb-6">
@@ -334,7 +539,10 @@ $categoryIcon = \App\Support\CategoryIcon::for($product->category?->name);
 
             {{-- Buy Now (dominant) + Add to Cart (secondary) --}}
             <div class="hidden md:flex flex-col gap-2.5 mb-6">
-                <button wire:click="buyNow"
+                {{-- @click opens the panel on the tap itself; wire:click only
+                     records that checkout started. The shopper never waits on
+                     the round trip, which is the entire point. --}}
+                <button type="button" @click="open()" wire:click="openPaymentChoice"
                     class="w-full flex items-center justify-center gap-2 bg-brand-orange hover:bg-[#e06610] text-white font-montserrat font-bold text-[15px] py-4 rounded-xl border-0 cursor-pointer transition-all hover:-translate-y-px shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
                     @disabled($product->available_stock < 1)>
                     <svg class="w-5 h-5 fill-none flex-shrink-0" style="stroke:currentColor;stroke-width:2" viewBox="0 0 24 24">
@@ -397,12 +605,119 @@ $categoryIcon = \App\Support\CategoryIcon::for($product->category?->name);
     </div>
     @endif
 
+    {{-- ─── RELATED PRODUCTS ────────────────────────────────────────────────── --}}
+    {{-- The page used to end at the specifications: a shopper who was not sold
+    on this exact unit had nowhere to go but back.
+
+    The category comes first. Someone reading about a smartwatch is in the
+    market for a smartwatch, and the next thing they want is the other ones —
+    which shop each belongs to is a detail they can weigh after. What else this
+    shop sells sits under it: still worth offering, but it answers a question
+    they have not asked yet. The two are never blended, and every card on the
+    marketplace rail names its vendor. --}}
+    @php
+        // "More Power Banks" reads like a shop; "More products in Power Banks"
+        // reads like a database. Falls back when a product has no category.
+        $categoryLabel = $product->category?->name;
+        $vendorRail    = $this->relatedFromVendor;
+        $elsewhereRail = $this->relatedElsewhere;
+    @endphp
+
+    @if ($elsewhereRail->isNotEmpty())
+    <section class="mt-10" aria-labelledby="rail-elsewhere-heading">
+        <div class="flex items-baseline justify-between gap-3 mb-1">
+            <h2 id="rail-elsewhere-heading" class="font-montserrat font-black text-[18px] md:text-[20px] text-brand-dark dark:text-[#e8f5e9]">
+                {{ $categoryLabel ? 'More '.Str::plural($categoryLabel).' on GadgetPlug' : 'Also on GadgetPlug' }}
+            </h2>
+        </div>
+        <p class="mb-4 text-[12px] text-brand-muted">From other verified shops on the marketplace.</p>
+
+        {{-- Horizontal rail on mobile, grid on desktop. Same cards either way —
+             only the container changes, so there is one set of markup. --}}
+        <div class="gp-rail scrollbar-none -mx-4 flex gap-3 overflow-x-auto px-4 pb-2
+                    md:mx-0 md:grid md:grid-cols-3 md:overflow-visible md:px-0 lg:grid-cols-4">
+            @foreach ($elsewhereRail as $related)
+                {{-- Eager on the first two: this rail is now the one that lands
+                     just under the fold, so its opening cards are what a
+                     scrolling shopper waits on. --}}
+                <x-product-card
+                    :product="$related"
+                    :show-vendor="true"
+                    :eager="$loop->index < 2"
+                    width="150px"
+                    class="shrink-0 md:w-auto" />
+            @endforeach
+        </div>
+    </section>
+    @endif
+
+    @if ($vendorRail->isNotEmpty())
+    <section class="mt-10" aria-labelledby="rail-vendor-heading">
+        <div class="flex items-baseline justify-between gap-3 mb-4">
+            <h2 id="rail-vendor-heading" class="font-montserrat font-black text-[18px] md:text-[20px] text-brand-dark dark:text-[#e8f5e9]">
+                More from {{ $product->vendor->name ?? 'this shop' }}
+            </h2>
+            @if ($product->vendor)
+            <a href="{{ route('store.show', $product->vendor) }}"
+               class="shrink-0 text-[12px] font-semibold text-brand hover:underline">
+                See all
+            </a>
+            @endif
+        </div>
+
+        <div class="gp-rail scrollbar-none -mx-4 flex gap-3 overflow-x-auto px-4 pb-2
+                    md:mx-0 md:grid md:grid-cols-3 md:overflow-visible md:px-0 lg:grid-cols-4">
+            @foreach ($vendorRail as $related)
+                <x-product-card
+                    :product="$related"
+                    width="150px"
+                    class="shrink-0 md:w-auto" />
+            @endforeach
+        </div>
+    </section>
+    @endif
+
+    {{-- ─── STEP A: PAYMENT CHOICE ──────────────────────────────────────────── --}}
+    {{-- Rendered with the page, hidden until Buy Now. Nothing is fetched when
+    it opens, which is why it appears on the tap instead of after a spinner.
+    x-cloak keeps it off screen for the frame before Alpine boots. --}}
+    <div x-show="payOpen"
+         x-cloak
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         class="fixed inset-0 z-[200] overflow-y-auto"
+         role="dialog"
+         aria-modal="true"
+         aria-label="Choose how to pay">
+        <div x-show="payOpen"
+             x-transition:enter="transition ease-out duration-300 delay-75"
+             x-transition:enter-start="opacity-0 translate-y-4"
+             x-transition:enter-end="opacity-100 translate-y-0"
+             class="min-h-full">
+            <x-checkout.payment-choice action="buyNow" :total="$product->price * $quantity">
+                <x-slot:dismiss>
+                    <button type="button" @click="close()"
+                        aria-label="Close"
+                        class="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20">
+                        <svg class="h-5 w-5 fill-none" style="stroke:currentColor;stroke-width:2" viewBox="0 0 24 24">
+                            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                    </button>
+                </x-slot:dismiss>
+            </x-checkout.payment-choice>
+        </div>
+    </div>
+
     {{-- ─── MOBILE STICKY CTA BAR ──────────────────────────────────────────── --}}
     {{-- Buy Now dominant (full width, top); Add to Cart + wishlist secondary
     (smaller, outlined) below it — same hierarchy as the desktop buttons. --}}
     <div class="fixed left-0 right-0 md:hidden bg-white dark:bg-[#1a2a1a] border-t border-brand-border dark:border-[#2a3a2a] px-4 py-3 flex flex-col gap-2"
          style="bottom: 3rem; z-index: 50;">
-        <button wire:click="buyNow"
+        <button type="button" @click="open()" wire:click="openPaymentChoice"
             class="w-full flex items-center justify-center gap-2 bg-brand-orange hover:bg-[#e06610] text-white font-montserrat font-bold text-[14px] py-3.5 rounded-xl transition-all shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
             @disabled($product->available_stock < 1)>
             <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">

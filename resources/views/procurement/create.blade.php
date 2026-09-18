@@ -31,12 +31,6 @@
             <p class="text-sm text-[#6f7b68] dark:text-zinc-400 mt-0.5">Choose a verified supplier to begin the procurement process.</p>
         </div>
         <div class="flex flex-wrap items-center gap-3">
-            <div class="relative">
-                <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#6f7b68] dark:text-zinc-400 text-sm">search</span>
-                <input type="text" id="supplierSearch" placeholder="Search suppliers..."
-                    class="pl-9 pr-4 py-2.5 border border-[#becab5] dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-800 text-sm dark:text-zinc-100 focus:border-[#016c00] focus:ring-2 focus:ring-[#016c00]/20 outline-none w-64"
-                    oninput="filterSuppliers(this.value)">
-            </div>
             <div x-data="supplierModal()">
                 <button type="button" @click="open = true" data-tour="procurement-new-supplier" class="flex items-center gap-2 px-4 py-2.5 border border-[#becab5] dark:border-zinc-600 rounded-lg text-[#016c00] dark:text-green-400 text-sm font-semibold hover:bg-[#f3f4f5] dark:hover:bg-zinc-700 transition-colors whitespace-nowrap">
                     <span class="material-symbols-outlined text-sm">add</span> New Supplier
@@ -83,46 +77,6 @@
     <form method="POST" action="{{ route('procurement.storeSupplier') }}" enctype="multipart/form-data">
         @csrf
 
-        {{-- Receipt Upload --}}
-        <div class="bg-white dark:bg-zinc-800 rounded-xl p-6 shadow-[0px_4px_20px_rgba(0,0,0,0.04)] border border-[#becab5]/30 dark:border-zinc-700 mb-6">
-            <div class="flex items-center gap-3 mb-4">
-                <div class="w-10 h-10 rounded-lg bg-[#016c00]/10 dark:bg-green-900/30 flex items-center justify-center">
-                    <span class="material-symbols-outlined text-[#016c00] dark:text-green-400">receipt_long</span>
-                </div>
-                <div>
-                    <h3 class="font-semibold text-[#191c1d] dark:text-zinc-100" style="font-family:'Montserrat',sans-serif;">Receipt / Waybill Photo</h3>
-                    <p class="text-xs text-[#6f7b68] dark:text-zinc-400">Snap or upload the purchase receipt for reference.</p>
-                </div>
-            </div>
-
-            <label id="receiptDropzone"
-                class="relative flex flex-col items-center justify-center w-full h-44 border-2 border-dashed rounded-xl cursor-pointer hover:border-[#016c00] hover:bg-[#f3f4f5] dark:hover:bg-zinc-700 transition-all group
-                    {{ ($receiptImage ?? false) ? 'border-[#016c00] bg-[#f3f4f5] dark:bg-zinc-700' : 'border-[#becab5] dark:border-zinc-600' }}">
-                <div id="receiptPlaceholder" class="flex flex-col items-center gap-2 text-[#6f7b68] dark:text-zinc-400 group-hover:text-[#016c00] dark:group-hover:text-green-400 transition-colors"
-                    @if($receiptImage ?? false) style="display:none" @endif>
-                    <span class="material-symbols-outlined text-4xl">photo_camera</span>
-                    <span class="text-sm font-semibold">Tap to snap or upload receipt</span>
-                    <span class="text-xs">JPG, PNG — max 5 MB</span>
-                </div>
-                <img id="receiptPreview"
-                    src="{{ ($receiptImage ?? false) ? asset('storage/' . $receiptImage) : '' }}"
-                    alt="Receipt preview"
-                    class="absolute inset-0 w-full h-full object-contain rounded-xl p-2"
-                    style="{{ ($receiptImage ?? false) ? '' : 'display:none' }}" />
-                <input type="file" name="receipt_image" id="receiptInput" accept="image/*" capture="environment"
-                    class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    onchange="previewReceipt(this)" />
-            </label>
-            @error('receipt_image')
-                <p class="text-red-600 dark:text-red-400 text-sm mt-2">{{ $message }}</p>
-            @enderror
-            <button type="button" id="receiptClear" onclick="clearReceipt()"
-                style="{{ ($receiptImage ?? false) ? 'display:flex' : 'display:none' }}"
-                class="mt-3 flex items-center gap-1 text-red-500 dark:text-red-400 text-xs font-semibold hover:text-red-700 dark:hover:text-red-300 transition-colors">
-                <span class="material-symbols-outlined text-sm">close</span> Remove photo
-            </button>
-        </div>
-
         {{-- Destination Branch --}}
         <div class="bg-white dark:bg-zinc-800 rounded-xl p-6 shadow-[0px_4px_20px_rgba(0,0,0,0.04)] border border-[#becab5]/30 dark:border-zinc-700 mb-6">
             <div class="flex items-center gap-3 mb-4">
@@ -155,6 +109,25 @@
             @error('store_id')
                 <p class="text-red-600 dark:text-red-400 text-sm mt-2">{{ $message }}</p>
             @enderror
+        </div>
+
+        {{-- Supplier search.
+             Lives here rather than up in the page header, where it used to sit
+             two cards above the thing it acts on — you typed in one place and
+             the cards appeared and disappeared somewhere off screen, which on a
+             phone meant not seeing the effect at all.
+
+             Enter is swallowed deliberately: this input is inside the form, and
+             every supplier card's Select button is a submit carrying its own
+             supplier_id. Without this, pressing Enter here would fire the first
+             one and pick a supplier nobody chose. --}}
+        <div class="relative mb-4">
+            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[#6f7b68] dark:text-zinc-400 text-sm">search</span>
+            <input type="search" id="supplierSearch" placeholder="Search suppliers..."
+                autocomplete="off"
+                class="w-full pl-9 pr-4 py-2.5 border border-[#becab5] dark:border-zinc-600 rounded-lg bg-white dark:bg-zinc-800 text-sm dark:text-zinc-100 focus:border-[#016c00] focus:ring-2 focus:ring-[#016c00]/20 outline-none"
+                oninput="filterSuppliers(this.value)"
+                onkeydown="if (event.key === 'Enter') event.preventDefault();">
         </div>
 
         {{-- Supplier Grid --}}
@@ -220,6 +193,49 @@
             </div>
             @endforelse
         </div>
+
+        {{-- Receipt Upload. Last now, after the supplier has been picked —
+             it is optional (nullable in storeSupplier), and the paperwork is
+             the part of this step that can wait. --}}
+        <div class="bg-white dark:bg-zinc-800 rounded-xl p-6 shadow-[0px_4px_20px_rgba(0,0,0,0.04)] border border-[#becab5]/30 dark:border-zinc-700 mt-6">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 rounded-lg bg-[#016c00]/10 dark:bg-green-900/30 flex items-center justify-center">
+                    <span class="material-symbols-outlined text-[#016c00] dark:text-green-400">receipt_long</span>
+                </div>
+                <div>
+                    <h3 class="font-semibold text-[#191c1d] dark:text-zinc-100" style="font-family:'Montserrat',sans-serif;">Receipt / Waybill Photo</h3>
+                    <p class="text-xs text-[#6f7b68] dark:text-zinc-400">Snap or upload the purchase receipt for reference.</p>
+                </div>
+            </div>
+
+            <label id="receiptDropzone"
+                class="relative flex flex-col items-center justify-center w-full h-44 border-2 border-dashed rounded-xl cursor-pointer hover:border-[#016c00] hover:bg-[#f3f4f5] dark:hover:bg-zinc-700 transition-all group
+                    {{ ($receiptImage ?? false) ? 'border-[#016c00] bg-[#f3f4f5] dark:bg-zinc-700' : 'border-[#becab5] dark:border-zinc-600' }}">
+                <div id="receiptPlaceholder" class="flex flex-col items-center gap-2 text-[#6f7b68] dark:text-zinc-400 group-hover:text-[#016c00] dark:group-hover:text-green-400 transition-colors"
+                    @if($receiptImage ?? false) style="display:none" @endif>
+                    <span class="material-symbols-outlined text-4xl">photo_camera</span>
+                    <span class="text-sm font-semibold">Tap to snap or upload receipt</span>
+                    <span class="text-xs">JPG, PNG — max 5 MB</span>
+                </div>
+                <img id="receiptPreview"
+                    src="{{ ($receiptImage ?? false) ? asset('storage/' . $receiptImage) : '' }}"
+                    alt="Receipt preview"
+                    class="absolute inset-0 w-full h-full object-contain rounded-xl p-2"
+                    style="{{ ($receiptImage ?? false) ? '' : 'display:none' }}" />
+                <input type="file" name="receipt_image" id="receiptInput" accept="image/*" capture="environment"
+                    class="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    onchange="previewReceipt(this)" />
+            </label>
+            @error('receipt_image')
+                <p class="text-red-600 dark:text-red-400 text-sm mt-2">{{ $message }}</p>
+            @enderror
+            <button type="button" id="receiptClear" onclick="clearReceipt()"
+                style="{{ ($receiptImage ?? false) ? 'display:flex' : 'display:none' }}"
+                class="mt-3 flex items-center gap-1 text-red-500 dark:text-red-400 text-xs font-semibold hover:text-red-700 dark:hover:text-red-300 transition-colors">
+                <span class="material-symbols-outlined text-sm">close</span> Remove photo
+            </button>
+        </div>
+
     </form>
 
     <script>

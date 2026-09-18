@@ -1,4 +1,10 @@
 @props([
+    // Strips the store away and leaves one thing on screen.
+    //
+    // A checkout is not a page to browse from — every link out of it is a way
+    // to lose an order that was nearly placed. Off by default, so every other
+    // page keeps the full storefront exactly as it was.
+    'focused'     => false,
     'title'       => "GadgetPlug — Nigeria's #1 Tech Marketplace",
     'description' => 'Buy phones, laptops and gadgets from CAC-verified Nigerian vendors. Test your item before you pay, with 2-hour dispatch across Uyo, Lagos, Abuja and 20 more cities.',
     'image'       => asset('images/logo.svg'),
@@ -82,6 +88,25 @@ $navCategories = \Illuminate\Support\Facades\Cache::remember(
 );
 @endphp
 
+    {{-- ─── HEADER (focused) ────────────────────────────────────────────────── --}}
+    @if ($focused)
+    {{-- The logo stays: it is the thing that says whose checkout this is, and
+    on a page asking for money that is worth more than any nav link. Nothing
+    else here is a link — there is nowhere to go but forward. --}}
+    <header class="bg-white dark:bg-[#162016] border-b border-brand-border dark:border-[#2a3a2a] sticky top-0 z-[100]">
+        <div class="max-w-[1000px] mx-auto px-4 md:px-6 py-3 flex items-center justify-between gap-3">
+            <img src="/images/logo.svg" alt="GadgetPlug" width="140" height="44" class="h-9 w-auto" draggable="false">
+            <span class="flex items-center gap-1.5 text-[11px] font-semibold text-brand-muted">
+                <svg class="w-3.5 h-3.5 fill-none" style="stroke:#068B03;stroke-width:2" viewBox="0 0 24 24">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                </svg>
+                Secure checkout
+            </span>
+        </div>
+    </header>
+    @else
+
     {{-- ─── HEADER ──────────────────────────────────────────────────────────── --}}
     <header class="bg-white dark:bg-[#162016] border-b border-brand-border dark:border-[#2a3a2a] sticky top-0 z-[100] transition-colors duration-200">
       <div class="max-w-[1440px] mx-auto px-4 md:px-6">
@@ -150,6 +175,9 @@ $navCategories = \Illuminate\Support\Facades\Cache::remember(
                             aria-label="Search products"
                             placeholder="Search phones, laptops, audio, accessories…"
                             value="{{ request('search') }}"
+                            {{-- Hand over to the live panel rather than making
+                                 them type a whole query and wait for a page. --}}
+                            x-on:focus="$dispatch('open-search')"
                             class="flex-1 bg-transparent border-none outline-none text-[13px] text-[#111] dark:text-[#e8f5e9] placeholder-[#8a9e8c] font-inter"
                         >
                         <button type="submit" aria-label="Search"
@@ -316,6 +344,7 @@ $navCategories = \Illuminate\Support\Facades\Cache::remember(
                             aria-label="Search products"
                             placeholder="Search phones, laptops…"
                             value="{{ request('search') }}"
+                            x-on:focus="$dispatch('open-search')"
                             class="flex-1 bg-transparent border-none outline-none text-[12px] text-[#111] dark:text-[#e8f5e9] placeholder-[#8a9e8c]">
                         <button type="submit" aria-label="Search"
                             class="flex-shrink-0 w-9 h-9 flex items-center justify-center rounded-lg bg-brand text-white hover:bg-[#055002] transition-colors">
@@ -416,6 +445,9 @@ $navCategories = \Illuminate\Support\Facades\Cache::remember(
         </div>
     </div>
 
+    @endif{{-- /focused header swap: category strip, menu backdrop and drawer
+              all belong to the full header and go with it --}}
+
     {{-- ─── PAY-ON-DELIVERY SUCCESS BANNER ─────────────────────────────────── --}}
     @if (session('pod_success'))
     <div class="bg-brand text-white px-4 py-4">
@@ -434,13 +466,14 @@ $navCategories = \Illuminate\Support\Facades\Cache::remember(
     @endif
 
     {{-- ─── PAGE CONTENT ────────────────────────────────────────────────────── --}}
-    <main id="main-content" class="pb-16 md:pb-0">
+    <main id="main-content" class="{{ $focused ? '' : 'pb-16 md:pb-0' }}">
         <div class="max-w-[1440px] mx-auto">
             {{ $slot }}
         </div>
     </main>
 
     {{-- ─── FOOTER ──────────────────────────────────────────────────────────── --}}
+    @unless ($focused)
     <footer class="bg-[#e8f0e9] dark:bg-brand-footer transition-colors duration-200">
       <div class="max-w-[1440px] mx-auto px-4 md:px-6 pt-9 pb-5">
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1.8fr_1fr_1fr_1fr] gap-7 mb-7">
@@ -532,6 +565,15 @@ $navCategories = \Illuminate\Support\Facades\Cache::remember(
         </div>
       </div>{{-- /max-w footer inner --}}
     </footer>
+    @endunless
+
+    {{-- ─── SEARCH PANEL ────────────────────────────────────────────────────── --}}
+    {{-- Opened by the nav button and by focusing either header field. Left out
+    of focused mode with the rest of the chrome: searching the catalogue is the
+    opposite of what a checkout is for. --}}
+    @unless ($focused)
+        <livewire:components.search-overlay />
+    @endunless
 
     {{-- ─── CART TOAST ──────────────────────────────────────────────────────── --}}
     <div
@@ -562,9 +604,25 @@ $navCategories = \Illuminate\Support\Facades\Cache::remember(
             value: $event.detail.value,
             currency: 'NGN',
         }, {eventID: $event.detail.eventId})"></div>
+
+    {{-- The two steps of the buying flow that happen without a page load, so
+    neither has a fresh render to carry an inline fbq() call the way checkout's
+    InitiateCheckout and Purchase do. Same arrangement as AddToCart above: the
+    Livewire action dispatches, this listens, and the event_id it carries is
+    the one the server-side CAPI copy was already sent with. --}}
+    <div x-data x-on:pixel-initiate-checkout.window="fbq('track', 'InitiateCheckout', {
+            value: $event.detail.value,
+            currency: 'NGN',
+        }, {eventID: $event.detail.eventId})"></div>
+
+    <div x-data x-on:pixel-add-payment-info.window="fbq('track', 'AddPaymentInfo', {
+            value: $event.detail.value,
+            currency: 'NGN',
+        }, {eventID: $event.detail.eventId})"></div>
     @endif
 
     {{-- ─── MOBILE BOTTOM NAV ───────────────────────────────────────────────── --}}
+    @unless ($focused)
     <nav class="fixed bottom-0 left-0 right-0 bg-white dark:bg-[#162016] border-t border-brand-border dark:border-[#2a3a2a] flex md:hidden z-[100] transition-colors duration-200">
         <a href="{{ route('home') }}" class="flex-1 flex flex-col items-center justify-center gap-0.5 min-h-[44px] py-2 cursor-pointer">
             <svg class="w-[22px] h-[22px] fill-none" style="stroke:#068B03;stroke-width:1.8" viewBox="0 0 24 24">
@@ -573,15 +631,17 @@ $navCategories = \Illuminate\Support\Facades\Cache::remember(
             </svg>
             <span class="text-[9px] text-brand font-montserrat font-semibold">Home</span>
         </a>
-        {{-- Was a plain div: not focusable, not activatable, and it did nothing
-             when tapped. Now scrolls to the search field at the top of the page. --}}
-        <a href="#site-search-mobile"
-           @click="scrolled = false"
+        {{-- Opens the search panel. It was a link to #site-search-mobile — the
+             field in the header — but that field sits in a row which collapses
+             on scroll, so the jump landed on something invisible and never
+             focused it. Tapping Search did nothing a shopper could see. --}}
+        <button type="button"
+           @click="$dispatch('open-search')"
            aria-label="Search products"
-           class="flex-1 flex flex-col items-center justify-center gap-0.5 min-h-[44px] py-2 cursor-pointer">
+           class="flex-1 flex flex-col items-center justify-center gap-0.5 min-h-[44px] py-2 cursor-pointer bg-transparent border-0">
             <x-gp-icon name="search" class="w-[22px] h-[22px] text-[#aaa]" />
             <span class="text-[9px] text-[#aaa] dark:text-[#4a6a4a] font-montserrat font-semibold">Search</span>
-        </a>
+        </button>
         <button class="flex-1 flex flex-col items-center justify-center gap-0.5 min-h-[44px] py-2 cursor-pointer bg-transparent border-0"
             @click="mobileMenu = !mobileMenu">
             <svg class="gp-icon-inactive w-[22px] h-[22px] fill-none" style="stroke:#aaa;stroke-width:1.8" viewBox="0 0 24 24">
@@ -605,6 +665,7 @@ $navCategories = \Illuminate\Support\Facades\Cache::remember(
             <span class="text-[9px] text-[#aaa] dark:text-[#4a6a4a] font-montserrat font-semibold">Account</span>
         </a>
     </nav>
+    @endunless
 
     {{-- wire:target.except skips background/auto-triggered requests (e.g. infinite-scroll
          loadMore, which already has its own inline spinner) so this full-page blur only

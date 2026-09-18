@@ -207,3 +207,15 @@ summary:focus-visible,
 @media (prefers-reduced-motion: reduce) {
     .gp-skeleton { animation: none; }
 }
+
+/* ─── Alpine ──────────────────────────────────────────────────────────────── */
+/* x-cloak was already used (the feed splash, now the checkout steps) with no
+   rule behind it, so the element it guarded rendered for one frame before
+   Alpine hid it. This is that missing rule. */
+[x-cloak] { display: none !important; }
+
+/* Horizontal product rails: snap each card to the left edge so a flick always
+   lands on a whole card rather than halfway through one. Paired with
+   .scrollbar-none above — on mobile the scrollbar is noise. */
+.gp-rail { scroll-snap-type: x mandatory; overscroll-behavior-x: contain; }
+.gp-rail > * { scroll-snap-align: start; }

@@ -165,7 +165,12 @@
             class="flex items-center gap-2 px-6 py-2.5 border border-[#becab5] dark:border-zinc-600 rounded-lg text-[#6f7b68] dark:text-zinc-400 text-sm font-semibold hover:bg-[#f3f4f5] dark:hover:bg-zinc-700 transition-colors">
             <span class="material-symbols-outlined text-sm">arrow_back</span> Back
         </a>
-        <form method="POST" action="{{ route('procurement.submit') }}">
+        {{-- Submitting is what turns the draft into a real procurement, so it
+             is also what retires the draft. Without this, the next order to
+             the same supplier and branch would open pre-filled with the items
+             of the one just submitted. --}}
+        <form method="POST" action="{{ route('procurement.submit') }}"
+              onsubmit="try { localStorage.removeItem('gp.procurement.items-draft') } catch (e) {}">
             @csrf
             <button type="submit"
                 class="flex items-center gap-2 px-6 py-2.5 bg-[#016c00] text-white text-sm font-bold rounded-lg hover:bg-green-800 transition-colors"

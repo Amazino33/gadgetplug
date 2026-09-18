@@ -41,6 +41,7 @@ test('a referral code entered at checkout creates a real commission on the resul
         ->set('email', 'jane@example.com')
         ->set('phone', '08012345678')
         ->set('lga', 'Uyo')
+        ->set('deliveryUrgency', 'today')
         ->set('address', '1 Test Street, long enough to pass validation')
         ->set('paymentMethod', 'pay_on_delivery')
         ->set('referralCode', $affiliate->code)
@@ -64,6 +65,7 @@ test('checkout with no referral code and no cookie creates no commission', funct
         ->set('email', 'no-affiliate@example.com')
         ->set('phone', '08012345678')
         ->set('lga', 'Uyo')
+        ->set('deliveryUrgency', 'today')
         ->set('address', '1 Test Street, long enough to pass validation')
         ->set('paymentMethod', 'pay_on_delivery')
         ->call('processCheckout');
@@ -83,6 +85,7 @@ test('a bogus referral code at checkout does not block the order from being plac
         ->set('email', 'bogus-code@example.com')
         ->set('phone', '08012345678')
         ->set('lga', 'Uyo')
+        ->set('deliveryUrgency', 'today')
         ->set('address', '1 Test Street, long enough to pass validation')
         ->set('paymentMethod', 'pay_on_delivery')
         ->set('referralCode', 'TOTALLY-FAKE-CODE')
