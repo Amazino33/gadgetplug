@@ -33,6 +33,16 @@ class ProcurementWizardController extends Controller
             'You are not authorized to run procurement for this store.'
         );
 
+        // This wizard sits on plain `auth`, outside the vendor panel, so
+        // EnsureUserBelongsToVendor never sees it — a blocked vendor could
+        // otherwise keep booking stock in through /procurement/create while
+        // locked out of everything else. Aborting with a built response rather
+        // than a status code: a bare 403 here has no panel to fall back to and
+        // ends up on the customer account page saying the wrong thing.
+        if ($vendor->isDashboardBlocked() && ! $user->isSuperAdmin()) {
+            abort(response()->view('vendor.blocked', ['vendor' => $vendor], 403));
+        }
+
         return $vendor;
     }
 

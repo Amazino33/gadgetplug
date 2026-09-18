@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\User;
+use App\Models\Vendor;
 use Closure;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -46,6 +47,27 @@ class EnsurePosVendorAccess
         foreach ($this->boundVendorIds($request) as $vendorId) {
             if (! $this->mayActFor($user, $vendorId)) {
                 abort(404);
+            }
+        }
+
+        // Access is fine; the account is not. A token issued before the block
+        // would otherwise keep trading indefinitely, since tokens are long
+        // lived and the till only re-authenticates when someone logs out.
+        if (! $user->isSuperAdmin()) {
+            $touched = array_unique(array_merge(
+                filled($sent) && is_numeric($sent) ? [(int) $sent] : [],
+                $this->boundVendorIds($request),
+            ));
+
+            $blocked = $touched
+                ? Vendor::whereKey($touched)->where('dashboard_blocked', true)->first()
+                : null;
+
+            if ($blocked) {
+                return response()->json([
+                    'message' => $blocked->dashboardBlockMessage(),
+                    'blocked' => true,
+                ], 403);
             }
         }
 

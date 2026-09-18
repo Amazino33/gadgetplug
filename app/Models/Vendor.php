@@ -19,12 +19,15 @@ class Vendor extends Model
         'pos_vat_enabled', 'pos_vat_rate', 'pos_blind_count_participants',
         'pos_blind_count_frequency', 'pos_blind_count_custom_days', 'owner_can_manage_roles',
         'pos_min_margin_percent', 'online_sales_enabled', 'initial_capital',
+        'dashboard_blocked', 'dashboard_blocked_reason', 'dashboard_blocked_at',
         'restock_window_days', 'restock_lead_time_days', 'restock_target_cover_days', 'restock_safety_buffer_days',
     ];
 
     protected $casts = [
         'pos_min_margin_percent'     => 'decimal:2',
         'online_sales_enabled'      => 'boolean',
+        'dashboard_blocked'         => 'boolean',
+        'dashboard_blocked_at'      => 'datetime',
         'initial_capital'           => 'decimal:2',
         'restock_window_days'       => 'integer',
         'restock_lead_time_days'    => 'integer',
@@ -155,6 +158,33 @@ class Vendor extends Model
     public function canSellOnline(): bool
     {
         return (bool) $this->online_sales_enabled;
+    }
+
+    /**
+     * Account-level block, used when a vendor owes the platform or has broken
+     * the terms: no panel, no till, until an admin lifts it.
+     *
+     * Super admins are exempt everywhere this is checked — support has to be
+     * able to look inside the account they just blocked, and locking ourselves
+     * out would only make the debt harder to settle.
+     */
+    public function isDashboardBlocked(): bool
+    {
+        return (bool) $this->dashboard_blocked;
+    }
+
+    /**
+     * What the blocked vendor is told. The admin's own wording when they gave
+     * one, because "why am I locked out" is otherwise a support ticket every
+     * single time.
+     */
+    public function dashboardBlockMessage(): string
+    {
+        $reason = trim((string) $this->dashboard_blocked_reason);
+
+        return $reason !== ''
+            ? $reason
+            : 'Your account has been suspended pending a payment or terms review.';
     }
 
     public function canAccess(User $user): bool

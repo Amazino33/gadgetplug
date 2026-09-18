@@ -29,8 +29,20 @@ class PosAuthController extends Controller
             return response()->json(['message' => 'Invalid PIN.'], 401);
         }
 
-        $token  = $user->createToken('pos-terminal', ['pos'])->plainTextToken;
         $vendor = \App\Models\Vendor::find($request->vendor_id);
+
+        // Blocked over payment or terms: no token at all, so a cashier cannot
+        // ring up a sale the platform has already told the owner it will not
+        // honour. The reason is returned verbatim — the person at the till
+        // needs to know it is the account and not their PIN.
+        if ($vendor?->isDashboardBlocked() && ! $user->isSuperAdmin()) {
+            return response()->json([
+                'message' => $vendor->dashboardBlockMessage(),
+                'blocked' => true,
+            ], 403);
+        }
+
+        $token  = $user->createToken('pos-terminal', ['pos'])->plainTextToken;
 
         return response()->json([
             'token'  => $token,

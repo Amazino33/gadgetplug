@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Vendors\Schemas;
 use Filament\Schemas\Schema;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Toggle;
 
 class VendorForm
@@ -28,6 +29,22 @@ class VendorForm
             Toggle::make('online_sales_enabled')
                 ->label('Online Sales Enabled')
                 ->helperText('When off, this vendor\'s products disappear from the storefront, new online orders against them are blocked, and Orders is hidden from their panel. POS/offline sales are unaffected. Existing online orders are untouched.'),
+            Toggle::make('dashboard_blocked')
+                ->label('Block dashboard access')
+                ->helperText('Use for unpaid fees or a terms breach. The vendor and their whole team lose the vendor panel AND the POS till — existing till logins stop working immediately. Their storefront listings are not touched; that is the Online Sales toggle above.')
+                ->live()
+                ->columnSpanFull(),
+            Textarea::make('dashboard_blocked_reason')
+                ->label('Reason shown to the vendor')
+                ->rows(2)
+                ->maxLength(500)
+                ->placeholder('e.g. Outstanding platform commission for August. Contact accounts to settle.')
+                // Required once the block is on: the vendor sees this text on
+                // the lockout screen, and a blank one turns every block into a
+                // support ticket asking what happened.
+                ->required(fn ($get) => (bool) $get('dashboard_blocked'))
+                ->visible(fn ($get) => (bool) $get('dashboard_blocked'))
+                ->columnSpanFull(),
             Toggle::make('owner_can_manage_roles')
                 ->label('Allow owner to manage roles')
                 ->helperText('Grants the vendor owner access to create and assign roles for their team.'),

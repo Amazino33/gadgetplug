@@ -75,6 +75,13 @@ Route::post('/invite/{token}', [App\Http\Controllers\VendorInviteController::cla
 
 // POS SPA — vendor-scoped entry point from Filament panel
 Route::get('/pos/{vendor:slug}', function (\App\Models\Vendor $vendor) {
+    // A blocked account loses the till as well as the panel. Checked at the
+    // page rather than only in the API so the terminal never boots and asks
+    // for a PIN it is going to refuse anyway.
+    if ($vendor->isDashboardBlocked() && ! auth()->user()?->isSuperAdmin()) {
+        return response()->view('vendor.blocked', ['vendor' => $vendor], 403);
+    }
+
     return view('pos.index', [
         'vendorId'   => $vendor->id,
         'vendorSlug' => $vendor->slug,
