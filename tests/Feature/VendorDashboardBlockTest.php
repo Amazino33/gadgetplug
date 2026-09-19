@@ -20,6 +20,16 @@ beforeEach(fn () => (new Database\Seeders\VendorPermissionsSeeder())->run());
 // the till until it is settled. These check that it actually closes both doors,
 // that support can still get in, and that lifting it puts everything back.
 
+// A real panel page, not the /plug/{slug} entry point. That entry point only
+// 302s to the dashboard, and following the redirect in-process leaves the
+// Filament tenant singleton populated for the second request — which is enough
+// to make the block look enforced in a test while a browser, whose every
+// request starts clean, sails straight past it.
+function panelPage(Vendor $vendor): string
+{
+    return '/plug/'.$vendor->slug.'/dashboard';
+}
+
 function blockedVendor(array $attributes = []): array
 {
     $owner  = User::factory()->create();
@@ -37,8 +47,7 @@ it('shows the lockout page instead of the panel for a blocked owner', function (
     ['owner' => $owner, 'vendor' => $vendor] = blockedVendor();
 
     $this->actingAs($owner)
-        ->followingRedirects()
-        ->get('/plug/'.$vendor->slug)
+        ->get(panelPage($vendor))
         ->assertStatus(403)
         ->assertSee('Account access suspended')
         ->assertSee('Outstanding platform commission for August.');
@@ -51,8 +60,7 @@ it('blocks the whole team, not just the owner', function () {
     $vendor->users()->attach($staff->id);
 
     $this->actingAs($staff)
-        ->followingRedirects()
-        ->get('/plug/'.$vendor->slug)
+        ->get(panelPage($vendor))
         ->assertStatus(403)
         ->assertSee('Account access suspended');
 });
@@ -61,8 +69,7 @@ it('falls back to a generic reason when the admin left one out', function () {
     ['owner' => $owner, 'vendor' => $vendor] = blockedVendor(['dashboard_blocked_reason' => null]);
 
     $this->actingAs($owner)
-        ->followingRedirects()
-        ->get('/plug/'.$vendor->slug)
+        ->get(panelPage($vendor))
         ->assertStatus(403)
         ->assertSee('pending a payment or terms review');
 });
@@ -76,13 +83,13 @@ it('lets a super admin through a blocked vendor so support can still work', func
     // Asserted on the status rather than the page text: what matters is that
     // the block middleware let them past, and the panel it renders afterwards
     // is somebody else's test to make.
-    expect($this->actingAs($admin)->followingRedirects()->get('/plug/'.$vendor->slug)->status())->not->toBe(403);
+    expect($this->actingAs($admin)->get(panelPage($vendor))->status())->not->toBe(403);
 });
 
 it('leaves an unblocked vendor alone', function () {
     ['owner' => $owner, 'vendor' => $vendor] = blockedVendor(['dashboard_blocked' => false]);
 
-    expect($this->actingAs($owner)->followingRedirects()->get('/plug/'.$vendor->slug)->status())->not->toBe(403);
+    expect($this->actingAs($owner)->get(panelPage($vendor))->status())->not->toBe(403);
 });
 
 it('closes the POS terminal page too', function () {
@@ -151,6 +158,6 @@ it('restores both the panel and the till when the block is lifted', function () 
 
     $vendor->update(['dashboard_blocked' => false]);
 
-    expect($this->actingAs($owner)->followingRedirects()->get('/plug/'.$vendor->slug)->status())->not->toBe(403);
+    expect($this->actingAs($owner)->get(panelPage($vendor))->status())->not->toBe(403);
     $this->actingAs($owner)->get('/pos/'.$vendor->slug)->assertOk();
 });

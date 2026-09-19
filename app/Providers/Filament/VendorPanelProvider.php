@@ -65,12 +65,25 @@ class VendorPanelProvider extends PanelProvider
                 SubstituteBindings::class,
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
-                \App\Http\Middleware\EnsureUserBelongsToVendor::class,
                 \App\Http\Middleware\TrackStorePresence::class,
             ])
             ->authMiddleware([
                 Authenticate::class,
             ])
+            // Must be tenant middleware, not panel middleware. Filament only
+            // resolves the tenant in IdentifyTenant, which sits at the END of
+            // the panel middleware stack — so anything registered in
+            // ->middleware() above runs while filament()->getTenant() is still
+            // null and silently falls through its own no-tenant guard.
+            // ->tenantMiddleware() runs immediately after IdentifyTenant, which
+            // is the first point the tenant actually exists.
+            //
+            // isPersistent so Livewire's own update requests are checked too;
+            // without it a blocked vendor keeps driving the panel over AJAX on
+            // a page that was already open.
+            ->tenantMiddleware([
+                \App\Http\Middleware\EnsureUserBelongsToVendor::class,
+            ], isPersistent: true)
             ->tenant(Vendor::class, slugAttribute: 'slug', ownershipRelationship: 'vendors')
             // No ->icon() on the groups: Filament refuses to render a sidebar
             // where a group and its items both carry icons, and the per-item
