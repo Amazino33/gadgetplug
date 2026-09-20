@@ -103,7 +103,7 @@
                     @endif
                 </p>
             </div>
-            @if($canCancel)
+            @if($canReset)
             <button wire:click="cancelSpecificSession({{ $activeCount->id }})"
                 wire:confirm="Cancel this count session? Every count entered so far is discarded and nothing is written to stock."
                 class="border border-[#2a3a2a] hover:border-red-800 hover:bg-red-900/20 text-[#c96a6a] text-xs font-semibold px-3 py-2 rounded-lg transition-colors">
