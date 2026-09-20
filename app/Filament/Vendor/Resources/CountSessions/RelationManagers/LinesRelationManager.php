@@ -55,6 +55,36 @@ class LinesRelationManager extends RelationManager
                     ->alignCenter()
                     ->getStateUsing(fn (AuditSession $r): int => $r->countedQuantity()),
 
+                TextColumn::make('sold')
+                    ->label('Sold')
+                    ->alignCenter()
+                    ->getStateUsing(function (AuditSession $r): int {
+                        return (int) \App\Models\InventoryLedger::where('product_id', $r->product_id)
+                            ->whereIn('transaction_type', ['pos_sale', 'online_sale'])
+                            ->sum('quantity_change') * -1;
+                    })
+                    ->url(fn (AuditSession $r): string => \App\Filament\Vendor\Resources\InventoryLedgers\InventoryLedgerResource::getUrl('index', [
+                        'tableFilters' => [
+                            'product_id' => ['value' => $r->product_id],
+                            'transaction_type' => ['value' => 'pos_sale'],
+                        ]
+                    ])),
+
+                TextColumn::make('total_stock_in')
+                    ->label('Total Stock In')
+                    ->alignCenter()
+                    ->getStateUsing(function (AuditSession $r): int {
+                        return (int) \App\Models\InventoryLedger::where('product_id', $r->product_id)
+                            ->where('transaction_type', 'restock')
+                            ->sum('quantity_change');
+                    })
+                    ->url(fn (AuditSession $r): string => \App\Filament\Vendor\Resources\InventoryLedgers\InventoryLedgerResource::getUrl('index', [
+                        'tableFilters' => [
+                            'product_id' => ['value' => $r->product_id],
+                            'transaction_type' => ['value' => 'restock'],
+                        ]
+                    ])),
+
                 TextColumn::make('variance')
                     ->label('Variance')
                     ->alignCenter()
