@@ -55,7 +55,7 @@ class BlindCount extends Page
     {
         $user   = auth()->user();
         $vendor = filament()->getTenant();
-        return $user->isSuperAdmin() || $user->hasVendorPermission($vendor->id, 'edit_products');
+        return $user->isSuperAdmin() || $vendor->isOwner($user) || $user->hasVendorPermission($vendor->id, 'edit_products');
     }
 
     // Who may let someone count again before the vendor's cadence has elapsed.
@@ -155,6 +155,12 @@ class BlindCount extends Page
     // ── Mount ─────────────────────────────────────────────────────────────────
     public function mount(): void
     {
+        // Non-counters (like the owner) shouldn't be bound to a single store's session
+        // so they can fall through to the global view showing all active sessions.
+        if (! $this->canCount()) {
+            return;
+        }
+
         $vendor  = filament()->getTenant();
         $storeId = ActiveStore::currentId();
 
@@ -574,6 +580,40 @@ class BlindCount extends Page
         // so nobody can wipe out a colleague's submitted count mid-verification.
         return ($session->status === 'a_counting' && $this->getRole() === 'a')
             || ($session->status === 'b_counting' && $this->getRole() === 'b');
+    }
+
+    public function getActiveSessions(): \Illuminate\Support\Collection
+    {
+        $vendor = filament()->getTenant();
+        return BlindCountSession::with(['store', 'storekeeperA', 'storekeeperB'])
+            ->where('vendor_id', $vendor->id)
+            ->whereIn('status', ['a_counting', 'b_counting'])
+            ->latest()
+            ->get();
+    }
+
+    public function cancelSpecificSession(int $id): void
+    {
+        if (! $this->canReset()) {
+            Notification::make()->title('You cannot cancel count sessions.')->danger()->send();
+            return;
+        }
+
+        $session = BlindCountSession::where('vendor_id', filament()->getTenant()->id)->find($id);
+        if (! $session || $session->status === 'completed') return;
+
+        BlindCountEntry::where('blind_count_session_id', $session->id)->delete();
+        $session->delete();
+
+        if ($this->sessionId === $id) {
+            $this->sessionId = null;
+        }
+
+        Notification::make()
+            ->title('Count session cancelled')
+            ->body('Nothing was saved to stock. Anyone eligible can now start a fresh count.')
+            ->success()
+            ->send();
     }
 
     public function cancelSession(): void

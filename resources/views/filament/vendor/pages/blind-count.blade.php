@@ -77,7 +77,9 @@
 </div>
 
 @else
-{{-- Manager / Owner: no active session --}}
+{{-- Manager / Owner: no active session (or managing all) --}}
+@php $activeCounts = $this->getActiveSessions(); @endphp
+@if($activeCounts->isEmpty())
 <div class="bg-[#0d1a0d] rounded-2xl border border-[#1a3a1a] p-8 text-center space-y-3">
     <div class="w-14 h-14 bg-[#1a3a1a] rounded-full flex items-center justify-center mx-auto">
         <x-heroicon-o-eye class="w-7 h-7 text-[#5a7a5c]"/>
@@ -85,6 +87,34 @@
     <h2 class="text-white font-montserrat font-bold text-lg">No Active Inventory Count</h2>
     <p class="text-[#5a7a5c] text-sm">You can view counts here, but not record one. To let a team member count, give their role the <span class="text-[#4caf50] font-semibold">Perform Inventory Count</span> permission under Settings &rarr; Roles.</p>
 </div>
+@else
+<div class="space-y-4">
+    <h2 class="text-white font-montserrat font-bold text-lg">Active Inventory Counts</h2>
+    @foreach($activeCounts as $activeCount)
+    <div class="bg-[#0d1a0d] rounded-2xl border border-[#1a3a1a] p-5 space-y-3">
+        <div class="flex justify-between items-start">
+            <div>
+                <p class="text-white font-semibold">{{ $activeCount->store ? $activeCount->store->name : 'All Branches' }}</p>
+                <p class="text-[#5a7a5c] text-sm mt-0.5">
+                    @if($activeCount->status === 'a_counting')
+                        Storekeeper A ({{ $activeCount->storekeeperA?->name }}) is counting...
+                    @elseif($activeCount->status === 'b_counting')
+                        Awaiting Storekeeper B (A: {{ $activeCount->storekeeperA?->name }})
+                    @endif
+                </p>
+            </div>
+            @if($canCancel)
+            <button wire:click="cancelSpecificSession({{ $activeCount->id }})"
+                wire:confirm="Cancel this count session? Every count entered so far is discarded and nothing is written to stock."
+                class="border border-[#2a3a2a] hover:border-red-800 hover:bg-red-900/20 text-[#c96a6a] text-xs font-semibold px-3 py-2 rounded-lg transition-colors">
+                Cancel Count
+            </button>
+            @endif
+        </div>
+    </div>
+    @endforeach
+</div>
+@endif
 @endif
 
 {{-- Manager's re-count authorisation. Lives on the manager's own login on
