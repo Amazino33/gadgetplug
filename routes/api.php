@@ -86,6 +86,7 @@ Route::prefix('pos')->middleware(NoStoreApiResponse::class)->group(function () {
         // Procurements (Receiving Stock)
         Route::get('procurements', [PosProcurementController::class, 'index']);
         Route::post('procurements/{procurement}/approve', [PosProcurementController::class, 'approve']);
+        Route::post('procurements/{procurement}/correct', [PosProcurementController::class, 'correct']);
 
         // Handing the day's takings over. Online only — see the controller.
         Route::get('cash',        [PosCashController::class, 'index']);

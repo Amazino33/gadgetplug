@@ -2,20 +2,22 @@
 
 namespace App\Filament\Vendor\Resources\Procurements\Pages;
 
-use App\Actions\Procurement\ApproveProcurementAction;
 use App\Filament\Vendor\Resources\Procurements\ProcurementResource;
 use App\Models\FinancialAccount;
 use App\Models\Procurement;
 use App\Models\ProcurementLogisticsLeg;
 use App\Services\ActiveStore;
 use App\Services\FinancialLedger;
+use App\Services\Procurement\ProcurementReview;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Illuminate\Support\HtmlString;
 use Override;
@@ -37,12 +39,7 @@ class ViewProcurement extends ViewRecord
                 Placeholder::make('destination')->label('Deliver To')
                     ->content($record->store->name ?? 'Default store'),
                 Placeholder::make('status')->label('Status')
-                    ->content(new HtmlString($this->badge($record->status, match ($record->status) {
-                        'pending'  => 'warning',
-                        'approved' => 'success',
-                        'voided'   => 'danger',
-                        default    => 'gray',
-                    }))),
+                    ->content(fn () => new HtmlString($this->statusBadgeHtml($record))),
                 Placeholder::make('payment_status')->label('Payment')
                     ->content(new HtmlString($this->badge(
                         match ($record->payment_status) {
@@ -80,10 +77,19 @@ class ViewProcurement extends ViewRecord
                     )),
             ])->visible((bool) $record->waybill_image),
 
-            Section::make('Items')->schema([
-                Placeholder::make('items_table')->label('')
-                    ->content(new HtmlString($this->buildItemsTable($record))),
-            ]),
+            // No Section wrapper: the cards carry their own headings and
+            // borders, and nesting them inside another bordered panel puts a
+            // second frame around every line on a 360px screen.
+            View::make('filament.vendor.procurement.review-cards')
+                ->viewData([
+                    'record'      => $record,
+                    'items'       => $record->items()->with(['product', 'corrections.correctedBy'])->get(),
+                    'statusBadge' => $this->statusBadgeHtml($record),
+                    'canApprove'  => auth()->user()->can('approve', $record)
+                        && ProcurementResource::canApprove($record),
+                    'canCorrect'  => auth()->user()->can('correct', $record)
+                        && ProcurementResource::canApprove($record),
+                ]),
 
             Section::make('Transport Cost')
                 ->description('What it cost to move this stock to your store — kept separate from what you paid the supplier for the goods, so the two are never mixed up in your reports.')
@@ -103,33 +109,65 @@ class ViewProcurement extends ViewRecord
         return
             [
                 Action::make('approve')
-                    ->label('Approve & Update Stock')
+                    ->label(fn () => $this->record->hasCorrections() ? 'Agree & Update Stock' : 'Approve & Update Stock')
                     ->icon('heroicon-o-check-circle')
                     ->color('success')
                     ->size('lg')
                     ->requiresConfirmation()
-                    ->modalHeading('Approve Procurement')
+                    ->modalHeading(fn () => $this->record->hasCorrections() ? 'Agree These Figures' : 'Approve Procurement')
                     ->modalDescription(fn () => sprintf(
-                        'Approving %s will restock %d products into %s and update their cost/selling price.',
+                        'Receiving %s will put %d units into %s at a total of %s, and update cost/selling prices.',
                         $this->record->reference,
-                        $this->record->items()->count(),
+                        $this->record->verifiedQuantity(),
                         $this->record->store->name ?? 'the default store',
+                        '₦' . number_format($this->record->verifiedTotal(), 2),
                     ))
-                    // Branch membership as well as the permission: goods sent
-                    // to Oraimo are received by Oraimo, because approving is
-                    // what puts them on a shelf and only the branch holding
-                    // the cartons can say they arrived.
-                    ->visible(fn () => $this->record->isPending()
-                        && $user->hasVendorPermission($vendor->id, 'approve_procurement')
-                        && ProcurementResource::canApprove($this->record)
-                        && ($this->record->created_by !== auth()->id() || !$vendor->hasOtherApprovers($this->record->created_by)))
-                    ->action(function (ApproveProcurementAction $approveAction) {
+                    // Visibility only mirrors the policy now. The policy is the
+                    // gate — ProcurementReview refuses regardless of what this
+                    // page chose to render, so reaching the action directly is
+                    // refused exactly as if the button had never been there.
+                    ->visible(fn () => auth()->user()->can('approve', $this->record)
+                        && ProcurementResource::canApprove($this->record))
+                    ->action(function (ProcurementReview $review) {
                         try {
                             // Received into the store the approver is working
                             // in, not blindly into the vendor's default one.
-                            $approveAction->execute($this->record, ActiveStore::currentId());
+                            $review->approve($this->record, auth()->user(), ActiveStore::currentId());
                             Notification::make()->title('Procurement Approved, Inventory Updated.')->success()->send();
-                            $this->refreshFormData(['status', 'approved_by', 'approved_at']);
+                            $this->refreshFormData(['status', 'approved_by', 'approved_at', 'awaiting_user_id', 'total_cost']);
+                        } catch (\Throwable $e) {
+                            Notification::make()->title('Error: ' . $e->getMessage())->danger()->send();
+                        }
+                    }),
+
+                // Saying a line is wrong. One action for the whole batch rather
+                // than a button per card: the approver walks the delivery once
+                // with the waybill in hand, and correcting three lines should
+                // be one trip back to the storekeeper, not three.
+                Action::make('correct')
+                    ->label(fn () => $this->record->isChangesRequested() ? 'Still Not Right' : 'Correct Figures')
+                    ->icon('heroicon-o-pencil-square')
+                    ->color('warning')
+                    ->size('lg')
+                    ->modalHeading('What did you actually receive?')
+                    ->modalDescription('Enter what you counted. The recorded figures are kept beside yours — nothing is overwritten — and the delivery goes back to the other party to agree.')
+                    ->modalSubmitActionLabel('Send Back')
+                    ->schema(fn () => $this->correctionFields())
+                    ->visible(fn () => auth()->user()->can('correct', $this->record)
+                        && ProcurementResource::canApprove($this->record))
+                    ->action(function (array $data, ProcurementReview $review) {
+                        try {
+                            $review->correct(
+                                $this->record,
+                                auth()->user(),
+                                $this->linesFromForm($data),
+                                $data['correction_note'] ?? null,
+                            );
+                            Notification::make()
+                                ->title('Sent back for re-check.')
+                                ->body('The other party has been asked to confirm your figures.')
+                                ->success()->send();
+                            $this->refreshFormData(['status', 'awaiting_user_id']);
                         } catch (\Throwable $e) {
                             Notification::make()->title('Error: ' . $e->getMessage())->danger()->send();
                         }
@@ -187,7 +225,7 @@ class ViewProcurement extends ViewRecord
                             ->required()->minLength(10)
                             ->placeholder('Explain why this record is being voided...')
                     ])
-                    ->visible(fn () => $this->record->isPending() && $user->hasVendorPermission($vendor->id, 'manage_inventory'))
+                    ->visible(fn () => $this->record->isOpen() && $user->hasVendorPermission($vendor->id, 'manage_inventory'))
                     ->action(function (array $data) {
                         $this->record->update(['status' => 'voided', 'void_reason' => $data['void_reason']]);
                         Notification::make()->title('Procurement Voided')
@@ -195,37 +233,6 @@ class ViewProcurement extends ViewRecord
                         $this->refreshFormData(['status', 'void_reason']);
                     }),
             ];
-    }
-
-    private function buildItemsTable(Procurement $record): string
-    {
-        $rows = '';
-        foreach ($record->items()->with('product')->get() as $item) {
-            $rows .= "<tr class='border-b border-gray-100 dark:border-gray-700'>
-                <td class='px-4 py-3 text-sm font-medium'>" . e($item->product->name ?? '—') . "</td>
-                <td class='px-4 py-3 text-xs text-gray-500'>" . e($item->barcode ?? '—') . "</td>
-                <td class='px-4 py-3 text-sm text-center'>{$item->quantity}</td>
-                <td class='px-4 py-3 text-sm'>₦" . number_format($item->unit_cost, 2) . "</td>
-                <td class='px-4 py-3 text-sm'>₦" . number_format($item->selling_price, 2) . "</td>
-                <td class='px-4 py-3 text-sm font-semibold'>₦" . number_format($item->lineTotal(), 2) . "</td>
-            </tr>";
-        }
-
-        return "<div class='overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700'>
-            <table class='w-full text-left'>
-                <thead>
-                    <tr class='bg-gray-50 dark:bg-gray-800 text-xs font-semibold text-gray-500 uppercase tracking-wider'>
-                        <th class='px-4 py-3'>Product</th>
-                        <th class='px-4 py-3'>Barcode</th>
-                        <th class='px-4 py-3 text-center'>Qty</th>
-                        <th class='px-4 py-3'>Unit Cost</th>
-                        <th class='px-4 py-3'>Selling Price</th>
-                        <th class='px-4 py-3'>Line Total</th>
-                    </tr>
-                </thead>
-                <tbody>{$rows}</tbody>
-            </table>
-        </div>";
     }
 
     private function buildLegsTable(Procurement $record): string
@@ -266,12 +273,178 @@ class ViewProcurement extends ViewRecord
         </div>";
     }
 
+    /**
+     * Correct one line, from the card showing that line.
+     *
+     * Mounted by name from the Blade view with the item id as an argument, so
+     * the form only ever asks about the carton in front of the person. The
+     * batch-wide version of this lives in getHeaderActions() for anyone
+     * checking a delivery off against a waybill instead of off a shelf.
+     */
+    public function correctLineAction(): Action
+    {
+        return Action::make('correctLine')
+            ->modalHeading(fn (array $arguments) => 'Correct: '
+                . ($this->lineFor($arguments)?->product->name ?? 'Item'))
+            ->modalDescription('Enter what you actually counted. The recorded figures are kept beside yours — nothing is overwritten — and the delivery goes back to the other party to agree.')
+            ->modalSubmitActionLabel('Send Back')
+            ->schema(fn (array $arguments) => $this->lineFields($this->lineFor($arguments)))
+            ->action(function (array $arguments, array $data, ProcurementReview $review) {
+                $item = $this->lineFor($arguments);
+
+                if (! $item) {
+                    Notification::make()->title('That line is no longer part of this delivery.')->danger()->send();
+
+                    return;
+                }
+
+                try {
+                    $review->correct(
+                        $this->record,
+                        auth()->user(),
+                        [$item->id => [
+                            'quantity'  => $data['quantity'] ?? null,
+                            'unit_cost' => $data['unit_cost'] ?? null,
+                        ]],
+                        $data['correction_note'] ?? null,
+                    );
+
+                    Notification::make()
+                        ->title('Sent back for re-check.')
+                        ->body('The other party has been asked to confirm your figures.')
+                        ->success()->send();
+
+                    $this->refreshFormData(['status', 'awaiting_user_id']);
+                } catch (\Throwable $e) {
+                    Notification::make()->title('Error: ' . $e->getMessage())->danger()->send();
+                }
+            });
+    }
+
+    /** @param  array<string, mixed>  $arguments */
+    private function lineFor(array $arguments): ?\App\Models\ProcurementItem
+    {
+        $id = $arguments['item'] ?? null;
+
+        return $id === null
+            ? null
+            : $this->record->items()->with('product')->find((int) $id);
+    }
+
+    /**
+     * The two correctable figures, prefilled with what the line currently
+     * says. Nothing else is editable — the supplier and the product are facts
+     * of the delivery, not opinions about it.
+     *
+     * @return array<int, \Filament\Schemas\Components\Component>
+     */
+    private function lineFields(?\App\Models\ProcurementItem $item): array
+    {
+        if (! $item) {
+            return [];
+        }
+
+        return [
+            TextInput::make('quantity')
+                ->label('Quantity received')
+                ->helperText('Recorded: ' . number_format($item->quantity))
+                ->numeric()->minValue(0)->required()
+                ->default($item->verifiedQuantity()),
+            TextInput::make('unit_cost')
+                ->label('Unit cost')
+                ->helperText('Recorded: ₦' . number_format((float) $item->unit_cost, 2))
+                ->numeric()->minValue(0)->required()
+                ->prefix('₦')
+                ->default($item->verifiedUnitCost()),
+            Textarea::make('correction_note')
+                ->label('Note (optional)')
+                ->placeholder('e.g. two cartons short on the pallet')
+                ->rows(2),
+        ];
+    }
+
+    private function statusBadgeHtml(Procurement $record): string
+    {
+        return $this->badge(
+            match ($record->status) {
+                'pending'           => 'Awaiting Check',
+                'changes_requested' => 'Sent Back',
+                default             => ucfirst($record->status),
+            },
+            match ($record->status) {
+                'pending'           => 'warning',
+                'changes_requested' => 'info',
+                'approved'          => 'success',
+                'voided'            => 'danger',
+                default             => 'gray',
+            },
+        );
+    }
+
+    /**
+     * One row per line, prefilled with what the line is currently understood
+     * to be, so agreeing with most of a delivery means changing only the line
+     * that is wrong.
+     *
+     * @return array<int, \Filament\Schemas\Components\Component>
+     */
+    private function correctionFields(): array
+    {
+        $fields = [];
+
+        foreach ($this->record->items()->with(['product', 'corrections'])->get() as $item) {
+            $fields[] = Section::make($item->product->name ?? 'Item')
+                ->description(sprintf(
+                    'Recorded: %d @ %s',
+                    $item->quantity,
+                    '₦' . number_format((float) $item->unit_cost, 2),
+                ))
+                ->schema([
+                    TextInput::make("lines.{$item->id}.quantity")
+                        ->label('Quantity received')
+                        ->numeric()->minValue(0)->required()
+                        ->default($item->verifiedQuantity()),
+                    TextInput::make("lines.{$item->id}.unit_cost")
+                        ->label('Unit cost')
+                        ->numeric()->minValue(0)->required()
+                        ->prefix('₦')
+                        ->default($item->verifiedUnitCost()),
+                ])->columns(2);
+        }
+
+        $fields[] = Textarea::make('correction_note')
+            ->label('Note (optional)')
+            ->placeholder('e.g. two cartons short on the pallet')
+            ->rows(2);
+
+        return $fields;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<int, array{quantity: int, unit_cost: float}>
+     */
+    private function linesFromForm(array $data): array
+    {
+        $lines = [];
+
+        foreach ($data['lines'] ?? [] as $itemId => $values) {
+            $lines[(int) $itemId] = [
+                'quantity'  => $values['quantity'] ?? null,
+                'unit_cost' => $values['unit_cost'] ?? null,
+            ];
+        }
+
+        return $lines;
+    }
+
     private function badge(string $label, string $color): string
     {
         $classes = match ($color) {
             'success' => 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
             'warning' => 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
             'danger'  => 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+            'info'     => 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
             default   => 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
         };
         return "<span class='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold {$classes}'>{$label}</span>";

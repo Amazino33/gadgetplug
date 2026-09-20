@@ -22,7 +22,10 @@ class ApproveProcurementAction
      */
     public function execute(Procurement $procurement, Store|int|null $store = null): void
     {
-        if (! $procurement->isPending()) {
+        // Open covers a batch nobody has questioned and one that has been
+        // argued back and forth — both are deliveries still waiting to be
+        // received. Only 'approved' and 'voided' are closed.
+        if (! $procurement->isOpen()) {
             throw new RuntimeException('Only pending procurements can be approved.');
         }
 
@@ -37,7 +40,15 @@ class ApproveProcurementAction
             $blocked       = [];
             $destinationId = null;
 
-            foreach ($procurement->items()->with('product')->get() as $item) {
+            foreach ($procurement->items()->with(['product', 'corrections'])->get() as $item) {
+                // What the two sides settled on, which is what the storekeeper
+                // wrote down whenever nobody disagreed with it. Receiving the
+                // verified figure is the whole reason the argument happens
+                // before this point rather than after: the shelf, the cost
+                // layer and the ledger are all written once, correctly, and
+                // never need an adjusting entry to walk back a wrong receipt.
+                $quantity = $item->verifiedQuantity();
+                $unitCost = $item->verifiedUnitCost();
                 // Locked for the same reason the inventory actions lock it: it
                 // serialises every writer of this product, which is what lets
                 // the stock mirror be recomputed without racing.
@@ -76,7 +87,7 @@ class ApproveProcurementAction
                     $rehomedTo = $row->store_id;
                 }
 
-                $row->quantity += $item->quantity;
+                $row->quantity += $quantity;
                 $row->save();
 
                 // The batch, at what this order actually paid for it — not at
@@ -87,13 +98,13 @@ class ApproveProcurementAction
                 StockCostLayers::receive(
                     productId: $product->id,
                     storeId: $row->store_id,
-                    quantity: $item->quantity,
-                    unitCost: $item->unit_cost !== null ? (float) $item->unit_cost : null,
+                    quantity: $quantity,
+                    unitCost: $unitCost,
                     source: $item,
                 );
 
                 $changes = [
-                    'cost_price' => $item->unit_cost,
+                    'cost_price' => $unitCost,
                     'price'      => $item->selling_price,
                 ];
 
@@ -109,7 +120,7 @@ class ApproveProcurementAction
                     'product_id'       => $item->product_id,
                     'user_id'          => $approverId,
                     'transaction_type' => 'restock',
-                    'quantity_change'  => $item->quantity,
+                    'quantity_change'  => $quantity,
                     'reference'        => $procurement->reference,
                     'description'      => "Procurement approved: {$procurement->reference}",
                 ]);
@@ -129,10 +140,18 @@ class ApproveProcurementAction
             }
 
             $procurement->update([
-                'status'      => 'approved',
+                'status'      => Procurement::STATUS_APPROVED,
                 'approved_by' => $approverId,
                 'approved_at' => now(),
             ]);
+
+            // What the delivery actually cost, once both sides agreed on it.
+            // Skipped when nothing was corrected so an untouched batch keeps
+            // the total it was recorded with, rather than having it silently
+            // restated by a recalculation it never asked for.
+            if ($procurement->hasCorrections()) {
+                $procurement->recalculateFromVerified();
+            }
         });
     }
 }

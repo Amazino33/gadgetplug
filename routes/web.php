@@ -119,6 +119,13 @@ Route::middleware('auth')->group(function () {
         ->name('settlement.show');
     Route::get('/settlement/{statement}/pdf', [App\Http\Controllers\SettlementStatementController::class, 'pdf'])
         ->name('settlement.pdf');
+
+    // The account close. Same arrangement as the statement above, over the
+    // close's own frozen payload rather than the statement's.
+    Route::get('/account-close/{close}', [App\Http\Controllers\StoreAccountCloseController::class, 'show'])
+        ->name('account-close.show');
+    Route::get('/account-close/{close}/pdf', [App\Http\Controllers\StoreAccountCloseController::class, 'pdf'])
+        ->name('account-close.pdf');
 });
 
 // A sale rendered as an 80mm receipt document, printed from its own page rather

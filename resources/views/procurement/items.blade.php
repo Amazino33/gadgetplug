@@ -1,5 +1,48 @@
 <x-layouts.procurement title="New Procurement — Step 2">
 
+    {{-- Plain CSS, not utility classes: these states are toggled by JS, and a
+         class that only ever appears inside a JS string is a class Tailwind's
+         scanner cannot see and will not generate. --}}
+    <style>
+        .item-row {
+            transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
+        }
+
+        /* The row being filled in.
+           Every row was the same white card, so on a ten-line order there was
+           nothing at all to say which one the keyboard was typing into — you
+           found out by reading back what you had entered. */
+        .item-row.is-active {
+            border-color: #016c00;
+            box-shadow: 0 0 0 3px rgba(1, 108, 0, .15), 0 8px 24px rgba(0, 0, 0, .08);
+        }
+
+        .dark .item-row.is-active {
+            border-color: #4ade80;
+            box-shadow: 0 0 0 3px rgba(74, 222, 128, .2), 0 8px 24px rgba(0, 0, 0, .4);
+        }
+
+        /* The number is always there so rows can be talked about ("line 3 is
+           wrong"); it only lights up on the one in hand. */
+        .item-row .row-badge {
+            transition: background-color .15s ease, color .15s ease;
+        }
+
+        .item-row.is-active .row-badge {
+            background-color: #016c00;
+            color: #fff;
+        }
+
+        /* Room to scroll the last row clear of the on-screen keyboard AND the
+           sticky bottom bar. Without it the final line of a long order sits
+           permanently under the keyboard with nowhere left to scroll to.
+           --keyboard-inset is set from JS off visualViewport. */
+        #itemsList {
+            scroll-margin-bottom: 8rem;
+            padding-bottom: var(--keyboard-inset, 0px);
+        }
+    </style>
+
     {{-- Stepper --}}
     <div class="bg-white dark:bg-zinc-800 rounded-xl p-6 shadow-[0px_4px_20px_rgba(0,0,0,0.04)] border border-[#becab5]/30 dark:border-zinc-700 mb-6">
         <div class="flex justify-between items-start mb-4">
@@ -130,7 +173,10 @@
             <div class="item-row bg-white dark:bg-zinc-800 rounded-xl p-4 border border-[#becab5]/50 dark:border-zinc-700 shadow-[0px_4px_20px_rgba(0,0,0,0.04)] flex flex-col lg:flex-row gap-4 lg:items-end" id="row_${idx}">
 
                 <div class="flex-1 min-w-[180px] relative">
-                    <label class="text-[10px] font-bold text-[#6f7b68] dark:text-zinc-500 uppercase tracking-wider block mb-1">Product</label>
+                    <label class="text-[10px] font-bold text-[#6f7b68] dark:text-zinc-500 uppercase tracking-wider flex items-center gap-1.5 mb-1">
+                        <span class="row-badge inline-flex items-center justify-center w-4 h-4 rounded-full bg-[#e7e8e9] dark:bg-zinc-700 text-[9px] font-bold text-[#6f7b68] dark:text-zinc-400 shrink-0">?</span>
+                        Product
+                    </label>
                     <input type="text" id="productSearch_${idx}" placeholder="Type to search product…" autocomplete="off"
                         value="${escapeHtml(prefillProduct?.name ?? prefill?.product_query ?? '')}"
                         oninput="onProductSearchInput(${idx})"
@@ -211,12 +257,46 @@
             </div>`;
 
             list.insertAdjacentHTML('beforeend', html);
+            renumberRows();
             updateCount();
             saveDraft();
+
+            // A row added and then left to the person to find is the whole
+            // complaint: it appears at the bottom of a list of identical white
+            // cards, below the fold, and on a phone underneath the keyboard
+            // that is about to open. So put it in the middle of the screen and
+            // into the field they were going to type in anyway.
+            //
+            // Restored draft rows are exempt — rebuilding a saved order would
+            // otherwise scroll and steal focus once per line.
+            if (!prefill) {
+                const row = document.getElementById(`row_${idx}`);
+                setActiveRow(row);
+                requestAnimationFrame(() => {
+                    row?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    document.getElementById(`productSearch_${idx}`)?.focus({ preventScroll: true });
+                });
+            }
+        }
+
+        /** Row numbers follow position, not creation order, so deleting line 2
+         *  does not leave the list reading 1, 3, 4. */
+        function renumberRows() {
+            document.querySelectorAll('#itemsList .item-row').forEach((row, i) => {
+                const badge = row.querySelector('.row-badge');
+                if (badge) badge.textContent = i + 1;
+            });
+        }
+
+        function setActiveRow(row) {
+            document.querySelectorAll('#itemsList .item-row.is-active')
+                .forEach(r => r.classList.remove('is-active'));
+            row?.classList.add('is-active');
         }
 
         function removeItem(idx) {
             document.getElementById(`row_${idx}`)?.remove();
+            renumberRows();
             updateCount();
             recalculate();
             saveDraft();
@@ -437,6 +517,53 @@
         // field would have to be re-bound on each insert.
         const itemsList = document.getElementById('itemsList');
 
+        // Whichever row holds the caret is the active one, however it got
+        // there — tapped, tabbed, or scanned into. Delegated because rows come
+        // and go, so per-row listeners would have to be wired on every add.
+        //
+        // The same handler lifts the field clear of the keyboard, because
+        // tapping straight into an existing row needs that as much as adding a
+        // new one does. The delay is for the keyboard's own open animation,
+        // which has not finished reporting its height on the focus event.
+        itemsList.addEventListener('focusin', (e) => {
+            setActiveRow(e.target.closest('.item-row'));
+
+            if (e.target.matches('input')) {
+                setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 250);
+            }
+        });
+
+        // The keyboard covering the field being typed into.
+        //
+        // On a phone the on-screen keyboard does not resize the page, it
+        // shrinks the visual viewport over it — so a field near the bottom
+        // stays exactly where it was, hidden, and the browser's own scrolling
+        // does not always correct for it. visualViewport is what reports the
+        // covered height; the padding below gives the list somewhere to scroll
+        // to, and the focused field is then brought into the part still
+        // visible.
+        const vv = window.visualViewport;
+
+        if (vv) {
+            const syncKeyboardInset = () => {
+                const covered = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+                document.documentElement.style.setProperty('--keyboard-inset', `${covered}px`);
+
+                // Only chase the field while the keyboard is actually up.
+                // Firing on every viewport change would fight the user's own
+                // scrolling the rest of the time.
+                if (covered > 120) {
+                    const focused = document.activeElement;
+                    if (focused && itemsList.contains(focused)) {
+                        focused.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }
+            };
+
+            vv.addEventListener('resize', syncKeyboardInset);
+            vv.addEventListener('scroll', syncKeyboardInset);
+        }
+
         itemsList.addEventListener('input', saveDraft);
 
         // change fires the moment a field loses focus — which is precisely
@@ -465,6 +592,7 @@
 
         if (restore.length > 0) {
             restore.forEach(item => addItem(item));
+            renumberRows();
             recalculate();
 
             if (draftItems) {

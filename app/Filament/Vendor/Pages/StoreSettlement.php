@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Vendor\Pages;
 
 use App\Actions\Cash\GenerateSettlementStatementAction;
+use App\Filament\Vendor\Pages\AccountClose;
 use App\Actions\Inventory\ApproveStockCountAction;
 use App\Actions\Inventory\RecordPhysicalCountAction;
 use App\Models\PhysicalStockCount;
@@ -391,6 +392,17 @@ class StoreSettlement extends Page
                         ->success()
                         ->send();
                 }),
+
+            // The close lives on its own page because it needs its own
+            // permission: this one is gated on reading the settlement, and
+            // ending a period is a different power from looking at one. Linked
+            // from here so the two read as the same job in two steps.
+            Action::make('accountClose')
+                ->label('Close the period')
+                ->icon('heroicon-o-lock-closed')
+                ->color('gray')
+                ->url(fn (): string => AccountClose::getUrl())
+                ->visible(fn (): bool => AccountClose::canAccess()),
 
             Action::make('generate')
                 ->label('Freeze this statement')

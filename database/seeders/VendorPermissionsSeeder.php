@@ -103,6 +103,13 @@ class VendorPermissionsSeeder extends Seeder
             // may hand cash over has no business reading any of that.
             'view_store_settlement',
 
+            // Closing a period. Separate from confirming cash and separate
+            // from anything that edits a sale or a debt, because a close is
+            // what makes a period's figures final — somebody who can both
+            // move the money and declare it settled is not being checked by
+            // anybody.
+            'close_store_period',
+
             // Reports Hub
             'view_reports_hub',
         ];

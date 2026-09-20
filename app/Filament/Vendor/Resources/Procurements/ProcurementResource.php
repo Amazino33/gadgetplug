@@ -7,6 +7,9 @@ use App\Services\ActiveStore;
 use Filament\Actions\Action;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
+use Filament\Tables\Columns\Layout\Panel;
+use Filament\Tables\Columns\Layout\Split;
+use Filament\Tables\Columns\Layout\Stack;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -111,9 +114,16 @@ class ProcurementResource extends Resource
             return null;
         }
 
+        // Both open states, not just 'pending'. A delivery somebody sent back
+        // is the one most in need of chasing — counting only untouched ones
+        // would make a disputed delivery quietly disappear from the badge and
+        // sit unresolved precisely because nobody was reminded of it.
         $count = static::reachableBy(
             Procurement::query()->where('procurements.vendor_id', $vendor->id)
-        )->where('procurements.status', 'pending')->count();
+        )->whereIn('procurements.status', [
+            Procurement::STATUS_PENDING,
+            Procurement::STATUS_CHANGES_REQUESTED,
+        ])->count();
 
         // Null rather than "0": a badge showing nothing to do is just noise on
         // the navigation for the many days there is nothing to do.
@@ -127,7 +137,7 @@ class ProcurementResource extends Resource
 
     public static function getNavigationBadgeTooltip(): ?string
     {
-        return 'Deliveries waiting to be approved into stock';
+        return 'Deliveries waiting to be agreed and received into stock';
     }
 
     public static function canAccess(): bool
@@ -160,75 +170,124 @@ class ProcurementResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            // Split, not nine columns side by side.
+            //
+            // The list had the same problem the review screen had: a row wider
+            // than a phone, dragged sideways to find the status. Filament
+            // stacks a Split below its breakpoint and lays it out as a row
+            // above, so one definition gives a card on a phone and a table on
+            // a desktop — and search, sorting and filters keep working, which
+            // hand-rolled cards would have cost.
             ->columns([
-                TextColumn::make('reference')
-                    ->label('Ref #')
-                    ->searchable()
-                    ->weight('bold')
-                    ->copyable(),
+                Split::make([
+                    Stack::make([
+                        TextColumn::make('reference')
+                            ->label('Ref #')
+                            ->searchable()
+                            ->weight('bold')
+                            ->copyable(),
 
-                TextColumn::make('supplier.name')
-                    ->label('Supplier')
-                    ->searchable()
-                    ->sortable(),
+                        TextColumn::make('supplier.name')
+                            ->label('Supplier')
+                            ->searchable()
+                            ->sortable()
+                            ->size('sm')
+                            ->color('gray'),
+                    ]),
 
-                TextColumn::make('store.name')
-                    ->label('Deliver To')
-                    ->placeholder('Default store')
-                    ->icon('heroicon-m-building-storefront')
-                    ->toggleable(),
-                TextColumn::make('items_count')
-                    ->label('Items')
-                    ->counts('items')
-                    ->alignCenter(),
+                    Stack::make([
+                        TextColumn::make('total_cost')
+                            ->label('Total Cost')
+                            ->money('NGN')
+                            ->sortable()
+                            ->weight('bold'),
 
-                TextColumn::make('total_cost')
-                    ->label('Total Cost')
-                    ->money('NGN')
-                    ->sortable(),
+                        TextColumn::make('store.name')
+                            ->label('Deliver To')
+                            ->placeholder('Default store')
+                            ->icon('heroicon-m-building-storefront')
+                            ->size('sm')
+                            ->color('gray'),
+                    ]),
 
-                TextColumn::make('amount_paid')
-                    ->label('Amount Paid')
-                    ->money('NGN'),
+                    Stack::make([
+                        TextColumn::make('status')
+                            ->badge()
+                            ->color(fn (?string $state) => match ($state) {
+                                'pending'           => 'warning',
+                                'changes_requested' => 'info',
+                                'approved'          => 'success',
+                                'voided'            => 'danger',
+                                default             => 'gray',
+                            })
+                            ->formatStateUsing(fn (?string $state) => match ($state) {
+                                'pending'           => 'Awaiting Check',
+                                // Named for what somebody has to do about it
+                                // rather than for the state it is in. "Changes
+                                // requested" describes the record; "sent back"
+                                // tells the person reading the list that it is
+                                // moving, and which way.
+                                'changes_requested' => 'Sent Back',
+                                default             => ucfirst((string) $state),
+                            }),
 
-                TextColumn::make('payment_status')
-                    ->label('Payment')
-                    ->badge()
-                    ->color(fn (?string $state) => match ($state) {
-                        'full'         => 'success',
-                        'part_payment' => 'warning',
-                        'credit'       => 'danger',
-                        default        => 'gray',
-                    })
-                    ->formatStateUsing(fn (?string $state) => match ($state) {
-                        'full'         => 'Fully Paid',
-                        'part_payment' => 'Part-Payment',
-                        'credit'       => 'Credit',
-                        default        => $state ?? '—',
-                    }),
+                        TextColumn::make('payment_status')
+                            ->label('Payment')
+                            ->badge()
+                            ->color(fn (?string $state) => match ($state) {
+                                'full'         => 'success',
+                                'part_payment' => 'warning',
+                                'credit'       => 'danger',
+                                default        => 'gray',
+                            })
+                            ->formatStateUsing(fn (?string $state) => match ($state) {
+                                'full'         => 'Fully Paid',
+                                'part_payment' => 'Part-Payment',
+                                'credit'       => 'Credit',
+                                default        => $state ?? '-',
+                            }),
+                    ]),
+                ])->from('md'),
 
-                TextColumn::make('status')
-                    ->badge()
-                    ->color(fn (?string $state) => match ($state) {
-                        'pending'  => 'warning',
-                        'approved' => 'success',
-                        'voided'   => 'danger',
-                        default    => 'gray',
-                    }),
+                // The detail nobody scans a list for, one tap away rather than
+                // pushing the columns that matter off the side of the screen.
+                Panel::make([
+                    Stack::make([
+                        TextColumn::make('items_count')
+                            ->label('Items')
+                            ->counts('items')
+                            ->icon('heroicon-m-squares-2x2')
+                            ->size('sm'),
 
-                TextColumn::make('creator.name')
-                    ->label('Logged By')
-                    ->toggleable(isToggledHiddenByDefault: true),
+                        TextColumn::make('amount_paid')
+                            ->label('Amount Paid')
+                            ->money('NGN')
+                            ->icon('heroicon-m-banknotes')
+                            ->size('sm'),
 
-                TextColumn::make('created_at')
-                    ->label('Date')
-                    ->dateTime('d M Y, H:i')
-                    ->sortable(),
+                        TextColumn::make('creator.name')
+                            ->label('Logged By')
+                            ->icon('heroicon-m-user')
+                            ->size('sm'),
+
+                        TextColumn::make('created_at')
+                            ->label('Date')
+                            ->dateTime('d M Y, H:i')
+                            ->icon('heroicon-m-calendar')
+                            ->sortable()
+                            ->size('sm'),
+                    ])->space(1),
+                ])->collapsible(),
             ])
             ->defaultSort('created_at', 'desc')
             ->filters([
                 SelectFilter::make('status')
-                    ->options(['pending' => 'Pending', 'approved' => 'Approved', 'voided' => 'Voided']),
+                    ->options([
+                        'pending'           => 'Awaiting Check',
+                        'changes_requested' => 'Sent Back',
+                        'approved'          => 'Approved',
+                        'voided'            => 'Voided',
+                    ]),
                 SelectFilter::make('payment_status')
                     ->label('Payment')
                     ->options(['full' => 'Fully Paid', 'part_payment' => 'Part-Payment', 'credit' => 'Credit']),

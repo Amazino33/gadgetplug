@@ -96,12 +96,14 @@ class CountSessionResource extends Resource
                         'a_counting' => 'First count in progress',
                         'b_counting' => 'Awaiting second counter',
                         'completed'  => 'Completed',
+                        'cancelled'  => 'Cancelled',
                         default      => ucfirst($state),
                     })
                     ->color(fn (string $state): string => match ($state) {
                         'a_counting' => 'warning',
                         'b_counting' => 'info',
                         'completed'  => 'success',
+                        'cancelled'  => 'danger',
                         default      => 'gray',
                     }),
 
@@ -182,6 +184,7 @@ class CountSessionResource extends Resource
                         'a_counting' => 'First count in progress',
                         'b_counting' => 'Awaiting second counter',
                         'completed'  => 'Completed',
+                        'cancelled'  => 'Cancelled',
                     ]),
             ])
             // The row itself opens the session — this list exists to be drilled

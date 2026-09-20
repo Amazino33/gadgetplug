@@ -572,7 +572,7 @@ class BlindCount extends Page
         $session = $this->getSession();
 
         // A completed session is an audit record — it must never be deletable
-        if (! $session || $session->status === 'completed') return false;
+        if (! $session || $session->status === 'completed' || $session->status === 'cancelled') return false;
 
         if ($this->canReset()) return true;
 
@@ -600,10 +600,9 @@ class BlindCount extends Page
         }
 
         $session = BlindCountSession::where('vendor_id', filament()->getTenant()->id)->find($id);
-        if (! $session || $session->status === 'completed') return;
+        if (! $session || $session->status === 'completed' || $session->status === 'cancelled') return;
 
-        BlindCountEntry::where('blind_count_session_id', $session->id)->delete();
-        $session->delete();
+        $session->update(['status' => 'cancelled']);
 
         if ($this->sessionId === $id) {
             $this->sessionId = null;
@@ -626,8 +625,7 @@ class BlindCount extends Page
         $session = $this->getSession();
         if (! $session) return;
 
-        BlindCountEntry::where('blind_count_session_id', $session->id)->delete();
-        $session->delete();
+        $session->update(['status' => 'cancelled']);
 
         // Back to a clean slate so the page re-renders on the start screen
         $this->sessionId = null;

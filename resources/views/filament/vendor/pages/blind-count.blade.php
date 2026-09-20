@@ -89,7 +89,7 @@
 </div>
 @else
 <div class="space-y-4">
-    <h2 class="text-white font-montserrat font-bold text-lg">Active Inventory Counts</h2>
+    <h2 class="text-gray-900 dark:text-white font-montserrat font-bold text-lg">Active Inventory Counts</h2>
     @foreach($activeCounts as $activeCount)
     <div class="bg-[#0d1a0d] rounded-2xl border border-[#1a3a1a] p-5 space-y-3">
         <div class="flex justify-between items-start">
