@@ -8,6 +8,7 @@ use Filament\Actions\Action;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\Layout\Panel;
+use Filament\Tables\Columns\Layout\View as LayoutView;
 use Filament\Tables\Columns\Layout\Split;
 use Filament\Tables\Columns\Layout\Stack;
 use Filament\Tables\Columns\TextColumn;
@@ -277,8 +278,22 @@ class ProcurementResource extends Resource
                             ->sortable()
                             ->size('sm'),
                     ])->space(1),
+
+                    // What was in the boxes, and the button to receive it.
+                    // Expanding a row is something people do to find out what
+                    // a delivery contained, and until now that was the one
+                    // thing the panel did not say.
+                    LayoutView::make('filament.vendor.procurement.list-items'),
                 ])->collapsible(),
             ])
+            // The panel renders every line of every expanded row, so the lines
+            // and their products are loaded with the page rather than one
+            // query per row. Corrections come too: a corrected line shows what
+            // it was as well as what it is.
+            ->modifyQueryUsing(fn (Builder $query) => $query->with([
+                'items.product',
+                'items.corrections',
+            ]))
             ->defaultSort('created_at', 'desc')
             ->filters([
                 SelectFilter::make('status')
