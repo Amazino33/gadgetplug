@@ -328,9 +328,39 @@
                 raises how much the shelf should be holding.
             </p>
 
+            {{-- The two figures the whole stock side exists to produce, said
+                 first and in the same terms: each count's own counted quantity
+                 at each product's own selling price, summed. --}}
+            <div class="mt-3 grid gap-4 sm:grid-cols-2">
+                <div class="rounded-lg bg-gray-50 p-3 dark:bg-gray-800/50">
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Opening stock, at selling price</p>
+                    <p class="mt-1 font-mono text-2xl font-bold text-gray-800 dark:text-gray-100">{{ $money($movement['opening_selling']) }}</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                        @if ($opening['count_id'])
+                            {{ number_format($movement['opening_units']) }} units over {{ number_format($movement['opening_products']) }} product(s)
+                            · {{ $opening['carried'] ? 'carried forward from the last close' : 'chosen' }}
+                        @else
+                            No opening count selected
+                        @endif
+                    </p>
+                </div>
+                <div class="rounded-lg bg-gray-50 p-3 dark:bg-gray-800/50">
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Closing stock, at selling price</p>
+                    <p class="mt-1 font-mono text-2xl font-bold text-gray-800 dark:text-gray-100">{{ $money($movement['closing_selling']) }}</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                        @if ($view['closing'])
+                            {{ number_format($movement['closing_units']) }} units over {{ number_format($movement['closing_products']) }} product(s)
+                        @else
+                            No closing count selected
+                        @endif
+                    </p>
+                </div>
+            </div>
+
             @if (! $variance['available'])
-                <p class="mt-3 text-sm text-gray-500 dark:text-gray-400">
-                    No closing count selected. A period closed on the money alone has only checked the half that balances whether or not goods left the shelf unrecorded — pick a count above, or take one with the button at the top.
+                <p class="mt-3 rounded-lg bg-warning-50 p-3 text-sm text-warning-800 dark:bg-warning-400/10 dark:text-warning-300">
+                    {{ $variance['reason'] ?? 'No closing count selected.' }}
+                    A period closed on the money alone has only checked the half that balances whether or not goods left the shelf unrecorded.
                 </p>
             @else
                 <div class="mt-3 grid gap-4 sm:grid-cols-3">
@@ -362,6 +392,12 @@
                      somebody gets accused over a discount. --}}
                 <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">{{ $variance['basis'] }}</p>
 
+                @if (($variance['missing_from_opening'] ?? 0) > 0)
+                    <p class="mt-1 text-xs text-warning-700 dark:text-warning-400">
+                        {{ $variance['missing_from_opening'] }} product(s) on the closing count were not on the opening count, so they are treated as starting the period at zero. If the branch actually held some, those lines will read as short by whatever it had.
+                    </p>
+                @endif
+
                 @if ($variance['unexplained_units'] !== $variance['units'])
                     <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                         The two figures differ because stock moved for recorded reasons that are neither a sale nor a delivery — a transfer to another branch, a picking, an adjustment. Those are not missing.
@@ -387,7 +423,12 @@
                             <tbody>
                                 @foreach ($variance['top_offenders'] as $row)
                                     <tr class="border-t border-gray-100 dark:border-gray-800">
-                                        <td class="py-2">{{ $row['product'] }}</td>
+                                        <td class="py-2">
+                                            {{ $row['product'] }}
+                                            @unless ($row['in_opening'])
+                                                <span class="ml-1 rounded bg-warning-100 px-1 text-[10px] text-warning-800 dark:bg-warning-400/20 dark:text-warning-300" title="This product was not on the opening count, so its opening is assumed to be zero">no opening</span>
+                                            @endunless
+                                        </td>
                                         <td class="py-2 text-right font-mono">{{ $row['opening'] }}</td>
                                         <td class="py-2 text-right font-mono">{{ $row['received'] }}</td>
                                         <td class="py-2 text-right font-mono">{{ $row['sold'] }}</td>

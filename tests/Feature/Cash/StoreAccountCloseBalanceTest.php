@@ -302,6 +302,59 @@ test('the count valuation says out loud that it is approximate', function () {
         ->and($v['basis'])->toContain('Recorded sales is the exact figure');
 });
 
+test('without an opening count nothing is reported as short', function () {
+    $ctx = closeContext(onShelf: 10);
+
+    // 52 in, 5 sold, 47 sitting on the shelf and counted. With no opening
+    // baseline the old arithmetic read opening as zero and called all 47
+    // missing — an accusation against a branch holding exactly what it should.
+    closeMovement($ctx, 'restock', 52);
+    closeMovement($ctx, 'pos_sale', -5);
+
+    $v = closeBalance($ctx, closeCount($ctx, 47))['count_variance'];
+
+    expect($v['available'])->toBeFalse()
+        ->and($v['units'])->toBe(0)
+        ->and($v['at_selling'])->toBe(0.0)
+        ->and($v['reason'])->toContain('Pick an opening count');
+});
+
+test('a product the opening count never covered is flagged, not silently assumed', function () {
+    $ctx = closeContext(onShelf: 10);
+
+    $newcomer = App\Models\Product::create([
+        'vendor_id' => $ctx['vendor']->id,
+        'store_id'  => $ctx['store']->id,
+        'category_id' => $ctx['product']->category_id,
+        'name' => 'Arrived Mid-Period', 'price' => 80000, 'cost_price' => 50000,
+        'stock_quantity' => 5, 'reserved_stock' => 0, 'status' => 'published',
+    ]);
+    App\Models\ProductStoreStock::updateOrCreate(
+        ['product_id' => $newcomer->id, 'store_id' => $ctx['store']->id],
+        ['quantity' => 5, 'reserved' => 0],
+    );
+
+    $opening = app(App\Actions\Inventory\RecordPhysicalCountAction::class)->execute(
+        countedBy: $ctx['owner'], store: $ctx['store'],
+        periodStart: now()->subWeek(), periodEnd: now(),
+        counts: [$ctx['product']->id => 10],
+    );
+
+    $closing = app(App\Actions\Inventory\RecordPhysicalCountAction::class)->execute(
+        countedBy: $ctx['owner'], store: $ctx['store'],
+        periodStart: now()->subWeek(), periodEnd: now(),
+        counts: [$ctx['product']->id => 10, $newcomer->id => 5],
+    );
+
+    $v = closeBalance($ctx, $closing, $opening)['count_variance'];
+
+    // Assuming zero is usually right for a product that arrived mid-period, but
+    // it is an assumption and it decides whether a line reads as a shortfall.
+    expect($v['missing_from_opening'])->toBe(1)
+        ->and(collect($v['top_offenders'])->firstWhere('product_id', $newcomer->id)['in_opening'] ?? null)
+            ->toBeFalse();
+});
+
 test('without a closing count there is no variance to report', function () {
     $ctx = closeContext();
 
@@ -311,7 +364,8 @@ test('without a closing count there is no variance to report', function () {
     // only checked the half that balances when goods walk out unrecorded.
     expect($v['available'])->toBeFalse()
         ->and($v['at_selling'])->toBe(0.0)
-        ->and($v['approximate'])->toBeTrue();
+        ->and($v['approximate'])->toBeTrue()
+        ->and($v['reason'])->toContain('Pick an opening and a closing count');
 });
 
 test('the debt tender and the customer ledger agree when the charge was posted', function () {

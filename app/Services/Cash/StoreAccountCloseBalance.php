@@ -603,10 +603,22 @@ class StoreAccountCloseBalance
             'lines_over'  => 0,
             'top_offenders' => [],
             'snapshot_variance' => null,
+            'reason' => null,
         ];
 
-        if (! $closingCount) {
-            return $blank;
+        // BOTH counts, not just the closing one. Expected closing is opening
+        // plus what came in less what was rung, and with no opening every
+        // product that existed before the period reads as opening zero — so a
+        // shelf still holding 47 units is reported as 47 missing. That is not a
+        // conservative estimate, it is an accusation the data does not support.
+        if (! $closingCount || ! $baseline->count) {
+            // array_merge, not +: the union operator keeps the left-hand
+            // key, and $blank already carries a null reason.
+            return array_merge($blank, ['reason' => match (true) {
+                ! $closingCount && ! $baseline->count => 'Pick an opening and a closing count. Without both there is nothing to compare.',
+                ! $closingCount => 'Pick a closing count — what is on the shelf now.',
+                default => 'Pick an opening count. Without one every product looks like it started the period at zero, so anything still on the shelf reads as missing.',
+            }]);
         }
 
         $opening = $baseline->quantities();
@@ -617,6 +629,9 @@ class StoreAccountCloseBalance
             $productId = (int) $line->product_id;
             $move = $moves->get($productId, ['received' => 0, 'sold' => 0, 'other' => 0]);
 
+            // Absent from the opening count is not the same as counted at
+            // zero, and the difference decides whether a shortfall is real.
+            $inOpening = $opening->has($productId);
             $openingUnits = (int) ($opening[$productId] ?? 0);
             $expected = $openingUnits + $move['received'] - $move['sold'];
             $variance = $expected - (int) $line->counted_quantity;
@@ -632,6 +647,7 @@ class StoreAccountCloseBalance
                 'product_id'  => $productId,
                 'product'     => $line->product?->name ?? ('Product #' . $productId),
                 'opening'     => $openingUnits,
+                'in_opening'  => $inOpening,
                 'received'    => $move['received'],
                 'sold'        => $move['sold'],
                 'other_moves' => $move['other'],
@@ -666,6 +682,13 @@ class StoreAccountCloseBalance
             'lines_short' => $rows->where('variance', '>', 0)->count(),
             'lines_over'  => $rows->where('variance', '<', 0)->count(),
             'products_counted' => $rows->count(),
+            'reason' => null,
+
+            // Products on the closing count that the opening count never
+            // covered. Their opening is assumed zero, which is only true if
+            // the branch genuinely had none — so the assumption is reported
+            // rather than made silently.
+            'missing_from_opening' => $rows->reject(fn (array $r) => $r['in_opening'])->count(),
 
             // Which shelf to go and look at. A total says there is a problem.
             'top_offenders' => $rows
