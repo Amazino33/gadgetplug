@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\ActiveStore;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Spatie\Activitylog\LogOptions;
@@ -111,6 +112,36 @@ class AuditSession extends Model
     public function isSettled(): bool
     {
         return in_array($this->status, ['verified', 'resolved_by_override'], true);
+    }
+
+    /**
+     * The branch this count belongs to: the blind-count session's store when
+     * this line came from one, else whoever is resolving it now — a solo
+     * audit never names a branch of its own, and the person settling it is
+     * the closest thing to one. Null only when neither is known.
+     */
+    public function resolvedStoreId(): ?int
+    {
+        return $this->countSession?->store_id ?? ActiveStore::currentId();
+    }
+
+    /**
+     * What the system currently shows for this count's own branch — the
+     * baseline a resolution corrects against. Falls back to the vendor-wide
+     * mirror only when no branch could be resolved at all, so this never
+     * measures one branch's count against every branch's stock.
+     */
+    public function branchSystemStock(): int
+    {
+        $storeId = $this->resolvedStoreId();
+
+        if ($storeId === null) {
+            return (int) $this->product->stock_quantity;
+        }
+
+        return (int) (ProductStoreStock::where('product_id', $this->product_id)
+            ->where('store_id', $storeId)
+            ->value('quantity') ?? 0);
     }
 
     public function getActivitylogOptions(): LogOptions

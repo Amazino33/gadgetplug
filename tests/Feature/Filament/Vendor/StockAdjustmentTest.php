@@ -4,8 +4,11 @@ use App\Filament\Vendor\Pages\StockAdjustment;
 use App\Models\Category;
 use App\Models\InventoryLedger;
 use App\Models\Product;
+use App\Models\ProductStoreStock;
+use App\Models\Store;
 use App\Models\User;
 use App\Models\Vendor;
+use App\Services\ActiveStore;
 use App\Services\VendorRoles;
 use Database\Seeders\VendorPermissionsSeeder;
 use Filament\Facades\Filament;
@@ -268,4 +271,43 @@ test('an inventory manager and the owner can reach the page', function () {
     $this->actingAs($data['owner']);
     Filament::setTenant($data['vendor']);
     expect(StockAdjustment::canAccess())->toBeTrue();
+});
+
+// A vendor with more than one branch: the sheet's figure is a target for the
+// branch the manager is standing in, so it must be measured against that
+// branch's own row, not every branch's stock added together. Getting this
+// wrong computes the wrong delta and silently sends it to the right store.
+test('the sheet figure is measured against the branch being worked in, not every branch combined', function () {
+    $data   = adjVendor();
+    $hq     = Store::create(['vendor_id' => $data['vendor']->id, 'name' => 'HQ', 'is_default' => true]);
+    $branch = Store::create(['vendor_id' => $data['vendor']->id, 'name' => 'Branch']);
+
+    // Vendor-wide mirror is 12 (10 + 2), but the branch itself only holds 2.
+    // Created at 0 and set via updateOrCreate: creating it already-stocked
+    // would open a home-store row of its own for whichever branch happened
+    // to be active at that moment, double-counting against the row set here.
+    $p = adjProduct($data['vendor'], 'SKU-1', 0);
+    ProductStoreStock::updateOrCreate(['product_id' => $p->id, 'store_id' => $hq->id], ['quantity' => 10, 'reserved' => 0]);
+    ProductStoreStock::updateOrCreate(['product_id' => $p->id, 'store_id' => $branch->id], ['quantity' => 2, 'reserved' => 0]);
+
+    // The owner: a manager needs a store_user row to reach a second branch
+    // at all, which is a different rule this test isn't about.
+    $this->actingAs($data['owner']);
+    Filament::setCurrentPanel(Filament::getPanel('vendor'));
+    Filament::setTenant($data['vendor']);
+    ActiveStore::set($data['vendor'], $data['owner'], $branch->id);
+
+    $component = Livewire::test(StockAdjustment::class)
+        ->set('pasted', "SKU-1\t15")
+        ->call('buildPreview');
+
+    // Current must read the branch's own 2, not the vendor-wide 12 — and the
+    // change is what actually moves the branch to 15, not 15 - 12.
+    expect($component->get('preview')[0]['current'])->toBe(2)
+        ->and($component->get('preview')[0]['change'])->toBe(13);
+
+    $component->call('apply');
+
+    expect(ProductStoreStock::where('product_id', $p->id)->where('store_id', $branch->id)->value('quantity'))->toBe(15)
+        ->and(ProductStoreStock::where('product_id', $p->id)->where('store_id', $hq->id)->value('quantity'))->toBe(10);
 });

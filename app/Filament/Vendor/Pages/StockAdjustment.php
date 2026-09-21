@@ -6,6 +6,7 @@ namespace App\Filament\Vendor\Pages;
 
 use App\Actions\Inventory\AdjustStockAction;
 use App\Models\Product;
+use App\Models\ProductStoreStock;
 use App\Services\ActiveStore;
 use BackedEnum;
 use Filament\Notifications\Notification;
@@ -285,7 +286,7 @@ class StockAdjustment extends Page
     /** @return array<string, mixed> */
     private function row(string $line, ?Product $product, ?int $target, ?string $error): array
     {
-        $current = $product ? (int) $product->stock_quantity : null;
+        $current = $product ? $this->currentStock($product) : null;
 
         return [
             'line'       => $line,
@@ -297,5 +298,25 @@ class StockAdjustment extends Page
             'change'     => ($product && $target !== null) ? $target - $current : null,
             'error'      => $error,
         ];
+    }
+
+    /**
+     * What this branch's own row shows — not the vendor-wide mirror. The
+     * sheet's number is an absolute target for the store being worked in
+     * (see buildPreview()'s docblock), so measuring it against every
+     * branch's stock combined would compute the wrong delta and apply()
+     * would then move that wrong amount, correctly, to the right store.
+     */
+    private function currentStock(Product $product): int
+    {
+        $storeId = ActiveStore::currentId();
+
+        if ($storeId === null) {
+            return (int) $product->stock_quantity;
+        }
+
+        return (int) (ProductStoreStock::where('product_id', $product->id)
+            ->where('store_id', $storeId)
+            ->value('quantity') ?? 0);
     }
 }

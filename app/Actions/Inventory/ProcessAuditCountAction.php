@@ -37,8 +37,13 @@ class ProcessAuditCountAction
             if ($audit->count_a === $audit->count_b) {
                 $audit->status = 'verified';
 
-                // We need to figure out how much stock is "missing" or "extra"
-                $currentSystemStock = $audit->product->stock_quantity;
+                // The branch this count actually belongs to, and what the
+                // system currently shows there — never the vendor-wide
+                // mirror, which would compare one branch's count against
+                // every branch's stock and "correct" a store that was never
+                // counted while the one actually walked stays wrong.
+                $storeId            = $audit->resolvedStoreId();
+                $currentSystemStock = $audit->branchSystemStock();
                 $quantityDifference = $audit->count_b - $currentSystemStock;
 
                 // Only write to the ledger if the stock actually changed
@@ -49,7 +54,8 @@ class ProcessAuditCountAction
                         transactionType: 'audit_correction',
                         userId: $storeKeeperBId,
                         reference: "Audit #{$audit->id}",
-                        description: "Inventory count verified. System expected {$currentSystemStock}, actually found {$audit->count_b}."
+                        description: "Inventory count verified. System expected {$currentSystemStock}, actually found {$audit->count_b}.",
+                        store: $storeId,
                     );
                 }
             } else {

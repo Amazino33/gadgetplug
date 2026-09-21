@@ -10,7 +10,6 @@ use App\Models\AuditSession;
 use App\Models\User;
 use App\Actions\Inventory\ProcessAuditCountAction;
 use App\Actions\Inventory\AdjustStockAction;
-use App\Services\ActiveStore;
 use App\Models\InventoryShortageCase;
 use App\Services\ShortageCaseService;
 use Filament\Forms\Components\Textarea;
@@ -22,7 +21,6 @@ use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
 use Illuminate\Support\Collection;
-use App\Models\ProductStoreStock;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -561,7 +559,7 @@ class AuditSessionResource extends Resource
                     ->modalHeading('Manager Override')
                     ->modalDescription(fn (AuditSession $record): string => $record->storekeeper_b_id
                         ? "A counted {$record->count_a}. B counted {$record->count_b}. Enter the correct stock figure."
-                        : "Solo count found {$record->count_a}. System expected {$record->product?->stock_quantity}. Enter the correct stock figure."
+                        : "Solo count found {$record->count_a}. System expected {$record->branchSystemStock()}. Enter the correct stock figure."
                     )
                     ->slideOver()
                     ->form([
@@ -871,16 +869,9 @@ class AuditSessionResource extends Resource
         string $reasonCode,
         AdjustStockAction $adjustStock,
     ): void {
-        $storeId = $record->countSession?->store_id ?? ActiveStore::currentId();
-
-        // The baseline is that branch's shelf, not the vendor-wide mirror.
-        $currentSystemStock = $storeId === null
-            ? (int) $record->product->stock_quantity
-            : (int) (ProductStoreStock::where('product_id', $record->product_id)
-                ->where('store_id', $storeId)
-                ->value('quantity') ?? 0);
-
-        $difference = $finalCount - $currentSystemStock;
+        $storeId            = $record->resolvedStoreId();
+        $currentSystemStock = $record->branchSystemStock();
+        $difference         = $finalCount - $currentSystemStock;
 
         // Only a shortfall is a loss. Finding more than expected is not a gain
         // to be booked here.
