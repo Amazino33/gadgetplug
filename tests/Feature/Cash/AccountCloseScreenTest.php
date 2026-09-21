@@ -161,8 +161,10 @@ test('the goods block and the handover list render on screen', function () {
         'amount_paid' => 180000,
         'payment_status' => 'full',
         'payment_method' => 'bank_transfer',
-        'status'     => 'completed',
-        'created_by' => $ctx['owner']->id,
+        'status'      => App\Models\Procurement::STATUS_APPROVED,
+        'created_by'  => $ctx['cashier']->id,
+        'approved_by' => $ctx['owner']->id,
+        'approved_at' => now(),
     ]);
 
     closeScreen($ctx, [
@@ -172,7 +174,10 @@ test('the goods block and the handover list render on screen', function () {
         ->assertOk()
         ->assertSee('What happened to the goods')
         ->assertSee('Opening stock')
-        ->assertSee('Stock bought in')
+        ->assertSee('Stock sent to this branch')
+        // Two names on every delivery, not just a total.
+        ->assertSee('Recorded by')
+        ->assertSee('Approved by')
         ->assertSee('Available to sell')
         ->assertSee('Left the shelf')
         ->assertSee('At selling price')

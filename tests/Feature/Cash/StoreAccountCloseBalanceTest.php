@@ -367,8 +367,10 @@ test('the goods block runs opening plus purchases less closing, at cost', functi
         'amount_paid' => 180000,
         'payment_status' => 'full',
         'payment_method' => 'bank_transfer',
-        'status'     => 'completed',
-        'created_by' => $ctx['owner']->id,
+        'status'      => App\Models\Procurement::STATUS_APPROVED,
+        'created_by'  => $ctx['cashier']->id,
+        'approved_by' => $ctx['owner']->id,
+        'approved_at' => now(),
     ]);
 
     // Cost price on the fixture product is 60,000.
@@ -389,6 +391,10 @@ test('the goods block runs opening plus purchases less closing, at cost', functi
         ->and($m['purchases'][0]['reference'])->toStartWith('GP-PROC-')
         ->and($m['purchases'][0]['supplier'])->toBe('Lagos Wholesale')
         ->and($m['purchases'][0]['date'])->not->toBeNull()
+        // Two names on every delivery: the person who recorded it and the
+        // person who let it through are deliberately not the same power.
+        ->and($m['purchases'][0]['recorded_by'])->toBe($ctx['cashier']->name)
+        ->and($m['purchases'][0]['approved_by'])->toBe($ctx['owner']->name)
         // Never to be read against the value sold above.
         ->and($m['basis'])->toContain('the difference is not profit');
 });
@@ -406,8 +412,10 @@ test('the goods block carries a selling-price column beside the cost one', funct
         'amount_paid' => 180000,
         'payment_status' => 'full',
         'payment_method' => 'bank_transfer',
-        'status'     => 'completed',
-        'created_by' => $ctx['owner']->id,
+        'status'      => App\Models\Procurement::STATUS_APPROVED,
+        'created_by'  => $ctx['cashier']->id,
+        'approved_by' => $ctx['owner']->id,
+        'approved_at' => now(),
     ]);
 
     // Three units at 60,000 cost and 100,000 retail — the delivery's own lines
@@ -467,6 +475,32 @@ test('a partial count is visible as partial, against what the branch holds', fun
         ->and($m['on_record']['cost'])->toBe(1500000.0);
 });
 
+test('a delivery nobody has approved is not stock the branch has received', function () {
+    $ctx = closeContext();
+
+    App\Models\Procurement::create([
+        'vendor_id'  => $ctx['vendor']->id,
+        'store_id'   => $ctx['store']->id,
+        'supplier_id' => App\Models\Supplier::create([
+            'vendor_id' => $ctx['vendor']->id, 'name' => 'Pending Supplier',
+        ])->id,
+        'total_cost' => 900000,
+        'amount_paid' => 0,
+        'payment_status' => 'credit',
+        'payment_method' => 'credit',
+        'status'     => App\Models\Procurement::STATUS_PENDING,
+        'created_by' => $ctx['cashier']->id,
+    ]);
+
+    $view = closeBalance($ctx);
+
+    // Approving is what actually puts goods on the shelf. Counting a pending
+    // delivery would credit the branch with stock nobody has sent it.
+    expect($view['stock_movement']['purchases_count'])->toBe(0)
+        ->and($view['stock_movement']['purchases_value'])->toBe(0.0)
+        ->and($view['procurement']['batches'])->toBe(0);
+});
+
 test('the goods block says so when it has only half the counts it needs', function () {
     $ctx = closeContext(onShelf: 10);
 
@@ -490,8 +524,10 @@ test('stock bought with cash is flagged, because it may have come out of the til
         'amount_paid' => 50000,
         'payment_status' => 'full',
         'payment_method' => 'cash',
-        'status'     => 'completed',
-        'created_by' => $ctx['owner']->id,
+        'status'      => App\Models\Procurement::STATUS_APPROVED,
+        'created_by'  => $ctx['cashier']->id,
+        'approved_by' => $ctx['owner']->id,
+        'approved_at' => now(),
     ]);
 
     $m = closeBalance($ctx)['stock_movement'];

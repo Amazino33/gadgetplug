@@ -136,7 +136,7 @@
                             <td class="py-1.5 text-right font-mono">{{ $money($movement['opening_selling']) }}</td>
                         </tr>
                         <tr>
-                            <td class="py-1.5 text-gray-500 dark:text-gray-400">Stock bought in ({{ $movement['purchases_count'] }})</td>
+                            <td class="py-1.5 text-gray-500 dark:text-gray-400">Stock sent to this branch ({{ $movement['purchases_count'] }})</td>
                             <td class="py-1.5 text-right font-mono">{{ $money($movement['purchases_value']) }}</td>
                             <td class="py-1.5 text-right font-mono">{{ $money($movement['purchases_selling']) }}</td>
                         </tr>
@@ -214,9 +214,11 @@
                         <table class="w-full text-sm">
                             <thead>
                                 <tr class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                                    <th class="py-2">Date</th>
+                                    <th class="py-2">Arrived</th>
                                     <th class="py-2">Reference</th>
                                     <th class="py-2">Supplier</th>
+                                    <th class="py-2">Recorded by</th>
+                                    <th class="py-2">Approved by</th>
                                     <th class="py-2 text-right">Cost</th>
                                     <th class="py-2 text-right">Retail</th>
                                 </tr>
@@ -224,7 +226,12 @@
                             <tbody>
                                 @foreach ($movement['purchases'] as $p)
                                     <tr class="border-t border-gray-100 dark:border-gray-800">
-                                        <td class="py-2 whitespace-nowrap">{{ $p['date'] }}</td>
+                                        <td class="py-2 whitespace-nowrap">
+                                            {{ $p['date'] }}
+                                            @if ($p['raised'] && $p['raised'] !== $p['date'])
+                                                <span class="block text-[10px] text-gray-400 dark:text-gray-500">raised {{ $p['raised'] }}</span>
+                                            @endif
+                                        </td>
                                         <td class="py-2 font-mono text-xs">
                                             {{ $p['reference'] }}
                                             @if ($p['paid_cash'])
@@ -232,6 +239,8 @@
                                             @endif
                                         </td>
                                         <td class="py-2">{{ $p['supplier'] }}</td>
+                                        <td class="py-2">{{ $p['recorded_by'] }}</td>
+                                        <td class="py-2">{{ $p['approved_by'] }}</td>
                                         <td class="py-2 text-right font-mono">{{ $money($p['amount']) }}</td>
                                         <td class="py-2 text-right font-mono">{{ $money($p['selling']) }}</td>
                                     </tr>

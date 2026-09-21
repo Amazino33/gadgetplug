@@ -128,7 +128,7 @@
             <td class="num">{{ $money($m['opening_selling'] ?? 0) }}</td>
         </tr>
         <tr class="row">
-            <td>Stock bought in ({{ $m['purchases_count'] ?? 0 }})</td>
+            <td>Stock sent to this branch ({{ $m['purchases_count'] ?? 0 }})</td>
             <td class="num">{{ $money($m['purchases_value'] ?? 0) }}</td>
             <td class="num">{{ $money($m['purchases_selling'] ?? 0) }}</td>
         </tr>
@@ -170,12 +170,14 @@
 
     @if (! empty($m['purchases']))
         <table style="margin-top:8px">
-            <tr><th>Date</th><th>Reference</th><th>Supplier</th><th class="num">Cost</th><th class="num">Retail</th></tr>
+            <tr><th>Arrived</th><th>Reference</th><th>Supplier</th><th>Recorded by</th><th>Approved by</th><th class="num">Cost</th><th class="num">Retail</th></tr>
             @foreach ($m['purchases'] as $row)
                 <tr class="row">
                     <td>{{ $row['date'] }}</td>
                     <td>{{ $row['reference'] }}{{ $row['paid_cash'] ? ' (cash)' : '' }}</td>
                     <td>{{ $row['supplier'] }}</td>
+                    <td>{{ $row['recorded_by'] }}</td>
+                    <td>{{ $row['approved_by'] }}</td>
                     <td class="num">{{ $money($row['amount']) }}</td>
                     <td class="num">{{ $money($row['selling']) }}</td>
                 </tr>

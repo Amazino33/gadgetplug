@@ -273,22 +273,47 @@ class StoreAccountCloseBalance
             ->groupBy('procurement_id')
             ->pluck('retail', 'procurement_id');
 
+        // Only approved deliveries. A procurement is what somebody intends to
+        // buy; approving it is what actually puts the goods on this branch's
+        // shelf — that is the moment ApproveProcurementAction posts the restock
+        // and moves product_store_stock. Counting a pending one would credit
+        // the branch with stock nobody has sent it yet.
+        //
+        // Dated and scoped on approved_at for the same reason: that is when the
+        // goods arrived, which is what makes this agree with the units on the
+        // ledger rather than drifting from them by however long an approval sat.
         $purchases = Procurement::query()
             ->leftJoin('suppliers', 'suppliers.id', '=', 'procurements.supplier_id')
+            ->leftJoin('users as recorder', 'recorder.id', '=', 'procurements.created_by')
+            ->leftJoin('users as approver', 'approver.id', '=', 'procurements.approved_by')
             ->where('procurements.store_id', $store->id)
-            ->where('procurements.status', '!=', 'voided')
-            ->whereBetween('procurements.created_at', [$from, $to])
-            ->orderBy('procurements.created_at')
+            ->where('procurements.status', Procurement::STATUS_APPROVED)
+            ->whereNotNull('procurements.approved_at')
+            ->whereBetween('procurements.approved_at', [$from, $to])
+            ->orderBy('procurements.approved_at')
             ->get([
                 'procurements.id', 'procurements.reference', 'procurements.total_cost',
                 'procurements.payment_method', 'procurements.status',
-                'procurements.created_at', 'suppliers.name as supplier',
+                'procurements.created_at', 'procurements.approved_at',
+                'suppliers.name as supplier',
+                'recorder.name as recorded_by',
+                'approver.name as approved_by',
             ])
             ->map(fn ($p) => [
                 'id'        => $p->id,
-                'date'      => $p->created_at?->format('d M Y'),
+                // When the goods landed, which is the date this block is about.
+                'date'      => $p->approved_at?->format('d M Y'),
+                // Kept beside it: a delivery approved long after it was raised
+                // is worth seeing, and the gap is invisible from one date.
+                'raised'    => $p->created_at?->format('d M Y'),
                 'reference' => $p->reference,
                 'supplier'  => $p->supplier ?? 'No supplier recorded',
+                // Two names, never one. A delivery is recorded by one person and
+                // approved by another precisely so the person who can create
+                // stock out of nothing is not the person who can wave it
+                // through — a row showing only a total says neither.
+                'recorded_by' => $p->recorded_by ?? 'Unknown',
+                'approved_by' => $p->approved_by ?? 'Not recorded',
                 'amount'    => round((float) $p->total_cost, 2),
                 'selling'   => round((float) ($retailByProcurement[$p->id] ?? 0), 2),
                 'status'    => $p->status,
@@ -711,10 +736,13 @@ class StoreAccountCloseBalance
 
         return [
             'units_received' => $units,
+            // Approved and dated by arrival, matching the units above: both
+            // are counting deliveries that actually reached the shelf.
             'batches' => Procurement::query()
                 ->where('store_id', $store->id)
-                ->where('status', '!=', 'voided')
-                ->whereBetween('created_at', [$from, $to])
+                ->where('status', Procurement::STATUS_APPROVED)
+                ->whereNotNull('approved_at')
+                ->whereBetween('approved_at', [$from, $to])
                 ->count(),
             // Carried on the row itself so no reader has to remember the rule.
             'is_money_line' => false,
