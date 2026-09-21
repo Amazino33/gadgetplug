@@ -233,6 +233,28 @@ test('stock that left as a recorded sale is not a variance', function () {
         ->and($v['at_selling'])->toBe(0.0);
 });
 
+test('a correction from either kind of stock count is not mistaken for goods moving', function () {
+    $ctx = closeContext(onShelf: 10);
+
+    $opening = closeCount($ctx, 10);
+
+    // This codebase counts stock two ways: the settlement count posts
+    // 'count_adjustment', the two-person blind count on the Inventory Count
+    // page posts 'audit_correction'. Both are a correction a count produced.
+    closeMovement($ctx, 'count_adjustment', -2);
+    closeMovement($ctx, 'audit_correction', -3);
+
+    $closing = closeCount($ctx, 10);
+
+    $v = closeBalance($ctx, $closing, $opening)['count_variance'];
+
+    // Counting either as stock movement would let last period's written-off
+    // shortfall reappear as this period's goods.
+    expect($v['units'])->toBe(0)
+        ->and($v['at_selling'])->toBe(0.0)
+        ->and($v['top_offenders'])->toBeEmpty();
+});
+
 test('a transfer to another branch is reported, not accused', function () {
     $ctx = closeContext(onShelf: 10);
 
@@ -292,19 +314,141 @@ test('without a closing count there is no variance to report', function () {
         ->and($v['approximate'])->toBeTrue();
 });
 
-test('the debt tender is cross-checked against the customer ledger', function () {
+test('the debt tender and the customer ledger agree when the charge was posted', function () {
     $ctx = closeContext();
 
+    $customer = App\Models\PosCustomer::create([
+        'vendor_id' => $ctx['vendor']->id,
+        'name'      => 'Credit Customer',
+    ]);
+
+    $sale = closeSale($ctx, 'debt', 30000, ['customer_id' => $customer->id]);
+    app(App\Actions\Pos\ChargeCustomerDebtAction::class)->execute($sale);
+
+    $check = closeBalance($ctx)['debt_check'];
+
+    // Both read the sale's tender rows rather than its total, so in the shape
+    // production actually produces they are the same money counted twice and
+    // must land on the same number.
+    expect($check['tender'])->toBe(30000.0)
+        ->and($check['ledger_charges'])->toBe(30000.0)
+        ->and($check['agrees'])->toBeTrue();
+});
+
+test('a credit sale whose charge never reached the ledger shows as a difference', function () {
+    $ctx = closeContext();
+
+    // The tender row exists; no charge was ever posted against it. Surfaced as
+    // a difference rather than swallowed, because a receivable nobody can be
+    // asked to pay is worth more attention than a rounding error.
     closeSale($ctx, 'debt', 30000);
 
     $check = closeBalance($ctx)['debt_check'];
 
-    // The balance runs on the tender. The ledger is the same money seen from
-    // the other side, and the difference is what is worth looking at.
     expect($check['tender'])->toBe(30000.0)
         ->and($check['ledger_charges'])->toBe(0.0)
         ->and($check['agrees'])->toBeFalse()
         ->and($check['difference'])->toBe(30000.0);
+});
+
+test('the goods block runs opening plus purchases less closing, at cost', function () {
+    $ctx = closeContext(onShelf: 10);
+
+    $supplier = App\Models\Supplier::create([
+        'vendor_id' => $ctx['vendor']->id,
+        'name'      => 'Lagos Wholesale',
+    ]);
+
+    App\Models\Procurement::create([
+        'vendor_id'  => $ctx['vendor']->id,
+        'store_id'   => $ctx['store']->id,
+        'supplier_id' => $supplier->id,
+        'total_cost' => 180000,
+        'amount_paid' => 180000,
+        'payment_status' => 'full',
+        'payment_method' => 'bank_transfer',
+        'status'     => 'completed',
+        'created_by' => $ctx['owner']->id,
+    ]);
+
+    // Cost price on the fixture product is 60,000.
+    $opening = closeCount($ctx, 10);   // 600,000 at cost
+    $closing = closeCount($ctx, 4);    // 240,000 at cost
+
+    $m = closeBalance($ctx, $closing, $opening)['stock_movement'];
+
+    expect($m['available'])->toBeTrue()
+        ->and($m['opening_value'])->toBe(600000.0)
+        ->and($m['purchases_value'])->toBe(180000.0)
+        ->and($m['available_value'])->toBe(780000.0)
+        ->and($m['closing_value'])->toBe(240000.0)
+        // What it cost to buy the things that are no longer there.
+        ->and($m['left_at_cost'])->toBe(540000.0)
+        // The model stamps its own reference on create, so this asserts the
+        // shape rather than the value the fixture asked for.
+        ->and($m['purchases'][0]['reference'])->toStartWith('GP-PROC-')
+        ->and($m['purchases'][0]['supplier'])->toBe('Lagos Wholesale')
+        ->and($m['purchases'][0]['date'])->not->toBeNull()
+        // Never to be read against the selling-price side above.
+        ->and($m['basis'])->toContain('At cost, not selling price');
+});
+
+test('the goods block says so when it has only half the counts it needs', function () {
+    $ctx = closeContext(onShelf: 10);
+
+    // Without a closing figure, "what left" would just be everything.
+    $m = closeBalance($ctx, null, closeCount($ctx, 10))['stock_movement'];
+
+    expect($m['available'])->toBeFalse();
+});
+
+test('stock bought with cash is flagged, because it may have come out of the till', function () {
+    $ctx = closeContext();
+
+    App\Models\Procurement::create([
+        'vendor_id'  => $ctx['vendor']->id,
+        'store_id'   => $ctx['store']->id,
+        'supplier_id' => App\Models\Supplier::create([
+            'vendor_id' => $ctx['vendor']->id,
+            'name'      => 'Cash Supplier',
+        ])->id,
+        'total_cost' => 50000,
+        'amount_paid' => 50000,
+        'payment_status' => 'full',
+        'payment_method' => 'cash',
+        'status'     => 'completed',
+        'created_by' => $ctx['owner']->id,
+    ]);
+
+    $m = closeBalance($ctx)['stock_movement'];
+
+    // Nothing in the data says whether this came from the till or the business
+    // account, and the difference decides whether it also belongs on the money
+    // side. Flagged for a person to answer rather than assumed either way.
+    expect($m['purchases'][0]['paid_cash'])->toBeTrue()
+        ->and($m['purchases_value'])->toBe(50000.0);
+});
+
+test('every handover in the period is listed, settled or not', function () {
+    $ctx = closeContext();
+
+    closeSale($ctx, 'cash', 100000);
+    closeRemit($ctx, 60000);
+
+    app(App\Actions\Cash\SubmitCashAction::class)->execute(
+        submitter: $ctx['cashier'], receiver: $ctx['owner'], store: $ctx['store'],
+        amount: 25000, reason: 'Second drop',
+    );
+
+    $subs = closeBalance($ctx)['submissions'];
+
+    expect($subs['count'])->toBe(2)
+        ->and($subs['rows'][0]['amount'])->toBe(60000.0)
+        ->and($subs['rows'][0]['counts'])->toBeTrue()
+        // Real money that moved, still not on the right of the balance.
+        ->and($subs['rows'][1]['amount'])->toBe(25000.0)
+        ->and($subs['rows'][1]['counts'])->toBeFalse()
+        ->and($subs['rows'][1]['from'])->toBe($ctx['cashier']->name);
 });
 
 test('profit never appears on the balance', function () {

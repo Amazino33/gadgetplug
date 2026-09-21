@@ -141,7 +141,7 @@ class AccountClose extends Page
                     ->columns(['sm' => 1, 'lg' => 3]),
 
                 Section::make('Stock')
-                    ->description('A period closed on the money alone has only checked the half that balances whether or not goods left the shelf unrecorded.')
+                    ->description(fn (): string => $this->stockNote())
                     ->schema([
                         Select::make('opening_count_id')
                             ->label('Opening count')
@@ -518,6 +518,37 @@ class AccountClose extends Page
 
     // -------------------------------------------------------------- options
 
+    /**
+     * What this period covers and what came into it, said where the counts are
+     * picked rather than only further down the page.
+     *
+     * Somebody choosing a count is deciding whether it matches the period in
+     * front of them, and they cannot do that without being told what the period
+     * is. The deliveries are here for the same reason: a branch that took stock
+     * in this month and sees nothing about it concludes the screen lost it.
+     */
+    private function stockNote(): string
+    {
+        $plain = 'Counting the shelf is the only check that sees goods leaving without a sale being rung.';
+
+        if (! $this->store()) {
+            return $plain;
+        }
+
+        $period = $this->period();
+        $received = $this->balance()['procurement'] ?? ['units_received' => 0, 'batches' => 0];
+
+        return sprintf(
+            'Closing %s to %s. %d units came in on %d %s in this period. %s',
+            $period['from']->format('d M Y'),
+            $period['to']->format('d M Y'),
+            $received['units_received'],
+            $received['batches'],
+            $received['batches'] === 1 ? 'delivery' : 'deliveries',
+            $plain,
+        );
+    }
+
     /** @return array<int, string> */
     private function branchOptions(): array
     {
@@ -551,14 +582,21 @@ class AccountClose extends Page
                 StoreAccountClose::forStore($store->id)->pluck('closing_count_id'),
             ))
             ->with('countedBy:id,name')
+            ->withCount('lines')
             ->orderByDesc('counted_at')
             ->limit(50)
             ->get()
             ->mapWithKeys(fn (PhysicalStockCount $c) => [
+                // Leads with the period the count covers, because that is what
+                // somebody is matching against when they pick one. Counting the
+                // shelf on the 20th for the period ending the 15th is a real
+                // mistake, and a label showing only the date it was taken hides it.
                 $c->id => sprintf(
-                    '%s — %d products, counted by %s',
-                    $c->counted_at?->format('d M Y, g:ia') ?? 'undated',
-                    $c->lines()->count(),
+                    '%s to %s · %d products · counted %s by %s',
+                    $c->period_start?->format('d M') ?? '?',
+                    $c->period_end?->format('d M Y') ?? '?',
+                    $c->lines_count,
+                    $c->counted_at?->format('d M Y') ?? 'undated',
                     $c->countedBy?->name ?? 'unknown',
                 ),
             ])

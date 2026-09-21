@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Cash;
 
+use App\Models\CashSubmission;
 use App\Models\InventoryLedger;
 use App\Models\PhysicalStockCount;
 use App\Models\PosCustomerLedgerEntry;
@@ -58,13 +59,19 @@ class StoreAccountCloseBalance
     private const SALE_TYPES = ['pos_sale', 'online_sale', 'dispatched'];
 
     /**
-     * Posted by approving a stock count, and excluded from every figure here.
+     * Posted by signing off a count, and excluded from every figure here.
      *
-     * It is the correction a previous count produced, not goods moving. Letting
-     * it into "received" would mean last month's shortfall, once written off,
-     * quietly reappeared as this month's stock.
+     * These are corrections a count produced, not goods moving. Letting one into
+     * "received" would mean last month's shortfall, once written off, quietly
+     * reappeared as this month's stock — and letting it into "sold" would credit
+     * the branch with a sale nobody made.
+     *
+     * Both types are here because this codebase counts stock two different ways:
+     * 'count_adjustment' comes from a settlement stock count, 'audit_correction'
+     * from the two-person blind count on the Inventory Count page. They are the
+     * same kind of event and must be treated the same.
      */
-    private const CORRECTION_TYPE = 'count_adjustment';
+    private const CORRECTION_TYPES = ['count_adjustment', 'audit_correction'];
 
     public function __construct(private readonly StoreReconciliation $reconciliation) {}
 
@@ -110,9 +117,10 @@ class StoreAccountCloseBalance
             'balance'        => $balance,
             'checkmate'      => $this->agreement($balance, $checkmate),
             'debt_check'     => $this->debtCheck($store, $from, $to, $balance),
-            'submissions'    => $this->submissions($checkmate),
+            'submissions'    => $this->submissions($checkmate, $this->submissionRows($store, $from, $to)),
             'count_variance' => $this->countVariance($store, $from, $to, $baseline, $closingCount),
             'procurement'    => $this->procurement($store, $from, $to),
+            'stock_movement' => $this->stockMovement($store, $from, $to, $baseline, $closingCount),
         ];
     }
 
@@ -225,10 +233,157 @@ class StoreAccountCloseBalance
         ];
     }
 
+    /**
+     * What the shelf was worth at the start, what was bought into it, and what
+     * it was worth at the end — so the difference is what actually left.
+     *
+     * Valued at COST throughout, and it has to be: a purchase has no selling
+     * price, only what was paid for it. That makes this the one block on the
+     * page not in selling-price naira, which is why it is kept apart from the
+     * balance above and never added to it. The two answer different questions —
+     * the balance asks where the money went, this asks what happened to the
+     * goods.
+     *
+     * It is not a profit figure and must not be read as one. "Left the shelf, at
+     * cost" is what it cost to buy the things that are gone; comparing it to the
+     * value sold above would be mixing a cost with a price, and the gap between
+     * them is not margin because neither side is scoped to the same goods.
+     *
+     * @return array<string, mixed>
+     */
+    private function stockMovement(
+        Store $store,
+        CarbonInterface $from,
+        CarbonInterface $to,
+        OpeningBaseline $baseline,
+        ?PhysicalStockCount $closingCount,
+    ): array {
+        $opening = $this->countAtCost($baseline->count);
+        $closing = $this->countAtCost($closingCount);
+
+        $purchases = Procurement::query()
+            ->leftJoin('suppliers', 'suppliers.id', '=', 'procurements.supplier_id')
+            ->where('procurements.store_id', $store->id)
+            ->where('procurements.status', '!=', 'voided')
+            ->whereBetween('procurements.created_at', [$from, $to])
+            ->orderBy('procurements.created_at')
+            ->get([
+                'procurements.id', 'procurements.reference', 'procurements.total_cost',
+                'procurements.payment_method', 'procurements.status',
+                'procurements.created_at', 'suppliers.name as supplier',
+            ])
+            ->map(fn ($p) => [
+                'id'        => $p->id,
+                'date'      => $p->created_at?->format('d M Y'),
+                'reference' => $p->reference,
+                'supplier'  => $p->supplier ?? 'No supplier recorded',
+                'amount'    => round((float) $p->total_cost, 2),
+                'status'    => $p->status,
+                // Surfaced rather than buried. Stock is normally paid for from
+                // the business account; one paid in cash is the case that could
+                // legitimately have come out of the till, and if it did it
+                // belongs on the money side as a declared till expense. Nothing
+                // in the data says which, so it is flagged for a person to
+                // answer rather than assumed either way.
+                'paid_cash' => $p->payment_method === 'cash',
+            ]);
+
+        $purchasesValue = round((float) $purchases->sum('amount'), 2);
+        $availableValue = round($opening['value'] + $purchasesValue, 2);
+
+        return [
+            // Both counts are needed before the arithmetic means anything: with
+            // no closing figure, "what left" would just be everything.
+            'available' => $baseline->count !== null && $closingCount !== null,
+
+            'opening_value' => $opening['value'],
+            'opening_units' => $opening['units'],
+
+            'purchases_value' => $purchasesValue,
+            'purchases_count' => $purchases->count(),
+            'purchases'       => $purchases->all(),
+
+            'available_value' => $availableValue,
+
+            'closing_value' => $closing['value'],
+            'closing_units' => $closing['units'],
+
+            // Opening plus what came in, less what is still there.
+            'left_at_cost' => round($availableValue - $closing['value'], 2),
+
+            // Units with no cost price recorded are left out of the value rather
+            // than valued at nothing, so the total is visibly understated rather
+            // than quietly wrong. Same rule the stock position panel follows.
+            'uncosted_lines' => $opening['uncosted'] + $closing['uncosted'],
+
+            'basis' => 'At cost, not selling price — a purchase has no selling price, only what was paid for it. '
+                . 'Do not compare this with the value sold above: that is what customers were charged, and the '
+                . 'difference between the two is not profit.',
+        ];
+    }
+
+    /**
+     * What a count was worth at cost, and how much of it could not be valued.
+     *
+     * @return array{units: int, value: float, uncosted: int}
+     */
+    private function countAtCost(?PhysicalStockCount $count): array
+    {
+        if (! $count) {
+            return ['units' => 0, 'value' => 0.0, 'uncosted' => 0];
+        }
+
+        $lines = $count->relationLoaded('lines') ? $count->lines : $count->lines()->get();
+
+        return [
+            'units'    => (int) $lines->sum('counted_quantity'),
+            'value'    => round((float) $lines->sum(
+                fn ($l) => (int) $l->counted_quantity * (float) ($l->unit_cost ?? 0),
+            ), 2),
+            'uncosted' => $lines->filter(fn ($l) => $l->unit_cost === null)->count(),
+        ];
+    }
+
+    /**
+     * Every handover in the period, named and dated.
+     *
+     * A total says a branch is short; this says who handed what over and when,
+     * which is the only form the conversation can actually take.
+     *
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function submissionRows(Store $store, CarbonInterface $from, CarbonInterface $to): Collection
+    {
+        return CashSubmission::query()
+            ->where('store_id', $store->id)
+            ->whereBetween('created_at', [$from, $to])
+            ->with(['submitter:id,name', 'receiver:id,name'])
+            ->orderBy('created_at')
+            ->get()
+            ->map(fn (CashSubmission $s) => [
+                'id'        => $s->id,
+                'date'      => $s->created_at?->format('d M Y'),
+                'reference' => $s->reference,
+                'from'      => $s->submitter?->name ?? 'Unknown',
+                'to'        => $s->receiver?->name ?? 'Not yet received',
+                'amount'    => round((float) $s->amount, 2),
+                'status'    => $s->status,
+                // Only a confirmed or settled handover counts on the right of
+                // the balance. One still pending is real money that has moved
+                // and is nonetheless still sitting inside the shortage.
+                'counts'    => in_array($s->status, [
+                    CashSubmission::STATUS_CONFIRMED,
+                    CashSubmission::STATUS_RESOLVED,
+                ], true),
+            ]);
+    }
+
     /** @param  array<string, mixed>  $checkmate */
-    private function submissions(array $checkmate): array
+    private function submissions(array $checkmate, ?Collection $rows = null): array
     {
         return [
+            'rows'      => $rows?->all() ?? [],
+            'count'     => $rows?->count() ?? 0,
             'confirmed' => (float) $checkmate['cash']['confirmed'],
             // Warned about rather than blocked on. Money waiting on a receiver
             // is nobody's problem yet, but closing without seeing it is how a
@@ -439,7 +594,7 @@ class StoreAccountCloseBalance
     {
         return InventoryLedger::query()
             ->where('store_id', $store->id)
-            ->where('transaction_type', '!=', self::CORRECTION_TYPE)
+            ->whereNotIn('transaction_type', self::CORRECTION_TYPES)
             ->whereBetween('created_at', [$from, $to])
             ->get(['product_id', 'transaction_type', 'quantity_change'])
             ->groupBy('product_id')

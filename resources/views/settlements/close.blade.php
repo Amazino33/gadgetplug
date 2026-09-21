@@ -118,6 +118,80 @@
         </div>
     @endif
 
+    <h2>What happened to the goods — at cost</h2>
+    @php $m = $p['stock_movement'] ?? ['available' => false]; @endphp
+    <table class="keep">
+        <tr class="row">
+            <td>Opening stock{{ ($m['opening_units'] ?? 0) ? ' (' . $m['opening_units'] . ' units)' : '' }}</td>
+            <td class="num">{{ $money($m['opening_value'] ?? 0) }}</td>
+        </tr>
+        <tr class="row">
+            <td>Stock bought in ({{ $m['purchases_count'] ?? 0 }})</td>
+            <td class="num">{{ $money($m['purchases_value'] ?? 0) }}</td>
+        </tr>
+        <tr class="total"><td>Available to sell</td><td class="num">{{ $money($m['available_value'] ?? 0) }}</td></tr>
+        <tr class="row">
+            <td>Closing stock{{ ($m['closing_units'] ?? 0) ? ' (' . $m['closing_units'] . ' units)' : '' }}</td>
+            <td class="num">({{ $money($m['closing_value'] ?? 0) }})</td>
+        </tr>
+        <tr class="total"><td>Left the shelf, at cost</td><td class="num">{{ $money($m['left_at_cost'] ?? 0) }}</td></tr>
+    </table>
+
+    @unless ($m['available'] ?? false)
+        <div class="warn">
+            Both an opening and a closing count are needed before "left the shelf" means anything.
+            Without them this is only part of the picture.
+        </div>
+    @endunless
+
+    @if (($m['uncosted_lines'] ?? 0) > 0)
+        <p class="muted" style="margin-top:6px">
+            {{ $m['uncosted_lines'] }} counted line(s) have no cost price recorded, so they are left
+            out of the values above rather than counted as worth nothing. The totals are understated.
+        </p>
+    @endif
+
+    {{-- Printed in full, because on paper there is nobody to ask what "at cost"
+         means and the figure sits inches from a selling-price total. --}}
+    <p class="muted" style="margin-top:6px">{{ $m['basis'] ?? '' }}</p>
+
+    @if (! empty($m['purchases']))
+        <table style="margin-top:8px">
+            <tr><th>Date</th><th>Reference</th><th>Supplier</th><th class="num">Cost</th></tr>
+            @foreach ($m['purchases'] as $row)
+                <tr class="row">
+                    <td>{{ $row['date'] }}</td>
+                    <td>{{ $row['reference'] }}{{ $row['paid_cash'] ? ' (cash)' : '' }}</td>
+                    <td>{{ $row['supplier'] }}</td>
+                    <td class="num">{{ $money($row['amount']) }}</td>
+                </tr>
+            @endforeach
+        </table>
+    @endif
+
+    <h2>Money handed over in this period</h2>
+    @if (empty($subs['rows']))
+        <p class="muted">Nobody handed any cash over in this period.</p>
+    @else
+        <table>
+            <tr><th>Date</th><th>From</th><th>To</th><th>Status</th><th class="num">Amount</th></tr>
+            @foreach ($subs['rows'] as $row)
+                <tr class="row">
+                    <td>{{ $row['date'] }}</td>
+                    <td>{{ $row['from'] }}</td>
+                    <td>{{ $row['to'] }}</td>
+                    <td>{{ str_replace('_', ' ', $row['status']) }}</td>
+                    <td class="num">{{ $money($row['amount']) }}</td>
+                </tr>
+            @endforeach
+            <tr class="total"><td colspan="4">Confirmed — counts on the right above</td><td class="num">{{ $money($subs['confirmed'] ?? 0) }}</td></tr>
+        </table>
+        <p class="muted" style="margin-top:6px">
+            Only confirmed handovers count as accounted for. Anything pending or disputed is real
+            money that has moved and is still sitting inside the shortage at the top.
+        </p>
+    @endif
+
     <h2>Stock counted</h2>
     @if ($variance['available'] ?? false)
         <table class="keep">

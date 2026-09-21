@@ -28,6 +28,7 @@
             $variance = $view['count_variance'];
             $opening  = $view['opening'];
             $procure  = $view['procurement'];
+            $movement = $view['stock_movement'];
             $gap      = (float) $balance['shortage'];
             // Sign before the symbol — "₦-5,000.00" reads as a typo.
             $money    = fn ($v) => ((float) $v < 0 ? '-₦' : '₦') . number_format(abs((float) $v), 2);
@@ -111,10 +112,162 @@
             </div>
         @endif
 
+        {{-- Goods, at cost, on the left; handovers, in money, on the right.
+             Deliberately below the balance and visually separate, because this
+             block is valued at COST and the balance above is in selling price.
+             Anyone adding a figure from one to a figure from the other gets a
+             meaningless number, so the labels say "at cost" on every total. --}}
+        <div class="mt-4 grid gap-4 lg:grid-cols-2">
+            <div class="fi-section rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
+                <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-200">What happened to the goods — at cost</h3>
+
+                <dl class="mt-3 space-y-2 text-sm">
+                    <div class="flex justify-between">
+                        <dt class="text-gray-500 dark:text-gray-400">Opening stock{{ $movement['opening_units'] ? ' (' . $movement['opening_units'] . ' units)' : '' }}</dt>
+                        <dd class="font-mono">{{ $money($movement['opening_value']) }}</dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-gray-500 dark:text-gray-400">Stock bought in ({{ $movement['purchases_count'] }})</dt>
+                        <dd class="font-mono">{{ $money($movement['purchases_value']) }}</dd>
+                    </div>
+                    <div class="flex justify-between border-t border-gray-200 pt-2 font-semibold dark:border-gray-700">
+                        <dt>Available to sell</dt>
+                        <dd class="font-mono">{{ $money($movement['available_value']) }}</dd>
+                    </div>
+                    <div class="flex justify-between">
+                        <dt class="text-gray-500 dark:text-gray-400">Closing stock{{ $movement['closing_units'] ? ' (' . $movement['closing_units'] . ' units)' : '' }}</dt>
+                        <dd class="font-mono">({{ $money($movement['closing_value']) }})</dd>
+                    </div>
+                    <div class="flex justify-between border-t border-gray-200 pt-2 text-base font-semibold dark:border-gray-700">
+                        <dt>Left the shelf, at cost</dt>
+                        <dd class="font-mono">{{ $money($movement['left_at_cost']) }}</dd>
+                    </div>
+                </dl>
+
+                @unless ($movement['available'])
+                    <p class="mt-3 rounded-lg bg-warning-50 p-2 text-xs text-warning-800 dark:bg-warning-400/10 dark:text-warning-300">
+                        Both an opening and a closing count are needed before "left the shelf" means anything. Without them this is only part of the picture.
+                    </p>
+                @endunless
+
+                @if ($movement['uncosted_lines'] > 0)
+                    <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                        {{ $movement['uncosted_lines'] }} counted line(s) have no cost price recorded, so they are left out of the values above rather than counted as worth nothing. The totals are understated by whatever they are worth.
+                    </p>
+                @endif
+
+                {{-- Said plainly, because "left the shelf at cost" sitting near
+                     "value sold" invites exactly the subtraction that produces a
+                     fake profit figure. --}}
+                <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">{{ $movement['basis'] }}</p>
+
+                @if (! empty($movement['purchases']))
+                    <div class="mt-4 overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                    <th class="py-2">Date</th>
+                                    <th class="py-2">Reference</th>
+                                    <th class="py-2">Supplier</th>
+                                    <th class="py-2 text-right">Cost</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($movement['purchases'] as $p)
+                                    <tr class="border-t border-gray-100 dark:border-gray-800">
+                                        <td class="py-2 whitespace-nowrap">{{ $p['date'] }}</td>
+                                        <td class="py-2 font-mono text-xs">
+                                            {{ $p['reference'] }}
+                                            @if ($p['paid_cash'])
+                                                <span class="ml-1 rounded bg-warning-100 px-1 text-[10px] text-warning-800 dark:bg-warning-400/20 dark:text-warning-300" title="Paid in cash — if it came out of this till it should also be a declared till expense on the money side">cash</span>
+                                            @endif
+                                        </td>
+                                        <td class="py-2">{{ $p['supplier'] }}</td>
+                                        <td class="py-2 text-right font-mono">{{ $money($p['amount']) }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+            </div>
+
+            <div class="fi-section rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
+                <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-200">Money handed over in this period</h3>
+
+                @if (empty($subs['rows']))
+                    <p class="mt-3 text-sm text-gray-500 dark:text-gray-400">
+                        Nobody handed any cash over in this period. If the tills took cash, all of it is still out there.
+                    </p>
+                @else
+                    <div class="mt-3 overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="text-left text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                    <th class="py-2">Date</th>
+                                    <th class="py-2">From</th>
+                                    <th class="py-2">To</th>
+                                    <th class="py-2">Status</th>
+                                    <th class="py-2 text-right">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($subs['rows'] as $s)
+                                    <tr class="border-t border-gray-100 dark:border-gray-800">
+                                        <td class="py-2 whitespace-nowrap">{{ $s['date'] }}</td>
+                                        <td class="py-2">{{ $s['from'] }}</td>
+                                        <td class="py-2">{{ $s['to'] }}</td>
+                                        <td class="py-2">
+                                            <span @class([
+                                                'rounded px-1.5 py-0.5 text-xs',
+                                                'bg-success-100 text-success-800 dark:bg-success-400/20 dark:text-success-300' => $s['counts'],
+                                                'bg-warning-100 text-warning-800 dark:bg-warning-400/20 dark:text-warning-300' => ! $s['counts'],
+                                            ])>{{ str_replace('_', ' ', $s['status']) }}</span>
+                                        </td>
+                                        <td @class(['py-2 text-right font-mono', 'text-gray-400 dark:text-gray-500' => ! $s['counts']])>{{ $money($s['amount']) }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <dl class="mt-3 space-y-2 border-t border-gray-200 pt-3 text-sm dark:border-gray-700">
+                        <div class="flex justify-between font-semibold"><dt>Confirmed — counts on the right above</dt><dd class="font-mono">{{ $money($subs['confirmed']) }}</dd></div>
+                        @if ($subs['pending'] > 0.009)
+                            <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Still waiting on a receiver</dt><dd class="font-mono">{{ $money($subs['pending']) }}</dd></div>
+                        @endif
+                        @if ($subs['disputed'] > 0.009)
+                            <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Disputed</dt><dd class="font-mono">{{ $money($subs['disputed']) }}</dd></div>
+                        @endif
+                    </dl>
+
+                    <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">
+                        Only confirmed handovers count as accounted for. Anything pending or disputed is real money that has moved and is still sitting inside the shortage at the top.
+                    </p>
+                @endif
+            </div>
+        </div>
+
         {{-- The independent signal. Deliberately below the money and visually
              separate: it is not part of the balance and must never be added to it. --}}
         <div class="fi-section mt-4 rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
-            <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-200">Stock counted</h3>
+            <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-200">Stock</h3>
+
+            {{-- Always shown, count or no count. "Where is the stock I bought?"
+                 is the first thing somebody asks this screen, and answering it
+                 only once a closing count exists makes a real delivery look
+                 like it was never recorded anywhere. --}}
+            <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                <span class="font-medium text-gray-700 dark:text-gray-200">Received this period:</span>
+                {{ $procure['units_received'] }} units
+                across {{ $procure['batches'] }} {{ $procure['batches'] === 1 ? 'delivery' : 'deliveries' }}.
+            </p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                Units, not money. Stock is paid for from the business account, not from this till, so
+                it does not belong on either side above — counting its cost as money out would invent
+                a shortage the same size. What it cost is on the Store Settlement page. Here it only
+                raises how much the shelf should be holding.
+            </p>
 
             @if (! $variance['available'])
                 <p class="mt-3 text-sm text-gray-500 dark:text-gray-400">

@@ -90,6 +90,42 @@ test('without a closing count the screen says only the money has been checked', 
         ->assertSee('No closing count selected');
 });
 
+test('stock received is shown whether or not a count has been taken', function () {
+    $ctx = closeContext();
+    closePanel($ctx);
+
+    closeMovement($ctx, 'restock', 12);
+
+    // Asked of every branch, count or no count: somebody who has just taken a
+    // delivery and sees nothing about it concludes the screen lost it.
+    closeScreen($ctx)
+        ->assertOk()
+        ->assertSee('Received this period')
+        ->assertSee('12 units')
+        // And why it is not money on either side above.
+        ->assertSee('Units, not money');
+});
+
+test('the period being closed and what came into it sit beside the count pickers', function () {
+    $ctx = closeContext();
+    closePanel($ctx);
+
+    closeMovement($ctx, 'restock', 12);
+
+    // Somebody choosing a count is deciding whether it matches the period in
+    // front of them, so the period has to be there — not only further down the
+    // page. Deliveries for the same reason: a branch that took stock in and
+    // sees nothing about it concludes the screen lost it.
+    //
+    // The option labels themselves are not asserted here: these are searchable
+    // selects, so Filament fetches their options over AJAX rather than putting
+    // them in the first render.
+    closeScreen($ctx)
+        ->assertOk()
+        ->assertSee('12 units came in on 0 deliveries in this period')
+        ->assertSee('Counting the shelf is the only check');
+});
+
 test('the variance renders once a closing count is chosen', function () {
     $ctx = closeContext(onShelf: 10);
     closePanel($ctx);
@@ -106,6 +142,45 @@ test('the variance renders once a closing count is chosen', function () {
         // Three units gone with no sale behind them, at the frozen selling price.
         ->assertSee('₦300,000.00')
         ->assertSee('Approximate');
+});
+
+test('the goods block and the handover list render on screen', function () {
+    $ctx = closeContext(onShelf: 10);
+    closePanel($ctx);
+
+    closeSale($ctx, 'cash', 100000);
+    closeRemit($ctx, 70000);
+
+    App\Models\Procurement::create([
+        'vendor_id'  => $ctx['vendor']->id,
+        'store_id'   => $ctx['store']->id,
+        'supplier_id' => App\Models\Supplier::create([
+            'vendor_id' => $ctx['vendor']->id, 'name' => 'Lagos Wholesale',
+        ])->id,
+        'total_cost' => 180000,
+        'amount_paid' => 180000,
+        'payment_status' => 'full',
+        'payment_method' => 'bank_transfer',
+        'status'     => 'completed',
+        'created_by' => $ctx['owner']->id,
+    ]);
+
+    closeScreen($ctx, [
+        'opening_count_id' => closeCount($ctx, 10)->id,
+        'closing_count_id' => closeCount($ctx, 4)->id,
+    ])
+        ->assertOk()
+        ->assertSee('What happened to the goods')
+        ->assertSee('Opening stock')
+        ->assertSee('Stock bought in')
+        ->assertSee('Available to sell')
+        ->assertSee('Left the shelf, at cost')
+        ->assertSee('Lagos Wholesale')
+        // Cost and selling price must never look like the same kind of number.
+        ->assertSee('At cost, not selling price')
+        // Each handover, named and dated, beside the goods.
+        ->assertSee('Money handed over in this period')
+        ->assertSee($ctx['cashier']->name);
 });
 
 test('closing freezes the figures and carries the baseline forward', function () {
