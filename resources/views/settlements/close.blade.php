@@ -118,23 +118,35 @@
         </div>
     @endif
 
-    <h2>What happened to the goods — at cost</h2>
+    <h2>What happened to the goods</h2>
     @php $m = $p['stock_movement'] ?? ['available' => false]; @endphp
     <table class="keep">
+        <tr><th></th><th class="num">At cost</th><th class="num">At selling price</th></tr>
         <tr class="row">
             <td>Opening stock{{ ($m['opening_units'] ?? 0) ? ' (' . $m['opening_units'] . ' units)' : '' }}</td>
             <td class="num">{{ $money($m['opening_value'] ?? 0) }}</td>
+            <td class="num">{{ $money($m['opening_selling'] ?? 0) }}</td>
         </tr>
         <tr class="row">
             <td>Stock bought in ({{ $m['purchases_count'] ?? 0 }})</td>
             <td class="num">{{ $money($m['purchases_value'] ?? 0) }}</td>
+            <td class="num">{{ $money($m['purchases_selling'] ?? 0) }}</td>
         </tr>
-        <tr class="total"><td>Available to sell</td><td class="num">{{ $money($m['available_value'] ?? 0) }}</td></tr>
+        <tr class="total">
+            <td>Available to sell</td>
+            <td class="num">{{ $money($m['available_value'] ?? 0) }}</td>
+            <td class="num">{{ $money($m['available_selling'] ?? 0) }}</td>
+        </tr>
         <tr class="row">
             <td>Closing stock{{ ($m['closing_units'] ?? 0) ? ' (' . $m['closing_units'] . ' units)' : '' }}</td>
             <td class="num">({{ $money($m['closing_value'] ?? 0) }})</td>
+            <td class="num">({{ $money($m['closing_selling'] ?? 0) }})</td>
         </tr>
-        <tr class="total"><td>Left the shelf, at cost</td><td class="num">{{ $money($m['left_at_cost'] ?? 0) }}</td></tr>
+        <tr class="total">
+            <td>Left the shelf</td>
+            <td class="num">{{ $money($m['left_at_cost'] ?? 0) }}</td>
+            <td class="num">{{ $money($m['left_at_selling'] ?? 0) }}</td>
+        </tr>
     </table>
 
     @unless ($m['available'] ?? false)
@@ -144,26 +156,28 @@
         </div>
     @endunless
 
-    @if (($m['uncosted_lines'] ?? 0) > 0)
+    @if (($m['uncosted_lines'] ?? 0) > 0 || ($m['unpriced_lines'] ?? 0) > 0)
         <p class="muted" style="margin-top:6px">
-            {{ $m['uncosted_lines'] }} counted line(s) have no cost price recorded, so they are left
-            out of the values above rather than counted as worth nothing. The totals are understated.
+            {{ $m['uncosted_lines'] ?? 0 }} counted line(s) have no cost price and
+            {{ $m['unpriced_lines'] ?? 0 }} have no selling price, so they are left out of that
+            column rather than counted as worth nothing. Those totals are understated.
         </p>
     @endif
 
-    {{-- Printed in full, because on paper there is nobody to ask what "at cost"
-         means and the figure sits inches from a selling-price total. --}}
+    {{-- Printed in full, because on paper there is nobody to ask what these columns
+         mean and the figure sits inches from a selling-price total. --}}
     <p class="muted" style="margin-top:6px">{{ $m['basis'] ?? '' }}</p>
 
     @if (! empty($m['purchases']))
         <table style="margin-top:8px">
-            <tr><th>Date</th><th>Reference</th><th>Supplier</th><th class="num">Cost</th></tr>
+            <tr><th>Date</th><th>Reference</th><th>Supplier</th><th class="num">Cost</th><th class="num">Retail</th></tr>
             @foreach ($m['purchases'] as $row)
                 <tr class="row">
                     <td>{{ $row['date'] }}</td>
                     <td>{{ $row['reference'] }}{{ $row['paid_cash'] ? ' (cash)' : '' }}</td>
                     <td>{{ $row['supplier'] }}</td>
                     <td class="num">{{ $money($row['amount']) }}</td>
+                    <td class="num">{{ $money($row['selling']) }}</td>
                 </tr>
             @endforeach
         </table>

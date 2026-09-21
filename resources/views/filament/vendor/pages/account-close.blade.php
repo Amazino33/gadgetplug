@@ -119,30 +119,44 @@
              meaningless number, so the labels say "at cost" on every total. --}}
         <div class="mt-4 grid gap-4 lg:grid-cols-2">
             <div class="fi-section rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
-                <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-200">What happened to the goods — at cost</h3>
+                <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-200">What happened to the goods</h3>
 
-                <dl class="mt-3 space-y-2 text-sm">
-                    <div class="flex justify-between">
-                        <dt class="text-gray-500 dark:text-gray-400">Opening stock{{ $movement['opening_units'] ? ' (' . $movement['opening_units'] . ' units)' : '' }}</dt>
-                        <dd class="font-mono">{{ $money($movement['opening_value']) }}</dd>
-                    </div>
-                    <div class="flex justify-between">
-                        <dt class="text-gray-500 dark:text-gray-400">Stock bought in ({{ $movement['purchases_count'] }})</dt>
-                        <dd class="font-mono">{{ $money($movement['purchases_value']) }}</dd>
-                    </div>
-                    <div class="flex justify-between border-t border-gray-200 pt-2 font-semibold dark:border-gray-700">
-                        <dt>Available to sell</dt>
-                        <dd class="font-mono">{{ $money($movement['available_value']) }}</dd>
-                    </div>
-                    <div class="flex justify-between">
-                        <dt class="text-gray-500 dark:text-gray-400">Closing stock{{ $movement['closing_units'] ? ' (' . $movement['closing_units'] . ' units)' : '' }}</dt>
-                        <dd class="font-mono">({{ $money($movement['closing_value']) }})</dd>
-                    </div>
-                    <div class="flex justify-between border-t border-gray-200 pt-2 text-base font-semibold dark:border-gray-700">
-                        <dt>Left the shelf, at cost</dt>
-                        <dd class="font-mono">{{ $money($movement['left_at_cost']) }}</dd>
-                    </div>
-                </dl>
+                <table class="mt-3 w-full text-sm">
+                    <thead>
+                        <tr class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                            <th class="py-1 text-left"></th>
+                            <th class="py-1 text-right">At cost</th>
+                            <th class="py-1 text-right">At selling price</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="py-1.5 text-gray-500 dark:text-gray-400">Opening stock{{ $movement['opening_units'] ? ' (' . $movement['opening_units'] . ' units)' : '' }}</td>
+                            <td class="py-1.5 text-right font-mono">{{ $money($movement['opening_value']) }}</td>
+                            <td class="py-1.5 text-right font-mono">{{ $money($movement['opening_selling']) }}</td>
+                        </tr>
+                        <tr>
+                            <td class="py-1.5 text-gray-500 dark:text-gray-400">Stock bought in ({{ $movement['purchases_count'] }})</td>
+                            <td class="py-1.5 text-right font-mono">{{ $money($movement['purchases_value']) }}</td>
+                            <td class="py-1.5 text-right font-mono">{{ $money($movement['purchases_selling']) }}</td>
+                        </tr>
+                        <tr class="border-t border-gray-200 font-semibold dark:border-gray-700">
+                            <td class="py-1.5">Available to sell</td>
+                            <td class="py-1.5 text-right font-mono">{{ $money($movement['available_value']) }}</td>
+                            <td class="py-1.5 text-right font-mono">{{ $money($movement['available_selling']) }}</td>
+                        </tr>
+                        <tr>
+                            <td class="py-1.5 text-gray-500 dark:text-gray-400">Closing stock{{ $movement['closing_units'] ? ' (' . $movement['closing_units'] . ' units)' : '' }}</td>
+                            <td class="py-1.5 text-right font-mono">({{ $money($movement['closing_value']) }})</td>
+                            <td class="py-1.5 text-right font-mono">({{ $money($movement['closing_selling']) }})</td>
+                        </tr>
+                        <tr class="border-t border-gray-200 text-base font-semibold dark:border-gray-700">
+                            <td class="py-1.5">Left the shelf</td>
+                            <td class="py-1.5 text-right font-mono">{{ $money($movement['left_at_cost']) }}</td>
+                            <td class="py-1.5 text-right font-mono">{{ $money($movement['left_at_selling']) }}</td>
+                        </tr>
+                    </tbody>
+                </table>
 
                 @unless ($movement['available'])
                     <p class="mt-3 rounded-lg bg-warning-50 p-2 text-xs text-warning-800 dark:bg-warning-400/10 dark:text-warning-300">
@@ -150,15 +164,21 @@
                     </p>
                 @endunless
 
-                @if ($movement['uncosted_lines'] > 0)
+                @if ($movement['uncosted_lines'] > 0 || $movement['unpriced_lines'] > 0)
                     <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                        {{ $movement['uncosted_lines'] }} counted line(s) have no cost price recorded, so they are left out of the values above rather than counted as worth nothing. The totals are understated by whatever they are worth.
+                        @if ($movement['uncosted_lines'] > 0)
+                            {{ $movement['uncosted_lines'] }} counted line(s) have no cost price,
+                        @endif
+                        @if ($movement['unpriced_lines'] > 0)
+                            {{ $movement['unpriced_lines'] }} have no selling price,
+                        @endif
+                        so they are left out of that column rather than counted as worth nothing. Those totals are understated.
                     </p>
                 @endif
 
-                {{-- Said plainly, because "left the shelf at cost" sitting near
-                     "value sold" invites exactly the subtraction that produces a
-                     fake profit figure. --}}
+                {{-- Said plainly, because "left the shelf at selling price"
+                     sitting near "value sold" invites exactly the subtraction
+                     that produces a fake profit figure. --}}
                 <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">{{ $movement['basis'] }}</p>
 
                 @if (! empty($movement['purchases']))
@@ -170,6 +190,7 @@
                                     <th class="py-2">Reference</th>
                                     <th class="py-2">Supplier</th>
                                     <th class="py-2 text-right">Cost</th>
+                                    <th class="py-2 text-right">Retail</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -184,6 +205,7 @@
                                         </td>
                                         <td class="py-2">{{ $p['supplier'] }}</td>
                                         <td class="py-2 text-right font-mono">{{ $money($p['amount']) }}</td>
+                                        <td class="py-2 text-right font-mono">{{ $money($p['selling']) }}</td>
                                     </tr>
                                 @endforeach
                             </tbody>

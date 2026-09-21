@@ -15,6 +15,7 @@ use App\Models\Procurement;
 use App\Models\Store;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * The value a branch sold in a period, against where that value went.
@@ -258,8 +259,19 @@ class StoreAccountCloseBalance
         OpeningBaseline $baseline,
         ?PhysicalStockCount $closingCount,
     ): array {
-        $opening = $this->countAtCost($baseline->count);
-        $closing = $this->countAtCost($closingCount);
+        $opening = $this->countValues($baseline->count);
+        $closing = $this->countValues($closingCount);
+
+        // Cost comes from procurements.total_cost, which is what was actually
+        // paid including anything added on the way. Retail comes from the
+        // lines, because only they carry a selling price. The two are read from
+        // different places on purpose rather than one being derived from the
+        // other.
+        $retailByProcurement = DB::table('procurement_items')
+            ->select('procurement_id')
+            ->selectRaw('COALESCE(SUM(quantity * COALESCE(selling_price, 0)), 0) as retail')
+            ->groupBy('procurement_id')
+            ->pluck('retail', 'procurement_id');
 
         $purchases = Procurement::query()
             ->leftJoin('suppliers', 'suppliers.id', '=', 'procurements.supplier_id')
@@ -278,6 +290,7 @@ class StoreAccountCloseBalance
                 'reference' => $p->reference,
                 'supplier'  => $p->supplier ?? 'No supplier recorded',
                 'amount'    => round((float) $p->total_cost, 2),
+                'selling'   => round((float) ($retailByProcurement[$p->id] ?? 0), 2),
                 'status'    => $p->status,
                 // Surfaced rather than buried. Stock is normally paid for from
                 // the business account; one paid in cash is the case that could
@@ -288,59 +301,79 @@ class StoreAccountCloseBalance
                 'paid_cash' => $p->payment_method === 'cash',
             ]);
 
-        $purchasesValue = round((float) $purchases->sum('amount'), 2);
-        $availableValue = round($opening['value'] + $purchasesValue, 2);
+        $purchasesValue   = round((float) $purchases->sum('amount'), 2);
+        $purchasesSelling = round((float) $purchases->sum('selling'), 2);
+        $availableValue   = round($opening['cost'] + $purchasesValue, 2);
+        $availableSelling = round($opening['selling'] + $purchasesSelling, 2);
 
         return [
             // Both counts are needed before the arithmetic means anything: with
             // no closing figure, "what left" would just be everything.
             'available' => $baseline->count !== null && $closingCount !== null,
 
-            'opening_value' => $opening['value'],
-            'opening_units' => $opening['units'],
+            'opening_value'   => $opening['cost'],
+            'opening_selling' => $opening['selling'],
+            'opening_units'   => $opening['units'],
 
-            'purchases_value' => $purchasesValue,
-            'purchases_count' => $purchases->count(),
-            'purchases'       => $purchases->all(),
+            'purchases_value'   => $purchasesValue,
+            'purchases_selling' => $purchasesSelling,
+            'purchases_count'   => $purchases->count(),
+            'purchases'         => $purchases->all(),
 
-            'available_value' => $availableValue,
+            'available_value'   => $availableValue,
+            'available_selling' => $availableSelling,
 
-            'closing_value' => $closing['value'],
-            'closing_units' => $closing['units'],
+            'closing_value'   => $closing['cost'],
+            'closing_selling' => $closing['selling'],
+            'closing_units'   => $closing['units'],
 
             // Opening plus what came in, less what is still there.
-            'left_at_cost' => round($availableValue - $closing['value'], 2),
+            'left_at_cost'    => round($availableValue - $closing['cost'], 2),
+            'left_at_selling' => round($availableSelling - $closing['selling'], 2),
 
-            // Units with no cost price recorded are left out of the value rather
-            // than valued at nothing, so the total is visibly understated rather
-            // than quietly wrong. Same rule the stock position panel follows.
+            // Units with no cost or no selling price recorded are left out of
+            // the relevant column rather than valued at nothing, so a total is
+            // visibly understated rather than quietly wrong. Same rule the
+            // stock position panel follows.
             'uncosted_lines' => $opening['uncosted'] + $closing['uncosted'],
+            'unpriced_lines' => $opening['unpriced'] + $closing['unpriced'],
 
-            'basis' => 'At cost, not selling price — a purchase has no selling price, only what was paid for it. '
-                . 'Do not compare this with the value sold above: that is what customers were charged, and the '
-                . 'difference between the two is not profit.',
+            'basis' => 'Two columns because they answer different questions. Cost is what the goods were '
+                . 'bought for; retail is what they are expected to sell for. Retail on the counts is each '
+                . "product's price frozen at counting, and on a delivery it is the selling price recorded "
+                . 'on its lines — so retail is an expectation, not money anybody has received. Neither '
+                . 'column should be compared with the value sold above: the difference is not profit.',
         ];
     }
 
     /**
-     * What a count was worth at cost, and how much of it could not be valued.
+     * What a count was worth, at cost and at retail, and how much could not be
+     * valued either way.
      *
-     * @return array{units: int, value: float, uncosted: int}
+     * Both prices are read from the count's own frozen lines rather than from
+     * the product today: a price that moved next week would silently restate
+     * what a closed period was holding.
+     *
+     * @return array{units: int, cost: float, selling: float, uncosted: int, unpriced: int}
      */
-    private function countAtCost(?PhysicalStockCount $count): array
+    private function countValues(?PhysicalStockCount $count): array
     {
         if (! $count) {
-            return ['units' => 0, 'value' => 0.0, 'uncosted' => 0];
+            return ['units' => 0, 'cost' => 0.0, 'selling' => 0.0, 'uncosted' => 0, 'unpriced' => 0];
         }
 
         $lines = $count->relationLoaded('lines') ? $count->lines : $count->lines()->get();
 
         return [
-            'units'    => (int) $lines->sum('counted_quantity'),
-            'value'    => round((float) $lines->sum(
+            'units'   => (int) $lines->sum('counted_quantity'),
+            'cost'    => round((float) $lines->sum(
                 fn ($l) => (int) $l->counted_quantity * (float) ($l->unit_cost ?? 0),
             ), 2),
+            'selling' => round((float) $lines->sum(
+                fn ($l) => (int) $l->counted_quantity * (float) ($l->unit_price ?? 0),
+            ), 2),
             'uncosted' => $lines->filter(fn ($l) => $l->unit_cost === null)->count(),
+            'unpriced' => $lines->filter(fn ($l) => $l->unit_price === null)->count(),
         ];
     }
 

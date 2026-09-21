@@ -174,10 +174,11 @@ test('the goods block and the handover list render on screen', function () {
         ->assertSee('Opening stock')
         ->assertSee('Stock bought in')
         ->assertSee('Available to sell')
-        ->assertSee('Left the shelf, at cost')
+        ->assertSee('Left the shelf')
+        ->assertSee('At selling price')
         ->assertSee('Lagos Wholesale')
         // Cost and selling price must never look like the same kind of number.
-        ->assertSee('At cost, not selling price')
+        ->assertSee('At cost')
         // Each handover, named and dated, beside the goods.
         ->assertSee('Money handed over in this period')
         ->assertSee($ctx['cashier']->name);

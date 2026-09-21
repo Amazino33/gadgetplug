@@ -389,8 +389,52 @@ test('the goods block runs opening plus purchases less closing, at cost', functi
         ->and($m['purchases'][0]['reference'])->toStartWith('GP-PROC-')
         ->and($m['purchases'][0]['supplier'])->toBe('Lagos Wholesale')
         ->and($m['purchases'][0]['date'])->not->toBeNull()
-        // Never to be read against the selling-price side above.
-        ->and($m['basis'])->toContain('At cost, not selling price');
+        // Never to be read against the value sold above.
+        ->and($m['basis'])->toContain('the difference is not profit');
+});
+
+test('the goods block carries a selling-price column beside the cost one', function () {
+    $ctx = closeContext(onShelf: 10);
+
+    $procurement = App\Models\Procurement::create([
+        'vendor_id'  => $ctx['vendor']->id,
+        'store_id'   => $ctx['store']->id,
+        'supplier_id' => App\Models\Supplier::create([
+            'vendor_id' => $ctx['vendor']->id, 'name' => 'Lagos Wholesale',
+        ])->id,
+        'total_cost' => 180000,
+        'amount_paid' => 180000,
+        'payment_status' => 'full',
+        'payment_method' => 'bank_transfer',
+        'status'     => 'completed',
+        'created_by' => $ctx['owner']->id,
+    ]);
+
+    // Three units at 60,000 cost and 100,000 retail — the delivery's own lines
+    // carry the selling price, so retail is recorded rather than guessed.
+    App\Models\ProcurementItem::create([
+        'procurement_id' => $procurement->id,
+        'product_id'     => $ctx['product']->id,
+        'quantity'       => 3,
+        'unit_cost'      => 60000,
+        'selling_price'  => 100000,
+    ]);
+
+    // Fixture product: 60,000 cost, 100,000 selling.
+    $opening = closeCount($ctx, 10);
+    $closing = closeCount($ctx, 4);
+
+    $m = closeBalance($ctx, $closing, $opening)['stock_movement'];
+
+    expect($m['opening_value'])->toBe(600000.0)
+        ->and($m['opening_selling'])->toBe(1000000.0)
+        ->and($m['purchases_value'])->toBe(180000.0)
+        ->and($m['purchases_selling'])->toBe(300000.0)
+        ->and($m['available_selling'])->toBe(1300000.0)
+        ->and($m['closing_selling'])->toBe(400000.0)
+        // What the goods that are gone would have sold for.
+        ->and($m['left_at_selling'])->toBe(900000.0)
+        ->and($m['purchases'][0]['selling'])->toBe(300000.0);
 });
 
 test('the goods block says so when it has only half the counts it needs', function () {
