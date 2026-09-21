@@ -176,6 +176,34 @@
                     </p>
                 @endif
 
+                {{-- The question this answers is "why is my closing stock so
+                     small", and the answer is almost always that the count
+                     covered part of the shelf. Shown as a comparison rather
+                     than a warning, because a partial count is legitimate — it
+                     just must not look like a total one. --}}
+                @php $rec = $movement['on_record']; @endphp
+                <div class="mt-3 rounded-lg bg-gray-50 p-3 text-xs dark:bg-gray-800/50">
+                    <p class="font-medium text-gray-700 dark:text-gray-200">How much of the shelf this count covered</p>
+                    <p class="mt-1 text-gray-600 dark:text-gray-300">
+                        The closing count covers
+                        <strong>{{ number_format($movement['closing_products']) }}</strong>
+                        product(s), {{ number_format($movement['closing_units']) }} units.
+                        The branch's records show
+                        <strong>{{ number_format($rec['products']) }}</strong>
+                        product(s) on hand, {{ number_format($rec['units']) }} units,
+                        worth {{ $money($rec['selling']) }} at selling price
+                        ({{ $money($rec['cost']) }} at cost).
+                    </p>
+                    @if ($movement['closing_products'] > 0 && $movement['closing_products'] < $rec['products'])
+                        <p class="mt-1 text-warning-700 dark:text-warning-400">
+                            Anything not counted is not in the closing value above, so "left the shelf" is overstated by whatever those products are worth. Count the rest, or read this as covering only what was counted.
+                        </p>
+                    @endif
+                    <p class="mt-1 text-gray-500 dark:text-gray-400">
+                        The records are what the count is there to check, so the two are meant to be read against each other — never added together.
+                    </p>
+                </div>
+
                 {{-- Said plainly, because "left the shelf at selling price"
                      sitting near "value sold" invites exactly the subtraction
                      that produces a fake profit figure. --}}

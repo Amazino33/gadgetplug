@@ -338,11 +338,51 @@ class StoreAccountCloseBalance
             'uncosted_lines' => $opening['uncosted'] + $closing['uncosted'],
             'unpriced_lines' => $opening['unpriced'] + $closing['unpriced'],
 
+            'opening_products' => $opening['products'],
+            'closing_products' => $closing['products'],
+
+            // What the branch's own records say is on the shelf right now, so a
+            // count that covered a fraction of the catalogue is visibly a
+            // fraction rather than a mysteriously small closing figure. This is
+            // the perpetual stock figure, not a count: it is what the count is
+            // there to check, and the two disagreeing is the point.
+            'on_record' => $this->onRecord($store),
+
             'basis' => 'Two columns because they answer different questions. Cost is what the goods were '
                 . 'bought for; retail is what they are expected to sell for. Retail on the counts is each '
                 . "product's price frozen at counting, and on a delivery it is the selling price recorded "
                 . 'on its lines — so retail is an expectation, not money anybody has received. Neither '
                 . 'column should be compared with the value sold above: the difference is not profit.',
+        ];
+    }
+
+    /**
+     * What the branch's records currently say it is holding.
+     *
+     * Never used in the arithmetic above — a close runs on what was counted,
+     * because the whole reason for counting is that the records can be wrong.
+     * It is carried only so a count covering 40 products out of 300 reads as a
+     * partial count rather than as a branch that has mysteriously emptied.
+     *
+     * @return array{products: int, units: int, cost: float, selling: float}
+     */
+    private function onRecord(Store $store): array
+    {
+        $row = DB::table('product_store_stock as pss')
+            ->join('products', 'products.id', '=', 'pss.product_id')
+            ->where('pss.store_id', $store->id)
+            ->where('pss.quantity', '>', 0)
+            ->selectRaw('COUNT(*) as products')
+            ->selectRaw('COALESCE(SUM(pss.quantity), 0) as units')
+            ->selectRaw('COALESCE(SUM(pss.quantity * COALESCE(products.cost_price, 0)), 0) as cost')
+            ->selectRaw('COALESCE(SUM(pss.quantity * COALESCE(products.price, 0)), 0) as selling')
+            ->first();
+
+        return [
+            'products' => (int) ($row->products ?? 0),
+            'units'    => (int) ($row->units ?? 0),
+            'cost'     => round((float) ($row->cost ?? 0), 2),
+            'selling'  => round((float) ($row->selling ?? 0), 2),
         ];
     }
 
@@ -359,7 +399,7 @@ class StoreAccountCloseBalance
     private function countValues(?PhysicalStockCount $count): array
     {
         if (! $count) {
-            return ['units' => 0, 'cost' => 0.0, 'selling' => 0.0, 'uncosted' => 0, 'unpriced' => 0];
+            return ['units' => 0, 'cost' => 0.0, 'selling' => 0.0, 'uncosted' => 0, 'unpriced' => 0, 'products' => 0];
         }
 
         $lines = $count->relationLoaded('lines') ? $count->lines : $count->lines()->get();
@@ -374,6 +414,7 @@ class StoreAccountCloseBalance
             ), 2),
             'uncosted' => $lines->filter(fn ($l) => $l->unit_cost === null)->count(),
             'unpriced' => $lines->filter(fn ($l) => $l->unit_price === null)->count(),
+            'products' => $lines->count(),
         ];
     }
 

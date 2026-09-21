@@ -437,6 +437,36 @@ test('the goods block carries a selling-price column beside the cost one', funct
         ->and($m['purchases'][0]['selling'])->toBe(300000.0);
 });
 
+test('a partial count is visible as partial, against what the branch holds', function () {
+    $ctx = closeContext(onShelf: 10);
+
+    // A second product on the shelf that the count never touched.
+    $uncounted = App\Models\Product::create([
+        'vendor_id' => $ctx['vendor']->id,
+        'store_id'  => $ctx['store']->id,
+        'category_id' => $ctx['product']->category_id,
+        'name' => 'Uncounted Phone', 'price' => 250000, 'cost_price' => 150000,
+        'stock_quantity' => 6, 'reserved_stock' => 0, 'status' => 'published',
+    ]);
+    App\Models\ProductStoreStock::updateOrCreate(
+        ['product_id' => $uncounted->id, 'store_id' => $ctx['store']->id],
+        ['quantity' => 6, 'reserved' => 0],
+    );
+
+    $m = closeBalance($ctx, closeCount($ctx, 4), closeCount($ctx, 10))['stock_movement'];
+
+    // The closing value only ever covers what was counted — which is exactly
+    // why a small figure has to be readable as a partial count rather than as a
+    // branch that emptied.
+    expect($m['closing_products'])->toBe(1)
+        ->and($m['closing_selling'])->toBe(400000.0)
+        ->and($m['on_record']['products'])->toBe(2)
+        ->and($m['on_record']['units'])->toBe(16)
+        // 10 x 100,000 + 6 x 250,000
+        ->and($m['on_record']['selling'])->toBe(2500000.0)
+        ->and($m['on_record']['cost'])->toBe(1500000.0);
+});
+
 test('the goods block says so when it has only half the counts it needs', function () {
     $ctx = closeContext(onShelf: 10);
 
