@@ -198,3 +198,39 @@ function closeBalance(
         openingCount: $openingCount,
     );
 }
+
+/**
+ * A finished two-person inventory count, exactly as the Inventory Count page
+ * leaves one: a completed session with an audit line per product.
+ *
+ * @param  array<int, array{counted: ?int, system: int, status?: string, override?: int}>  $lines
+ */
+function closeAuditSession(array $ctx, array $lines, array $over = []): App\Models\BlindCountSession
+{
+    $session = App\Models\BlindCountSession::create(array_merge([
+        'vendor_id'        => $ctx['vendor']->id,
+        'store_id'         => $ctx['store']->id,
+        'status'           => 'completed',
+        'frequency'        => 'daily',
+        'product_order'    => array_keys($lines),
+        'storekeeper_a_id' => $ctx['cashier']->id,
+        'storekeeper_b_id' => $ctx['owner']->id,
+    ], $over));
+
+    foreach ($lines as $productId => $line) {
+        App\Models\AuditSession::create([
+            'vendor_id'              => $ctx['vendor']->id,
+            'blind_count_session_id' => $session->id,
+            'product_id'             => $productId,
+            'system_quantity'        => $line['system'],
+            'storekeeper_a_id'       => $ctx['cashier']->id,
+            'storekeeper_b_id'       => $ctx['owner']->id,
+            'count_a'                => $line['counted'] ?? 0,
+            'count_b'                => $line['counted'] ?? 0,
+            'manager_override_count' => $line['override'] ?? null,
+            'status'                 => $line['status'] ?? 'verified',
+        ]);
+    }
+
+    return $session;
+}

@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Filament\Vendor\Pages;
 
 use App\Actions\Cash\CloseStoreAccountAction;
+use App\Actions\Inventory\AdoptAuditCountAction;
 use App\Actions\Inventory\RecordPhysicalCountAction;
+use App\Models\BlindCountSession;
 use App\Models\PhysicalStockCount;
 use App\Models\Product;
 use App\Models\Store;
@@ -16,6 +18,7 @@ use App\Services\Cash\StoreAccountCloseBalance;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -200,6 +203,41 @@ class AccountClose extends Page
                         ->reorderable(false),
                 ])
                 ->action(fn (array $data) => $this->recordCount($data)),
+
+            // The count people actually take here is the two-person blind count
+            // on the Inventory Count page. It stores a different shape — one row
+            // per product per counter — so it is adopted into a settlement count
+            // rather than read through, with cost and selling price frozen the
+            // way every other count in this system freezes them.
+            Action::make('useAuditCount')
+                ->label('Use an inventory count')
+                ->icon('heroicon-o-document-magnifying-glass')
+                ->color('gray')
+                ->visible(fn (): bool => $this->store() !== null && $this->canCount())
+                ->modalHeading('Use a finished inventory count')
+                ->modalDescription('Takes an inventory count from the Inventory Count page and makes it usable here. Lines the two counters never agreed on are left out, because there is no figure to close on.')
+                ->modalSubmitActionLabel('Use this count')
+                ->schema(fn (): array => [
+                    Select::make('session_id')
+                        ->label('Inventory count')
+                        ->options(fn (): array => $this->auditCountOptions())
+                        ->searchable()
+                        ->required()
+                        ->helperText('Only finished counts at this branch are listed.'),
+
+                    Radio::make('role')
+                        ->label('Use it as')
+                        ->options([
+                            'closing' => 'The closing count — what is on the shelf now',
+                            'opening' => 'The opening count — what the period started with',
+                        ])
+                        ->default('closing')
+                        ->required()
+                        // There is nothing to choose once the chain is running:
+                        // the opening is whatever the last close ended on.
+                        ->disableOptionWhen(fn (string $value): bool => $value === 'opening' && $this->priorClose() !== null),
+                ])
+                ->action(fn (array $data) => $this->adoptAuditCount($data)),
 
             Action::make('close')
                 ->label('Close period')
@@ -426,6 +464,46 @@ class AccountClose extends Page
             ->send();
     }
 
+    private function adoptAuditCount(array $data): void
+    {
+        $store = $this->store();
+
+        $session = $store ? BlindCountSession::query()
+            ->where('store_id', $store->id)
+            ->find((int) ($data['session_id'] ?? 0)) : null;
+
+        if (! $session) {
+            Notification::make()->title('That inventory count is not at this branch.')->danger()->send();
+
+            return;
+        }
+
+        try {
+            $count = app(AdoptAuditCountAction::class)->execute($session, auth()->user());
+        } catch (Throwable $e) {
+            Notification::make()->title($e->getMessage())->danger()->send();
+
+            return;
+        }
+
+        // The opening is only ever a choice on a first close; after that the
+        // chain owns it and a selection here would be ignored anyway.
+        $role = ($data['role'] ?? 'closing') === 'opening' && $this->priorClose() === null
+            ? 'opening'
+            : 'closing';
+
+        $this->filters[$role . '_count_id'] = $count->id;
+        $this->memo = null;
+
+        $skipped = $count->lines->count();
+
+        Notification::make()
+            ->title('Inventory count #' . $session->id . ' is now the ' . $role . ' count')
+            ->body($count->note ?? sprintf('%d products carried across.', $skipped))
+            ->success()
+            ->send();
+    }
+
     private function closePeriod(): void
     {
         $store = $this->store();
@@ -547,6 +625,47 @@ class AccountClose extends Page
             $received['batches'] === 1 ? 'delivery' : 'deliveries',
             $plain,
         );
+    }
+
+    /**
+     * Finished inventory counts at this branch that could close a period.
+     *
+     * One already adopted still appears, labelled, because the adoption is
+     * idempotent — picking it again selects the same count rather than making
+     * a competing one, and hiding it would just look like the count vanished.
+     *
+     * @return array<int, string>
+     */
+    private function auditCountOptions(): array
+    {
+        $store = $this->store();
+
+        if (! $store) {
+            return [];
+        }
+
+        $adopted = PhysicalStockCount::query()
+            ->where('store_id', $store->id)
+            ->whereNotNull('blind_count_session_id')
+            ->pluck('id', 'blind_count_session_id');
+
+        return BlindCountSession::query()
+            ->where('store_id', $store->id)
+            ->where('status', 'completed')
+            ->withCount('auditLines')
+            ->orderByDesc('updated_at')
+            ->limit(50)
+            ->get()
+            ->mapWithKeys(fn (BlindCountSession $b) => [
+                $b->id => sprintf(
+                    '#%d · finished %s · %d products%s',
+                    $b->id,
+                    $b->updated_at?->format('d M Y') ?? 'undated',
+                    $b->audit_lines_count,
+                    isset($adopted[$b->id]) ? ' · already in use' : '',
+                ),
+            ])
+            ->all();
     }
 
     /** @return array<int, string> */

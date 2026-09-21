@@ -184,6 +184,54 @@ test('the goods block and the handover list render on screen', function () {
         ->assertSee($ctx['cashier']->name);
 });
 
+test('an inventory count can be pulled in and used to close', function () {
+    $ctx = closeContext(onShelf: 10);
+    closePanel($ctx);
+
+    $session = closeAuditSession($ctx, [
+        $ctx['product']->id => ['counted' => 7, 'system' => 10],
+    ]);
+
+    // The count people actually take lives on the Inventory Count page in a
+    // different shape, so the picker could never see it directly.
+    $screen = closeScreen($ctx)
+        ->assertActionVisible('useAuditCount')
+        ->callAction('useAuditCount', ['session_id' => $session->id, 'role' => 'closing'])
+        ->assertHasNoActionErrors();
+
+    $count = App\Models\PhysicalStockCount::where('blind_count_session_id', $session->id)->first();
+
+    expect($count)->not->toBeNull();
+
+    // Selected straight away, because the only reason to pull one in here is to
+    // close on it.
+    $screen->assertSet('filters.closing_count_id', $count->id)
+        ->callAction('close')
+        ->assertHasNoActionErrors();
+
+    expect(App\Models\StoreAccountClose::latestFor($ctx['store']->id)->closing_count_id)
+        ->toBe($count->id);
+});
+
+test('an inventory count from another branch cannot be pulled in', function () {
+    $ctx = closeContext(onShelf: 10);
+    closePanel($ctx);
+
+    $other = App\Models\Store::create([
+        'vendor_id' => $ctx['vendor']->id, 'name' => 'Second Branch', 'is_default' => false,
+    ]);
+
+    $session = closeAuditSession(
+        $ctx,
+        [$ctx['product']->id => ['counted' => 7, 'system' => 10]],
+        ['store_id' => $other->id],
+    );
+
+    closeScreen($ctx)->callAction('useAuditCount', ['session_id' => $session->id, 'role' => 'closing']);
+
+    expect(App\Models\PhysicalStockCount::count())->toBe(0);
+});
+
 test('closing freezes the figures and carries the baseline forward', function () {
     $ctx = closeContext(onShelf: 10);
     closePanel($ctx);
