@@ -36,3 +36,13 @@ test('the job can be dispatched onto the queue without executing synchronously',
         return true;
     });
 });
+
+test('the job is dispatched on its own meta queue, isolated from media/default', function () {
+    Queue::fake();
+
+    $payload = app(MetaConversionsService::class)->buildEventPayload('Purchase', 'GP-JOB-3', 'https://gadgetplug.com.ng/checkout');
+
+    dispatch(new SendMetaConversionEventJob($payload));
+
+    Queue::assertPushedOn('meta', SendMetaConversionEventJob::class);
+});

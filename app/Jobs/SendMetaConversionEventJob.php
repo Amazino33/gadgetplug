@@ -19,7 +19,13 @@ class SendMetaConversionEventJob implements ShouldQueue
 
     public int $tries = 3;
 
-    public function __construct(private array $payload) {}
+    public function __construct(private array $payload)
+    {
+        // Own queue, kept separate from media/default so a backlog or crash
+        // in image processing (GenerateResponsiveImagesJob, etc.) can never
+        // delay a Meta CAPI event.
+        $this->onQueue('meta');
+    }
 
     public function payload(): array
     {

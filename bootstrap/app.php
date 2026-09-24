@@ -40,6 +40,20 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [EnsureDeviceToken::class]);
     })
     ->withSchedule(function (Schedule $schedule): void {
+        // This host doesn't allow a persistent `queue:work` daemon, so nothing
+        // else drains the jobs table — a job dispatched from a request (e.g.
+        // SendMetaConversionEventJob at checkout) would otherwise just sit
+        // there until someone runs queue:work by hand. This piggybacks on the
+        // existing schedule:run cron (already firing every minute) to work
+        // through the queue instead. `meta` is drained before `default` so a
+        // media/responsive-image backlog can never delay a Meta CAPI event.
+        // --stop-when-empty exits as soon as both queues are clear rather
+        // than idling; --max-time=50 is a safety net so a run can't still be
+        // going when the next minute's cron tick starts.
+        $schedule->command('queue:work --queue=meta,default --stop-when-empty --max-time=50')
+            ->everyMinute()
+            ->withoutOverlapping();
+
         // Hourly rather than daily since the hold is measured in days; this keeps
         // a commission from sitting cleared-but-uncredited for up to a day longer
         // than its actual hold window.
