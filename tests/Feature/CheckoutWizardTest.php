@@ -81,7 +81,7 @@ test('delivery details must be complete before the confirm step', function () {
     Volt::test('checkout')
         ->call('choosePayment', 'pay_on_delivery')
         ->call('goToConfirm')
-        ->assertHasErrors(['name', 'phone', 'lga', 'address', 'deliveryUrgency'])
+        ->assertHasErrors(['name', 'phone', 'lga', 'address'])
         ->assertSet('step', 2);
 });
 
@@ -94,7 +94,6 @@ test('a complete delivery step reaches confirm', function () {
         ->set('phone', '08012345678')
         ->set('lga', 'Uyo')
         ->set('address', '12 Test Close, near the market')
-        ->set('deliveryUrgency', 'today')
         ->call('goToConfirm')
         ->assertHasNoErrors()
         ->assertSet('step', 3);
@@ -109,14 +108,13 @@ test('going back keeps everything already typed', function () {
         ->set('phone', '08012345678')
         ->set('lga', 'Uyo')
         ->set('address', '12 Test Close, near the market')
-        ->set('deliveryUrgency', 'today')
         ->call('goToConfirm')
         ->call('goToStep', 2)
         ->assertSet('step', 2)
         ->assertSet('name', 'Aniekan Udo')
         ->assertSet('phone', '08012345678')
         ->assertSet('address', '12 Test Close, near the market')
-        ->assertSet('deliveryUrgency', 'today');
+;
 });
 
 test('the progress bar cannot be used to jump forward past an unfilled step', function () {
@@ -140,7 +138,6 @@ test('a pay-on-delivery order goes through with no email at all', function () {
         ->set('phone', '08012345678')
         ->set('lga', 'Uyo')
         ->set('address', '12 Test Close, near the market')
-        ->set('deliveryUrgency', 'today')
         ->call('goToConfirm')
         ->call('processCheckout')
         ->assertHasNoErrors();
@@ -162,7 +159,6 @@ test('an email given on the delivery path is still kept', function () {
         ->set('phone', '08012345678')
         ->set('lga', 'Uyo')
         ->set('address', '12 Test Close, near the market')
-        ->set('deliveryUrgency', 'today')
         ->call('goToConfirm')
         ->call('processCheckout');
 
@@ -178,15 +174,24 @@ test('paying online still requires an email, because Paystack will not open a tr
         ->set('phone', '08012345678')
         ->set('lga', 'Uyo')
         ->set('address', '12 Test Close, near the market')
-        ->set('deliveryUrgency', 'today')
         ->call('goToConfirm')
         ->assertHasErrors(['email'])
         ->assertSet('step', 2);
 });
 
-// ── Delivery time, now asked before the order exists ────────────────────────
+// The delivery-time picker was removed: it was a required step standing between
+// a shopper and the Continue button, for a question the rider settles on
+// WhatsApp anyway. A checkout that asks again is a regression.
+test('the delivery step does not ask when the customer wants the order', function () {
+    checkoutWizardCart(checkoutWizardProduct());
 
-test('the chosen delivery day is written onto the order itself', function () {
+    Volt::test('checkout')
+        ->call('choosePayment', 'pay_on_delivery')
+        ->assertDontSee('When do you want it?')
+        ->assertDontSee('Pick a date');
+});
+
+test('a complete delivery step needs nothing but name, phone, area and address', function () {
     checkoutWizardCart(checkoutWizardProduct());
 
     Volt::test('checkout')
@@ -195,48 +200,9 @@ test('the chosen delivery day is written onto the order itself', function () {
         ->set('phone', '08012345678')
         ->set('lga', 'Uyo')
         ->set('address', '12 Test Close, near the market')
-        ->call('setUrgency', 'tomorrow')
-        ->call('goToConfirm')
-        ->call('processCheckout');
-
-    $order = Order::firstOrFail();
-
-    expect($order->delivery_urgency)->toBe('tomorrow')
-        ->and($order->preferred_delivery_date->toDateString())->toBe(now()->addDay()->toDateString())
-        ->and($order->delivery_preference_set_at)->not->toBeNull();
-});
-
-test('a scheduled delivery needs a date inside the window', function () {
-    checkoutWizardCart(checkoutWizardProduct());
-
-    $component = Volt::test('checkout')
-        ->call('choosePayment', 'pay_on_delivery')
-        ->set('name', 'Aniekan Udo')
-        ->set('phone', '08012345678')
-        ->set('lga', 'Uyo')
-        ->set('address', '12 Test Close, near the market')
-        ->call('setUrgency', 'scheduled');
-
-    $component->set('deliveryDate', now()->subDay()->toDateString())
-        ->call('goToConfirm')
-        ->assertHasErrors(['deliveryDate']);
-
-    $component->set('deliveryDate', now()->addDays(3)->toDateString())
         ->call('goToConfirm')
         ->assertHasNoErrors()
         ->assertSet('step', 3);
-});
-
-test('picking today after picking a date clears the stale date', function () {
-    checkoutWizardCart(checkoutWizardProduct());
-
-    Volt::test('checkout')
-        ->call('choosePayment', 'pay_on_delivery')
-        ->call('setUrgency', 'scheduled')
-        ->set('deliveryDate', now()->addDays(5)->toDateString())
-        ->call('setUrgency', 'today')
-        ->assertSet('deliveryDate', '')
-        ->assertSet('showDatePicker', false);
 });
 
 // ── The guard that matters most ─────────────────────────────────────────────
@@ -248,7 +214,7 @@ test('processCheckout enforces the delivery rules even when the steps are skippe
     Volt::test('checkout')
         ->set('paymentMethod', 'pay_on_delivery')
         ->call('processCheckout')
-        ->assertHasErrors(['name', 'phone', 'lga', 'address', 'deliveryUrgency']);
+        ->assertHasErrors(['name', 'phone', 'lga', 'address']);
 
     expect(Order::count())->toBe(0);
 });

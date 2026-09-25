@@ -50,7 +50,6 @@ function readyCheckout(Product $product, int $quantity = 1): \Livewire\Features\
         ->set('email', 'ndianabasi@example.com')
         ->set('phone', '08057189760')
         ->set('lga', 'Uyo')
-        ->set('deliveryUrgency', 'today')
         ->set('address', '12 Test Close, enough characters')
         ->set('paymentMethod', 'pay_on_delivery');
 }

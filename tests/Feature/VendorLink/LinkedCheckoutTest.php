@@ -33,7 +33,6 @@ function placeLinkedOrder(): Livewire\Features\SupportTesting\Testable
         ->set('email', 'jane@example.com')
         ->set('phone', '08040000000')
         ->set('lga', 'Uyo')
-        ->set('deliveryUrgency', 'today')
         ->set('address', '1 Test Street, enough characters')
         ->set('paymentMethod', 'pay_on_delivery')
         ->call('processCheckout');
