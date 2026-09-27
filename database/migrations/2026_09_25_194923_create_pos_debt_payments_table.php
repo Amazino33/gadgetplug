@@ -46,7 +46,10 @@ return new class extends Migration
 
             $table->timestamps();
 
-            $table->index(['vendor_id', 'store_id', 'collected_by', 'collected_at']);
+            // Named explicitly: the generated name runs to 70 characters and
+            // MySQL refuses any identifier over 64 (SQLite, which the tests
+            // use, does not care — so only a real deploy caught it).
+            $table->index(['vendor_id', 'store_id', 'collected_by', 'collected_at'], 'pos_debt_payments_lookup_index');
         });
     }
 
