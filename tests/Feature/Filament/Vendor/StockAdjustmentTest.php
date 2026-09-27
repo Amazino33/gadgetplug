@@ -34,7 +34,7 @@ function adjVendor(): array
     return compact('owner', 'vendor', 'manager');
 }
 
-function adjProduct(Vendor $vendor, string $sku, int $stock = 0, ?string $barcode = null): Product
+function adjProduct(Vendor $vendor, string $sku, int $stock = 0, ?string $barcode = null, ?Store $home = null): Product
 {
     return Product::create([
         'vendor_id'      => $vendor->id,
@@ -45,6 +45,7 @@ function adjProduct(Vendor $vendor, string $sku, int $stock = 0, ?string $barcod
         'price'          => 1000,
         'stock_quantity' => $stock,
         'status'         => 'published',
+        'store_id'       => $home?->id,
     ]);
 }
 
@@ -310,4 +311,191 @@ test('the sheet figure is measured against the branch being worked in, not every
 
     expect(ProductStoreStock::where('product_id', $p->id)->where('store_id', $branch->id)->value('quantity'))->toBe(15)
         ->and(ProductStoreStock::where('product_id', $p->id)->where('store_id', $hq->id)->value('quantity'))->toBe(10);
+});
+
+// ── Pick from list ───────────────────────────────────────────────────────────
+
+/** A vendor with two branches, the owner working in the second. */
+function adjTwoBranches(array $data): array
+{
+    $hq     = Store::create(['vendor_id' => $data['vendor']->id, 'name' => 'HQ', 'is_default' => true]);
+    $branch = Store::create(['vendor_id' => $data['vendor']->id, 'name' => 'Branch']);
+
+    test()->actingAs($data['owner']);
+    Filament::setCurrentPanel(Filament::getPanel('vendor'));
+    Filament::setTenant($data['vendor']);
+    ActiveStore::set($data['vendor'], $data['owner'], $branch->id);
+
+    return [$hq, $branch];
+}
+
+function adjStock(Product $p, Store $store, int $qty): void
+{
+    ProductStoreStock::updateOrCreate(['product_id' => $p->id, 'store_id' => $store->id], ['quantity' => $qty, 'reserved' => 0]);
+}
+
+test('the list shows this branch products, zeroes included, and nothing else', function () {
+    $data = adjVendor();
+    [$hq, $branch] = adjTwoBranches($data);
+
+    $stocked = adjProduct($data['vendor'], 'IN-1');
+    $soldOut = adjProduct($data['vendor'], 'IN-0');
+    $hqOnly  = adjProduct($data['vendor'], 'HQ-1', home: $hq);
+    adjStock($stocked, $branch, 4);
+    adjStock($soldOut, $branch, 0);
+    adjStock($hqOnly, $hq, 9);
+
+    $other = Vendor::create(['user_id' => User::factory()->create()->id, 'name' => 'Other', 'slug' => 'other-list']);
+    adjProduct($other, 'THEIRS');
+
+    $rows = Livewire::test(StockAdjustment::class)->instance()->getProducts();
+
+    expect(collect($rows->items())->mapWithKeys(fn ($r) => [$r->sku => (int) $r->on_hand])->all())
+        ->toBe(['IN-0' => 0, 'IN-1' => 4]);
+});
+
+test('the list can be searched by name, SKU or barcode', function () {
+    $data = adjVendor();
+    [, $branch] = adjTwoBranches($data);
+
+    adjStock(adjProduct($data['vendor'], 'CHG-1', 0, '6901443'), $branch, 1);
+    adjStock(adjProduct($data['vendor'], 'CBL-2'), $branch, 1);
+
+    $page = Livewire::test(StockAdjustment::class);
+
+    expect(collect($page->set('search', 'chg')->instance()->getProducts()->items())->pluck('sku')->all())->toBe(['CHG-1'])
+        ->and(collect($page->set('search', '6901443')->instance()->getProducts()->items())->pluck('sku')->all())->toBe(['CHG-1']);
+});
+
+test('saving a line sets the branch to the typed total and ledgers it with the reason', function () {
+    $data = adjVendor();
+    [$hq, $branch] = adjTwoBranches($data);
+
+    $p = adjProduct($data['vendor'], 'SKU-1');
+    adjStock($p, $hq, 10);
+    adjStock($p, $branch, 2);
+
+    Livewire::test(StockAdjustment::class)
+        ->set('reason', 'Found in back store')
+        ->set("counts.{$p->id}", '5')
+        ->call('setStock', $p->id)
+        ->assertHasNoErrors()
+        ->assertSet("saved.{$p->id}", 3)
+        ->assertDispatched('stock-line-saved', id: $p->id);
+
+    expect(ProductStoreStock::where('product_id', $p->id)->where('store_id', $branch->id)->value('quantity'))->toBe(5)
+        ->and(ProductStoreStock::where('product_id', $p->id)->where('store_id', $hq->id)->value('quantity'))->toBe(10);
+
+    $ledger = InventoryLedger::where('product_id', $p->id)->sole();
+
+    expect($ledger->transaction_type)->toBe('stock_adjustment')
+        ->and($ledger->quantity_change)->toBe(3)
+        ->and($ledger->description)->toBe('Found in back store')
+        ->and($ledger->user_id)->toBe($data['owner']->id);
+});
+
+test('saving the figure already on the shelf writes nothing', function () {
+    $data = adjVendor();
+    [, $branch] = adjTwoBranches($data);
+
+    $p = adjProduct($data['vendor'], 'SKU-1');
+    adjStock($p, $branch, 6);
+
+    Livewire::test(StockAdjustment::class)
+        ->set("counts.{$p->id}", '6')
+        ->call('setStock', $p->id)
+        ->assertSet("saved.{$p->id}", 0);
+
+    expect(InventoryLedger::count())->toBe(0);
+});
+
+test('a line can be taken down to zero', function () {
+    $data = adjVendor();
+    [, $branch] = adjTwoBranches($data);
+
+    $p = adjProduct($data['vendor'], 'SKU-1');
+    adjStock($p, $branch, 6);
+
+    Livewire::test(StockAdjustment::class)
+        ->set("counts.{$p->id}", '0')
+        ->call('setStock', $p->id);
+
+    expect(ProductStoreStock::where('product_id', $p->id)->where('store_id', $branch->id)->value('quantity'))->toBe(0);
+});
+
+test('a blank, negative or fractional figure is refused', function (string $typed) {
+    $data = adjVendor();
+    [, $branch] = adjTwoBranches($data);
+
+    $p = adjProduct($data['vendor'], 'SKU-1');
+    adjStock($p, $branch, 6);
+
+    Livewire::test(StockAdjustment::class)
+        ->set("counts.{$p->id}", $typed)
+        ->call('setStock', $p->id)
+        ->assertHasErrors("counts.{$p->id}");
+
+    expect(InventoryLedger::count())->toBe(0);
+})->with(['', '-2', '2.5', 'abc']);
+
+test('an empty reason blocks a list save', function () {
+    $data = adjVendor();
+    [, $branch] = adjTwoBranches($data);
+
+    $p = adjProduct($data['vendor'], 'SKU-1');
+    adjStock($p, $branch, 6);
+
+    Livewire::test(StockAdjustment::class)
+        ->set('reason', ' ')
+        ->set("counts.{$p->id}", '8')
+        ->call('setStock', $p->id)
+        ->assertHasErrors('reason');
+
+    expect(InventoryLedger::count())->toBe(0);
+});
+
+// The list only offers this branch's rows, so a crafted call for another
+// branch's product (or another vendor's) must not open a row here either.
+test('a product this branch does not stock cannot be set from the list', function () {
+    $data = adjVendor();
+    [$hq, $branch] = adjTwoBranches($data);
+
+    $hqOnly = adjProduct($data['vendor'], 'HQ-1', home: $hq);
+    adjStock($hqOnly, $hq, 9);
+
+    $other  = Vendor::create(['user_id' => User::factory()->create()->id, 'name' => 'Other', 'slug' => 'other-set']);
+    $theirs = adjProduct($other, 'THEIRS');
+
+    Livewire::test(StockAdjustment::class)
+        ->set("counts.{$hqOnly->id}", '5')
+        ->call('setStock', $hqOnly->id)
+        ->set("counts.{$theirs->id}", '5')
+        ->call('setStock', $theirs->id);
+
+    expect(InventoryLedger::count())->toBe(0)
+        ->and(ProductStoreStock::where('store_id', $branch->id)->count())->toBe(0);
+});
+
+test('switching mode swaps the default reason but keeps one the user wrote', function () {
+    $data = adjVendor();
+    asManager($data);
+
+    Livewire::test(StockAdjustment::class)
+        ->assertSet('reason', StockAdjustment::REASON_LIST)
+        ->call('setMode', 'paste')
+        ->assertSet('reason', StockAdjustment::REASON_SHEET)
+        ->set('reason', 'Recount after flood')
+        ->call('setMode', 'list')
+        ->assertSet('reason', 'Recount after flood');
+});
+
+test('the page renders in both modes', function () {
+    $data = adjVendor();
+    [, $branch] = adjTwoBranches($data);
+    adjStock(adjProduct($data['vendor'], 'SKU-1'), $branch, 3);
+
+    Livewire::test(StockAdjustment::class)
+        ->assertSee('Product SKU-1')
+        ->call('setMode', 'paste')
+        ->assertSee('Paste your rows');
 });

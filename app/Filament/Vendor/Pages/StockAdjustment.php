@@ -11,7 +11,10 @@ use App\Services\ActiveStore;
 use BackedEnum;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Illuminate\Contracts\Pagination\Paginator;
 use Illuminate\Support\Collection;
+use Livewire\Attributes\Url;
+use Livewire\WithPagination;
 use UnitEnum;
 
 /**
@@ -27,9 +30,16 @@ use UnitEnum;
  * still moves through AdjustStockAction, against the store the user is currently
  * working in, and lands in the ledger as a 'stock_adjustment' with a reason
  * attached — so the opening balance is explained rather than merely present.
+ *
+ * The list mode covers the other half of the job: correcting products one at a
+ * time without knowing their SKUs. It lists what this branch stocks and saves
+ * each line the moment it is entered, through the same action and ledger type
+ * as the paste.
  */
 class StockAdjustment extends Page
 {
+    use WithPagination;
+
     protected static null|string|BackedEnum $navigationIcon  = 'heroicon-o-adjustments-horizontal';
     protected static string|null|UnitEnum   $navigationGroup = 'Inventory';
     protected static ?string $navigationLabel = 'Stock Adjustment';
@@ -56,11 +66,29 @@ class StockAdjustment extends Page
             || $user->hasVendorPermission($vendor->id, 'adjust_stock');
     }
 
+    public const REASON_SHEET = 'Opening stock from vendor sheet';
+    public const REASON_LIST  = 'Stock correction';
+
+    public const PER_PAGE = 25;
+
+    /** 'list' to pick products one by one, 'paste' for a spreadsheet block. */
+    #[Url]
+    public string $mode = 'list';
+
+    /** Narrows the branch's products by name, SKU or barcode. */
+    public string $search = '';
+
+    /** @var array<int|string, mixed> typed shelf totals, keyed by product id */
+    public array $counts = [];
+
+    /** @var array<int, int> product id => change just saved, for the row's confirmation */
+    public array $saved = [];
+
     /** Pasted rows: an identifier and a quantity per line. */
     public string $pasted = '';
 
     /** Why the stock is being set. Stored on every ledger row this creates. */
-    public string $reason = 'Opening stock from vendor sheet';
+    public string $reason = self::REASON_LIST;
 
     /** @var array<int, array<string, mixed>> */
     public array $preview = [];
@@ -222,6 +250,129 @@ class StockAdjustment extends Page
 
         // Re-read from the database so the screen shows the new reality
         $this->buildPreview();
+    }
+
+    /**
+     * Swaps modes, and the stock reason with it, but only while the user has
+     * not written one of their own.
+     */
+    public function setMode(string $mode): void
+    {
+        if (! in_array($mode, ['list', 'paste'], true)) {
+            return;
+        }
+
+        if ($this->reason === $this->defaultReason($this->mode)) {
+            $this->reason = $this->defaultReason($mode);
+        }
+
+        $this->mode = $mode;
+    }
+
+    public function updatedSearch(): void
+    {
+        $this->resetPage();
+    }
+
+    /**
+     * The branch's own stock rows, zeroes included: a product this branch has
+     * sold out of still belongs to it and is exactly what gets corrected.
+     * A vendor with no stores yet has no branch rows, so it sees its whole
+     * catalogue against the vendor-wide figure, as currentStock() does.
+     */
+    public function getProducts(): Paginator
+    {
+        $storeId = ActiveStore::currentId();
+        $term    = trim($this->search);
+
+        $query = Product::query()
+            ->where('products.vendor_id', filament()->getTenant()->id)
+            ->when($term !== '', fn ($q) => $q->where(fn ($w) => $w
+                ->where('products.name', 'like', "%{$term}%")
+                ->orWhere('products.sku', 'like', "%{$term}%")
+                ->orWhere('products.barcode', 'like', "%{$term}%")))
+            ->orderBy('products.name')
+            ->orderBy('products.id');
+
+        if ($storeId === null) {
+            return $query
+                ->select(['products.id', 'products.name', 'products.sku', 'products.barcode', 'products.stock_quantity as on_hand'])
+                ->simplePaginate(self::PER_PAGE);
+        }
+
+        return $query
+            ->join('product_store_stock as pss', fn ($j) => $j
+                ->on('pss.product_id', '=', 'products.id')
+                ->where('pss.store_id', $storeId))
+            ->select(['products.id', 'products.name', 'products.sku', 'products.barcode', 'pss.quantity as on_hand'])
+            ->simplePaginate(self::PER_PAGE);
+    }
+
+    /**
+     * Saves one line from the list straight away. The typed figure is the
+     * shelf total, as in the paste, so the change is worked out here against
+     * the branch's current row rather than trusted from the screen, which may
+     * be stale by a sale or two.
+     */
+    public function setStock(int $productId, AdjustStockAction $adjust): void
+    {
+        abort_unless(static::canAccess(), 403);
+
+        $raw = trim((string) ($this->counts[$productId] ?? ''));
+
+        if ($raw === '' || ! ctype_digit($raw)) {
+            $this->addError("counts.{$productId}", 'Enter a whole number, 0 or more.');
+            return;
+        }
+
+        if (trim($this->reason) === '') {
+            $this->addError('reason', 'Give a reason — it is stored against every stock movement this creates.');
+            return;
+        }
+
+        $storeId = ActiveStore::currentId();
+
+        // Only this vendor's products, and only those this branch stocks: the
+        // list never offers anything else, so neither does the action.
+        $product = Product::query()
+            ->where('vendor_id', filament()->getTenant()->id)
+            ->when($storeId !== null, fn ($q) => $q->whereHas('storeStocks', fn ($s) => $s->where('store_id', $storeId)))
+            ->find($productId);
+
+        if (! $product) {
+            Notification::make()->title('That product is not stocked in ' . $this->getStoreName() . '.')->danger()->send();
+            return;
+        }
+
+        $change = (int) $raw - $this->currentStock($product);
+
+        $this->resetErrorBag("counts.{$productId}");
+
+        if ($change !== 0) {
+            try {
+                $adjust->execute(
+                    productId:       $product->id,
+                    quantityChanged: $change,
+                    transactionType: 'stock_adjustment',
+                    userId:          auth()->id(),
+                    reference:       'Stock adjustment',
+                    description:     trim($this->reason),
+                    store:           $storeId,
+                );
+            } catch (\Throwable $e) {
+                Notification::make()->title("{$product->name} could not be updated")->body($e->getMessage())->danger()->send();
+                return;
+            }
+        }
+
+        unset($this->counts[$productId]);
+        $this->saved[$productId] = $change;
+        $this->dispatch('stock-line-saved', id: $productId);
+    }
+
+    private function defaultReason(string $mode): string
+    {
+        return $mode === 'paste' ? self::REASON_SHEET : self::REASON_LIST;
     }
 
     public function clearAll(): void
