@@ -7,6 +7,7 @@ use App\Http\Controllers\Pos\PosSaleController;
 use App\Http\Controllers\Pos\PosReceiptController;
 use App\Http\Controllers\Pos\PosSessionController;
 use App\Http\Controllers\Pos\PosCashController;
+use App\Http\Controllers\Pos\PosDebtPaymentController;
 use App\Http\Controllers\Pos\PosExpenseController;
 use App\Http\Controllers\Pos\PosPickingController;
 use App\Http\Controllers\Pos\PosSyncController;
@@ -36,7 +37,8 @@ Route::prefix('pos')->middleware(NoStoreApiResponse::class)->group(function () {
 
         // Route-model bound, so EnsurePosVendorAccess checks the customer's own
         // vendor rather than trusting a vendor_id in the query string.
-        Route::get('customers/{customer}/outstanding', [PosCustomerController::class, 'outstanding']);
+        Route::get('customers/{customer}/outstanding',  [PosCustomerController::class, 'outstanding']);
+        Route::post('customers/{customer}/repayments', [PosDebtPaymentController::class, 'store']);
 
         // Sales
         Route::post('sales',                       [PosSaleController::class, 'store']);

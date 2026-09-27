@@ -24,6 +24,7 @@ import ReturnModal from '../components/ReturnModal';
 import ZReportModal from '../components/ZReportModal';
 import CashUpModal from '../components/CashUpModal';
 import ExpenseModal from '../components/ExpenseModal';
+import DebtRepaymentModal from '../components/DebtRepaymentModal';
 import ReceiptModal from '../components/ReceiptModal';
 import StuckSalesModal from '../components/StuckSalesModal';
 import SalesHistoryModal from '../components/SalesHistoryModal';
@@ -119,6 +120,9 @@ const TopMenu = ({ setModal, panelUrl, pendingProcurementsCount }) => {
                                 {pendingProcurementsCount}
                             </span>
                         )}
+                    </button>
+                    <button onClick={() => handleAction('debtRepayment')} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2">
+                        Debt Repayment
                     </button>
                     <button onClick={() => handleAction('submitCash')} className="w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2">
                         Submit Cash
@@ -982,6 +986,21 @@ export default function POS({ user, vendorId, shift, onShiftClosed, onLogout }) 
                                 color="orange"
                             />
                             <SheetBtn
+                                label="Expense"
+                                onClick={() => { setModal('expense'); setShowMobileMore(false); }}
+                                color="orange"
+                            />
+                            <SheetBtn
+                                label={pendingProcurementsCount > 0 ? `Receive Stock (${pendingProcurementsCount})` : 'Receive Stock'}
+                                onClick={() => { setModal('procurements'); setShowMobileMore(false); }}
+                                color={pendingProcurementsCount > 0 ? 'orange' : 'gray'}
+                            />
+                            <SheetBtn
+                                label="Debt Repayment"
+                                onClick={() => { setModal('debtRepayment'); setShowMobileMore(false); }}
+                                color="green"
+                            />
+                            <SheetBtn
                                 label="Submit Cash"
                                 onClick={() => { setModal('submitCash'); setShowMobileMore(false); }}
                                 color="green"
@@ -991,6 +1010,13 @@ export default function POS({ user, vendorId, shift, onShiftClosed, onLogout }) 
                                 onClick={() => { setModal('suspendedSales'); setShowMobileMore(false); }}
                                 color={pendingSales.length > 0 ? 'orange' : 'gray'}
                             />
+                            {shift && (
+                                <SheetBtn
+                                    label="End of Day"
+                                    onClick={() => { setModal('cashup'); setShowMobileMore(false); }}
+                                    color="red"
+                                />
+                            )}
                         </div>
 
                         {pendingError && (
@@ -1104,6 +1130,12 @@ export default function POS({ user, vendorId, shift, onShiftClosed, onLogout }) 
             )}
             {modal === 'expense' && (
                 <ExpenseModal
+                    vendorId={vendorId}
+                    onClose={() => setModal(null)}
+                />
+            )}
+            {modal === 'debtRepayment' && (
+                <DebtRepaymentModal
                     vendorId={vendorId}
                     onClose={() => setModal(null)}
                 />

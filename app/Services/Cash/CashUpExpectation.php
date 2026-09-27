@@ -6,6 +6,7 @@ namespace App\Services\Cash;
 
 use App\Models\CashUpRectification;
 use App\Models\Expense;
+use App\Models\PosDebtPayment;
 use App\Models\PosSession;
 use App\Models\PosReturn;
 use App\Models\PosSale;
@@ -145,6 +146,19 @@ class CashUpExpectation
             ];
         }
 
+        // Money a customer paid down on their running debt, collected into
+        // this drawer today. The mirror of drawer_payouts: that leaves, this
+        // arrives, both physically true the moment they're recorded.
+        $debtRepaymentsCash = $this->debtRepayments($vendorId, $storeId, $cashierId, $businessDate, ['cash']);
+
+        if ($debtRepaymentsCash > 0.009) {
+            $cashLines[] = [
+                'key'    => 'debt_repayments',
+                'label'  => 'Debt repayments collected',
+                'amount' => round($debtRepaymentsCash, 2),
+            ];
+        }
+
         $cashLines = array_merge($cashLines, $this->rectificationLines($entries, CashUpRectification::LEG_CASH));
 
         // ── Terminal leg ─────────────────────────────────────────────────────
@@ -170,6 +184,16 @@ class CashUpExpectation
                 'key'    => 'terminal_refunds',
                 'label'  => 'Refunds paid back on the terminal',
                 'amount' => round(-$terminalRefunds, 2),
+            ];
+        }
+
+        $debtRepaymentsTerminal = $this->debtRepayments($vendorId, $storeId, $cashierId, $businessDate, self::TERMINAL_METHODS);
+
+        if ($debtRepaymentsTerminal > 0.009) {
+            $terminalLines[] = [
+                'key'    => 'debt_repayments',
+                'label'  => 'Debt repayments collected',
+                'amount' => round($debtRepaymentsTerminal, 2),
             ];
         }
 
@@ -203,6 +227,30 @@ class CashUpExpectation
             ->where('created_by', $cashierId)
             ->whereNotNull('posted_at')
             ->whereDate('incurred_at', $businessDate)
+            ->sum('amount'), 2);
+    }
+
+    /**
+     * What this cashier collected today against customers' running debt, on
+     * the given tender(s).
+     *
+     * Scoped identically to drawerPayouts — collector, branch, trading day —
+     * so one till's collection can never raise another till's expected
+     * figure. Collected_at rather than created_at for the same reason
+     * Expense reads incurred_at: this feature is online-only, so the two
+     * never actually diverge, but the field exists for the day the record
+     * describes, not the moment a request happened to land.
+     *
+     * @param  list<string>  $methods
+     */
+    private function debtRepayments(int $vendorId, int $storeId, int $cashierId, string $businessDate, array $methods): float
+    {
+        return round((float) PosDebtPayment::query()
+            ->where('vendor_id', $vendorId)
+            ->where('store_id', $storeId)
+            ->where('collected_by', $cashierId)
+            ->whereIn('method', $methods)
+            ->whereDate('collected_at', $businessDate)
             ->sum('amount'), 2);
     }
 
