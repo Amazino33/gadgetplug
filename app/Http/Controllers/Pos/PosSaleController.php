@@ -47,6 +47,10 @@ class PosSaleController extends Controller
             // idempotent, which is what stops a lost response becoming a second
             // sale of the same goods.
             'offline_id'                 => 'nullable|string|max:64',
+            // Where and by whom the till says this sale was rung — the same
+            // two fields the sync path honours.
+            'store_id'                   => 'nullable|integer',
+            'cashier_id'                 => 'nullable|integer',
             'pos_session_id'             => 'nullable|integer',
             'customer_id'                => 'nullable|integer',
             'items'                      => 'required|array|min:1',
@@ -87,6 +91,21 @@ class PosSaleController extends Controller
 
         $vendor = Vendor::findOrFail($request->vendor_id);
 
+        if ($request->filled('cashier_id') && (int) $request->cashier_id !== $request->user()->id) {
+            throw ValidationException::withMessages([
+                'cashier_id' => 'This sale was rung by another cashier.',
+            ]);
+        }
+
+        // Settled before the transaction so an unclear branch is answered as
+        // exactly that (TillBranchUnclear renders its own 422), not folded into
+        // the generic "sale rejected" below.
+        $storeId = TillStore::forSale(
+            $request->user(),
+            (int) $request->vendor_id,
+            $request->filled('store_id') ? (int) $request->store_id : null,
+        );
+
         // Derived from the till's offline_id, exactly as PosSyncController does.
         //
         // The two paths used different schemes: sync built the reference from
@@ -116,7 +135,7 @@ class PosSaleController extends Controller
             // MySQL kills one of the two transactions precisely so the other can
             // finish, and the killed one succeeds on a retry. Laravel re-runs
             // the closure for exactly this class of error.
-            $sale = DB::transaction(function () use ($request, $adjustStock, $priceFloor, $vendor, $revenue, $reference) {
+            $sale = DB::transaction(function () use ($request, $adjustStock, $priceFloor, $vendor, $revenue, $reference, $storeId) {
             $subtotal = collect($request->items)->sum(function ($item) {
                 $lineTotal = $item['unit_price'] * $item['quantity'];
                 return $lineTotal - ($item['discount_amount'] ?? 0);
@@ -152,9 +171,8 @@ class PosSaleController extends Controller
             $sale = PosSale::create([
                 'reference'               => $reference,
                 'vendor_id'               => $request->vendor_id,
-                // The branch this till stands in, derived from the cashier's
-                // assignment — the POS has no panel session to read.
-                'store_id'                => TillStore::resolve($request->user(), (int) $request->vendor_id),
+                // The branch the till was rung in — see TillStore::forSale().
+                'store_id'                => $storeId,
                 'pos_session_id'          => $request->pos_session_id,
                 'cashier_id'              => $request->user()->id,
                 'customer_id'             => $request->customer_id,

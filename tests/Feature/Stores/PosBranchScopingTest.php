@@ -83,19 +83,20 @@ test('a cashier at the default store receives only that store products', functio
     expect($names)->toContain('Main Only')->not->toContain('Branch Only');
 });
 
-test('a cashier with no store assignment falls back to the default branch', function () {
+test('a cashier with no store assignment is refused, not sent to the default branch', function () {
     $vendor = posVendor();
     $branch = Store::create(['vendor_id' => $vendor->id, 'name' => 'Branch B']);
     posProduct($vendor, $vendor->defaultStore, 10, 'Main Only');
     posProduct($vendor, $branch, 4, 'Branch Only');
 
-    // Same resolution the sale path has used since Phase 4 — no second rule.
+    // Falling back to the default store is how a day of Zeelink Phones sales
+    // was checked against a branch that held none of the phones (26/09/2026).
     $cashier = posCashier($vendor);
     Sanctum::actingAs($cashier, ['pos']);
 
-    $names = collect($this->getJson("/api/pos/products?vendor_id={$vendor->id}")->json())->pluck('name');
-
-    expect($names)->toContain('Main Only')->not->toContain('Branch Only');
+    $this->getJson("/api/pos/products?vendor_id={$vendor->id}")
+        ->assertStatus(422)
+        ->assertJsonPath('code', App\Exceptions\TillBranchUnclear::CODE);
 });
 
 test('a product with nothing left at the branch is not offered', function () {

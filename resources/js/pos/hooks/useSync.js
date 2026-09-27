@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { db } from '../lib/db';
 import api from '../lib/api';
 import { markSaleSynced } from '../lib/salesHistory';
+import { salesToSync } from '../lib/syncQueue';
 import { markPickingPaymentSynced, pendingPickingPayments, prunePickingPayments } from '../lib/pickings';
 import {
     applyServerShift, clearSyncFailure, markCloseSynced, markOpenSynced,
@@ -32,9 +33,7 @@ export function useSync(vendorId, cashierId, onStuckSalesChange) {
             .where('synced').equals(0)
             .toArray();
 
-        const pendingSales = unsyncedSales.filter(
-            (s) => s.sync_status !== 'rejected' && s.sync_status !== 'error'
-        );
+        const pendingSales = salesToSync(unsyncedSales, cashierId);
 
         if (pendingSales.length > 0) {
             try {

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Pos;
 use App\Actions\Finance\RecognizePosSaleRevenueAction;
 use App\Actions\Inventory\AdjustStockAction;
 use App\Actions\Pos\ChargeCustomerDebtAction;
+use App\Exceptions\TillBranchUnclear;
 use App\Http\Controllers\Controller;
 use App\Models\PosCustomer;
 use App\Models\PosSale;
@@ -40,6 +41,10 @@ class PosSyncController extends Controller
             'sales.*.discount_amount' => 'nullable|numeric|min:0',
             'sales.*.amount_tendered' => 'nullable|numeric|min:0',
             'sales.*.completed_at'    => 'required|date',
+            // Recorded by the till when the sale was rung. Absent only on a
+            // sale queued before the till started recording them.
+            'sales.*.store_id'        => 'nullable|integer',
+            'sales.*.cashier_id'      => 'nullable|integer',
             // 'nullable' matters here even with 'required_if' present — see the
             // identical fix in PosSaleController::store() for why a present-but-
             // null 'payments' otherwise fails 'array'/'min' on every plain sale.
@@ -62,6 +67,26 @@ class PosSyncController extends Controller
             }
 
             try {
+                // Whoever rang the sale is who it belongs to. The till only
+                // sends the signed-in cashier's own sales, so a different id
+                // here means it was rung by someone else — recording it under
+                // this login would put their takings in this cashier's drawer.
+                $rungBy = $payload['cashier_id'] ?? null;
+
+                if ($rungBy !== null && (int) $rungBy !== $request->user()->id) {
+                    throw ValidationException::withMessages([
+                        'cashier_id' => 'This sale was rung by another cashier. It will sync when they sign in on this till.',
+                    ]);
+                }
+
+                // Where the sale was rung, not where this till happens to be
+                // signed in now — and never a guess.
+                $storeId = TillStore::forSale(
+                    $request->user(),
+                    (int) $request->vendor_id,
+                    isset($payload['store_id']) ? (int) $payload['store_id'] : null,
+                );
+
                 // The till enforces the floor before completing an offline
                 // sale, so reaching here below it means the cached rules were
                 // bypassed or tampered with. Re-checked on the pre-VAT goods
@@ -73,11 +98,11 @@ class PosSyncController extends Controller
                     (float) $payload['total'] - (float) ($payload['vat_amount'] ?? 0),
                 );
 
-                DB::transaction(function () use ($payload, $request, $adjustStock, $existingRef) {
+                DB::transaction(function () use ($payload, $request, $adjustStock, $existingRef, $storeId) {
                     $sale = PosSale::create([
                         'reference'               => $existingRef,
                         'vendor_id'               => $request->vendor_id,
-                        'store_id'                => TillStore::resolve($request->user(), (int) $request->vendor_id),
+                        'store_id'                => $storeId,
                         'pos_session_id'          => null,
                         'cashier_id'              => $request->user()->id,
                         'customer_id'             => $payload['customer_id'] ?? null,
@@ -171,6 +196,14 @@ class PosSyncController extends Controller
                 });
 
                 $results[] = ['offline_id' => $payload['offline_id'], 'status' => 'synced', 'reference' => $existingRef];
+            } catch (TillBranchUnclear $e) {
+                // Understood and refused, like a validation failure: sending it
+                // again unchanged would only be refused again.
+                $results[] = [
+                    'offline_id' => $payload['offline_id'],
+                    'status'     => 'rejected',
+                    'message'    => $e->getMessage(),
+                ];
             } catch (ValidationException $e) {
                 // Reported separately from a crash: this sale was understood
                 // and refused, and the goods are already off the shelf, so it

@@ -139,7 +139,7 @@ const TopMenu = ({ setModal, panelUrl, pendingProcurementsCount }) => {
     );
 };
 
-export default function POS({ user, vendorId, shift, onShiftClosed, onLogout }) {
+export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onLogout }) {
     const vendorSettings = JSON.parse(localStorage.getItem('pos_vendor_settings') ?? '{}');
     const VAT_ENABLED = vendorSettings.vat_enabled ?? true;
     const VAT_RATE    = vendorSettings.vat_rate    ?? 7.5;
@@ -440,6 +440,12 @@ export default function POS({ user, vendorId, shift, onShiftClosed, onLogout }) 
         const payload = {
             offline_id:              checkoutRef.current.forAttempt(),
             vendor_id:               vendorId,
+            // Where and by whom, fixed now rather than worked out whenever the
+            // queue happens to sync — by then a different login may be on this
+            // till. Null store only on a till signed in before branches were
+            // recorded; the server then uses the till login's own branch.
+            store_id:                storeId ?? null,
+            cashier_id:              user.id,
             pos_session_id:          session?.id ?? null,
             customer_id:             customer?.id ?? null,
             items: cart.map((item) => ({

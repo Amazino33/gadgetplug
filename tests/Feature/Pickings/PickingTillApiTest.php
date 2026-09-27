@@ -41,9 +41,9 @@ test('another branch pickings are not on this till', function () {
         pickingPicker($vendor, 'Branch Trader'), $branch, [['product_id' => $branchProduct->id, 'quantity' => 2]],
     );
 
-    // The owner's till resolves to the default store, so the branch trip is
+    // The owner's till is signed in at the main store, so the branch trip is
     // somebody else's business.
-    Sanctum::actingAs(User::find($vendor->user_id));
+    Sanctum::actingAs(User::find($vendor->user_id), ['pos', \App\Services\Inventory\TillStore::ability($main->id)]);
 
     $response = $this->getJson('/api/pos/pickings?vendor_id=' . $vendor->id)->assertOk();
 

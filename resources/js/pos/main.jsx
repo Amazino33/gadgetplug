@@ -11,6 +11,8 @@ import '../../css/pos.css';
 function App() {
     const [user, setUser]       = useState(null);
     const [vendorId, setVendorId] = useState(null);
+    // The branch this till signed in to — stamped on every sale it rings.
+    const [store, setStore]       = useState(null);
     // The day this cashier is trading. Selling is gated behind it: a shift that
     // was never opened has no counted float, and a closing count measured
     // against an unknown opening proves nothing.
@@ -29,19 +31,25 @@ function App() {
             try {
                 setUser(JSON.parse(stored));
                 setVendorId(Number(vid));
+                // Absent on a till signed in before branches were recorded.
+                // Its sales then carry no branch and the server uses the till
+                // login's own — or refuses, and this till is signed out below.
+                setStore(JSON.parse(localStorage.getItem('pos_store') ?? 'null'));
             } catch { /* stale data */ }
         }
     }, []);
 
-    const handleLogin = (u, vid) => {
+    const handleLogin = (u, vid, s) => {
         setUser(u);
         setVendorId(vid);
+        setStore(s ?? null);
     };
 
     const handleLogout = () => {
         localStorage.removeItem('pos_token');
         localStorage.removeItem('pos_user');
         localStorage.removeItem('pos_vendor_id');
+        localStorage.removeItem('pos_store');
         localStorage.removeItem('pos_session');
         localStorage.removeItem('pos_cart');
         localStorage.removeItem('pos_customer');
@@ -49,11 +57,27 @@ function App() {
         localStorage.removeItem('pos_recoveredAt');
         setUser(null);
         setVendorId(null);
+        setStore(null);
         // Deliberately NOT cleared from IndexedDB: the shift belongs to the
         // cashier and the trading day, not to this login. Someone who signs out
         // to let a colleague use the till comes back to the same open day.
         setShift(null);
     };
+
+    // The server could not tell which branch this till is in (see lib/api).
+    // Signing in again is the only fix, so the till does it for the cashier
+    // and says why on the sign-in screen. Queued sales are untouched — they
+    // live in IndexedDB and go up after the next sign-in.
+    useEffect(() => {
+        const onBranchUnclear = (e) => {
+            try { sessionStorage.setItem('pos_login_notice', e.detail ?? ''); } catch { /* private mode */ }
+            handleLogout();
+        };
+
+        window.addEventListener('pos:branch-unclear', onBranchUnclear);
+
+        return () => window.removeEventListener('pos:branch-unclear', onBranchUnclear);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     if (!user) return <Login onLogin={handleLogin} />;
 
@@ -90,6 +114,7 @@ function App() {
         <POS
             user={user}
             vendorId={vendorId}
+            storeId={store?.id ?? null}
             shift={shift}
             onShiftClosed={setShift}
             onLogout={handleLogout}

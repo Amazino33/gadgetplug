@@ -18,14 +18,15 @@ uses(RefreshDatabase::class);
  * and the customer got a visibly worse receipt purely because the connection
  * was down.
  */
-function loginAsTill(array $ctx, string $pin = '1234')
+function loginAsTill(array $ctx, string $pin = '1234', ?int $storeId = null, ?App\Models\User $as = null)
 {
-    $ctx['owner']->forceFill(['pos_pin' => Hash::make($pin)])->save();
+    ($as ?? $ctx['owner'])->forceFill(['pos_pin' => Hash::make($pin)])->save();
 
-    return test()->postJson('/api/pos/auth/login', [
+    return test()->postJson('/api/pos/auth/login', array_filter([
         'vendor_id' => $ctx['vendor']->id,
         'pin'       => $pin,
-    ]);
+        'store_id'  => $storeId,
+    ]));
 }
 
 it('sends the receipt layout the till needs to print without the server', function () {
@@ -85,9 +86,8 @@ it('names the branch only when the vendor has more than one store', function () 
         'address'   => '12 Allen Avenue',
         'phone'     => '08031234567',
     ]);
-    $ctx['owner']->stores()->sync([$second->id]);
-
-    $store = loginAsTill($ctx)->json('vendor.store');
+    // The owner works in both, so the till is signed in to the one they are in.
+    $store = loginAsTill($ctx, storeId: $second->id)->json('vendor.store');
 
     expect($store['show'])->toBeTrue()
         ->and($store['name'])->toBe('Ikeja Branch')
@@ -103,9 +103,12 @@ it('resolves the branch the same way a sale does — from the cashier assignment
     ]);
     Store::create(['vendor_id' => $ctx['vendor']->id, 'name' => 'Yaba Branch']);
 
-    $ctx['owner']->stores()->sync([$assigned->id]);
+    // A cashier who works in one branch is signed in to it without being asked.
+    $cashier = App\Models\User::factory()->create();
+    $ctx['vendor']->users()->attach($cashier->id);
+    $cashier->stores()->sync([$assigned->id]);
 
-    expect(loginAsTill($ctx)->json('vendor.store.name'))->toBe('Surulere Branch');
+    expect(loginAsTill($ctx, as: $cashier)->json('vendor.store.name'))->toBe('Surulere Branch');
 });
 
 it('still sends the VAT settings the till computes with', function () {

@@ -59,10 +59,6 @@ class PosSessionController extends Controller
 
         $storeId = TillStore::resolve($request->user(), (int) $request->vendor_id);
 
-        if ($storeId === null) {
-            return $this->noBranch();
-        }
-
         $businessDate = BusinessDate::today();
         $existing = PosSession::forDay($request->user()->id, $storeId, $businessDate);
 
@@ -91,14 +87,14 @@ class PosSessionController extends Controller
                 'status'               => PosSession::STATUS_OPEN,
                 'open_idempotency_key' => $request->idempotency_key,
             ]);
-        } catch (UniqueConstraintViolationException) {
+        } catch (UniqueConstraintViolationException $e) {
             // Two tills opening at once. The unique key settled it; whichever
             // won is the day, and the loser joins it.
             $session = PosSession::forDay($request->user()->id, $storeId, $businessDate);
 
             return $session
                 ? $this->openedResponse($request, $session, 200)
-                : $this->noBranch();
+                : throw $e;
         }
 
         activity()->causedBy($request->user())
@@ -116,10 +112,6 @@ class PosSessionController extends Controller
         $request->validate(['vendor_id' => 'required|integer']);
 
         $storeId = TillStore::resolve($request->user(), (int) $request->vendor_id);
-
-        if ($storeId === null) {
-            return $this->noBranch();
-        }
 
         $session = PosSession::openFor($request->user()->id, $storeId);
 
@@ -228,10 +220,6 @@ class PosSessionController extends Controller
         $request->validate(['vendor_id' => 'required|integer']);
 
         $storeId = TillStore::resolve($request->user(), (int) $request->vendor_id);
-
-        if ($storeId === null) {
-            return $this->noBranch();
-        }
 
         $sessions = PosSession::query()
             ->forStore($storeId)
@@ -369,13 +357,6 @@ class PosSessionController extends Controller
             'session'         => $session->toBlindArray(),
             'vendor_settings' => TillProfile::for($request->user(), $session->vendor),
         ], $status);
-    }
-
-    private function noBranch(): JsonResponse
-    {
-        return response()->json([
-            'message' => 'This till is not assigned to a branch, so it cannot open a session. Ask your manager to assign you to a store.',
-        ], 422);
     }
 
     // ── Suspended sales ─────────────────────────────────────────────

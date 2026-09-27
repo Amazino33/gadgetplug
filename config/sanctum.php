@@ -37,7 +37,13 @@ return [
     |
     */
 
-    'guard' => ['web'],
+    // Empty on purpose: the till authenticates with its own bearer token and
+    // nothing else. With 'web' here, whoever was signed into the vendor panel
+    // in the same browser silently became the till's user — on 26/09/2026 a
+    // manager's panel session took over a cashier's till, the sales were
+    // checked against the manager's (unresolvable) branch, and a whole day of
+    // them was refused as "Insufficient stock".
+    'guard' => [],
 
     /*
     |--------------------------------------------------------------------------

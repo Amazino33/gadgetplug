@@ -86,14 +86,14 @@ test('a retried open returns the same day rather than starting a second', functi
 
 test('a till standing in no branch is told plainly', function () {
     $ctx = tillContext();
-    // Unassign the cashier and remove the fallback branch entirely.
+    // A business with more than one shop, and a cashier assigned to none of
+    // them. There is no branch to guess — the default store is not one.
+    App\Models\Store::create(['vendor_id' => $ctx['vendor']->id, 'name' => 'Second Shop']);
     $ctx['cashier']->stores()->detach();
-    $ctx['store']->update(['is_default' => false]);
 
-    openViaApi($ctx)->assertStatus(422)->assertJsonPath(
-        'message',
-        'This till is not assigned to a branch, so it cannot open a session. Ask your manager to assign you to a store.'
-    );
+    openViaApi($ctx)->assertStatus(422)
+        ->assertJsonPath('code', App\Exceptions\TillBranchUnclear::CODE)
+        ->assertJsonPath('message', App\Exceptions\TillBranchUnclear::noBranch()->getMessage());
 });
 
 test('a cashier cannot open a session in another vendor books', function () {

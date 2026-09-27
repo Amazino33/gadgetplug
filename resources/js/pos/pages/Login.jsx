@@ -14,8 +14,20 @@ export default function Login({ onLogin }) {
     const [vendorId, setVendorId] = useState(
         () => lockedVendorId ?? localStorage.getItem('pos_vendor_id') ?? ''
     );
-    const [error, setError]     = useState('');
+    // Why the till was signed out, if it was — see main.jsx. Read once.
+    const [error, setError]     = useState(() => {
+        try {
+            const notice = sessionStorage.getItem('pos_login_notice') ?? '';
+            sessionStorage.removeItem('pos_login_notice');
+            return notice;
+        } catch {
+            return '';
+        }
+    });
     const [loading, setLoading] = useState(false);
+    // Offered when the PIN belongs to someone who works in several branches:
+    // the till has to know which one it is standing in before it can sell.
+    const [branches, setBranches] = useState(null);
     const vendorInputRef        = useRef(null);
     const pinInputRef           = useRef(null);
 
@@ -30,15 +42,20 @@ export default function Login({ onLogin }) {
 
     const backspace = () => setPin((p) => p.slice(0, -1));
 
-    const submit = async () => {
+    const submit = async (storeId = null) => {
         if (!vendorId || pin.length < 4) return;
         setLoading(true);
         setError('');
         try {
-            const { data } = await api.post('/auth/login', { vendor_id: Number(vendorId), pin });
+            const { data } = await api.post('/auth/login', {
+                vendor_id: Number(vendorId),
+                pin,
+                store_id:  storeId ?? undefined,
+            });
             localStorage.setItem('pos_token', data.token);
             localStorage.setItem('pos_vendor_id', String(vendorId));
             localStorage.setItem('pos_user', JSON.stringify(data.user));
+            localStorage.setItem('pos_store', JSON.stringify(data.store ?? null));
             localStorage.setItem('pos_vendor_settings', JSON.stringify(data.vendor ?? { vat_enabled: true, vat_rate: 7.5 }));
 
             const { data: products } = await api.get('/products', { params: { vendor_id: vendorId } });
@@ -54,9 +71,24 @@ export default function Login({ onLogin }) {
                 await db.customers.bulkPut(customers);
             } catch { /* offline or refused — the till still opens */ }
 
-            onLogin(data.user, Number(vendorId));
-        } catch {
-            setError('Invalid PIN. Try again.');
+            onLogin(data.user, Number(vendorId), data.store ?? null);
+        } catch (e) {
+            const body = e?.response?.data;
+
+            // The PIN was right; the till just needs to know which branch.
+            // The PIN is kept so choosing one signs straight in.
+            if (body?.code === 'choose_store') {
+                setBranches(body.stores ?? []);
+                if (storeId) setError(body.message);
+                return;
+            }
+
+            // A wrong PIN says so. Anything else the server explained — no
+            // branch assigned, the account blocked — is shown as it said it,
+            // because "Invalid PIN" would send the cashier retyping a PIN that
+            // was never the problem.
+            setBranches(null);
+            setError(e?.response?.status === 401 || !body?.message ? 'Invalid PIN. Try again.' : body.message);
             setPin('');
             pinInputRef.current?.focus();
         } finally {
@@ -78,6 +110,43 @@ export default function Login({ onLogin }) {
     };
 
     const keys = ['1','2','3','4','5','6','7','8','9','','0','⌫'];
+
+    if (branches) {
+        return (
+            <div className="min-h-screen bg-[#F9FAFB] dark:bg-gray-950 flex items-center justify-center p-4">
+                <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-xl w-full max-w-sm p-6 sm:p-10">
+                    <div className="text-center mb-6">
+                        <p className="text-lg font-bold text-gray-800 dark:text-gray-100">Which branch are you in?</p>
+                        <p className="text-gray-400 dark:text-gray-500 text-sm mt-1">
+                            Sales on this till will come out of that branch's stock.
+                        </p>
+                    </div>
+
+                    <div className="space-y-2.5">
+                        {branches.map((branch) => (
+                            <button
+                                key={branch.id}
+                                onClick={() => submit(branch.id)}
+                                disabled={loading}
+                                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 bg-[#F9FAFB] dark:bg-gray-800 px-4 py-3 text-left text-sm font-semibold text-gray-800 dark:text-gray-100 hover:border-[#068B03] hover:bg-green-50 dark:hover:bg-gray-700 disabled:opacity-50 active:scale-[0.99]"
+                            >
+                                {branch.name}
+                            </button>
+                        ))}
+                    </div>
+
+                    {error && <p className="text-red-500 text-xs text-center mt-4">{error}</p>}
+
+                    <button
+                        onClick={() => { setBranches(null); setPin(''); setError(''); }}
+                        className="w-full mt-5 text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+                    >
+                        Not you? Enter a different PIN
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-[#F9FAFB] dark:bg-gray-950 flex items-center justify-center p-4">
