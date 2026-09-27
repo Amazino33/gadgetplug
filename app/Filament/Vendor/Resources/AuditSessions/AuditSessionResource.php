@@ -86,10 +86,15 @@ class AuditSessionResource extends Resource
                     ->extraAttributes(['style' => 'min-width: 180px']),
 
                 // ── 3. System Qty ────────────────────────────────────────────────
-                TextColumn::make('product.stock_quantity')
+                // The branch's own figure, not the vendor-wide mirror across every
+                // branch — this is what a correction actually gets measured against
+                // (see AuditSession::branchSystemStock()), so showing anything else
+                // here would disagree with the number the override modal shows.
+                TextColumn::make('system_qty')
                     ->label('System Qty')
                     ->alignCenter()
                     ->numeric()
+                    ->getStateUsing(fn (AuditSession $r): int => $r->branchSystemStock())
                     ->badge()
                     ->color('gray'),
 

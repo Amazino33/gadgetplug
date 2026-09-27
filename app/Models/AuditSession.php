@@ -116,13 +116,19 @@ class AuditSession extends Model
 
     /**
      * The branch this count belongs to: the blind-count session's store when
-     * this line came from one, else whoever is resolving it now — a solo
-     * audit never names a branch of its own, and the person settling it is
-     * the closest thing to one. Null only when neither is known.
+     * this line came from one, else the product's own home branch — a solo
+     * audit never names a branch of its own, but "Start Inventory Count" on
+     * the Products list only ever fires for a product homed at the counter's
+     * own branch (ProductResource scopes that list to it), so the product is
+     * the reliable signal. Whoever happens to be resolving the session comes
+     * last and only as a fallback for the rare product with no home branch
+     * recorded — the Audit Sessions list is vendor-wide, not branch-scoped,
+     * so the resolver's own active store can easily be a different branch
+     * than the one actually counted.
      */
     public function resolvedStoreId(): ?int
     {
-        return $this->countSession?->store_id ?? ActiveStore::currentId();
+        return $this->countSession?->store_id ?? $this->product?->store_id ?? ActiveStore::currentId();
     }
 
     /**

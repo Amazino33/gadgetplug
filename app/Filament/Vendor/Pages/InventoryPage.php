@@ -61,19 +61,10 @@ class InventoryPage extends Page
         return ['storeFilter' => $this->storeFilter];
     }
 
-    protected function getHeaderWidgets(): array
-    {
-        return [InventoryOverviewWidget::class];
-    }
-
-    public function getHeaderWidgetsColumns(): int|array
-    {
-        return 2;
-    }
-
     public function getWidgets(): array
     {
         return [
+            InventoryOverviewWidget::class,
             InventoryTableWidget::class,
             StockMovementChart::class,
         ];
