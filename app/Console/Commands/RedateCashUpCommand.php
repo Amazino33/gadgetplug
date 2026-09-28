@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Models\PosSale;
 use App\Models\PosSession;
 use App\Services\Cash\CashUpExpectation;
 use App\Services\Cash\ZReportWriter;
@@ -88,6 +89,25 @@ class RedateCashUpCommand extends Command
 
         if ($clash) {
             $this->error("This cashier already has record #{$clash->id} for {$date} at this branch.");
+
+            return self::FAILURE;
+        }
+
+        // A count belongs to a day the cashier actually traded. Without this the
+        // command would happily move a record onto an empty day — which on
+        // 28/09/2026 it did, to a Sunday the shop was shut, on a guess.
+        [$dayStart, $dayEnd] = BusinessDate::boundsFor($date);
+
+        $salesThatDay = PosSale::query()
+            ->where('vendor_id', $session->vendor_id)
+            ->where('store_id', $session->store_id)
+            ->where('cashier_id', $session->cashier_id)
+            ->where('status', '!=', 'voided')
+            ->whereBetween('completed_at', [$dayStart, $dayEnd])
+            ->count();
+
+        if ($salesThatDay === 0) {
+            $this->error("{$session->cashier?->name} rang no sales at this branch on {$date}. Nothing shows the count belongs to that day, so it has not been moved.");
 
             return self::FAILURE;
         }

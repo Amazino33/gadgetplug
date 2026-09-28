@@ -95,6 +95,14 @@ test('it will not move a day a manager has already explained', function () {
         ->assertFailed();
 });
 
+test('it will not move a count onto a day the cashier did not trade', function () {
+    // 26/09 has no sales for this cashier. A move there would be a guess.
+    $this->artisan('pos:redate-cash-up', ['session' => $this->session->id, 'date' => '2026-09-26', '--force' => true])
+        ->assertFailed();
+
+    expect($this->session->refresh()->business_date->toDateString())->toBe('2026-09-28');
+});
+
 test('it will not move a day into the future', function () {
     $this->artisan('pos:redate-cash-up', ['session' => $this->session->id, 'date' => '2026-09-29', '--force' => true])
         ->assertFailed();
