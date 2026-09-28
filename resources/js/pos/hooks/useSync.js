@@ -5,9 +5,13 @@ import { markSaleSynced } from '../lib/salesHistory';
 import { salesToSync } from '../lib/syncQueue';
 import { markPickingPaymentSynced, pendingPickingPayments, prunePickingPayments } from '../lib/pickings';
 import {
-    applyServerShift, clearSyncFailure, markCloseSynced, markOpenSynced,
-    noteSyncFailure, pendingShifts, STATUS_PENDING_REVIEW,
+    applyServerShift, clearSyncFailure, closeMustWait, detachFromWrongDay,
+    markCloseSynced, markOpenSynced, noteSyncFailure, pendingShifts,
+    STATUS_PENDING_REVIEW,
 } from '../lib/shift';
+
+/** The server's answer to a count sent against another day's session. */
+const WRONG_DAY = 'session_wrong_day';
 
 /**
  * Background sync: every 30s, push any unsynced IndexedDB sales to the server.
@@ -88,11 +92,14 @@ export function useSync(vendorId, cashierId, onStuckSalesChange) {
      * Sales go first (they are earlier in sync()), which matters: the server
      * computes what the drawer should hold from the sales it has, so a close
      * that overtook its own day's sales would be measured against a day that had
-     * barely happened and would read as an enormous shortage.
+     * barely happened and would read as an enormous shortage. Going first is
+     * not enough on its own — the upload can fail — so a close whose day still
+     * has sales waiting stays on the device until they are through.
      */
     const syncShifts = async () => {
         const pending = await pendingShifts();
         const myPending = pending.filter((s) => s.cashier_id === cashierId);
+        const unsyncedSales = await db.offlineSales.where('synced').equals(0).toArray();
 
         for (const shift of myPending) {
             if (shift.open_synced !== 1) {
@@ -102,6 +109,8 @@ export function useSync(vendorId, cashierId, onStuckSalesChange) {
             }
 
             if (shift.status === STATUS_PENDING_REVIEW && shift.close_synced !== 1) {
+                if (closeMustWait(shift, unsyncedSales)) continue;
+
                 await pushClose(shift);
             }
         }
@@ -113,6 +122,9 @@ export function useSync(vendorId, cashierId, onStuckSalesChange) {
                 vendor_id: shift.vendor_id,
                 opening_float: shift.opening_float,
                 terminal_id: shift.terminal_id ?? undefined,
+                // The day this shift was opened, which is not necessarily the
+                // day this request gets through.
+                business_date: shift.business_date,
                 idempotency_key: shift.open_key,
             });
 
@@ -163,6 +175,7 @@ export function useSync(vendorId, cashierId, onStuckSalesChange) {
                 counted_terminal: shift.counted_terminal,
                 notes: shift.notes ?? undefined,
                 idempotency_key: shift.close_key,
+                business_date: shift.business_date,
             });
 
             // The authoritative figures, which replace this device's provisional
@@ -172,6 +185,15 @@ export function useSync(vendorId, cashierId, onStuckSalesChange) {
             await clearSyncFailure(shift.id);
         } catch (e) {
             const status = e?.response?.status;
+
+            // The session this device was holding is another day's. Let go
+            // of it and open this shift's own day next cycle, rather than
+            // taking the other day's figures as this one's.
+            if (status === 409 && e.response?.data?.code === WRONG_DAY) {
+                await detachFromWrongDay(shift.id);
+
+                return;
+            }
 
             // Already closed there. Whatever the server holds is the record, so
             // take it rather than keep offering a second count.

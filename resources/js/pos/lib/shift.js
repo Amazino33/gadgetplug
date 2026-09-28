@@ -224,6 +224,46 @@ export async function pendingShifts(now = Date.now()) {
     });
 }
 
+/**
+ * Whether this shift's close has to wait for its own day's sales.
+ *
+ * The server freezes what the drawer should hold the moment the close lands,
+ * from the sales it has. A close that overtakes its day's sales — because the
+ * sale upload failed this cycle, say — is measured against a day that has
+ * barely happened and reads as an enormous shortage, for ever.
+ *
+ * Sales the server already refused do not hold it back: they need a person,
+ * not a retry, and waiting on them would leave the day uncounted for good.
+ */
+export function closeMustWait(shift, unsyncedSales) {
+    return unsyncedSales.some((sale) =>
+        sale.synced !== 1
+        && sale.sync_status !== 'rejected'
+        && sale.sync_status !== 'error'
+        && (sale.cashier_id == null || sale.cashier_id === shift.cashier_id)
+        && sale.completed_at
+        && businessDate(new Date(sale.completed_at)) === shift.business_date
+    );
+}
+
+/**
+ * The server holds this shift against a different day's session.
+ *
+ * Forgets that session so the next cycle opens the shift's own day. A till
+ * that adopted a misdated session would otherwise post its count to the
+ * wrong day, or have it dropped as "already cashed up".
+ */
+export async function detachFromWrongDay(shiftId) {
+    await db.shifts.update(shiftId, {
+        open_synced: 0,
+        server_id: null,
+        sync_attempts: 0,
+        next_attempt_at: null,
+        sync_status: null,
+        sync_message: null,
+    });
+}
+
 /** Record a failed attempt and hold the next one off. */
 export async function noteSyncFailure(shiftId, now = Date.now()) {
     const shift = await db.shifts.get(shiftId);

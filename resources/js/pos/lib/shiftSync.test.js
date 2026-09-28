@@ -5,7 +5,9 @@ import {
     applyServerShift,
     backoffFor,
     clearSyncFailure,
+    closeMustWait,
     closeShift,
+    detachFromWrongDay,
     markCloseSynced,
     markOpenSynced,
     noteSyncFailure,
@@ -199,5 +201,58 @@ describe('finishing the day with no signal at all', () => {
 
         // A new key per attempt would make every retry look like a new day.
         expect(row.open_key).toBe(shift.open_key);
+    });
+});
+
+describe('a close waiting for its own day', () => {
+    // 13:00 in Lagos on the 27th and the 28th.
+    const on27 = '2026-09-27T12:00:00.000Z';
+    const on28 = '2026-09-28T12:00:00.000Z';
+    const shift = { cashier_id: CASHIER, business_date: '2026-09-27' };
+    const sale = (over) => ({ synced: 0, cashier_id: CASHIER, completed_at: on27, ...over });
+
+    it('waits while a sale from that day is still on the device', () => {
+        // Sent now, it would be measured against a day missing that sale.
+        expect(closeMustWait(shift, [sale()])).toBe(true);
+    });
+
+    it('waits for a queued sale that names no cashier, which goes up as theirs', () => {
+        expect(closeMustWait(shift, [sale({ cashier_id: null })])).toBe(true);
+    });
+
+    it('does not wait on another day', () => {
+        expect(closeMustWait(shift, [sale({ completed_at: on28 })])).toBe(false);
+    });
+
+    it('does not wait on another cashier', () => {
+        expect(closeMustWait(shift, [sale({ cashier_id: CASHIER + 1 })])).toBe(false);
+    });
+
+    it('does not wait for ever on a sale the server refused', () => {
+        // That sale needs a person. Waiting would leave the day uncounted.
+        expect(closeMustWait(shift, [sale({ sync_status: 'rejected' })])).toBe(false);
+        expect(closeMustWait(shift, [sale({ sync_status: 'error' })])).toBe(false);
+    });
+
+    it('goes once nothing from that day is left', () => {
+        expect(closeMustWait(shift, [])).toBe(false);
+    });
+});
+
+describe('a shift held against the wrong day', () => {
+    it('lets go of that session and opens its own day again', async () => {
+        const shift = await start();
+        await markOpenSynced(shift.id, { id: 51 });
+        await closeShift(shift.id, { countedCash: 500, countedTerminal: 0 });
+
+        await detachFromWrongDay(shift.id);
+
+        const [pending] = await pendingShifts();
+
+        expect(pending.id).toBe(shift.id);
+        expect(pending.open_synced).toBe(0);
+        expect(pending.server_id).toBeNull();
+        // The count itself is kept, to be sent to the right day.
+        expect(pending.counted_cash).toBe(500);
     });
 });

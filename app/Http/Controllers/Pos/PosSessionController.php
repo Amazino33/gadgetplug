@@ -3,15 +3,12 @@
 namespace App\Http\Controllers\Pos;
 
 use App\Http\Controllers\Controller;
-use App\Models\PosReturn;
-use App\Models\PosSale;
 use App\Models\PosSession;
 use App\Models\PosSuspendedSale;
-use App\Models\PosZReport;
 use App\Services\Cash\CashUpExpectation;
+use App\Services\Cash\ZReportWriter;
 use App\Services\Inventory\TillStore;
 use App\Support\Pos\BusinessDate;
-use App\Support\Pos\CashUpBreakdown;
 use App\Support\Pos\TillProfile;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
@@ -39,6 +36,9 @@ use Illuminate\Support\Facades\DB;
  */
 class PosSessionController extends Controller
 {
+    /** A close aimed at a session for a different trading day than the count's. */
+    public const WRONG_DAY = 'session_wrong_day';
+
     /**
      * Start the day, or rejoin the one already running.
      *
@@ -55,11 +55,25 @@ class PosSessionController extends Controller
             'opening_float'   => 'required|numeric|min:0',
             'terminal_id'     => 'nullable|string|max:100',
             'idempotency_key' => 'nullable|string|max:120',
+            'business_date'   => 'nullable|date_format:Y-m-d',
         ]);
 
         $storeId = TillStore::resolve($request->user(), (int) $request->vendor_id);
 
-        $businessDate = BusinessDate::today();
+        // The day the till opened, not the day the request happened to land.
+        // A shift that could not reach the server on the 27th used to arrive on
+        // the 28th and be filed as the 28th — its counts then measured against
+        // a day that had barely begun, and the real 28th locked out as "already
+        // cashed up". Only a till that sends no date gets today.
+        $today = BusinessDate::today();
+        $businessDate = $request->input('business_date', $today);
+
+        if ($businessDate > $today) {
+            return response()->json([
+                'message' => 'That trading day has not started yet. Check the date and time on this till.',
+            ], 422);
+        }
+
         $existing = PosSession::forDay($request->user()->id, $storeId, $businessDate);
 
         if ($existing) {
@@ -144,10 +158,25 @@ class PosSessionController extends Controller
             'counted_terminal' => 'required|numeric|min:0',
             'notes'            => 'nullable|string|max:1000',
             'idempotency_key'  => 'nullable|string|max:120',
+            'business_date'    => 'nullable|date_format:Y-m-d',
         ]);
 
         if ((int) $session->cashier_id !== $request->user()->id) {
             return response()->json(['message' => 'This session belongs to another cashier, or the server record was reset.'], 404);
+        }
+
+        // A count for one day posted against another day's session. A till
+        // that adopted a misdated session holds its id; accepting the count
+        // would freeze it against the wrong day's sales, and answering "already
+        // cashed up" would drop it altogether. Told apart so the till opens
+        // its own day instead.
+        if ($request->filled('business_date')
+            && $session->business_date->toDateString() !== $request->business_date) {
+            return response()->json([
+                'code'    => self::WRONG_DAY,
+                'message' => 'This count is for '.$request->business_date.', but that session is for '
+                    .$session->business_date->toDateString().'.',
+            ], 409);
         }
 
         if (! $session->isOpen()) {
@@ -187,7 +216,7 @@ class PosSessionController extends Controller
                 'close_idempotency_key' => $request->idempotency_key,
             ]);
 
-            return [$breakdown, $this->writeZReport($session->refresh(), $breakdown)];
+            return [$breakdown, app(ZReportWriter::class)->write($session->refresh())];
         });
 
         $session->refresh();
@@ -257,78 +286,13 @@ class PosSessionController extends Controller
                 $session->counted_terminal = $breakdown->expectedTerminal;
                 $session->terminal_variance = 0;
 
-                $report = $this->buildZReport($session);
+                $report = app(ZReportWriter::class)->build($session);
             } else {
                 return response()->json(['message' => 'Z-Report not yet generated. Cash up first.'], 404);
             }
         }
 
         return response()->json($report->load('cashier:id,name'));
-    }
-
-    /**
-     * The signed slip.
-     *
-     * Written from the session's frozen figures rather than recomputed, so a
-     * reprint is the same piece of paper it was the first time.
-     *
-     * Its sales are gathered the way the reconciliation gathers them — by
-     * cashier, branch and business date — rather than by pos_session_id. Sales
-     * replayed through the offline sync endpoint carry no session id at all, so
-     * the old slip silently omitted every sale rung while the till was offline.
-     */
-    private function buildZReport(PosSession $session): PosZReport
-    {
-        [$from, $to] = BusinessDate::boundsFor($session->business_date->toDateString());
-
-        $sales = PosSale::query()
-            ->where('vendor_id', $session->vendor_id)
-            ->where('store_id', $session->store_id)
-            ->where('cashier_id', $session->cashier_id)
-            ->where('status', '!=', 'voided')
-            ->whereBetween('completed_at', [$from, $to])
-            ->get();
-
-        $returns = PosReturn::query()
-            ->where('vendor_id', $session->vendor_id)
-            ->where('cashier_id', $session->cashier_id)
-            ->whereBetween('created_at', [$from, $to])
-            ->get();
-
-        return new PosZReport([
-            'pos_session_id'      => $session->id,
-            'vendor_id'           => $session->vendor_id,
-            'cashier_id'          => $session->cashier_id,
-            'report_date'         => $session->business_date->toDateString(),
-            'cash_sales'          => $sales->where('payment_method', 'cash')->sum('total'),
-            'card_sales'          => $sales->where('payment_method', 'card')->sum('total'),
-            'bank_transfer_sales' => $sales->where('payment_method', 'bank_transfer')->sum('total'),
-            'total_sales'         => $sales->sum('total'),
-            'total_vat'           => $sales->sum('vat_amount'),
-            'total_discounts'     => $sales->sum('discount_amount'),
-            'total_returns'       => $returns->sum('refund_amount'),
-            'transaction_count'   => $sales->count(),
-            'return_count'        => $returns->count(),
-            'opening_float'       => $session->opening_float,
-            'cash_expected'       => $session->expected_cash,
-            'cash_counted'        => $session->counted_cash,
-            'cash_variance'       => $session->cash_variance,
-            'terminal_expected'   => $session->expected_terminal,
-            'terminal_counted'    => $session->counted_terminal,
-            'terminal_variance'   => $session->terminal_variance,
-            'notes'               => $session->notes,
-            'generated_at'        => now(),
-        ]);
-    }
-
-    private function writeZReport(PosSession $session, CashUpBreakdown $breakdown): PosZReport
-    {
-        $report = $this->buildZReport($session);
-        
-        return PosZReport::updateOrCreate(
-            ['pos_session_id' => $report->pos_session_id],
-            $report->toArray()
-        );
     }
 
     /** @return array<int, array<string, mixed>> */
