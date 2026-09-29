@@ -16,6 +16,9 @@ Route::view('/privacy-policy', 'pages.privacy-policy')->name('privacy-policy');
 Volt::route('/product/{product:slug}', 'pages.product-detail')->name('product.show');
 // A store's own page — where the feed's store line lands, so a customer who
 // likes one product can see the rest of what that shop sells.
+// Every store that sells online, verified first — where "Browse Verified
+// Plugs" on the home hero lands.
+Volt::route('/stores', 'pages.stores')->name('stores.index');
 Volt::route('/store/{vendor:slug}', 'pages.vendor-store')->name('store.show');
 Volt::route('/cart', 'pages.cart')->name('cart');
 

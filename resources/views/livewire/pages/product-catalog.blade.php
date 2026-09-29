@@ -229,12 +229,12 @@ $cardBgs = [
         </p>
 
         <div class="flex items-center gap-3 justify-center md:justify-start">
-            <button class="bg-brand-orange hover:bg-[#e06610] text-white font-montserrat font-bold text-[13px] px-5 py-2.5 rounded-[10px] border-0 cursor-pointer transition-all hover:-translate-y-px">
+            <a href="#products" class="bg-brand-orange hover:bg-[#e06610] text-white font-montserrat font-bold text-[13px] px-5 py-2.5 rounded-[10px] border-0 cursor-pointer transition-all hover:-translate-y-px">
                 Shop New Arrivals →
-            </button>
-            <button class="bg-transparent text-brand font-montserrat font-bold text-[13px] px-5 py-[9px] rounded-[10px] border-2 border-brand cursor-pointer hover:bg-brand hover:text-white transition-colors">
+            </a>
+            <a href="{{ route('stores.index') }}" class="bg-transparent text-brand font-montserrat font-bold text-[13px] px-5 py-[9px] rounded-[10px] border-2 border-brand cursor-pointer hover:bg-brand hover:text-white transition-colors">
                 Browse Verified Plugs
-            </button>
+            </a>
         </div>
 
         {{-- Stats --}}

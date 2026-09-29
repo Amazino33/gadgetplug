@@ -153,7 +153,8 @@ class Product extends Model implements HasMedia
     public function scopeVisibleOnline(Builder $query): void
     {
         $query->published()->where('show_online', true)
-              ->whereHas('vendor', fn (Builder $q) => $q->where('online_sales_enabled', true));
+              ->whereHas('vendor', fn (Builder $q) => $q->where('online_sales_enabled', true))
+              ->whereHas('media', fn (Builder $q) => $q->where('collection_name', 'product-images'));
     }
 
     public function scopeVisibleInPos(Builder $query): void
