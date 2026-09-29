@@ -4,14 +4,12 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Console\Commands\Concerns\ShowsCashUpComparison;
 use App\Models\PosSale;
 use App\Models\PosSession;
-use App\Services\Cash\CashUpExpectation;
-use App\Services\Cash\ZReportWriter;
+use App\Services\Cash\CashUpRefreeze;
 use App\Support\Pos\BusinessDate;
 use Illuminate\Console\Command;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
 
 /**
  * Moves a cash-up that was filed under the wrong trading day back to its own.
@@ -32,6 +30,8 @@ use Illuminate\Support\Facades\DB;
  */
 class RedateCashUpCommand extends Command
 {
+    use ShowsCashUpComparison;
+
     protected $signature = 'pos:redate-cash-up
                             {session : The End of Day record (pos_sessions) id}
                             {date : The trading day it actually belongs to, as YYYY-MM-DD}
@@ -39,9 +39,9 @@ class RedateCashUpCommand extends Command
 
     protected $description = 'Move a cash-up filed under the wrong trading day back to its own day, and recompute what it should have held';
 
-    public function handle(CashUpExpectation $expectation, ZReportWriter $zReports): int
+    public function handle(CashUpRefreeze $refreeze): int
     {
-        $session = PosSession::with('cashier', 'store', 'rectifications')->find($this->argument('session'));
+        $session = PosSession::with('cashier', 'store')->find($this->argument('session'));
 
         if (! $session) {
             $this->error('No End of Day record with that id.');
@@ -73,14 +73,8 @@ class RedateCashUpCommand extends Command
             return self::FAILURE;
         }
 
-        if (! $session->isPendingReview()) {
-            $this->error("Only a record waiting for review can be moved. This one is '{$session->status}'.");
-
-            return self::FAILURE;
-        }
-
-        if ($session->rectifications->isNotEmpty()) {
-            $this->error('A manager has already explained part of this record against its current figures. Remove those explanations first.');
+        if ($refusal = $refreeze->refusal($session)) {
+            $this->error($refusal);
 
             return self::FAILURE;
         }
@@ -112,25 +106,9 @@ class RedateCashUpCommand extends Command
             return self::FAILURE;
         }
 
-        $breakdown = $expectation->compute(
-            vendorId: (int) $session->vendor_id,
-            storeId: (int) $session->store_id,
-            cashierId: (int) $session->cashier_id,
-            businessDate: $date,
-            openingFloat: (float) $session->opening_float,
-        );
+        $breakdown = $refreeze->preview($session, $date);
 
-        $countedCash = (float) $session->counted_cash;
-        $countedTerminal = (float) $session->counted_terminal;
-
-        $this->table(['', "Now ({$from})", "Moved ({$date})"], [
-            ['Counted cash', $countedCash, $countedCash],
-            ['Expected cash', (float) $session->expected_cash, $breakdown->expectedCash],
-            ['Cash difference', (float) $session->cash_variance, $breakdown->cashVarianceAgainst($countedCash)],
-            ['Counted terminal', $countedTerminal, $countedTerminal],
-            ['Expected terminal', (float) $session->expected_terminal, $breakdown->expectedTerminal],
-            ['Terminal difference', (float) $session->terminal_variance, $breakdown->terminalVarianceAgainst($countedTerminal)],
-        ]);
+        $this->showComparison($session, $breakdown, "Now ({$from})", "Moved ({$date})");
 
         if (! $this->option('force')) {
             $this->warn('Dry run. Re-run with --force to move it.');
@@ -138,32 +116,7 @@ class RedateCashUpCommand extends Command
             return self::SUCCESS;
         }
 
-        $before = $session->only(['business_date', 'expected_cash', 'expected_terminal', 'cash_variance', 'terminal_variance']);
-
-        DB::transaction(function () use ($session, $date, $breakdown, $countedCash, $countedTerminal, $zReports) {
-            // Written past the model, deliberately: the frozen-evidence guard
-            // exists to stop a count being quietly re-measured, and this is the
-            // one sanctioned, logged exception — the old figures were measured
-            // against the wrong day and never described this drawer.
-            PosSession::whereKey($session->id)->update([
-                // Bound as a date rather than a bare string, so it is stored in
-                // the same shape the model writes and the unique key still bites.
-                'business_date'     => Carbon::parse($date)->startOfDay(),
-                'expected_cash'     => $breakdown->expectedCash,
-                'expected_terminal' => $breakdown->expectedTerminal,
-                'cash_variance'     => $breakdown->cashVarianceAgainst($countedCash),
-                'terminal_variance' => $breakdown->terminalVarianceAgainst($countedTerminal),
-                'breakdown'         => json_encode($breakdown->toArray()),
-            ]);
-
-            $zReports->write($session->refresh());
-        });
-
-        activity()
-            ->performedOn($session)
-            ->withProperties(['before' => $before, 'moved_to' => $date])
-            ->tap(fn ($a) => $a->vendor_id = $session->vendor_id)
-            ->log('Moved cash-up to its own trading day');
+        $refreeze->apply($session, $date, $breakdown, 'Moved cash-up to its own trading day');
 
         $this->info("Moved to {$date}. The cashier's {$from} can now be cashed up.");
 
