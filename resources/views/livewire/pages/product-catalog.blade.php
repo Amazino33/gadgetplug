@@ -318,11 +318,11 @@ $cardBgs = [
 <div class="flex gap-5 px-4 md:px-6 py-7 items-start bg-[#f8fcf8] dark:bg-[#0d1a0d]">
 
     {{-- Category sidebar (desktop only) --}}
-    <aside class="hidden lg:block w-[200px] flex-shrink-0 bg-white dark:bg-[#1a2a1a] rounded-2xl border border-brand-border dark:border-[#2a3a2a] overflow-hidden sticky top-[92px]">
-        <div class="bg-brand px-4 py-3.5">
+    <aside class="hidden lg:block w-[200px] flex-shrink-0 bg-white dark:bg-[#1a2a1a] rounded-2xl border border-brand-border dark:border-[#2a3a2a] overflow-hidden sticky top-[92px] max-h-[calc(100vh-120px)] flex flex-col">
+        <div class="bg-brand px-4 py-3.5 flex-shrink-0">
             <p class="font-montserrat font-bold text-[12px] text-white tracking-[0.5px] uppercase">Browse Categories</p>
         </div>
-        <div class="py-2">
+        <div class="py-2 overflow-y-auto overflow-x-hidden flex-1 scrollbar-none">
             {{-- All products --}}
             <button wire:click="filterCategory(null)"
                 aria-pressed="{{ $selectedCategory === null ? 'true' : 'false' }}"
