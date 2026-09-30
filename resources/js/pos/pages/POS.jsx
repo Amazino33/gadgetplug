@@ -4,7 +4,7 @@ import { useSync } from '../hooks/useSync';
 import { fmt, generateOfflineId } from '../lib/format';
 import { createCheckoutId } from '../lib/checkoutId';
 import { cartFloorTotal } from '../lib/cartFloor';
-import { addToCart } from '../lib/cartAdd';
+import { addToCart, roomFor } from '../lib/cartAdd';
 import { shouldRedirectTypingToSearch } from '../lib/typeAhead';
 import { db } from '../lib/db';
 import { pruneOldSales, recordSale } from '../lib/salesHistory';
@@ -353,7 +353,13 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
 
     const updateQty = (idx, qty) => {
         if (qty < 1) { removeItem(idx); return; }
-        setCart((prev) => { const u = [...prev]; u[idx] = { ...u[idx], qty }; return u; });
+        setCart((prev) => {
+            // Belt and braces, like the price floor below: the quantity box
+            // and the + button already stop at the shelf.
+            if (qty > roomFor(prev, prev[idx], idx)) return prev;
+
+            const u = [...prev]; u[idx] = { ...u[idx], qty }; return u;
+        });
     };
 
     const updatePrice = (idx, price) => {
@@ -366,6 +372,18 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
             u[idx] = { ...u[idx], price: Math.max(price, floor) };
             return u;
         });
+    };
+
+    // A refused sale handed back to the till, from the stuck list or from
+    // Sales history. Only ever offered on an empty cart: loading one sale over
+    // another would lose whatever is on screen.
+    const returnRefusedToCart = (items, originalCompletedAt) => {
+        setCart(items);
+        setRecoveredAt(originalCompletedAt ?? null);
+        setSelectedIdx(null);
+        setCartDiscount({ amount: 0, type: 'fixed', approvedBy: null });
+        setModal(null);
+        syncNow();
     };
 
     const removeItem = (idx) => {
@@ -1103,6 +1121,7 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
             {modal === 'quantity' && selectedIdx !== null && (
                 <QuantityModal
                     item={cart[selectedIdx]}
+                    max={roomFor(cart, cart[selectedIdx], selectedIdx)}
                     onConfirm={(qty) => { updateQty(selectedIdx, qty); setModal(null); }}
                     onClose={() => setModal(null)}
                     onNegotiate={() => setModal('price')}
@@ -1113,6 +1132,7 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
             {modal === 'addQuantity' && pendingProduct && (
                 <QuantityModal
                     item={{ ...pendingProduct, qty: 1 }}
+                    max={roomFor(cart, pendingProduct)}
                     title="Add to Sale"
                     hint="Type the quantity and press Enter · Esc cancels"
                     onConfirm={confirmPending}
@@ -1217,6 +1237,8 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
                         setIsReprintView(true);
                         setLastSale(sale);
                     }}
+                    cartEmpty={cartEmpty}
+                    onReturnToCart={returnRefusedToCart}
                 />
             )}
             {modal === 'suspendedSales' && (
@@ -1239,14 +1261,7 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
                     // Gated on an empty cart for the same reason resuming a held
                     // sale is: loading one sale over another would lose whatever
                     // is on screen, and a cashier mid-sale would never get it back.
-                    onReturnToCart={(items, originalCompletedAt) => {
-                        setCart(items);
-                        setRecoveredAt(originalCompletedAt ?? null);
-                        setSelectedIdx(null);
-                        setCartDiscount({ amount: 0, type: 'fixed', approvedBy: null });
-                        setModal(null);
-                        syncNow();
-                    }}
+                    onReturnToCart={returnRefusedToCart}
                 />
             )}
             {/* A slow connection used to leave the screen looking untouched, so

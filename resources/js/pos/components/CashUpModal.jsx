@@ -230,13 +230,28 @@ function Review({ expectation, counts }) {
                 </p>
             )}
 
-            <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+            {/* Named with its amount, not just counted. A mistyped sale that
+                never uploaded is otherwise just a vast shortage with no
+                explanation anywhere on the screen. */}
+            {context.unsynced_sales > 0 && (
+                <p className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+                    <strong>{fmt(context.unsynced_total)}</strong> from {context.unsynced_sales} sale{context.unsynced_sales === 1 ? '' : 's'} has
+                    not uploaded yet. It is counted above on its own line. If that amount looks wrong, check My Sales
+                    before you finish and tell your manager.
+                </p>
+            )}
+
+            {context.refused_sales > 0 && (
+                <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
+                    <strong>{fmt(context.refused_total)}</strong> from {context.refused_sales} sale{context.refused_sales === 1 ? ' was' : 's were'} refused
+                    by the server and {context.refused_sales === 1 ? 'is' : 'are'} left out of these figures. Fix {context.refused_sales === 1 ? 'it' : 'them'} from
+                    the ⚠ stuck list or My Sales, then ring {context.refused_sales === 1 ? 'it' : 'them'} again.
+                </p>
+            )}
+
+            <p className="rounded-xl bg-gray-50 px-4 py-3 text-xs text-gray-600 dark:bg-gray-800/60 dark:text-gray-300">
                 This is the till's own working, from the {context.sales_count} sale{context.sales_count === 1 ? '' : 's'} on
                 this device. <strong>Your manager sees the final figure</strong> once it reaches the server.
-                {context.unsynced_sales > 0 && (
-                    <> {context.unsynced_sales} sale{context.unsynced_sales === 1 ? ' has' : 's have'} not
-                    uploaded yet, so the final figure will differ.</>
-                )}
             </p>
 
         </div>

@@ -10,6 +10,8 @@ import {
     pruneOldSales,
     recordSale,
     RETENTION_DAYS,
+    refusedSales,
+    takeBackRefusedSale,
 } from './salesHistory';
 
 const daysAgo = (n) => new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString();
@@ -268,5 +270,52 @@ describe('what a reprint needs, kept on the device', () => {
 
         expect(row.customer).toBeNull();
         expect(row.amount_tendered).toBeNull();
+    });
+});
+
+describe('taking back a refused sale', () => {
+    beforeEach(async () => {
+        await db.offlineSales.clear();
+        await db.products.clear();
+    });
+
+    const queued = (over = {}) => ({
+        offline_id: 'watch', synced: 0, completed_at: '2026-09-30T16:49:57.000Z',
+        items: [{ product_id: 7, product_name: 'Smart Watch Storm Ultra', unit_price: 24000, quantity: 13500 }],
+        ...over,
+    });
+
+    it('takes a refused sale off the device and hands its lines back', async () => {
+        await db.products.add({ id: 7, name: 'Smart Watch Storm Ultra', price: 24000 });
+        await db.offlineSales.add(queued({ sync_status: 'error', sync_error: 'Insufficient stock' }));
+        await recordSale(aSale({ offline_id: 'watch' }), 1);
+
+        const taken = await takeBackRefusedSale('watch');
+
+        expect(taken.lines).toHaveLength(1);
+        // Rung again at the time the goods actually left.
+        expect(taken.completedAt).toBe('2026-09-30T16:49:57.000Z');
+        expect(await db.offlineSales.count()).toBe(0);
+        expect(await db.sales.count()).toBe(0);
+    });
+
+    it('never takes back a sale that is only waiting to upload', async () => {
+        // It may be in flight. Ringing it again would record it twice.
+        await db.offlineSales.add(queued());
+
+        expect(await takeBackRefusedSale('watch')).toBeNull();
+        expect(await db.offlineSales.count()).toBe(1);
+    });
+
+    it('lists refusal reasons by offline id', async () => {
+        await db.offlineSales.bulkAdd([
+            queued({ sync_status: 'rejected', sync_error: 'Insufficient stock' }),
+            queued({ offline_id: 'fine' }),
+        ]);
+
+        const refused = await refusedSales();
+
+        expect([...refused.keys()]).toEqual(['watch']);
+        expect(refused.get('watch')).toBe('Insufficient stock');
     });
 });

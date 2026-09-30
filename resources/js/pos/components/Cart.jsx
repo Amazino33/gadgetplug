@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import { fmt } from '../lib/format';
+import { roomFor } from '../lib/cartAdd';
 
 function MobileCartRow({ item, idx, isSelected, onSelect, onRemove }) {
     const rowRef   = useRef(null);
@@ -186,7 +187,10 @@ export default function Cart({ items, selectedIdx, onSelect, onQtyChange, onRemo
                                         <span className="w-8 text-center text-sm font-semibold dark:text-gray-200 font-mono tabular-nums">{item.qty}</span>
                                         <button
                                             onClick={(e) => { e.stopPropagation(); onQtyChange(idx, item.qty + 1); }}
-                                            className="w-7 h-7 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 font-bold text-sm flex items-center justify-center"
+                                            // Stops at what the shelf holds, as the quantity box does.
+                                            disabled={item.qty + 1 > roomFor(items, item, idx)}
+                                            title={item.qty + 1 > roomFor(items, item, idx) ? 'No more on the shelf at this branch' : undefined}
+                                            className="w-7 h-7 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 font-bold text-sm flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
                                         >+</button>
                                     </div>
                                 </td>

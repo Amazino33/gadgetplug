@@ -176,8 +176,10 @@ describe('the reveal', () => {
         await countBoth('30000', '0');
 
         // A sync problem, not a missing-money problem — the cashier has to be
-        // told which they are looking at.
-        expect(await screen.findByText(/not uploaded yet/i)).toBeTruthy();
+        // told which they are looking at, and how much of it there is: once
+        // on its own line in the working, once in words underneath.
+        expect(await screen.findByText('Cash sales not uploaded yet')).toBeTruthy();
+        expect(screen.getByText(/has\s+not uploaded yet/i)).toBeTruthy();
     });
 
     it('leads on to the note rather than finishing behind the cashier back', async () => {

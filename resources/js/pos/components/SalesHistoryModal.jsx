@@ -1,12 +1,17 @@
 import { useEffect, useState } from 'react';
 import { fmt } from '../lib/format';
 import api from '../lib/api';
-import { localSales, mergeSales } from '../lib/salesHistory';
+import { localSales, mergeSales, refusedSales, takeBackRefusedSale } from '../lib/salesHistory';
 
 // A cashier's own sales — for looking something up and reprinting a receipt.
 // Scoped server-side to sales this cashier personally rang up.
-export default function SalesHistoryModal({ vendorId, cashierId, onClose, onReprint }) {
+export default function SalesHistoryModal({ vendorId, cashierId, onClose, onReprint, onReturnToCart, cartEmpty = true }) {
     const [sales, setSales]     = useState([]);
+    // Refusal reasons by offline id. A refused sale used to read "Pending
+    // upload" here, exactly like one merely waiting for signal, so a cashier
+    // looking at a sale the server had turned down had no way to tell, and
+    // nothing to press.
+    const [refused, setRefused] = useState(new Map());
     const [loading, setLoading] = useState(true);
     const [offline, setOffline] = useState(false);
     const [expandedRef, setExpandedRef] = useState(null);
@@ -14,6 +19,7 @@ export default function SalesHistoryModal({ vendorId, cashierId, onClose, onRepr
     useEffect(() => {
         (async () => {
             const local = await localSales(cashierId).catch(() => []);
+            setRefused(await refusedSales().catch(() => new Map()));
 
             setSales(mergeSales(local, []));
             setLoading(false);
@@ -74,6 +80,14 @@ export default function SalesHistoryModal({ vendorId, cashierId, onClose, onRepr
         });
     };
 
+    const returnToCart = async (e, sale) => {
+        e.stopPropagation();
+
+        const taken = await takeBackRefusedSale(sale.offline_id);
+
+        if (taken) onReturnToCart?.(taken.lines, taken.completedAt);
+    };
+
     const toggleExpand = (ref) => {
         setExpandedRef(expandedRef === ref ? null : ref);
     };
@@ -116,7 +130,9 @@ export default function SalesHistoryModal({ vendorId, cashierId, onClose, onRepr
                                     <div className="min-w-0">
                                         <div className="flex items-center gap-2">
                                             <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">{sale.reference ?? 'Not uploaded yet'}</p>
-                                            {sale.pending_sync && (
+                                            {sale.pending_sync && refused.has(sale.offline_id) ? (
+                                                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-red-100 text-red-700">Refused</span>
+                                            ) : sale.pending_sync && (
                                                 <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">Pending upload</span>
                                             )}
                                             <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${statusBadge(sale.status)}`}>
@@ -129,6 +145,11 @@ export default function SalesHistoryModal({ vendorId, cashierId, onClose, onRepr
                                         <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
                                             {new Date(sale.completed_at).toLocaleString('en-NG')}
                                         </p>
+                                        {sale.pending_sync && refused.has(sale.offline_id) && (
+                                            <p className="text-xs font-medium text-red-700 dark:text-red-400 mt-1">
+                                                {refused.get(sale.offline_id)}
+                                            </p>
+                                        )}
                                     </div>
                                     <div className="text-right shrink-0 flex flex-col items-end">
                                         <p className="text-sm font-bold text-gray-800 dark:text-gray-100 mb-1">{fmt(sale.total)}</p>
@@ -138,6 +159,16 @@ export default function SalesHistoryModal({ vendorId, cashierId, onClose, onRepr
                                         >
                                             Reprint
                                         </button>
+                                        {sale.pending_sync && refused.has(sale.offline_id) && onReturnToCart && (
+                                            <button
+                                                onClick={(e) => returnToCart(e, sale)}
+                                                disabled={!cartEmpty}
+                                                title={cartEmpty ? undefined : 'Finish or clear the sale on screen first'}
+                                                className="mt-1 text-xs font-semibold text-red-700 hover:underline disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
+                                            >
+                                                Return to cart
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                                 

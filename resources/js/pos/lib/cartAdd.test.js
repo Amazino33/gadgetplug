@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addToCart } from './cartAdd';
+import { addToCart, priceNeedsConfirming, roomFor } from './cartAdd';
 
 const charger = { id: 1, name: 'Samsung 25W Charger', price: 5300 };
 const cable   = { id: 2, name: 'Samsung Cable',       price: 1500 };
@@ -69,5 +69,48 @@ describe('addToCart', () => {
         expect(addToCart(cart, charger, 1).items[0]).toMatchObject({
             qty: 2, price: 4800, listPrice: 5300, lineDiscount: 200,
         });
+    });
+});
+
+describe('roomFor', () => {
+    const watch = { id: 7, name: 'Smart Watch Storm Ultra', price: 24000, available_stock: 3, reserved: 1 };
+
+    it('allows what is physically on the shelf, reservations included', () => {
+        // The server refuses beyond the shelf, not beyond the unreserved part.
+        expect(roomFor([], watch)).toBe(4);
+    });
+
+    it('takes off what the sale already holds on other lines', () => {
+        const cart = [{ ...watch, qty: 1 }, { ...watch, qty: 2, price: 22000 }];
+
+        expect(roomFor(cart, watch)).toBe(1);
+    });
+
+    it('does not count the line being edited against itself', () => {
+        const cart = [{ ...watch, qty: 1 }, { ...watch, qty: 2, price: 22000 }];
+
+        // Editing line 1: the other line holds 1, so line 1 may hold 3.
+        expect(roomFor(cart, cart[1], 1)).toBe(3);
+    });
+
+    it('ignores other products', () => {
+        expect(roomFor([{ ...charger, qty: 5 }], watch)).toBe(4);
+    });
+
+    it('does not guess when the till does not know the stock', () => {
+        expect(roomFor([], { id: 8, price: 100 })).toBe(Infinity);
+    });
+});
+
+describe('priceNeedsConfirming', () => {
+    it('asks about a price more than double the normal one', () => {
+        // ₦24,000 typed with four extra zeros.
+        expect(priceNeedsConfirming(240000000, 24000)).toBe(true);
+        expect(priceNeedsConfirming(48001, 24000)).toBe(true);
+    });
+
+    it('lets an ordinary price through', () => {
+        expect(priceNeedsConfirming(48000, 24000)).toBe(false);
+        expect(priceNeedsConfirming(20000, 24000)).toBe(false);
     });
 });

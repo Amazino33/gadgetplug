@@ -1,4 +1,5 @@
 import { db } from './db';
+import { cartLinesFromSale } from './recoverSale';
 
 // How long a till keeps its own sales. Seven days is a working week: long
 // enough to answer "what did I sell on Monday" and reprint for a customer who
@@ -107,6 +108,51 @@ export async function forgetUnsyncedSale(offlineId) {
         .delete();
 }
 
+/** Whether the server refused a queued sale, which is what makes it safe to take back. */
+export function isRefused(queueRow) {
+    return queueRow?.synced !== 1
+        && (queueRow?.sync_status === 'rejected' || queueRow?.sync_status === 'error');
+}
+
+/** The refusal reason for each refused sale in the queue, by offline id. */
+export async function refusedSales() {
+    const queue = await db.offlineSales.where('synced').equals(0).toArray();
+
+    return new Map(queue.filter(isRefused).map((row) => [row.offline_id, row.sync_error || 'Refused by the server.']));
+}
+
+/**
+ * Takes a refused sale off the device and hands its lines back for the cart.
+ *
+ * Safe only because the server refused it: its transaction rolled back, so no
+ * stock moved and no money was posted, and the only trace is on this device —
+ * both copies of which go here. A sale merely waiting to upload is never taken
+ * back: it may be in flight, and ringing it again would record it twice.
+ *
+ * Lines are rebuilt from today's catalogue rather than from the sale's own —
+ * see lib/recoverSale for why the bare lines could not be repriced.
+ *
+ * @returns {Promise<{lines: array, completedAt: string|null}|null>} null if
+ *          there is nothing refused to take back
+ */
+export async function takeBackRefusedSale(offlineId) {
+    if (!offlineId) return null;
+
+    const row = await db.offlineSales.where('offline_id').equals(offlineId).first();
+
+    if (!isRefused(row)) return null;
+
+    const items = row.items ?? [];
+    const catalogue = await db.products.bulkGet(items.map((i) => i.product_id));
+
+    await db.offlineSales.delete(row.id);
+    await forgetUnsyncedSale(row.offline_id);
+
+    // The day the goods actually left, carried back so the corrected sale is
+    // recorded then rather than on the day it was put right.
+    return { lines: cartLinesFromSale(items, catalogue), completedAt: row.completed_at ?? null };
+}
+
 /** This cashier's sales held on the device, newest first. */
 export async function localSales(cashierId) {
     if (!cashierId) return [];
@@ -148,6 +194,7 @@ export function mergeSales(local, server) {
             payment_method:  sale.payment_method,
             items:           sale.items,
             status:          sale.status,
+            offline_id:      sale.offline_id ?? null,
             // Lets the screen say so, rather than presenting an unsynced sale
             // as though the server had confirmed it.
             pending_sync:    sale.synced !== 1,

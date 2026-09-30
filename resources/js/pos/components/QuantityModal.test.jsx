@@ -92,4 +92,34 @@ describe('QuantityModal', () => {
         expect(onClose).toHaveBeenCalled();
         expect(onConfirm).not.toHaveBeenCalled();
     });
+
+    describe('the shelf', () => {
+        it('refuses more than the branch holds, and says how many are left', async () => {
+            const onConfirm = vi.fn();
+            render(<QuantityModal item={item} max={4} onConfirm={onConfirm} onClose={vi.fn()} />);
+
+            await userEvent.keyboard('13500{Enter}');
+
+            expect(onConfirm).not.toHaveBeenCalled();
+            expect(screen.getByText(/only 4 left/i)).toBeTruthy();
+        });
+
+        it('takes a quantity the shelf can cover', async () => {
+            const onConfirm = vi.fn();
+            render(<QuantityModal item={item} max={4} onConfirm={onConfirm} onClose={vi.fn()} />);
+
+            await userEvent.keyboard('4{Enter}');
+
+            expect(onConfirm).toHaveBeenCalledWith(4);
+        });
+
+        it('still lets zero take the line out', async () => {
+            const onConfirm = vi.fn();
+            render(<QuantityModal item={item} max={0} onConfirm={onConfirm} onClose={vi.fn()} />);
+
+            await userEvent.keyboard('0{Enter}');
+
+            expect(onConfirm).toHaveBeenCalledWith(0);
+        });
+    });
 });

@@ -1,7 +1,6 @@
 import { fmt } from '../lib/format';
 import { db } from '../lib/db';
-import { forgetUnsyncedSale } from '../lib/salesHistory';
-import { cartLinesFromSale } from '../lib/recoverSale';
+import { takeBackRefusedSale } from '../lib/salesHistory';
 
 // Sales that reached the server and were genuinely rejected (insufficient
 // stock, a price below floor, etc.) — not a connectivity problem, so retrying
@@ -22,18 +21,9 @@ export default function StuckSalesModal({ sales, onClose, onRetried, onReturnToC
     // rolled its transaction back, so no stock moved and no money was posted.
     // The only trace is on this device, and both copies go here.
     const returnToCart = async (sale) => {
-        const items = sale.items ?? [];
+        const taken = await takeBackRefusedSale(sale.offline_id);
 
-        // Rebuilt from today's catalogue rather than from the sale's own lines
-        // — see lib/recoverSale for why the bare lines could not be repriced.
-        const catalogue = await db.products.bulkGet(items.map((i) => i.product_id));
-
-        await db.offlineSales.delete(sale.id);
-        await forgetUnsyncedSale(sale.offline_id);
-
-        // The day the goods actually left, carried back so the corrected sale
-        // is recorded then rather than on the day it was put right.
-        onReturnToCart(cartLinesFromSale(items, catalogue), sale.completed_at ?? null);
+        if (taken) onReturnToCart(taken.lines, taken.completedAt);
     };
 
     return (

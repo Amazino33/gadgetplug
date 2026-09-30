@@ -31,6 +31,7 @@ beforeEach(async () => {
     await db.sales.clear();
     await db.refunds.clear();
     await db.shifts.clear();
+    await db.offlineSales.clear();
 });
 
 // These mirror tests/Feature/CashUp/CashUpExpectationTest.php case for case.
@@ -258,5 +259,59 @@ describe('reading the day off the device', () => {
         const result = await provisionalFor(shift);
 
         expect(result.expectedCash).toBe(50000);
+    });
+});
+
+describe('sales that have not reached the server', () => {
+    it('counts a waiting sale on a line of its own, so its amount can be seen', () => {
+        const result = computeExpectation({
+            sales: [
+                aSale({ total: 10000, amount_tendered: 10000 }),
+                // The smart watch of 30/09/2026.
+                aSale({ total: 324000000, amount_tendered: 324000000, synced: 0 }),
+            ],
+        });
+
+        expect(line(result.cashLines, 'cash_sales')).toBe(10000);
+        expect(line(result.cashLines, 'unsynced_cash')).toBe(324000000);
+        expect(result.expectedCash).toBe(324010000);
+        expect(result.context.unsynced_total).toBe(324000000);
+    });
+
+    it('puts a waiting card or transfer sale on the terminal line of its own', () => {
+        const result = computeExpectation({
+            sales: [aSale({ payment_method: 'bank_transfer', total: 50000, amount_tendered: 0, synced: 0 })],
+        });
+
+        expect(line(result.terminalLines, 'transfer_sales')).toBe(0);
+        expect(line(result.terminalLines, 'unsynced_terminal')).toBe(50000);
+    });
+
+    it('leaves a refused sale out of both legs, and says so', () => {
+        const result = computeExpectation({
+            sales: [aSale({ total: 10000, amount_tendered: 10000 })],
+            refused: [aSale({ total: 324000000, synced: 0 })],
+        });
+
+        expect(result.expectedCash).toBe(10000);
+        expect(result.context.refused_sales).toBe(1);
+        expect(result.context.refused_total).toBe(324000000);
+    });
+
+    it('reads a refusal off the upload queue when working out the day', async () => {
+        await db.sales.bulkAdd([
+            { cashier_id: CASHIER, ...aSale({ offline_id: 'ok', total: 10000, amount_tendered: 10000, synced: 0 }) },
+            { cashier_id: CASHIER, ...aSale({ offline_id: 'bad', total: 324000000, amount_tendered: 324000000, synced: 0 }) },
+        ]);
+        await db.offlineSales.bulkAdd([
+            { offline_id: 'ok', synced: 0 },
+            { offline_id: 'bad', synced: 0, sync_status: 'error', sync_error: 'Insufficient stock' },
+        ]);
+
+        const shift = { cashier_id: CASHIER, business_date: businessDate(), opening_float: 0 };
+        const result = await provisionalFor(shift);
+
+        expect(result.expectedCash).toBe(10000);
+        expect(result.context.refused_total).toBe(324000000);
     });
 });

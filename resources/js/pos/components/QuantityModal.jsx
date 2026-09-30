@@ -13,6 +13,9 @@ export default function QuantityModal({
     onNegotiate,
     title = 'Change Quantity',
     hint  = 'Type the quantity and press Enter · 0 removes the item',
+    // The most this line may hold: the branch's shelf, less what the sale
+    // already has elsewhere. See roomFor() in lib/cartAdd.
+    max   = Infinity,
 }) {
     const [qty, setQty] = useState(String(item.qty));
     const inputRef = useRef(null);
@@ -38,10 +41,16 @@ export default function QuantityModal({
     // doing nothing at all, which reads as the till being stuck.
     const typedQty = () => (qty.trim() === '' ? item.qty : parseInt(qty, 10));
 
+    const overStock = (() => {
+        const n = typedQty();
+
+        return !isNaN(n) && n > max;
+    })();
+
     const confirm = () => {
         const n = typedQty();
 
-        if (!isNaN(n) && n >= 0) onConfirm(n);
+        if (!isNaN(n) && n >= 0 && n <= max) onConfirm(n);
     };
 
     // Carries the quantity out with it. Negotiating from here used to lose
@@ -51,6 +60,8 @@ export default function QuantityModal({
     // so the caller needs the number to add the line it is about to reprice.
     const negotiate = () => {
         const n = typedQty();
+
+        if (overStock) return;
 
         onNegotiate(!isNaN(n) && n >= 1 ? n : 1);
     };
@@ -74,9 +85,21 @@ export default function QuantityModal({
                     // so it has to refuse the "e", "+" and "-" that a number
                     // input would have allowed through on its own.
                     onChange={(e) => setQty(e.target.value.replace(/[^0-9]/g, ''))}
-                    className="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-4xl font-bold text-gray-800 text-center focus:outline-none focus:border-[#068B03] mb-4"
+                    className={`w-full border-2 rounded-xl px-4 py-3 text-4xl font-bold text-center focus:outline-none mb-4 ${
+                        overStock
+                            ? 'border-red-400 text-red-600 focus:border-red-500'
+                            : 'border-gray-200 text-gray-800 focus:border-[#068B03]'
+                    }`}
                 />
-                <p className="text-xs text-gray-400 text-center mb-4">{hint}</p>
+                {overStock ? (
+                    <p className="text-xs text-red-600 font-semibold text-center mb-4">
+                        {max === 0
+                            ? 'None left on the shelf at this branch.'
+                            : `Only ${max} left on the shelf at this branch.`}
+                    </p>
+                ) : (
+                    <p className="text-xs text-gray-400 text-center mb-4">{hint}</p>
+                )}
 
                 {item.can_negotiate && onNegotiate && (
                     <button
@@ -92,7 +115,8 @@ export default function QuantityModal({
                         Cancel
                     </button>
                     <button onClick={confirm}
-                        className="flex-1 py-2.5 rounded-xl bg-[#068B03] text-white text-sm font-bold hover:bg-[#057002]">
+                        disabled={overStock}
+                        className="flex-1 py-2.5 rounded-xl bg-[#068B03] text-white text-sm font-bold hover:bg-[#057002] disabled:opacity-40 disabled:cursor-not-allowed">
                         Set [Enter]
                     </button>
                 </div>

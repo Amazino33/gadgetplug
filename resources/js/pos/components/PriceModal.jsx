@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useKeyboard } from '../hooks/useKeyboard';
 import { fmt } from '../lib/format';
+import { priceNeedsConfirming } from '../lib/cartAdd';
 
 // Negotiate a line price at the till. The floor shown here comes from the
 // product feed and is only ever the lowest allowed price — the cost it was
@@ -12,6 +13,9 @@ export default function PriceModal({ item, onConfirm, onClose }) {
     const floor     = item.min_price ?? listPrice;
 
     const [price, setPrice] = useState(String(item.price));
+    // A price far above normal is asked about once before it is believed —
+    // extra zeros are the usual reason, not a customer paying a premium.
+    const [highConfirmed, setHighConfirmed] = useState(false);
     const inputRef = useRef(null);
 
     useEffect(() => { inputRef.current?.select(); }, []);
@@ -21,9 +25,21 @@ export default function PriceModal({ item, onConfirm, onClose }) {
     const valid  = !isNaN(parsed) && parsed >= floor;
     const off    = valid ? listPrice - parsed : 0;
 
-    const confirm = () => { if (valid) onConfirm(parsed); };
+    const tooHigh = valid && priceNeedsConfirming(parsed, listPrice);
 
-    useKeyboard({ Enter: confirm, Escape: onClose }, [price], { allowInInput: true });
+    const confirm = () => {
+        if (!valid) return;
+
+        if (tooHigh && !highConfirmed) {
+            setHighConfirmed(true);
+
+            return;
+        }
+
+        onConfirm(parsed);
+    };
+
+    useKeyboard({ Enter: confirm, Escape: onClose }, [price, highConfirmed], { allowInInput: true });
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
@@ -38,7 +54,7 @@ export default function PriceModal({ item, onConfirm, onClose }) {
                     value={price}
                     min={floor}
                     step="0.01"
-                    onChange={(e) => setPrice(e.target.value)}
+                    onChange={(e) => { setPrice(e.target.value); setHighConfirmed(false); }}
                     className={`w-full border-2 rounded-xl px-4 py-3 text-3xl font-bold text-center focus:outline-none mb-3 ${
                         tooLow
                             ? 'border-red-400 text-red-600 focus:border-red-500'
@@ -58,6 +74,13 @@ export default function PriceModal({ item, onConfirm, onClose }) {
                 {tooLow && (
                     <p className="text-xs text-red-600 font-semibold text-center mb-4">
                         Too low — {fmt(floor)} is the minimum on this product.
+                    </p>
+                )}
+
+                {tooHigh && (
+                    <p className="text-xs text-red-600 font-semibold text-center mb-4">
+                        {fmt(parsed)} is more than double the normal price of {fmt(listPrice)}.
+                        {highConfirmed ? ' Press Set again if that is really the price.' : ' Check for extra zeros.'}
                     </p>
                 )}
 
