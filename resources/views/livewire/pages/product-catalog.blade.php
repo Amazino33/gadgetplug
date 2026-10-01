@@ -81,7 +81,7 @@ new class extends Component {
         match ($this->sort) {
             'price_asc'  => $query->orderBy('price'),
             'price_desc' => $query->orderByDesc('price'),
-            default      => $query->latest(),
+            default      => $query->orderByRaw('ROW_NUMBER() OVER(PARTITION BY category_id ORDER BY created_at DESC)')->latest(),
         };
 
         $categories = Category::withCount('products')
@@ -391,7 +391,7 @@ $cardBgs = [
 
         {{-- Skeleton — visible only while Livewire is fetching, so filtering or
              paging shows page structure instead of an empty column. --}}
-        <div wire:loading.flex class="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3.5" aria-hidden="true">
+        <div wire:loading.flex wire:target="filterCategory, sort" class="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3.5" aria-hidden="true">
             @for ($i = 0; $i < 6; $i++)
             <div class="bg-white dark:bg-[#1a2a1a] rounded-2xl border border-brand-border dark:border-[#2a3a2a] overflow-hidden">
                 <div class="gp-skeleton h-[140px] w-full"></div>
@@ -411,7 +411,7 @@ $cardBgs = [
 
         {{-- Product grid --}}
         @if ($products->count())
-        <div id="products" wire:loading.remove class="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3.5 scroll-mt-24">
+        <div id="products" wire:loading.remove wire:target="filterCategory, sort" class="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3.5 scroll-mt-24">
             @foreach ($products as $product)
             @php
                 $bg = $cardBgs[$product->id % count($cardBgs)];
