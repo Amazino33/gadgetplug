@@ -34,9 +34,9 @@ class InventoryLedgerResource extends Resource
 
     private const TYPE_LABELS = [
         'online_sale'           => 'Online Sale',
-        'pos_sale'               => 'POS Sale',
-        'pos_void'               => 'POS Sale Voided',
-        'pos_return'             => 'POS Return',
+        'pos_sale'               => 'Shop Sale',
+        'pos_void'               => 'Shop Sale Voided',
+        'pos_return'             => 'Shop Return',
         'restock'                => 'Restock',
         'audit_correction'       => 'Audit Correction',
         'refund'                 => 'Refund',

@@ -65,7 +65,7 @@ class RecognizePosSaleRevenueAction
             return;
         }
 
-        $this->post($sale->vendor_id, $sale, (float) $sale->total, $sale->payment_method, "POS sale — {$sale->reference}");
+        $this->post($sale->vendor_id, $sale, (float) $sale->total, $sale->payment_method, "Shop sale — {$sale->reference}");
     }
 
     // Reverses every 'in' entry the sale posted — its own for a plain sale,
@@ -94,7 +94,7 @@ class RecognizePosSaleRevenueAction
                     direction: 'out',
                     amount: (float) $original->amount,
                     source: $original,
-                    description: "Reversal — POS sale {$sale->reference} voided",
+                    description: "Reversal — shop sale {$sale->reference} voided",
                     createdBy: auth()->id(),
                 );
             } catch (Throwable $e) {

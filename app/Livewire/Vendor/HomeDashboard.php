@@ -99,7 +99,7 @@ class HomeDashboard extends Component
                 'id' => 'record_sale',
                 'label' => 'Record Sale',
                 'icon' => 'heroicon-o-computer-desktop',
-                'route' => url('/pos/' . $vendor->slug),
+                'route' => url('/sales-point/' . $vendor->slug),
                 'permission' => 'access_pos',
                 'owner_prominence' => 'secondary',
                 'staff_prominence' => 'hero',

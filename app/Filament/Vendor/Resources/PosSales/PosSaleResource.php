@@ -27,8 +27,14 @@ class PosSaleResource extends Resource
     protected static ?string $tenantOwnershipRelationshipName = 'vendor';
 
     protected static string|null|\BackedEnum $navigationIcon  = 'heroicon-o-receipt-percent';
-    protected static string|null|UnitEnum   $navigationGroup = 'Point of Sale';
-    protected static ?string                $navigationLabel = 'POS Sales';
+    protected static string|null|UnitEnum   $navigationGroup = 'Sales Point';
+    protected static ?string                $navigationLabel = 'Shop Sales';
+
+    // Named for people rather than the class: in Nigeria "POS" is the card
+    // machine, so a page headed "Pos Sales" read as card payments only.
+    protected static ?string                $modelLabel = 'shop sale';
+
+    protected static ?string                $pluralModelLabel = 'shop sales';
     protected static ?int $navigationSort = 2;
 
     public static function canAccess(): bool
@@ -134,7 +140,7 @@ class PosSaleResource extends Resource
                     ->color('danger')
                     ->requiresConfirmation()
                     ->modalIcon('heroicon-o-exclamation-triangle')
-                    ->modalHeading('Void POS Sale')
+                    ->modalHeading('Void Shop Sale')
                     ->modalDescription('Are you sure you want to void this sale? The stock will be returned to inventory and revenue will be reversed. This cannot be undone.')
                     ->form([
                         \Filament\Forms\Components\Textarea::make('reason')
@@ -164,7 +170,7 @@ class PosSaleResource extends Resource
                                     transactionType: 'pos_void',
                                     userId: $user->id,
                                     reference: $record->reference,
-                                    description: "Void POS sale — {$item->product_name}. Reason: {$data['reason']}",
+                                    description: "Void shop sale — {$item->product_name}. Reason: {$data['reason']}",
                                     // Back to the branch it was sold from, not
                                     // the vendor's default store.
                                     store: $record->store_id,

@@ -184,7 +184,7 @@ class PosSyncController extends Controller
                             transactionType: 'pos_sale',
                             userId: $request->user()->id,
                             reference: $sale->reference,
-                            description: "Offline POS sync — {$item['product_name']} x{$item['quantity']}",
+                            description: "Offline shop sale sync — {$item['product_name']} x{$item['quantity']}",
                             store: $sale->store_id,
                         );
                     }

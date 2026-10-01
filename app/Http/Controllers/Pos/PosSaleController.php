@@ -270,7 +270,7 @@ class PosSaleController extends Controller
                     transactionType: 'pos_sale',
                     userId: $request->user()->id,
                     reference: $sale->reference,
-                    description: "POS sale — {$item['product_name']} x{$item['quantity']}",
+                    description: "Shop sale — {$item['product_name']} x{$item['quantity']}",
                     // Off the shelf the customer is standing at, not the
                     // vendor's default branch.
                     store: $sale->store_id,
@@ -342,7 +342,7 @@ class PosSaleController extends Controller
                     transactionType: 'pos_void',
                     userId: $request->user()->id,
                     reference: $sale->reference,
-                    description: "Void POS sale — {$item->product_name}",
+                    description: "Void shop sale — {$item->product_name}",
                     // Back to the branch it was sold from. Without this the stock
                     // returns to the vendor's default store, so a sale voided at
                     // one branch quietly credits another.

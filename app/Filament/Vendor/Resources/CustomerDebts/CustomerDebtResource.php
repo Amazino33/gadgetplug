@@ -30,7 +30,7 @@ class CustomerDebtResource extends Resource
     protected static ?string $tenantOwnershipRelationshipName = 'vendor';
 
     protected static string|null|\BackedEnum $navigationIcon  = 'heroicon-o-banknotes';
-    protected static string|null|UnitEnum    $navigationGroup = 'Point of Sale';
+    protected static string|null|UnitEnum    $navigationGroup = 'Sales Point';
     protected static ?string                 $navigationLabel = 'Customer Debts';
     protected static ?string                 $modelLabel      = 'customer debt';
     protected static ?int                    $navigationSort  = 3;

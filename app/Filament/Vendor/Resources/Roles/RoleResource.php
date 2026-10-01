@@ -108,7 +108,12 @@ class RoleResource extends ShieldRoleResource
                     'name',
                     fn ($query) => $query->whereIn('name', self::GRANTABLE_PERMISSIONS)
                 )
-                ->getOptionLabelFromRecordUsing(fn ($record) => Str::headline($record->name))
+                // "pos" in a permission name is the till, which people call the
+                // Sales Point — in Nigeria a "POS" is the card machine. Matched
+                // as a whole word so "deposit" and "post" are left alone.
+                ->getOptionLabelFromRecordUsing(fn ($record) => Str::headline(
+                    preg_replace('/(^|_)pos(?=_|$)/', '$1sales_point', $record->name)
+                ))
                 ->bulkToggleable()
                 ->columns(3),
         ]);

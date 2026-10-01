@@ -76,8 +76,13 @@ Route::get('/invite/{token}', [App\Http\Controllers\VendorInviteController::clas
 Route::post('/invite/{token}', [App\Http\Controllers\VendorInviteController::class, 'store'])
     ->name('vendor.invite.store');
 
-// POS SPA — vendor-scoped entry point from Filament panel
-Route::get('/pos/{vendor:slug}', function (\App\Models\Vendor $vendor) {
+// The till (Sales Point) — vendor-scoped entry point from the Filament panel.
+//
+// It lived at /pos until October 2026. In Nigeria "POS" is the card machine, so
+// the till was renamed Sales Point and moved here; /pos still redirects (below),
+// so installed till icons and bookmarks keep working. Route names keep "pos":
+// they are code, not words anyone reads.
+Route::get('/sales-point/{vendor:slug}', function (\App\Models\Vendor $vendor) {
     // A blocked account loses the till as well as the panel. Checked at the
     // page rather than only in the API so the terminal never boots and asks
     // for a PIN it is going to refuse anyway.
@@ -134,17 +139,26 @@ Route::middleware('auth')->group(function () {
 // A sale rendered as an 80mm receipt document, printed from its own page rather
 // than out of the POS modal. Session-authenticated and vendor-scoped: it names
 // the cashier and customer, so it is not the customer-facing copy.
-Route::get('/pos/receipt/{sale}', [App\Http\Controllers\Pos\PosReceiptController::class, 'show'])
+Route::get('/sales-point/receipt/{sale}', [App\Http\Controllers\Pos\PosReceiptController::class, 'show'])
     ->middleware('auth')
     ->name('pos.receipt');
 
-// Fallback — bare /pos with no vendor context
-Route::get('/pos', fn () => view('pos.index', [
+// Fallback — bare /sales-point with no vendor context
+Route::get('/sales-point', fn () => view('pos.index', [
     'vendorId'   => null,
     'vendorSlug' => null,
     'vendorName' => null,
     'panelUrl'   => null,
 ]))->name('pos');
+
+// The till's old address. Every path under it, query string and all, goes to
+// the same place under /sales-point, so a till icon installed before the move
+// still opens the till.
+Route::get('/pos/{path?}', function (Illuminate\Http\Request $request, ?string $path = null) {
+    $query = $request->getQueryString();
+
+    return redirect('/sales-point'.($path ? '/'.$path : '').($query ? '?'.$query : ''), 301);
+})->where('path', '.*');
 
 // Procurement Wizard
 Route::middleware(['auth'])->prefix('procurement')->name('procurement.')->group(function () {

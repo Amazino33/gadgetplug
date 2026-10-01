@@ -71,7 +71,7 @@ class TeamMembers extends Page
                 }),
 
             Action::make('setPosPin')
-                ->label('Set POS PIN')
+                ->label('Set Sales Point PIN')
                 ->icon(Heroicon::OutlinedFingerPrint)
                 ->schema([
                     Select::make('user_id')
@@ -92,7 +92,7 @@ class TeamMembers extends Page
                     $user = User::find($data['user_id']);
                     if ($user) {
                         $user->update(['pos_pin' => Hash::make($data['pin'])]);
-                        Notification::make()->title('POS PIN set for ' . $user->name)->success()->send();
+                        Notification::make()->title('Sales Point PIN set for ' . $user->name)->success()->send();
                     }
                 }),
 

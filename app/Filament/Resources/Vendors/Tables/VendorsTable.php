@@ -91,7 +91,7 @@ class VendorsTable
                     ->color(fn ($record) => $record->online_sales_enabled ? 'danger' : 'success')
                     ->requiresConfirmation()
                     ->modalDescription(fn ($record) => $record->online_sales_enabled
-                        ? 'This vendor\'s products will disappear from the storefront and Orders will be hidden from their panel. POS/offline sales are unaffected. Existing online orders are untouched.'
+                        ? 'This vendor\'s products will disappear from the storefront and Orders will be hidden from their panel. Sales Point / offline sales are unaffected. Existing online orders are untouched.'
                         : 'This vendor\'s products will become visible on the storefront and they will regain access to Orders in their panel.')
                     ->action(fn ($record) => $record->update(['online_sales_enabled' => ! $record->online_sales_enabled])),
                 // Separate from the edit form so support can lock or release an
@@ -105,8 +105,8 @@ class VendorsTable
                         ? 'Restore access for '.$record->name
                         : 'Block access for '.$record->name)
                     ->modalDescription(fn ($record) => $record->dashboard_blocked
-                        ? 'The owner and their team get the vendor panel and the POS till back immediately.'
-                        : 'The owner and their whole team lose the vendor panel and the POS till immediately — till logins already open stop working on their next request. Storefront listings are not affected.')
+                        ? 'The owner and their team get the vendor panel and the Sales Point back immediately.'
+                        : 'The owner and their whole team lose the vendor panel and the Sales Point immediately — till logins already open stop working on their next request. Storefront listings are not affected.')
                     ->modalSubmitActionLabel(fn ($record) => $record->dashboard_blocked ? 'Restore access' : 'Block access')
                     ->schema(fn ($record) => $record->dashboard_blocked ? [] : [
                         Textarea::make('dashboard_blocked_reason')

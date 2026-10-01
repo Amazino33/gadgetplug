@@ -33,7 +33,7 @@ class PickerResource extends Resource
     protected static ?string $tenantOwnershipRelationshipName = 'vendor';
 
     protected static string|null|BackedEnum $navigationIcon  = 'heroicon-o-hand-raised';
-    protected static string|null|UnitEnum   $navigationGroup = 'Point of Sale';
+    protected static string|null|UnitEnum   $navigationGroup = 'Sales Point';
     protected static ?string                $navigationLabel = 'Vendor Pickings';
     protected static ?string                $modelLabel      = 'picker';
     protected static ?int                   $navigationSort  = 4;

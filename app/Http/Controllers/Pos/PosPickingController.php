@@ -245,7 +245,7 @@ class PosPickingController extends Controller
                         item: $item,
                         quantity: $held,
                         userId: $userId,
-                        note: 'Returned at POS'
+                        note: 'Returned at the Sales Point'
                     );
                     $returnedUnits += $held;
                 }

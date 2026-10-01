@@ -165,7 +165,7 @@ export default function Login({ onLogin }) {
 
                 <div className="text-center mb-6">
                     <p className="text-2xl font-bold" style={{ fontFamily: 'Montserrat, sans-serif', color: '#068B03' }}>
-                        GadgetPlug POS
+                        GadgetPlug Sales Point
                     </p>
                     {lockedVendorName
                         ? <p className="text-gray-600 dark:text-gray-400 text-sm font-medium mt-1">{lockedVendorName}</p>

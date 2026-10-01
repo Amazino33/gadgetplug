@@ -92,11 +92,11 @@ it('leaves an unblocked vendor alone', function () {
     expect($this->actingAs($owner)->get(panelPage($vendor))->status())->not->toBe(403);
 });
 
-it('closes the POS terminal page too', function () {
+it('closes the Sales Point terminal page too', function () {
     ['owner' => $owner, 'vendor' => $vendor] = blockedVendor();
 
     $this->actingAs($owner)
-        ->get('/pos/'.$vendor->slug)
+        ->get('/sales-point/'.$vendor->slug)
         ->assertStatus(403)
         ->assertSee('Account access suspended');
 });
@@ -159,5 +159,5 @@ it('restores both the panel and the till when the block is lifted', function () 
     $vendor->update(['dashboard_blocked' => false]);
 
     expect($this->actingAs($owner)->get(panelPage($vendor))->status())->not->toBe(403);
-    $this->actingAs($owner)->get('/pos/'.$vendor->slug)->assertOk();
+    $this->actingAs($owner)->get('/sales-point/'.$vendor->slug)->assertOk();
 });

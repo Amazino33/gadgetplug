@@ -82,7 +82,8 @@ self.addEventListener('fetch', (event) => {
     // last month's code with no way to tell. Network-first keeps the till fully
     // offline-capable — the cached shell is still served the moment a fetch
     // fails — while letting a deploy actually land when there is a connection.
-    if (url.pathname.startsWith('/pos')) {
+    // /pos is the till's old address, which now redirects to /sales-point.
+    if (url.pathname.startsWith('/sales-point') || url.pathname.startsWith('/pos')) {
         event.respondWith(networkFirst(request));
         return;
     }

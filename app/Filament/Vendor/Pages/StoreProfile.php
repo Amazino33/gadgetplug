@@ -100,12 +100,12 @@ class StoreProfile extends Page
                             ->placeholder('Tell customers what you sell and what makes your store unique…'),
                     ]),
 
-                Section::make('POS Settings')
-                    ->description('Configure how VAT is applied on Point of Sale transactions.')
+                Section::make('Sales Point Settings')
+                    ->description('Configure how VAT is applied on sales made at the Sales Point.')
                     ->schema([
                         Toggle::make('pos_vat_enabled')
-                            ->label('Charge VAT on POS sales')
-                            ->helperText('When off, VAT will not be calculated or shown on any POS receipt.')
+                            ->label('Charge VAT on shop sales')
+                            ->helperText('When off, VAT will not be calculated or shown on any Sales Point receipt.')
                             ->default(true)
                             ->live(),
 

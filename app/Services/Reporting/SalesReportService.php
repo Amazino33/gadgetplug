@@ -88,7 +88,7 @@ class SalesReportService
 
         return [
             'Online' => $summary['online_revenue'],
-            'POS' => $summary['pos_revenue'],
+            'Shop' => $summary['pos_revenue'],
         ];
     }
 

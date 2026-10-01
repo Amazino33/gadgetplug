@@ -28,10 +28,10 @@ class VendorForm
                 ->default(true),
             Toggle::make('online_sales_enabled')
                 ->label('Online Sales Enabled')
-                ->helperText('When off, this vendor\'s products disappear from the storefront, new online orders against them are blocked, and Orders is hidden from their panel. POS/offline sales are unaffected. Existing online orders are untouched.'),
+                ->helperText('When off, this vendor\'s products disappear from the storefront, new online orders against them are blocked, and Orders is hidden from their panel. Sales Point / offline sales are unaffected. Existing online orders are untouched.'),
             Toggle::make('dashboard_blocked')
                 ->label('Block dashboard access')
-                ->helperText('Use for unpaid fees or a terms breach. The vendor and their whole team lose the vendor panel AND the POS till — existing till logins stop working immediately. Their storefront listings are not touched; that is the Online Sales toggle above.')
+                ->helperText('Use for unpaid fees or a terms breach. The vendor and their whole team lose the vendor panel AND the Sales Point — existing till logins stop working immediately. Their storefront listings are not touched; that is the Online Sales toggle above.')
                 ->live()
                 ->columnSpanFull(),
             Textarea::make('dashboard_blocked_reason')

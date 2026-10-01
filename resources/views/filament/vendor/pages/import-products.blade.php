@@ -99,7 +99,7 @@
              leftover node from an earlier step after enough round-trips. --}}
         <x-filament::section wire:key="import-step-upload" heading="Choose your file">
             <p class="text-sm text-gray-600 dark:text-gray-400">
-                A CSV or Excel (.xlsx) export from your current POS, or a spreadsheet you filled in
+                A CSV or Excel (.xlsx) export from your current sales software, or a spreadsheet you filled in
                 yourself. The first row must be the column headings.
             </p>
 

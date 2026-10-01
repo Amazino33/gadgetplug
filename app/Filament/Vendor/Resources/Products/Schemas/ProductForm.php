@@ -567,8 +567,8 @@ class ProductForm
                                                         ->default(true),
 
                                                     Toggle::make('show_in_pos')
-                                                        ->label('Offline Store (POS)')
-                                                        ->helperText('Available for in-person POS sales')
+                                                        ->label('Offline Store (Sales Point)')
+                                                        ->helperText('Available for in-person sales at the Sales Point')
                                                         ->default(true),
                                                 ]),
 

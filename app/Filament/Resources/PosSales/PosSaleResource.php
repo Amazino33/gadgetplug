@@ -18,7 +18,11 @@ class PosSaleResource extends Resource
     protected static ?string $model = PosSale::class;
 
     protected static string|null|\BackedEnum $navigationIcon  = 'heroicon-o-receipt-percent';
-    protected static ?string                $navigationLabel = 'POS Sales';
+    protected static ?string                $navigationLabel = 'Shop Sales';
+
+    protected static ?string                $modelLabel = 'shop sale';
+
+    protected static ?string                $pluralModelLabel = 'shop sales';
     protected static ?int                   $navigationSort  = 4;
 
     public static function getNavigationGroup(): ?string

@@ -152,11 +152,11 @@
     <div class="fi-section mt-6 rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
         <div class="p-6 pb-3">
             <h3 class="text-base font-semibold text-gray-950 dark:text-white">Sales by team member</h3>
-            <p class="text-sm text-gray-500 dark:text-gray-400">POS sales only — an online order has no cashier.</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">Shop sales only — an online order has no cashier.</p>
         </div>
 
         @if ($cashiers->isEmpty())
-            <p class="px-6 pb-6 text-sm text-gray-500 dark:text-gray-400">No POS sales in this period.</p>
+            <p class="px-6 pb-6 text-sm text-gray-500 dark:text-gray-400">No shop sales in this period.</p>
         @else
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">

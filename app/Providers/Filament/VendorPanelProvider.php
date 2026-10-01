@@ -96,7 +96,7 @@ class VendorPanelProvider extends PanelProvider
             // the chevron there — and Filament remembers each person's own
             // expand/collapse choices in local storage from then on.
             ->navigationGroups([
-                NavigationGroup::make('Point of Sale')->collapsed(),
+                NavigationGroup::make('Sales Point')->collapsed(),
                 NavigationGroup::make('Orders')->collapsed(),
                 NavigationGroup::make('Products')->collapsed(),
                 NavigationGroup::make('Inventory')->collapsed(),
@@ -107,10 +107,10 @@ class VendorPanelProvider extends PanelProvider
                 NavigationGroup::make('Settings')->collapsed(),
             ])
             ->navigationItems([
-                NavigationItem::make('POS Terminal')
-                    ->url(fn(): string => url('/pos/' . (filament()->getTenant()?->slug ?? '')))
+                NavigationItem::make('Sales Point Terminal')
+                    ->url(fn(): string => url('/sales-point/' . (filament()->getTenant()?->slug ?? '')))
                     ->icon('heroicon-o-computer-desktop')
-                    ->group('Point of Sale')
+                    ->group('Sales Point')
                     ->sort(1)
                     ->visible(function () {
                         $user = auth()->user();

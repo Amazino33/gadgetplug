@@ -72,7 +72,7 @@ test('stock leaving is shown as a negative, stock arriving as a positive', funct
     $html = movementsHtml($ctx);
 
     expect($html)->toContain('-3')
-        ->and($html)->toContain('POS Sale');
+        ->and($html)->toContain('Shop Sale');
 });
 
 test('a movement with nobody behind it reads as System, not as a blank', function () {

@@ -45,7 +45,7 @@ class EarningsWidget extends StatsOverviewWidget
 
         return [
             Stat::make('All-Time Revenue', '₦'.number_format($all['revenue'], 2))
-                ->description('Online and POS combined')
+                ->description('Online and shop combined')
                 ->descriptionIcon('heroicon-m-banknotes')
                 ->color('success'),
 
