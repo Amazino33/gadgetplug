@@ -125,6 +125,9 @@ export function useSync(vendorId, cashierId, onStuckSalesChange) {
                 // The day this shift was opened, which is not necessarily the
                 // day this request gets through.
                 business_date: shift.business_date,
+                // Why earlier days were left uncounted, if the cashier was
+                // asked this morning. Recorded once however often this replays.
+                ...(shift.missing_day_reasons ? { missing_day_reasons: shift.missing_day_reasons } : {}),
                 idempotency_key: shift.open_key,
             });
 

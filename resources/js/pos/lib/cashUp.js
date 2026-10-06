@@ -166,6 +166,20 @@ export async function provisionalFor(shift) {
     const { sales, refunds, refused } = await dayRows(shift.cashier_id, shift.business_date);
 
     let expenses = [];
+
+    // The expenses endpoint only answers for today. Counting an earlier day
+    // with today's payouts would take the wrong money off it, so a past day
+    // goes without them here; the server's figure includes that day's own.
+    if (shift.business_date !== businessDate()) {
+        return computeExpectation({
+            sales,
+            refunds,
+            refused,
+            openingFloat: num(shift.opening_float),
+            expenses,
+        });
+    }
+
     try {
         const { data } = await api.get('/expenses', { params: { vendor_id: shift.vendor_id } });
         expenses = data?.expenses || [];

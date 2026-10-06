@@ -5,6 +5,7 @@ namespace App\Filament\Vendor\Resources\CashUps\Pages;
 use App\Actions\CashUp\ApproveCashUpAction;
 use App\Actions\CashUp\RecordRectificationAction;
 use App\Filament\Vendor\Resources\CashUps\CashUpResource;
+use App\Filament\Vendor\Resources\CashUps\Widgets\MissingEndOfDaysWidget;
 use App\Models\CashUpRectification;
 use App\Models\PosSession;
 use App\Models\PosSale;
@@ -70,6 +71,12 @@ class ListCashUps extends ListRecords
                 ? $waiting.' waiting to be reviewed.'
                 : 'Nothing waiting to be reviewed.')
         );
+    }
+
+    /** Days nobody has counted have no record to list, so they are shown above. */
+    protected function getHeaderWidgets(): array
+    {
+        return [MissingEndOfDaysWidget::class];
     }
 
     public function table(Table $table): Table

@@ -50,6 +50,20 @@ export async function shiftFor(cashierId, date = businessDate()) {
         .first()) ?? null;
 }
 
+/**
+ * The server's list of this cashier's uncounted days at this branch, or null
+ * when it cannot be reached — the till then works from what it holds itself.
+ */
+export async function fetchMissingDays(vendorId) {
+    try {
+        const { data } = await api.get('/sessions/active', { params: { vendor_id: vendorId } });
+
+        return Array.isArray(data?.missing) ? data.missing : null;
+    } catch {
+        return null;
+    }
+}
+
 /** The day this cashier is currently trading, or null if they have not started. */
 export async function openShiftFor(cashierId) {
     const shift = await shiftFor(cashierId);
@@ -82,7 +96,7 @@ export async function unclosedShiftsFor(cashierId) {
  * button or a reloaded app resumes rather than starting a second day — the same
  * answer the server gives for a repeated open.
  */
-export async function openShift({ cashierId, vendorId, openingFloat, terminalId = null }) {
+export async function openShift({ cashierId, vendorId, openingFloat, terminalId = null, missingDayReasons = [] }) {
     if (!cashierId) throw new Error('A shift needs a cashier.');
 
     const amount = Number(openingFloat);
@@ -96,12 +110,98 @@ export async function openShift({ cashierId, vendorId, openingFloat, terminalId 
 
     if (existing) return existing;
 
-    const row = {
+    const row = newShiftRow({ cashierId, vendorId, date, terminalId, openingFloat: amount });
+
+    // Why earlier days are being left uncounted. Travels with this day's open,
+    // which is what reliably reaches the server, signal or not.
+    row.missing_day_reasons = missingDayReasons.length ? missingDayReasons : null;
+
+    const id = await db.shifts.add(row);
+
+    return { ...row, id };
+}
+
+/**
+ * The device's row for an earlier day that was never counted, so it can be.
+ *
+ * A day this device opened already has one. A day opened elsewhere is adopted
+ * with the server's session, so only its close is sent. A day with sales and no
+ * shift at all is opened after the fact, with the float the cashier says was in
+ * the drawer that morning; the sync opens it under its own date, then closes it.
+ */
+export async function shiftForMissingDay({ cashierId, vendorId, day, openingFloat = null }) {
+    const existing = await shiftFor(cashierId, day.business_date);
+
+    if (existing) return existing;
+
+    const fromServer = day.session ?? null;
+    const amount = Number(fromServer ? fromServer.opening_float : openingFloat);
+
+    if (!Number.isFinite(amount) || amount < 0) {
+        throw new Error('Enter how much was in the drawer that morning. Zero is fine if it was empty.');
+    }
+
+    const row = newShiftRow({ cashierId, vendorId, date: day.business_date, openingFloat: amount });
+
+    if (fromServer) {
+        row.server_id = fromServer.id;
+        row.open_synced = 1;
+    }
+
+    const id = await db.shifts.add(row);
+
+    return { ...row, id };
+}
+
+/**
+ * Earlier days still waiting to be counted, as far as the till can tell.
+ *
+ * The server knows days opened on any device and days sold on with no shift
+ * at all; this device knows days it opened, and days it has already counted
+ * but not yet sent. A day counted here is done, whatever the server says until
+ * the count arrives — asking for it twice would only produce a second count.
+ *
+ * @param serverMissing  the server's list, or null when it could not be asked
+ */
+export async function missingDaysFor(cashierId, serverMissing = null) {
+    if (!cashierId) return [];
+
+    const today = businessDate();
+    const rows = await db.shifts.where('cashier_id').equals(cashierId).toArray();
+    const local = new Map(rows.map((row) => [row.business_date, row]));
+    const days = new Map();
+
+    for (const day of serverMissing ?? []) {
+        const row = local.get(day.business_date);
+
+        if (row && row.status !== STATUS_OPEN) continue;
+
+        days.set(day.business_date, { ...day, local: row ?? null });
+    }
+
+    for (const row of rows) {
+        if (row.status === STATUS_OPEN && row.business_date < today && !days.has(row.business_date)) {
+            days.set(row.business_date, {
+                business_date: row.business_date,
+                session: null,
+                sales_count: null,
+                sales_total: null,
+                reasons: [],
+                local: row,
+            });
+        }
+    }
+
+    return [...days.values()].sort((a, b) => a.business_date.localeCompare(b.business_date));
+}
+
+function newShiftRow({ cashierId, vendorId, date, terminalId = null, openingFloat }) {
+    return {
         cashier_id:    cashierId,
         vendor_id:     vendorId,
         business_date: date,
         terminal_id:   terminalId,
-        opening_float: amount,
+        opening_float: openingFloat,
         opened_at:     new Date().toISOString(),
         status:        STATUS_OPEN,
 
@@ -128,10 +228,6 @@ export async function openShift({ cashierId, vendorId, openingFloat, terminalId 
         open_synced:  0,
         close_synced: 0,
     };
-
-    const id = await db.shifts.add(row);
-
-    return { ...row, id };
 }
 
 /**
@@ -314,6 +410,7 @@ export async function announceShift(shift) {
         vendor_id: shift.vendor_id,
         opening_float: shift.opening_float,
         ...(shift.terminal_id ? { terminal_id: shift.terminal_id } : {}),
+        ...(shift.missing_day_reasons ? { missing_day_reasons: shift.missing_day_reasons } : {}),
         idempotency_key: shift.open_key,
     });
 

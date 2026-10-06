@@ -7,8 +7,23 @@ import { businessDate } from '../lib/shift';
 import StartShift from './StartShift';
 
 vi.mock('../lib/api', () => ({
-    default: { post: vi.fn().mockResolvedValue({ data: { id: 1 } }) },
+    default: {
+        post: vi.fn().mockResolvedValue({ data: { id: 1 } }),
+        // No signal by default: the till works from what it holds itself.
+        get: vi.fn().mockRejectedValue(new Error('offline')),
+    },
 }));
+
+/** The server's list of this cashier's uncounted days, for the next load. */
+const serverSays = async (missing) => {
+    const api = (await import('../lib/api')).default;
+    api.get.mockResolvedValueOnce({ data: { missing } });
+};
+
+const missingDay = (over = {}) => ({
+    business_date: '2026-10-03', store_id: 1, cashier_id: 7,
+    session: null, sales_count: 4, sales_total: 25000, reasons: [], ...over,
+});
 
 // Auto-cleanup is not on (vitest globals are off), so each render has to be
 // torn down or the next test finds two of every button.
@@ -43,7 +58,7 @@ describe('greeting the cashier', () => {
         show();
 
         await screen.findByText('Nkechi');
-        expect(screen.queryByText(/still open/i)).toBeNull();
+        expect(screen.queryByText(/no end of day/i)).toBeNull();
     });
 
     it('surfaces a day that was never closed', async () => {
@@ -56,8 +71,97 @@ describe('greeting the cashier', () => {
 
         // A forgotten day would otherwise hang open for ever, its float
         // unaccounted for, while the cashier simply starts another.
-        expect(await screen.findByText(/a day is still open/i)).toBeTruthy();
-        expect(screen.getByText(/2026-01-01/)).toBeTruthy();
+        expect(await screen.findByText(/one earlier day has no end of day/i)).toBeTruthy();
+        expect(screen.getByText(/thursday 1 january/i)).toBeTruthy();
+    });
+});
+
+describe('earlier days with no end of day', () => {
+    it('asks for a day the server knows about, even one this device never saw', async () => {
+        // Sold on, never opened: Zeelink Phones' Saturday.
+        await serverSays([missingDay()]);
+        show();
+
+        expect(await screen.findByText(/saturday 3 october/i)).toBeTruthy();
+        expect(screen.getByText(/4 sales/i)).toBeTruthy();
+    });
+
+    it('will not start today until each day is recorded or a reason is given', async () => {
+        await serverSays([missingDay()]);
+        show();
+
+        const start = await screen.findByRole('button', { name: /start today without them/i });
+        expect(start.disabled).toBe(true);
+
+        await userEvent.type(screen.getByLabelText(/say why/i), 'Manager has the drawer key');
+
+        expect(start.disabled).toBe(false);
+    });
+
+    it('sends the reason with the morning open, against each day put off', async () => {
+        await serverSays([missingDay(), missingDay({ business_date: '2026-10-04' })]);
+        const onStarted = vi.fn();
+        show({ onStarted });
+
+        await userEvent.type(await screen.findByLabelText(/say why/i), 'Manager has the drawer key');
+        await userEvent.click(screen.getByRole('button', { name: /start today without them/i }));
+        await userEvent.click(screen.getByRole('button', { name: '0' }));
+        await userEvent.click(screen.getByRole('button', { name: /open the till/i }));
+
+        await waitFor(() => expect(onStarted).toHaveBeenCalled());
+        expect(onStarted.mock.calls[0][0].missing_day_reasons).toEqual([
+            { business_date: '2026-10-03', reason: 'Manager has the drawer key' },
+            { business_date: '2026-10-04', reason: 'Manager has the drawer key' },
+        ]);
+    });
+
+    it('asks for the morning float of a day that was never opened, then counts it', async () => {
+        await serverSays([missingDay()]);
+        show();
+
+        await userEvent.click(await screen.findByRole('button', { name: /record end of day/i }));
+
+        expect(screen.getByText(/no shift was started that day/i)).toBeTruthy();
+
+        await userEvent.click(screen.getByRole('button', { name: '0' }));
+        await userEvent.click(screen.getByRole('button', { name: /next: count that day/i }));
+
+        // The day now exists on the device, under its own date, ready to be
+        // opened and closed on the server by the sync.
+        const row = await db.shifts.where('business_date').equals('2026-10-03').first();
+        expect(row.opening_float).toBe(0);
+        expect(row.open_synced).toBe(0);
+        expect(await screen.findByText(/how much cash have you counted/i)).toBeTruthy();
+    });
+
+    it('adopts a day opened on another device without asking for its float again', async () => {
+        await serverSays([missingDay({ session: { id: 51, opening_float: 5000 } })]);
+        show();
+
+        await userEvent.click(await screen.findByRole('button', { name: /record end of day/i }));
+
+        const row = await db.shifts.where('business_date').equals('2026-10-03').first();
+        expect(row.server_id).toBe(51);
+        expect(row.opening_float).toBe(5000);
+        // Already open on the server: only the close is left to send.
+        expect(row.open_synced).toBe(1);
+        expect(await screen.findByText(/how much cash have you counted/i)).toBeTruthy();
+    });
+
+    it('does not ask again for a day already counted here but not yet sent', async () => {
+        await db.shifts.add({
+            cashier_id: 7, business_date: '2026-10-03', status: 'pending_review',
+            opening_float: 0, open_synced: 0, close_synced: 0,
+        });
+        await serverSays([missingDay()]);
+        show();
+
+        await screen.findByText('Nkechi');
+        await waitFor(async () => {
+            const api = (await import('../lib/api')).default;
+            expect(api.get).toHaveBeenCalled();
+        });
+        expect(screen.queryByText(/no end of day/i)).toBeNull();
     });
 });
 

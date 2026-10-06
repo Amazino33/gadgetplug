@@ -1,5 +1,5 @@
 import 'fake-indexeddb/auto';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from './db';
 import { businessDate } from './shift';
 import { computeExpectation, dayRows, describeVariance, provisionalFor, varianceAgainst } from './cashUp';
@@ -313,5 +313,22 @@ describe('sales that have not reached the server', () => {
 
         expect(result.expectedCash).toBe(10000);
         expect(result.context.refused_total).toBe(324000000);
+    });
+});
+
+describe('counting an earlier day', () => {
+    it('does not take today payouts off an earlier day', async () => {
+        const api = (await import('./api')).default;
+        const spy = vi.spyOn(api, 'get').mockResolvedValue({ data: { expenses: [{ amount: 3000 }] } });
+
+        await db.sales.add({ cashier_id: CASHIER, ...aSale({ total: 40000, amount_tendered: 40000, completed_at: '2026-01-01T09:00:00Z' }) });
+
+        const shift = { cashier_id: CASHIER, business_date: '2026-01-01', opening_float: 0 };
+        const result = await provisionalFor(shift);
+
+        expect(result.expectedCash).toBe(40000);
+        expect(spy).not.toHaveBeenCalled();
+
+        spy.mockRestore();
     });
 });

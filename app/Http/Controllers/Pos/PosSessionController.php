@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Pos;
 
 use App\Http\Controllers\Controller;
+use App\Models\PosMissingDayReason;
 use App\Models\PosSession;
 use App\Models\PosSuspendedSale;
 use App\Services\Cash\CashUpExpectation;
+use App\Services\Cash\MissingEndOfDays;
 use App\Services\Cash\ZReportWriter;
 use App\Services\Inventory\TillStore;
 use App\Support\Pos\BusinessDate;
@@ -13,6 +15,7 @@ use App\Support\Pos\TillProfile;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -56,9 +59,17 @@ class PosSessionController extends Controller
             'terminal_id'     => 'nullable|string|max:100',
             'idempotency_key' => 'nullable|string|max:120',
             'business_date'   => 'nullable|date_format:Y-m-d',
+            // Why earlier days are being left uncounted. Sent with the open
+            // because the open is what reliably reaches the server, offline
+            // or not; the till will not start a day without one.
+            'missing_day_reasons'                 => 'nullable|array|max:31',
+            'missing_day_reasons.*.business_date' => 'required|date_format:Y-m-d',
+            'missing_day_reasons.*.reason'        => 'required|string|min:3|max:500',
         ]);
 
         $storeId = TillStore::resolve($request->user(), (int) $request->vendor_id);
+
+        $this->recordMissingDayReasons($request, $storeId);
 
         // The day the till opened, not the day the request happened to land.
         // A shift that could not reach the server on the 27th used to arrive on
@@ -137,6 +148,11 @@ class PosSessionController extends Controller
             // left hanging — a forgotten day would otherwise stay open for ever
             // with its float unaccounted for.
             'unclosed'      => $this->unclosed($request->user()->id, $storeId),
+            // Wider than unclosed: any device, and days with sales but no
+            // record at all. What the till asks the cashier to account for
+            // before it starts a new day.
+            'missing'       => app(MissingEndOfDays::class)
+                ->forCashier((int) $request->vendor_id, $storeId, $request->user()->id),
         ]);
     }
 
@@ -293,6 +309,38 @@ class PosSessionController extends Controller
         }
 
         return response()->json($report->load('cashier:id,name'));
+    }
+
+    /**
+     * Keep the cashier's reasons for leaving earlier days uncounted.
+     *
+     * Once per missing day per morning: a retried open finds the row already
+     * there. Only past days — today is not missing, it is being traded.
+     */
+    private function recordMissingDayReasons(Request $request, int $storeId): void
+    {
+        $today = BusinessDate::today();
+
+        foreach ((array) $request->input('missing_day_reasons', []) as $entry) {
+            if ($entry['business_date'] >= $today) {
+                continue;
+            }
+
+            PosMissingDayReason::updateOrCreate(
+                [
+                    'cashier_id'    => $request->user()->id,
+                    'store_id'      => $storeId,
+                    // Dates rather than strings, so a retry matches the row
+                    // the first attempt wrote in whatever shape it was stored.
+                    'business_date' => Carbon::parse($entry['business_date'])->startOfDay(),
+                    'given_on'      => Carbon::parse($today)->startOfDay(),
+                ],
+                [
+                    'vendor_id' => (int) $request->vendor_id,
+                    'reason'    => trim($entry['reason']),
+                ],
+            );
+        }
     }
 
     /** @return array<int, array<string, mixed>> */
