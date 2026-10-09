@@ -32,6 +32,8 @@ vi.mock('../lib/db', () => ({
                     toArray: async () => localCatalogue.filter(predicate),
                 }),
             }),
+            bulkPut: vi.fn(async () => {}),
+            bulkDelete: vi.fn(async () => {}),
         },
     },
 }));
@@ -260,5 +262,80 @@ describe('with no network', () => {
         await type('nothing like this');
 
         expect(await screen.findByText(/No product matches/)).toBeDefined();
+    });
+});
+
+describe('the server keeps the figures fresh without slowing anything down', () => {
+    it('Enter acts on what is on screen, without waiting for the server', async () => {
+        const api = (await import('../lib/api')).default;
+        // A server that never answers — the connection a cashier is
+        // sometimes standing on.
+        api.get.mockImplementation(() => new Promise(() => {}));
+
+        const onSelect = vi.fn();
+        render(<SearchBar vendorId={1} onSelect={onSelect} />);
+
+        await type('samsung cable');
+        await screen.findByText('Samsung Cable');
+        await userEvent.keyboard('{ArrowDown}{Enter}');
+
+        expect(onSelect).toHaveBeenCalledWith(cable);
+    });
+
+    it('replaces a stale stock figure in place, and the highlight stays on the same product', async () => {
+        const api = (await import('../lib/api')).default;
+        // Restocked since this till last reloaded, and ordered differently.
+        const restockedCable = { ...cable, available_stock: 40 };
+        api.get.mockResolvedValue({ data: [restockedCable, charger] });
+
+        const onSelect = vi.fn();
+        render(<SearchBar vendorId={1} onSelect={onSelect} />);
+
+        await type('samsung');
+        await screen.findByText('Samsung Cable');
+        await userEvent.keyboard('{ArrowDown}{ArrowDown}'); // onto the cable, row 2 locally
+
+        expect(await screen.findByText('40 left')).toBeDefined();
+
+        await userEvent.keyboard('{Enter}');
+
+        expect(onSelect).toHaveBeenCalledWith(restockedCable);
+    });
+
+    it('writes the fresh figures to the device, and drops what the server no longer sells', async () => {
+        const { db } = await import('../lib/db');
+        db.products.bulkPut.mockClear();
+        db.products.bulkDelete.mockClear();
+
+        const api = (await import('../lib/api')).default;
+        // The charger sold out since login; only the cable comes back.
+        api.get.mockResolvedValue({ data: [cable] });
+
+        render(<SearchBar vendorId={1} onSelect={vi.fn()} />);
+
+        await type('samsung');
+
+        await waitFor(() => expect(db.products.bulkDelete).toHaveBeenCalledWith([charger.id]));
+        expect(db.products.bulkPut).toHaveBeenCalledWith([cable]);
+        await waitFor(() => expect(screen.queryByText('Samsung 25W Charger')).toBeNull());
+    });
+
+    it('a late answer does not reopen the list after a product has been picked', async () => {
+        const api = (await import('../lib/api')).default;
+        let answer;
+        api.get.mockImplementation(() => new Promise((resolve) => { answer = resolve; }));
+
+        render(<SearchBar vendorId={1} onSelect={vi.fn()} />);
+
+        await type('samsung');
+        await screen.findByText('Samsung Cable');
+        // The question is already on its way to the server when the cashier picks.
+        await waitFor(() => expect(answer).toBeDefined());
+        await userEvent.click(screen.getByText('Samsung Cable'));
+
+        answer({ data: [charger, cable] });
+        await new Promise((r) => setTimeout(r, 20));
+
+        expect(screen.queryByText('Samsung 25W Charger')).toBeNull();
     });
 });

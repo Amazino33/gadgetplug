@@ -5,6 +5,10 @@ import { createLatestSearch } from '../lib/latestSearch';
 import { highlightIndexFor, selectionForEnter } from '../lib/searchSelection';
 import { createBurstTracker, looksLikeBarcode, scanFor } from '../lib/scanSignal';
 
+// How long after the device's answer the server is asked. Long enough that
+// someone still typing does not send a request per letter.
+const SERVER_DELAY_MS = 250;
+
 const SearchBar = forwardRef(function SearchBar({
     vendorId,
     onSelect,
@@ -27,6 +31,8 @@ const SearchBar = forwardRef(function SearchBar({
     const debounceRef           = useRef(null);
     const rootRef               = useRef(null);
     const scanMissTimerRef      = useRef(null);
+    const serverTimerRef        = useRef(null);
+    const resultsRef            = useRef([]);
 
     // The text that `results` is currently the answer to. Enter needs to know
     // whether what is on screen describes what is in the box, because a
@@ -72,7 +78,10 @@ const SearchBar = forwardRef(function SearchBar({
     useEffect(() => () => {
         clearTimeout(debounceRef.current);
         clearTimeout(scanMissTimerRef.current);
+        clearTimeout(serverTimerRef.current);
     }, []);
+
+    useEffect(() => { resultsRef.current = results; }, [results]);
 
     /**
      * Returns the results it settled on, so Enter can act on them without
@@ -117,14 +126,81 @@ const SearchBar = forwardRef(function SearchBar({
         setResults(local);
         settledRef.current = trimmed;
 
+        clearTimeout(serverTimerRef.current);
+        serverTimerRef.current = setTimeout(() => askServer(trimmed, token, local), SERVER_DELAY_MS);
+
         return local;
-    }, [latestSearch]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [vendorId, latestSearch]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    /**
+     * The device's catalogue is only reloaded every ten minutes, so a restock
+     * or a new product can be invisible to it for that long. The server is
+     * asked behind every search to close that gap — but in the background.
+     *
+     * An earlier version made Enter wait for this answer and swapped the list
+     * out from under the cashier with a spinner while it came, which made
+     * every scan as slow as the connection. Nothing waits on it now: the
+     * device's answer is already on screen and Enter acts on that. When the
+     * server answers, the list is corrected in place, the highlight stays on
+     * the same product, and the device's copy is updated so the next scan
+     * and the cart's quantity cap read today's stock too.
+     */
+    const askServer = async (q, token, local) => {
+        if (!navigator.onLine) return;
+
+        let data;
+        try {
+            ({ data } = await api.get('/products/search', {
+                params: { vendor_id: vendorId, q },
+                timeout: 5000,
+            }));
+        } catch {
+            return; // offline or too slow — what the device knows is already showing
+        }
+
+        if (!Array.isArray(data)) return;
+
+        // The device's copy is corrected even if the cashier has moved on:
+        // the figures are just as true for the next search or scan.
+        try {
+            await db.products.bulkPut(data);
+
+            // The server caps a search at 20; under that, its answer is the
+            // whole list, so anything the device matched that it left out is
+            // sold out, unpublished or moved — and must stop being offered.
+            if (data.length < 20) {
+                const live = new Set(data.map((p) => p.id));
+                const gone = local.filter((p) => !live.has(p.id)).map((p) => p.id);
+                if (gone.length) await db.products.bulkDelete(gone);
+            }
+        } catch { /* the device's copy stays as it was; the next reload fixes it */ }
+
+        // The list only changes if it is still the answer to what is typed.
+        if (!latestSearch.isCurrent(token)) return;
+        if (inputRef.current && inputRef.current.value.trim() !== q) return;
+
+        // Keep the highlight on the product, not the row number — the server
+        // may order or filter differently, and Enter must still add what the
+        // cashier is looking at. If that product is gone, nothing is
+        // highlighted, so Enter adds nothing rather than its neighbour.
+        const shown = resultsRef.current;
+        setActiveIndex((prev) => {
+            if (prev < 0) return prev;
+            const id = shown[prev]?.id;
+            return data.findIndex((p) => p.id === id);
+        });
+        setResults(data);
+    };
 
     // Everything Enter does ends here: the box empty and ready for the next
     // product, with no stale debounced search still in flight to reopen the
     // panel a moment later behind whatever just opened.
     const reset = () => {
         clearTimeout(debounceRef.current);
+        clearTimeout(serverTimerRef.current);
+        // Retires whatever search is in flight, so a server answer landing
+        // after a pick cannot reopen the list behind the quantity box.
+        latestSearch.start();
         burst.reset();
         settledRef.current = '';
         setQuery('');
