@@ -54,6 +54,7 @@ class StoreProfile extends Page
             'pos_vat_rate'                 => $vendor->pos_vat_rate ?? 7.5,
             'pos_blind_count_participants' => $vendor->pos_blind_count_participants ?? 2,
             'pos_min_margin_percent'       => $vendor->pos_min_margin_percent ?? 0,
+            'allow_negative_stock'         => (bool) $vendor->allow_negative_stock,
             'pos_blind_count_frequency'    => $vendor->pos_blind_count_frequency ?? 'daily',
             'pos_blind_count_custom_days'  => $vendor->pos_blind_count_custom_days ?? 3,
         ]);
@@ -163,6 +164,16 @@ class StoreProfile extends Page
                             ->suffix('%')
                             ->default(0)
                             ->required(),
+
+                        // Off is how every shop has always worked: a sale that
+                        // would take stock below zero is refused. On, it goes
+                        // through and the shortfall shows on the Negative Stock
+                        // report until a delivery or count settles it. A product
+                        // can override this either way from its own form.
+                        Toggle::make('allow_negative_stock')
+                            ->label('Allow selling below zero stock')
+                            ->helperText('When on, the till can sell more than your records say you have — useful when goods arrive before they are entered. Shortfalls appear on the Negative Stock report.')
+                            ->default(false),
                     ]),
 
                 Section::make('Bank Details for Payouts')
@@ -206,6 +217,7 @@ class StoreProfile extends Page
             'pos_vat_rate'                 => $data['pos_vat_enabled'] ? ($data['pos_vat_rate'] ?? 7.5) : 0,
             'pos_blind_count_participants' => (int) ($data['pos_blind_count_participants'] ?? 2),
             'pos_min_margin_percent'       => (float) ($data['pos_min_margin_percent'] ?? 0),
+            'allow_negative_stock'         => (bool) ($data['allow_negative_stock'] ?? false),
             'pos_blind_count_frequency'    => $data['pos_blind_count_frequency'] ?? 'daily',
             'pos_blind_count_custom_days'  => ($data['pos_blind_count_frequency'] ?? 'daily') === 'custom'
                 ? (int) ($data['pos_blind_count_custom_days'] ?? 3)

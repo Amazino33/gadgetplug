@@ -1,8 +1,104 @@
 import { useRef } from 'react';
 import { fmt } from '../lib/format';
 import { roomFor } from '../lib/cartAdd';
+import { shortfallFor, stockText, unitsOf } from '../lib/units';
 
-function MobileCartRow({ item, idx, isSelected, onSelect, onRemove }) {
+// Clicks inside a row must not also select it (desktop) or start a swipe (mobile).
+const stop = (e) => e.stopPropagation();
+
+/**
+ * The unit chips, price type and stock notes under a cart line.
+ *
+ * Renders nothing extra for a product with no units — a catalogue cached
+ * before units existed looks exactly as it always did.
+ */
+function LineUnits({ items, item, idx, onUnitChange, onPriceTypeChange, onSetDefaultUnit }) {
+    const units = unitsOf(item);
+    const hasWholesale = units.some((u) => u.wholesale_price != null);
+    const stock = stockText(item);
+    const short = item.allow_negative ? shortfallFor(items, item) : 0;
+    const atLimit = ! item.allow_negative && Number.isFinite(roomFor(items, item, idx)) && item.qty >= roomFor(items, item, idx);
+
+    if (units.length === 0 && ! stock) return null;
+
+    return (
+        <div className="mt-1.5 space-y-1" onClick={stop} onPointerDown={stop}>
+            {units.length > 1 && (
+                <div className="flex flex-wrap items-center gap-1">
+                    {units.map((u) => {
+                        const active = Number(u.id) === Number(item.unit_id);
+                        return (
+                            <button
+                                key={u.id}
+                                type="button"
+                                onClick={() => onUnitChange?.(idx, u.id)}
+                                aria-pressed={active}
+                                className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border transition-colors ${
+                                    active
+                                        ? 'bg-[#068B03] border-[#068B03] text-white'
+                                        : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-[#068B03]'
+                                }`}
+                            >
+                                {u.name}
+                            </button>
+                        );
+                    })}
+                    {item.unit_id != null && Number(item.unit_id) !== Number(item.default_unit_id) && (
+                        <button
+                            type="button"
+                            onClick={() => onSetDefaultUnit?.(idx, item.unit_id)}
+                            title="Add this product as this unit from now on"
+                            className="text-[11px] text-[#068B03] dark:text-green-400 underline decoration-dotted underline-offset-2"
+                        >
+                            Set as default
+                        </button>
+                    )}
+                </div>
+            )}
+
+            {hasWholesale && (
+                <div className="flex items-center gap-1 text-[11px]">
+                    {['retail', 'wholesale'].map((type) => (
+                        <button
+                            key={type}
+                            type="button"
+                            onClick={() => onPriceTypeChange?.(idx, type)}
+                            aria-pressed={item.price_type === type}
+                            className={`px-1.5 py-0.5 rounded font-semibold capitalize ${
+                                item.price_type === type
+                                    ? 'bg-gray-800 text-white dark:bg-gray-200 dark:text-gray-900'
+                                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
+                            }`}
+                        >
+                            {type}
+                        </button>
+                    ))}
+                    {item.wholesaleMissing && (
+                        <span className="text-gray-400 dark:text-gray-500">No wholesale price for {item.unit_name} — retail used</span>
+                    )}
+                </div>
+            )}
+
+            {stock && (
+                <p className="text-[11px] text-gray-400 dark:text-gray-500">In stock: {stock}</p>
+            )}
+
+            {short > 0 && (
+                <p role="status" className="text-[11px] font-semibold text-amber-700 bg-amber-50 dark:text-amber-300 dark:bg-amber-950 rounded px-1.5 py-0.5 inline-block">
+                    Sells {short} below stock — allowed for this product
+                </p>
+            )}
+
+            {atLimit && (
+                <p className="text-[11px] font-semibold text-red-600 dark:text-red-400">
+                    That is all the stock at this branch.
+                </p>
+            )}
+        </div>
+    );
+}
+
+function MobileCartRow({ items, item, idx, isSelected, onSelect, onRemove, unitHandlers }) {
     const rowRef   = useRef(null);
     const startX   = useRef(0);
     const snapTx   = useRef(0);
@@ -98,9 +194,10 @@ function MobileCartRow({ item, idx, isSelected, onSelect, onRemove }) {
                             −{fmt(item.lineDiscount)}
                         </span>
                     )}
+                    <LineUnits items={items} item={item} idx={idx} {...unitHandlers} />
                 </div>
                 <div className="text-right shrink-0">
-                    <p className="text-xs text-gray-400 dark:text-gray-500 font-mono tabular-nums">×{item.qty}</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 font-mono tabular-nums">×{item.qty}{item.unit_name && unitsOf(item).length > 1 ? ` ${item.unit_name}` : ''}</p>
                     <p className="text-sm font-bold text-gray-800 dark:text-gray-100 font-mono tabular-nums">{fmt(lineTotal)}</p>
                 </div>
             </div>
@@ -108,7 +205,11 @@ function MobileCartRow({ item, idx, isSelected, onSelect, onRemove }) {
     );
 }
 
-export default function Cart({ items, selectedIdx, onSelect, onQtyChange, onRemove, onPriceEdit }) {
+export default function Cart({ items, selectedIdx, onSelect, onQtyChange, onRemove, onPriceEdit, onUnitChange, onPriceTypeChange, onSetDefaultUnit }) {
+    const unitHandlers = { onUnitChange, onPriceTypeChange, onSetDefaultUnit };
+    // Two units of one product are two lines, so the id alone is not unique.
+    const lineKey = (item, idx) => `${item.id}-${item.unit_id ?? 'x'}-${idx}`;
+
     if (items.length === 0) {
         return (
             <div className="flex flex-col items-center justify-center h-full text-gray-300 dark:text-gray-700">
@@ -129,12 +230,14 @@ export default function Cart({ items, selectedIdx, onSelect, onQtyChange, onRemo
             <div className="md:hidden py-2">
                 {items.map((item, idx) => (
                     <MobileCartRow
-                        key={item.id}
+                        key={lineKey(item, idx)}
+                        items={items}
                         item={item}
                         idx={idx}
                         isSelected={idx === selectedIdx}
                         onSelect={onSelect}
                         onRemove={onRemove}
+                        unitHandlers={unitHandlers}
                     />
                 ))}
             </div>
@@ -157,7 +260,7 @@ export default function Cart({ items, selectedIdx, onSelect, onQtyChange, onRemo
 
                         return (
                             <tr
-                                key={item.id}
+                                key={lineKey(item, idx)}
                                 onClick={() => onSelect(idx)}
                                 className={`border-b border-gray-50 dark:border-gray-800 cursor-pointer transition-colors ${
                                     isSelected ? 'bg-green-50 dark:bg-green-950' : 'hover:bg-gray-50 dark:hover:bg-gray-800'
@@ -175,6 +278,7 @@ export default function Cart({ items, selectedIdx, onSelect, onQtyChange, onRemo
                                             {item.lineDiscount > 0 && (
                                                 <p className="text-xs text-brand-orange font-mono tabular-nums">Discount: −{fmt(item.lineDiscount)}</p>
                                             )}
+                                            <LineUnits items={items} item={item} idx={idx} {...unitHandlers} />
                                         </div>
                                     </div>
                                 </td>

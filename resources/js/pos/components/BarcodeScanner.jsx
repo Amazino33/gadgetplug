@@ -1,6 +1,26 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { db } from '../lib/db';
 import api from '../lib/api';
+import { carriesBarcode, unitForBarcode } from '../lib/units';
+
+// Tags the product with the unit its code belongs to, so a crate's code rings
+// up a crate.
+function withScannedUnit(product, code) {
+    const unitId = unitForBarcode(product, code);
+
+    return unitId != null ? { ...product, scanned_unit_id: unitId } : product;
+}
+
+// A second barcode, or a unit's own, is not indexed on the device — only the
+// main barcode is — so it is looked for the slow way, and only after the
+// indexed lookup came up empty.
+async function findByExtraBarcode(code) {
+    try {
+        return await db.products.filter((p) => (p.barcodes ?? []).some((b) => b.barcode === code)).first();
+    } catch {
+        return undefined;
+    }
+}
 
 // Camera-based barcode scan — mirrors the same interaction pattern as the
 // admin panel's barcode-scanner Blade component (BarcodeDetector API with a
@@ -52,9 +72,11 @@ export default function BarcodeScanner({ vendorId, onProductFound }) {
                     // likely already knows this product.
                     timeout: 5000,
                 });
-                const exact = data.find((p) => p.barcode === barcode);
+                // Any barcode the product carries — a crate's own code rings up
+                // a crate, a bottle's code the product's default unit.
+                const exact = data.find((p) => carriesBarcode(p, barcode));
                 if (exact) {
-                    onProductFound(exact);
+                    onProductFound(withScannedUnit(exact, barcode));
                     setOpen(false);
                     return;
                 }
@@ -63,9 +85,10 @@ export default function BarcodeScanner({ vendorId, onProductFound }) {
 
         // Offline, or the server had nothing to say: whatever was cached at
         // the last refresh is what keeps the till selling.
-        const local = await db.products.where('barcode').equals(barcode).first();
+        const local = await db.products.where('barcode').equals(barcode).first()
+            ?? await findByExtraBarcode(barcode);
         if (local) {
-            onProductFound(local);
+            onProductFound(withScannedUnit(local, barcode));
             setOpen(false);
             return;
         }

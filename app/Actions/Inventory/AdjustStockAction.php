@@ -16,10 +16,21 @@ use Exception;
 class AdjustStockAction
 {
     /**
+     * Units the last movement took beyond what the shelf held — non-zero only
+     * when $allowNegative let a sale go below zero. Read straight after
+     * execute(); the caller uses it to mark the sale's cost as estimated.
+     */
+    public int $lastShortfall = 0;
+
+    /**
      * $unitCost: what units coming IN cost, when the caller knows (goods back
      * from a failed delivery re-enter at the cost they left with). Left null,
      * an inbound movement is costed at the product's current cost price, as
      * every caller before it has been.
+     *
+     * @param  bool  $allowNegative  Let this movement take stock below zero.
+     *                               Off unless the caller has checked the
+     *                               shop's and product's negative-stock rule.
      *
      * @throws Exception
      */
@@ -34,8 +45,11 @@ class AdjustStockAction
         ?string $reasonCode = null,
         Store|int|null $store = null,
         ?float $unitCost = null,
+        bool $allowNegative = false,
     ) {
-        return DB::transaction(function () use ($productId, $quantityChanged, $transactionType, $userId, $reference, $description, $auditSessionId, $reasonCode, $store, $unitCost) {
+        $this->lastShortfall = 0;
+
+        return DB::transaction(function () use ($productId, $quantityChanged, $transactionType, $userId, $reference, $description, $auditSessionId, $reasonCode, $store, $unitCost, $allowNegative) {
             // 1. PESSIMISTIC LOCK: Lock the product row until the transaction is done.
             // If POS tries to sell this at the exact same millisecond, it will be forced to wait.
             // Still the product row and not merely the store row: it is what
@@ -50,7 +64,13 @@ class AdjustStockAction
             // holds, not the vendor-wide total. Selling from a store that has
             // none must fail even when another store is full.
             if ($quantityChanged < 0 && $row->quantity < abs($quantityChanged)) {
-                throw new Exception('Insufficient stock for product: ' . $product->name);
+                if (! $allowNegative) {
+                    throw new Exception('Insufficient stock for product: ' . $product->name);
+                }
+
+                // Allowed below zero: the goods have left, so the row records
+                // the debt and a later delivery or count settles it.
+                $this->lastShortfall = abs($quantityChanged) - max(0, $row->quantity);
             }
 
             // 4. Move the stock. products.stock_quantity is not touched here —

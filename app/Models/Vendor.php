@@ -21,10 +21,12 @@ class Vendor extends Model
         'pos_min_margin_percent', 'online_sales_enabled', 'initial_capital',
         'dashboard_blocked', 'dashboard_blocked_reason', 'dashboard_blocked_at',
         'restock_window_days', 'restock_lead_time_days', 'restock_target_cover_days', 'restock_safety_buffer_days',
+        'allow_negative_stock',
     ];
 
     protected $casts = [
         'pos_min_margin_percent'     => 'decimal:2',
+        'allow_negative_stock'      => 'boolean',
         'online_sales_enabled'      => 'boolean',
         'dashboard_blocked'         => 'boolean',
         'dashboard_blocked_at'      => 'datetime',

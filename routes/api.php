@@ -31,6 +31,7 @@ Route::prefix('pos')->middleware(NoStoreApiResponse::class)->group(function () {
         // Products — initial load + barcode/name search
         Route::get('products',        [PosProductController::class, 'index']);
         Route::get('products/search', [PosProductController::class, 'search']);
+        Route::post('products/{productId}/default-unit', [PosProductController::class, 'setDefaultUnit'])->whereNumber('productId');
 
         // Customers
         Route::get('customers',       [PosCustomerController::class, 'index']);

@@ -3,6 +3,7 @@
 namespace App\Services\Pos;
 
 use App\Models\Product;
+use App\Models\ProductUnit;
 use App\Models\Vendor;
 use Illuminate\Validation\ValidationException;
 
@@ -41,6 +42,35 @@ class PosPriceFloor
     }
 
     /**
+     * The lowest one unit may sell for — one crate, at retail or wholesale.
+     *
+     * The same rule as floorFor(), measured against the unit's own list price
+     * for the chosen price type and the cost of the base units inside it. The
+     * base unit at retail is exactly floorFor(), so a product with no extra
+     * units is held to the floor it always was.
+     */
+    public function floorForUnit(Product $product, ProductUnit $unit, string $priceType, float $minMarginPercent): float
+    {
+        $factor = max(1, (int) $unit->conversion_factor);
+
+        if ($unit->is_base && $priceType !== 'wholesale') {
+            return $this->floorFor($product, $minMarginPercent);
+        }
+
+        $list = $unit->is_base && $priceType === 'wholesale'
+            ? (float) ($product->wholesale_price ?? $product->price)
+            : ($unit->priceFor($priceType) ?? $unit->priceFor('retail'));
+
+        if (! $product->allow_pos_price_override || $product->cost_price === null) {
+            return round($list, 2);
+        }
+
+        $costFloor = (float) $product->cost_price * $factor * (1 + $minMarginPercent / 100);
+
+        return round(min($costFloor, $list), 2);
+    }
+
+    /**
      * @param  array<int, array{product_id: int, unit_price: float|string, quantity: int, discount_amount?: float|string}>  $items
      * @param  float  $netAfterDiscounts  Goods value after every discount, before VAT.
      *
@@ -66,9 +96,22 @@ class PosPriceFloor
                 ]);
             }
 
-            $floor    = $this->floorFor($product, $margin);
-            $quantity = (int) $item['quantity'];
-            $lineNet  = ((float) $item['unit_price'] * $quantity) - (float) ($item['discount_amount'] ?? 0);
+            // A line sold in a unit (resolved by SaleLineResolver) is measured
+            // per unit sold: one crate against the crate's floor.
+            $unit = ! empty($item['product_unit_id'])
+                ? ProductUnit::where('product_id', $product->id)->find($item['product_unit_id'])
+                : null;
+
+            if ($unit) {
+                $floor    = $this->floorForUnit($product, $unit, $item['price_type'] ?? 'retail', $margin);
+                $quantity = (int) $item['unit_qty'];
+                $lineNet  = (float) $item['line_gross'] - (float) ($item['discount_amount'] ?? 0);
+            } else {
+                $floor    = $this->floorFor($product, $margin);
+                $quantity = (int) $item['quantity'];
+                $lineNet  = ((float) $item['unit_price'] * $quantity) - (float) ($item['discount_amount'] ?? 0);
+            }
+
             $lineTotalFloor = $floor * $quantity;
 
             $floorTotal += $lineTotalFloor;

@@ -162,7 +162,141 @@ class Product extends Model implements HasMedia
         'preferred_quantity' => 'integer',
         'published_at'    => 'datetime',
         'unpublish_at'    => 'datetime',
+        'wholesale_price' => 'decimal:2',
+        'negative_stock_override' => 'boolean',
     ];
+
+    protected static function booted(): void
+    {
+        // Every product has a base selling unit that mirrors its own price, and
+        // its main barcode is findable in product_barcodes. Kept in step here
+        // rather than at each place a price or barcode changes — the form, the
+        // bulk price page, procurement approval and the importer all save
+        // through this model, and none of them has to remember.
+        static::saved(function (Product $product) {
+            $product->syncBaseUnit();
+            $product->syncMainBarcode();
+        });
+    }
+
+    /** Every selling unit, base unit first. */
+    public function units(): HasMany
+    {
+        return $this->hasMany(ProductUnit::class)->orderByDesc('is_base')->orderBy('sort_order')->orderBy('id');
+    }
+
+    /** The units a vendor adds on top of the base unit — what the form edits. */
+    public function extraUnits(): HasMany
+    {
+        return $this->hasMany(ProductUnit::class)->where('is_base', false)->orderBy('sort_order')->orderBy('id');
+    }
+
+    public function defaultUnit(): BelongsTo
+    {
+        return $this->belongsTo(ProductUnit::class, 'default_unit_id');
+    }
+
+    public function barcodes(): HasMany
+    {
+        return $this->hasMany(ProductBarcode::class);
+    }
+
+    /**
+     * Extra barcodes for the base unit. The main one lives in products.barcode
+     * and is mirrored automatically, so it is left out here to keep the form
+     * from offering the same code twice.
+     */
+    public function extraBaseBarcodes(): HasMany
+    {
+        return $this->hasMany(ProductBarcode::class)
+            ->whereNull('product_unit_id')
+            ->where('barcode', '!=', (string) ($this->getRawOriginal('barcode') ?? ''));
+    }
+
+    /** Creates or updates the base unit row so it matches this product. */
+    public function syncBaseUnit(): void
+    {
+        $relevant = $this->wasRecentlyCreated
+            || $this->wasChanged(['price', 'wholesale_price', 'base_unit'])
+            || ! $this->default_unit_id;
+
+        if (! $relevant) {
+            return;
+        }
+
+        $values = [
+            'name'            => mb_substr($this->base_unit ?: 'Piece', 0, 64),
+            // The stored column, not the accessor: a linked listing's accessor
+            // quotes the supplier's live price, and this row mirrors what the
+            // vendor actually saved.
+            'price'           => $this->attributes['price'] ?? 0,
+            'wholesale_price' => $this->attributes['wholesale_price'] ?? null,
+        ];
+
+        $unit = ProductUnit::where('product_id', $this->id)->where('is_base', true)->first();
+
+        if ($unit) {
+            $unit->update($values);
+        } else {
+            $unit = ProductUnit::create($values + [
+                'product_id'        => $this->id,
+                'vendor_id'         => $this->vendor_id,
+                'conversion_factor' => 1,
+                'is_base'           => true,
+                'is_active'         => true,
+                'sort_order'        => 0,
+            ]);
+        }
+
+        if (! $this->default_unit_id) {
+            // Quietly: this is bookkeeping, not an edit anyone made, and a
+            // normal save would run this hook again.
+            $this->forceFill(['default_unit_id' => $unit->id])->saveQuietly();
+        }
+    }
+
+    /** Keeps products.barcode findable in product_barcodes as the base unit's code. */
+    public function syncMainBarcode(): void
+    {
+        if (! $this->wasRecentlyCreated && ! $this->wasChanged('barcode')) {
+            return;
+        }
+
+        $old = $this->wasRecentlyCreated ? null : $this->getOriginal('barcode');
+
+        if (filled($old)) {
+            ProductBarcode::where('product_id', $this->id)
+                ->whereNull('product_unit_id')
+                ->where('barcode', $old)
+                ->delete();
+        }
+
+        $new = trim((string) $this->barcode);
+
+        if ($new === '') {
+            return;
+        }
+
+        $existing = ProductBarcode::where('vendor_id', $this->vendor_id)->where('barcode', $new)->first();
+
+        if ($existing && ((int) $existing->product_id !== (int) $this->id || $existing->product_unit_id !== null)) {
+            // Another product (or one of this product's own bigger units)
+            // already answers to this code. Saving it anyway would leave a scan
+            // unable to tell which one the customer is holding.
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'barcode' => "Barcode {$new} is already used by another product or unit in this shop.",
+            ]);
+        }
+
+        if (! $existing) {
+            ProductBarcode::create([
+                'vendor_id'       => $this->vendor_id,
+                'product_id'      => $this->id,
+                'product_unit_id' => null,
+                'barcode'         => $new,
+            ]);
+        }
+    }
 
     public function scopePublished(Builder $query): void
     {

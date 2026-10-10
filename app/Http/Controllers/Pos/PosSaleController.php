@@ -16,8 +16,10 @@ use App\Models\PosSalePayment;
 use App\Models\Product;
 use App\Models\User;
 use App\Models\Vendor;
+use App\Services\Inventory\NegativeStock;
 use App\Services\Inventory\TillStore;
 use App\Services\Pos\PosPriceFloor;
+use App\Services\Pos\SaleLineResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -27,6 +29,35 @@ use Illuminate\Validation\ValidationException;
 
 class PosSaleController extends Controller
 {
+    /**
+     * The ledger line for a sale. Unchanged for a line sold in its base unit;
+     * a crate reads "x1 Crate (24)" so the movement explains itself.
+     */
+    public static function stockDescription(string $prefix, array $item): string
+    {
+        if (! empty($item['unit_qty']) && (int) $item['unit_qty'] !== (int) $item['quantity']) {
+            return "{$prefix} — {$item['product_name']} x{$item['unit_qty']} {$item['unit_name']} ({$item['quantity']})";
+        }
+
+        return "{$prefix} — {$item['product_name']} x{$item['quantity']}";
+    }
+
+    /**
+     * Cost for a line that sold below zero stock. There were no purchase
+     * batches for the missing units, so the product's current cost price
+     * stands in for all of them and the line says so.
+     */
+    public static function estimatedCost(array $item, $costPrice, $batchCost): array
+    {
+        return [
+            'cost_estimated' => true,
+            'unit_cost'      => $costPrice,
+            'cost_total'     => $costPrice !== null
+                ? round((float) $costPrice * (int) $item['quantity'], 2)
+                : $batchCost,
+        ];
+    }
+
     /** Whether this payload puts any part of the sale on credit. */
     private function salePayloadHasDebt(Request $request): bool
     {
@@ -60,6 +91,11 @@ class PosSaleController extends Controller
             'items.*.unit_price'         => 'required|numeric|min:0',
             'items.*.quantity'           => 'required|integer|min:1',
             'items.*.discount_amount'    => 'nullable|numeric|min:0',
+            // Selling units. All optional: a till without them sends the
+            // lines it always did and they are read exactly as before.
+            'items.*.product_unit_id'    => 'nullable|integer',
+            'items.*.unit_qty'           => 'nullable|integer|min:1',
+            'items.*.price_type'         => 'nullable|in:retail,wholesale',
             'discount_amount'            => 'nullable|numeric|min:0',
             'discount_type'              => 'nullable|in:percentage,fixed',
             'discount_scope'             => 'nullable|in:item,cart',
@@ -130,15 +166,20 @@ class PosSaleController extends Controller
             }
         }
 
+        // Lines sold in a unit become base quantities here, from the server's
+        // own unit records. Lines without a unit come back untouched.
+        $resolver = app(SaleLineResolver::class);
+        $lines    = $resolver->resolve($vendor, $request->items);
+        $products = $resolver->products();
+
         try {
             // Five attempts, not one. A deadlock is transient by definition:
             // MySQL kills one of the two transactions precisely so the other can
             // finish, and the killed one succeeds on a retry. Laravel re-runs
             // the closure for exactly this class of error.
-            $sale = DB::transaction(function () use ($request, $adjustStock, $priceFloor, $vendor, $revenue, $reference, $storeId) {
-            $subtotal = collect($request->items)->sum(function ($item) {
-                $lineTotal = $item['unit_price'] * $item['quantity'];
-                return $lineTotal - ($item['discount_amount'] ?? 0);
+            $sale = DB::transaction(function () use ($request, $adjustStock, $priceFloor, $vendor, $revenue, $reference, $storeId, $lines, $products) {
+            $subtotal = collect($lines)->sum(function ($item) {
+                return $item['line_gross'] - ($item['discount_amount'] ?? 0);
             });
 
             $cartDiscount = (float) ($request->discount_amount ?? 0);
@@ -147,7 +188,7 @@ class PosSaleController extends Controller
             // fact — nothing above this point stops a client posting any price
             // it likes. Checked on the pre-VAT goods value: VAT is collected on
             // the customer's behalf, not margin the store gets to give away.
-            $priceFloor->guard($vendor, $request->items, $subtotal - $cartDiscount);
+            $priceFloor->guard($vendor, $lines, $subtotal - $cartDiscount);
 
             $vatRate      = (float) ($request->vat_rate ?? 7.5);
             $vatAmount    = round(($subtotal - $cartDiscount) * ($vatRate / 100), 2);
@@ -221,7 +262,7 @@ class PosSaleController extends Controller
             // Cost is read once up front rather than per line: profit reporting
             // needs what each item cost AT THIS MOMENT, and a later restock must
             // not retroactively change what this sale earned.
-            $costPrices = Product::whereIn('id', collect($request->items)->pluck('product_id'))
+            $costPrices = Product::whereIn('id', collect($lines)->pluck('product_id'))
                 ->pluck('cost_price', 'id');
 
             // Kept against the payload's own line numbers, so the batch cost
@@ -229,15 +270,20 @@ class PosSaleController extends Controller
             // line even when the same product appears on the cart twice.
             $saleItems = [];
 
-            foreach ($request->items as $line => $item) {
+            foreach ($lines as $line => $item) {
                 $lineDiscount = (float) ($item['discount_amount'] ?? 0);
-                $lineTotal    = ($item['unit_price'] * $item['quantity']) - $lineDiscount;
+                $lineTotal    = $item['line_gross'] - $lineDiscount;
 
                 $saleItems[$line] = PosSaleItem::create([
                     'pos_sale_id'  => $sale->id,
                     'product_id'   => $item['product_id'],
                     'product_name' => $item['product_name'],
                     'product_sku'  => $item['product_sku'] ?? null,
+                    'product_unit_id' => $item['product_unit_id'],
+                    'unit_name'       => $item['unit_name'],
+                    'unit_qty'        => $item['unit_qty'],
+                    'sold_unit_price' => $item['sold_unit_price'],
+                    'price_type'      => $item['price_type'],
                     'unit_price'   => $item['unit_price'],
                     'unit_cost'    => $costPrices[$item['product_id']] ?? null,
                     'quantity'     => $item['quantity'],
@@ -258,10 +304,11 @@ class PosSaleController extends Controller
             // keys() rather than values(): the line numbers are what tie each
             // movement back to the sale line it belongs to, and the sort still
             // gives the single agreed product order the deadlock fix needs.
-            $stockOrder = collect($request->items)->sortBy('product_id')->keys();
+            $stockOrder = collect($lines)->sortBy('product_id')->keys();
 
             foreach ($stockOrder as $line) {
-                $item = $request->items[$line];
+                $item = $lines[$line];
+                $product = $products->get((int) $item['product_id']);
 
                 // Deduct physical stock immediately (POS = item leaves the shelf now)
                 $ledger = $adjustStock->execute(
@@ -270,10 +317,14 @@ class PosSaleController extends Controller
                     transactionType: 'pos_sale',
                     userId: $request->user()->id,
                     reference: $sale->reference,
-                    description: "Shop sale — {$item['product_name']} x{$item['quantity']}",
+                    description: self::stockDescription('Shop sale', $item),
                     // Off the shelf the customer is standing at, not the
                     // vendor's default branch.
                     store: $sale->store_id,
+                    // Refused below zero unless the shop (or this product) has
+                    // chosen to allow it — in which case the sale goes through
+                    // and the shortfall shows on the Negative Stock report.
+                    allowNegative: $product ? NegativeStock::allowed($product, $vendor) : false,
                 );
 
                 // What these units genuinely cost, from the batches they came
@@ -281,7 +332,9 @@ class PosSaleController extends Controller
                 // was provisionally stamped with above. Left alone when the
                 // batches could not say — the unit_cost snapshot still stands
                 // as the fallback, exactly as before.
-                if ($ledger?->cost_total !== null) {
+                if ($adjustStock->lastShortfall > 0) {
+                    $saleItems[$line]->update(self::estimatedCost($item, $costPrices[$item['product_id']] ?? null, $ledger?->cost_total));
+                } elseif ($ledger?->cost_total !== null) {
                     $saleItems[$line]->update(['cost_total' => $ledger->cost_total]);
                 }
             }

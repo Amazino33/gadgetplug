@@ -300,9 +300,13 @@ export function receiptHtml(sale, config = {}) {
     // it — no truncation, which is what the modal did to long product names.
     const items = (sale.items ?? []).map((item) => {
         const name = item.product_name ?? item.name ?? '';
+        // Sold in a bigger unit: "1 Crate × ₦9,700", not "24 × ₦404.17".
+        const inUnit   = item.unit_qty != null && Number(item.unit_qty) !== Number(item.quantity);
+        const qtyLabel = inUnit ? `${item.unit_qty} ${item.unit_name ?? ''}`.trim() : item.quantity;
+        const each     = inUnit ? (item.sold_unit_price ?? item.unit_price) : item.unit_price;
         const qty  = settings.show_item_unit_price !== false
-            ? `${escapeHtml(item.quantity)} &times; ${escapeHtml(money(item.unit_price))}`
-            : escapeHtml(item.quantity);
+            ? `${escapeHtml(qtyLabel)} &times; ${escapeHtml(money(each))}`
+            : escapeHtml(qtyLabel);
 
         return `<div class="item">
 <div class="item-name">${escapeHtml(name)}</div>

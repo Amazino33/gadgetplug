@@ -13,8 +13,10 @@ use App\Models\PosSaleItem;
 use App\Models\PosSalePayment;
 use App\Models\Product;
 use App\Models\Vendor;
+use App\Services\Inventory\NegativeStock;
 use App\Services\Inventory\TillStore;
 use App\Services\Pos\PosPriceFloor;
+use App\Services\Pos\SaleLineResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -92,13 +94,20 @@ class PosSyncController extends Controller
                 // bypassed or tampered with. Re-checked on the pre-VAT goods
                 // value, derived from the total so it holds whether or not the
                 // client bothered to send a subtotal.
+                // Lines sold in a unit become base quantities, from the
+                // server's own unit records — the same resolver the counter
+                // path uses. Lines without a unit pass through untouched.
+                $resolver = app(SaleLineResolver::class);
+                $lines    = $resolver->resolve($vendor, $payload['items']);
+                $products = $resolver->products();
+
                 $priceFloor->guard(
                     $vendor,
-                    $payload['items'],
+                    $lines,
                     (float) $payload['total'] - (float) ($payload['vat_amount'] ?? 0),
                 );
 
-                DB::transaction(function () use ($payload, $request, $adjustStock, $existingRef, $storeId) {
+                DB::transaction(function () use ($payload, $request, $adjustStock, $existingRef, $storeId, $lines, $products, $vendor) {
                     $sale = PosSale::create([
                         'reference'               => $existingRef,
                         'vendor_id'               => $request->vendor_id,
@@ -162,31 +171,48 @@ class PosSyncController extends Controller
                     // product's cost now. The true cost at the time of the
                     // offline sale isn't recoverable, but recording today's is
                     // closer than leaving it blank for an already-completed sale.
-                    $costPrices = Product::whereIn('id', collect($payload['items'])->pluck('product_id'))
+                    $costPrices = Product::whereIn('id', collect($lines)->pluck('product_id'))
                         ->pluck('cost_price', 'id');
 
-                    foreach ($payload['items'] as $item) {
-                        PosSaleItem::create([
+                    foreach ($lines as $item) {
+                        $saleItem = PosSaleItem::create([
                             'pos_sale_id'     => $sale->id,
                             'product_id'      => $item['product_id'],
                             'product_name'    => $item['product_name'],
                             'product_sku'     => $item['product_sku'] ?? null,
+                            'product_unit_id' => $item['product_unit_id'],
+                            'unit_name'       => $item['unit_name'],
+                            'unit_qty'        => $item['unit_qty'],
+                            'sold_unit_price' => $item['sold_unit_price'],
+                            'price_type'      => $item['price_type'],
                             'unit_price'      => $item['unit_price'],
                             'unit_cost'       => $costPrices[$item['product_id']] ?? null,
                             'quantity'        => $item['quantity'],
                             'discount_amount' => $item['discount_amount'] ?? 0,
-                            'total'           => $item['total'],
+                            // A line from a till without units keeps the total
+                            // it sent, exactly as before. A unit line's money is
+                            // the unit price times the units sold.
+                            'total'           => $item['product_unit_id']
+                                ? $item['line_gross'] - (float) ($item['discount_amount'] ?? 0)
+                                : $item['total'],
                         ]);
 
-                        $adjustStock->execute(
+                        $product = $products->get((int) $item['product_id']);
+
+                        $ledger = $adjustStock->execute(
                             productId: $item['product_id'],
                             quantityChanged: -$item['quantity'],
                             transactionType: 'pos_sale',
                             userId: $request->user()->id,
                             reference: $sale->reference,
-                            description: "Offline shop sale sync — {$item['product_name']} x{$item['quantity']}",
+                            description: PosSaleController::stockDescription('Offline shop sale sync', $item),
                             store: $sale->store_id,
+                            allowNegative: $product ? NegativeStock::allowed($product, $vendor) : false,
                         );
+
+                        if ($adjustStock->lastShortfall > 0) {
+                            $saleItem->update(PosSaleController::estimatedCost($item, $costPrices[$item['product_id']] ?? null, $ledger?->cost_total));
+                        }
                     }
 
                     if ($sale->customer_id) {

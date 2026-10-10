@@ -11,12 +11,20 @@ class ProcurementItem extends Model
     protected $fillable = [
         'procurement_id', 'product_id', 'barcode',
         'quantity', 'unit_cost', 'selling_price',
+        // The unit it was bought in. quantity/unit_cost above stay in base units.
+        'product_unit_id', 'unit_qty', 'cost_per_unit',
     ];
 
     protected $casts = [
         'unit_cost'     => 'decimal:2',
         'selling_price' => 'decimal:2',
+        'cost_per_unit' => 'decimal:2',
     ];
+
+    public function productUnit(): BelongsTo
+    {
+        return $this->belongsTo(ProductUnit::class);
+    }
 
     public function procurement(): BelongsTo
     {

@@ -1,3 +1,5 @@
+import { carriesBarcode, unitForBarcode } from './units';
+
 /**
  * Tells a barcode scan apart from a cashier typing.
  *
@@ -61,14 +63,20 @@ export function scanFor({ query = '', results = [], burst = false } = {}) {
     if (! trimmed) return null;
     if (! looksLikeBarcode(trimmed) && ! burst) return null;
 
+    // The main barcode, or any extra one — a crate's own code included.
     const carrying = results.filter(
-        (p) => p?.barcode != null && String(p.barcode) === trimmed
+        (p) => (p?.barcode != null && String(p.barcode) === trimmed) || carriesBarcode(p, trimmed)
     );
 
     // Exactly one, never "the first one". Two products claiming one barcode
     // is something the unique index forbids, so if it somehow happens the
     // till has no business guessing which of them the customer is holding.
-    return carrying.length === 1 ? carrying[0] : null;
+    if (carrying.length !== 1) return null;
+
+    // Which unit the code is on: a crate's code rings up a crate.
+    const unitId = unitForBarcode(carrying[0], trimmed);
+
+    return unitId != null ? { ...carrying[0], scanned_unit_id: unitId } : carrying[0];
 }
 
 // A handheld wedge emits characters far faster than fingers can. Measured on

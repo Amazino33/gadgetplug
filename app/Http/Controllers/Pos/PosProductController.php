@@ -4,7 +4,10 @@ namespace App\Http\Controllers\Pos;
 
 use App\Http\Controllers\Controller;
 use App\Models\Product;
+use App\Models\ProductBarcode;
 use App\Models\ProductStoreStock;
+use App\Models\ProductUnit;
+use App\Services\Inventory\NegativeStock;
 use App\Models\Vendor;
 use App\Services\Inventory\TillStore;
 use App\Services\Pos\PosPriceFloor;
@@ -30,11 +33,36 @@ class PosProductController extends Controller
         $vendor = Vendor::findOrFail($request->vendor_id);
 
         $products = $this->branchCatalogue($request)
-            ->with('media')
+            ->with(['media', 'units', 'barcodes'])
             ->get()
             ->map(fn ($p) => $this->format($p, $vendor));
 
         return response()->json($products);
+    }
+
+    /**
+     * Makes a unit the one this product goes into the cart as.
+     *
+     * Any cashier may: it changes how the till behaves, not what anything
+     * costs. Scoped like every other call here — the product and the unit
+     * must both belong to the vendor the till is signed in to.
+     */
+    public function setDefaultUnit(Request $request, int $productId): JsonResponse
+    {
+        $request->validate([
+            'vendor_id' => 'required|integer',
+            'unit_id'   => 'required|integer',
+        ]);
+
+        $product = Product::where('vendor_id', $request->vendor_id)->findOrFail($productId);
+
+        $unit = ProductUnit::where('product_id', $product->id)
+            ->where('is_active', true)
+            ->findOrFail($request->unit_id);
+
+        $product->update(['default_unit_id' => $unit->id]);
+
+        return response()->json(['default_unit_id' => $unit->id]);
     }
 
     // Live search by barcode, SKU, or name
@@ -57,8 +85,12 @@ class PosProductController extends Controller
                 ->where('barcode', $q)
                 ->orWhere('sku', $q)
                 ->orWhere('name', 'like', "%{$q}%")
+                // A second barcode, or a unit's own (a crate's code).
+                ->orWhereIn('products.id', ProductBarcode::select('product_id')
+                    ->where('vendor_id', $request->vendor_id)
+                    ->where('barcode', $q))
             )
-            ->with('media')
+            ->with(['media', 'units', 'barcodes'])
             ->limit(20)
             ->get()
             ->map(fn ($p) => $this->format($p, $vendor));
@@ -83,15 +115,22 @@ class PosProductController extends Controller
     {
         $storeId = TillStore::resolve($request->user(), (int) $request->vendor_id);
 
+        // A product the shop sells below zero stays on the till with nothing
+        // on the shelf — that is the whole point of allowing it.
+        $shopAllowsNegative = (bool) Vendor::whereKey($request->vendor_id)->value('allow_negative_stock');
+
         return Product::visibleInPos()
             ->where('products.vendor_id', $request->vendor_id)
             ->where('products.store_id', $storeId)
-            ->whereExists(fn ($q) => $q
-                ->selectRaw('1')
-                ->from('product_store_stock')
-                ->whereColumn('product_store_stock.product_id', 'products.id')
-                ->where('product_store_stock.store_id', $storeId)
-                ->whereRaw('product_store_stock.quantity - product_store_stock.reserved > 0'))
+            ->where(fn ($stocked) => $stocked
+                ->whereExists(fn ($q) => $q
+                    ->selectRaw('1')
+                    ->from('product_store_stock')
+                    ->whereColumn('product_store_stock.product_id', 'products.id')
+                    ->where('product_store_stock.store_id', $storeId)
+                    ->whereRaw('product_store_stock.quantity - product_store_stock.reserved > 0'))
+                ->orWhere('products.negative_stock_override', true)
+                ->when($shopAllowsNegative, fn ($q) => $q->orWhereNull('products.negative_stock_override')))
             ->select($this->columns())
             ->addSelect([
                 'store_quantity' => ProductStoreStock::select('quantity')
@@ -117,6 +156,8 @@ class PosProductController extends Controller
             'products.allow_pos_price_override', 'products.stock_quantity',
             'products.reserved_stock', 'products.low_stock_threshold',
             'products.vendor_id', 'products.store_id',
+            'products.base_unit', 'products.wholesale_price',
+            'products.default_unit_id', 'products.negative_stock_override',
         ];
     }
 
@@ -146,6 +187,57 @@ class PosProductController extends Controller
             // but someone is counting on them.
             'reserved'        => $p->storeReserved(),
             'image'           => $p->getFirstMediaUrl('product-images', 'thumb'),
+
+            // ── Selling units ──
+            // Signed, unlike available_stock: a product sold below zero shows
+            // what is owed rather than a flat 0.
+            'on_hand'         => $p->storeQuantity(),
+            'base_unit'       => $p->base_unit ?: 'Piece',
+            'default_unit_id' => $p->default_unit_id,
+            'allow_negative'  => NegativeStock::allowed($p, $vendor),
+            'units'           => $this->formatUnits($p, $vendor),
+            // Every code this product answers to; unit_id null = base unit.
+            'barcodes'        => $p->relationLoaded('barcodes')
+                ? $p->barcodes->map(fn ($b) => ['barcode' => $b->barcode, 'unit_id' => $b->product_unit_id])->values()
+                : [],
         ];
+    }
+
+    /**
+     * The units the till may sell this product in, each with its own floors.
+     *
+     * Floors are worked out here, as min_price always was, so what it costs
+     * the shop never reaches the device — only how low a price may go.
+     */
+    private function formatUnits(Product $p, Vendor $vendor): array
+    {
+        if (! $p->relationLoaded('units')) {
+            return [];
+        }
+
+        $margin = (float) ($vendor->pos_min_margin_percent ?? 0);
+
+        return $p->units->where('is_active', true)->map(function (ProductUnit $u) use ($p, $margin) {
+            // The base unit's retail price is the product's own price, which
+            // for a resold listing is quoted live from the supplier.
+            $price     = $u->is_base ? (float) $p->price : (float) $u->price;
+            $wholesale = $u->is_base
+                ? ($p->wholesale_price !== null ? (float) $p->wholesale_price : null)
+                : ($u->wholesale_price !== null ? (float) $u->wholesale_price : null);
+
+            return [
+                'id'                  => $u->id,
+                'name'                => $u->name,
+                'conversion_factor'   => (int) $u->conversion_factor,
+                'is_base'             => (bool) $u->is_base,
+                'price'               => $price,
+                'wholesale_price'     => $wholesale,
+                'min_price'           => $this->priceFloor->floorForUnit($p, $u, 'retail', $margin),
+                'wholesale_min_price' => $wholesale !== null
+                    ? $this->priceFloor->floorForUnit($p, $u, 'wholesale', $margin)
+                    : null,
+                'sort_order'          => (int) $u->sort_order,
+            ];
+        })->values()->all();
     }
 }

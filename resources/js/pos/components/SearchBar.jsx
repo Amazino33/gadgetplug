@@ -112,6 +112,8 @@ const SearchBar = forwardRef(function SearchBar({
         const local = await db.products
             .filter((p) =>
                 p.barcode === trimmed ||
+                // A unit's own code (a crate) or a second barcode.
+                (p.barcodes ?? []).some((b) => b.barcode === trimmed) ||
                 (p.sku && p.sku.toLowerCase() === trimmed.toLowerCase()) ||
                 (p.name && p.name.toLowerCase().includes(trimmed.toLowerCase()))
             )

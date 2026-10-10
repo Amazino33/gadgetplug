@@ -5,6 +5,7 @@ import { fmt, generateOfflineId } from '../lib/format';
 import { createCheckoutId } from '../lib/checkoutId';
 import { cartFloorTotal } from '../lib/cartFloor';
 import { addToCart, roomFor } from '../lib/cartAdd';
+import { findUnit, lineFields, prepareLine } from '../lib/units';
 import { shouldRedirectTypingToSearch } from '../lib/typeAhead';
 import { db } from '../lib/db';
 import { pruneOldSales, recordSale } from '../lib/salesHistory';
@@ -313,7 +314,7 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
      */
     const addProduct = useCallback((product, qty = 1) => {
         setCart((prev) => {
-            const { items, index } = addToCart(prev, product, qty);
+            const { items, index } = addToCart(prev, product, qty, priceModeRef.current);
             setSelectedIdx(index);
             return items;
         });
@@ -324,9 +325,76 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
     }, []);
 
     const askQuantityFor = useCallback((product) => {
-        setPendingProduct(product);
+        // Already in its selling unit, so the quantity box counts crates and
+        // stops at the crates the shelf holds.
+        setPendingProduct(prepareLine(product, priceModeRef.current));
         setModal('addQuantity');
     }, []);
+
+    // ── Selling units ────────────────────────────────────────────────
+
+    // Retail or wholesale for the whole cart. Each line can still be switched
+    // on its own; this sets every line, and the lines added after it.
+    const [priceMode, setPriceModeState] = useState('retail');
+    const priceModeRef = useRef('retail');
+
+    // Reprices one line in a unit and price type. The negotiated price and line
+    // discount go: they were agreed for the old unit, not this one.
+    const repriceLine = (prev, idx, unitId, priceType) => {
+        const line = prev[idx];
+        const unit = findUnit(line, unitId);
+
+        if (! unit) return prev;
+
+        const next = { ...line, ...lineFields(unit, priceType), lineDiscount: 0 };
+        const room = roomFor(prev, next, idx);
+
+        // Not even one of that unit fits on what the shelf holds.
+        if (room < 1) return prev;
+
+        next.qty = Math.min(next.qty, room);
+
+        const items = [...prev];
+        items[idx] = next;
+
+        return items;
+    };
+
+    const changeLineUnit = (idx, unitId) => {
+        setCart((prev) => repriceLine(prev, idx, unitId, prev[idx]?.requested_price_type ?? priceModeRef.current));
+    };
+
+    const changeLinePriceType = (idx, priceType) => {
+        setCart((prev) => repriceLine(prev, idx, prev[idx]?.unit_id, priceType));
+    };
+
+    const setPriceMode = (priceType) => {
+        priceModeRef.current = priceType;
+        setPriceModeState(priceType);
+        setCart((prev) => prev.reduce(
+            (items, line, idx) => (line.unit_id != null ? repriceLine(items, idx, line.unit_id, priceType) : items),
+            prev,
+        ));
+    };
+
+    // Any cashier may change which unit a product goes in as. Saved on the
+    // device at once so the next scan uses it, and on the server so every
+    // other till does too after its next catalogue refresh.
+    const setDefaultUnit = async (idx, unitId) => {
+        const productId = cart[idx]?.id;
+
+        if (productId == null) return;
+
+        setCart((prev) => prev.map((line) => (line.id === productId ? { ...line, default_unit_id: unitId } : line)));
+
+        try {
+            await db.products.update(productId, { default_unit_id: unitId });
+        } catch { /* the device copy is refreshed from the server soon anyway */ }
+
+        try {
+            await api.post(`/products/${productId}/default-unit`, { vendor_id: vendorId, unit_id: unitId });
+        } catch { /* offline: this till keeps it; the others learn it when it next saves online */ }
+    };
 
     const cancelPending = useCallback(() => {
         setPendingProduct(null);
@@ -399,6 +467,9 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
 
     const clearCart = () => {
         setCart([]);
+        // The next customer starts at retail; wholesale is chosen per sale.
+        priceModeRef.current = 'retail';
+        setPriceModeState('retail');
         setRecoveredAt(null);
         setSelectedIdx(null);
         setCustomer(null);
@@ -471,10 +542,19 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
                 product_id:      item.id,
                 product_name:    item.name,
                 product_sku:     item.sku ?? null,
+                // Per unit sold — one crate's price on a crate line.
                 unit_price:      item.price,
-                quantity:        item.qty,
+                // Always in base units (bottles). The server works this out
+                // again from the unit itself; it is sent so an older server
+                // and the receipt both read a sensible number.
+                quantity:        item.qty * (item.factor || 1),
                 discount_amount: item.lineDiscount || 0,
                 total:           item.price * item.qty - (item.lineDiscount || 0),
+                product_unit_id: item.unit_id ?? null,
+                unit_qty:        item.unit_id != null ? item.qty : null,
+                unit_name:       item.unit_name ?? null,
+                sold_unit_price: item.unit_id != null ? item.price : null,
+                price_type:      item.price_type ?? 'retail',
             })),
             discount_amount:         discountAmount,
             discount_type:           cartDiscount.type,
@@ -793,6 +873,28 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
                     </div>
                 )}
 
+                {/* Retail | Wholesale for the whole cart */}
+                <div className="flex items-center gap-2 px-4 md:px-6 py-1.5 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 shrink-0">
+                    <span className="text-[11px] text-gray-400 dark:text-gray-500 uppercase tracking-wide">Prices</span>
+                    <div role="group" aria-label="Price type for this sale" className="inline-flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                        {['retail', 'wholesale'].map((type) => (
+                            <button
+                                key={type}
+                                type="button"
+                                onClick={() => setPriceMode(type)}
+                                aria-pressed={priceMode === type}
+                                className={`px-3 py-1 text-xs font-semibold capitalize ${
+                                    priceMode === type
+                                        ? 'bg-[#068B03] text-white'
+                                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                                }`}
+                            >
+                                {type}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
                 {/* Cart */}
                 <div className="flex-1 overflow-y-auto bg-white dark:bg-gray-900">
                     <Cart
@@ -802,6 +904,9 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
                         onQtyChange={updateQty}
                         onRemove={removeItem}
                         onPriceEdit={(idx) => { setSelectedIdx(idx); setModal('price'); }}
+                        onUnitChange={changeLineUnit}
+                        onPriceTypeChange={changeLinePriceType}
+                        onSetDefaultUnit={setDefaultUnit}
                     />
                 </div>
 

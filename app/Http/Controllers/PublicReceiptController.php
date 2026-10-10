@@ -114,8 +114,10 @@ class PublicReceiptController extends Controller
             'soldAt'   => $sale->completed_at ?? $sale->created_at,
             'items'    => $sale->items->map(fn ($item) => [
                 'name'       => $item->product_name,
-                'quantity'   => $item->quantity,
-                'unit_price' => $item->unit_price,
+                // "1 Crate × ₦9,700", not "24 × ₦404.17". Unchanged for a
+                // line sold in its base unit.
+                'quantity'   => $item->soldInLargerUnit() ? "{$item->unit_qty} {$item->unit_name}" : $item->quantity,
+                'unit_price' => $item->soldInLargerUnit() ? $item->sold_unit_price : $item->unit_price,
                 'total'      => $item->total,
             ]),
             'payments'   => $sale->payments,

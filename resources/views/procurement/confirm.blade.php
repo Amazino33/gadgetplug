@@ -80,7 +80,15 @@
                         </div>
                         <div class="text-center">
                             <p class="text-[10px] text-[#6f7b68] dark:text-zinc-500 uppercase tracking-wider">Qty</p>
-                            <p class="text-sm font-bold text-[#191c1d] dark:text-zinc-100" style="font-family:'Montserrat',sans-serif;">{{ $item['quantity'] }}</p>
+                            @php
+                                $boughtIn = ! empty($item['product_unit_id'])
+                                    ? $product->units->firstWhere('id', (int) $item['product_unit_id'])
+                                    : null;
+                            @endphp
+                            <p class="text-sm font-bold text-[#191c1d] dark:text-zinc-100" style="font-family:'Montserrat',sans-serif;">{{ $item['quantity'] }}@if($boughtIn && $boughtIn->conversion_factor > 1) {{ $boughtIn->name }}@endif</p>
+                            @if($boughtIn && $boughtIn->conversion_factor > 1)
+                                <p class="text-[10px] text-[#6f7b68] dark:text-zinc-500">= {{ $item['quantity'] * $boughtIn->conversion_factor }} {{ $product->base_unit }}</p>
+                            @endif
                         </div>
                         <div class="text-center">
                             <p class="text-[10px] text-[#6f7b68] dark:text-zinc-500 uppercase tracking-wider">Unit Cost</p>

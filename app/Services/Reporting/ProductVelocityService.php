@@ -82,7 +82,11 @@ class ProductVelocityService
 
         $posRows = FinancialReportService::recognizedPosSaleItemsQuery($vendorId, $from, $to)
             ->groupBy('pos_sale_items.product_id')
-            ->selectRaw('pos_sale_items.product_id, SUM(pos_sale_items.quantity) as units, SUM(pos_sale_items.quantity * pos_sale_items.unit_price) as revenue')
+            // A line sold by the crate stores quantity in bottles and unit_price
+            // as the rounded per-bottle equivalent, so multiplying the two can be
+            // kobo out; its own line money is exact. Every older line keeps the
+            // original sum untouched.
+            ->selectRaw('pos_sale_items.product_id, SUM(pos_sale_items.quantity) as units, SUM(CASE WHEN pos_sale_items.unit_qty IS NULL THEN pos_sale_items.quantity * pos_sale_items.unit_price ELSE pos_sale_items.total + pos_sale_items.discount_amount END) as revenue')
             ->get()
             ->keyBy('product_id');
 

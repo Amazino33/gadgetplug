@@ -1,0 +1,112 @@
+<?php
+
+use App\Models\Category;
+use App\Models\Product;
+use App\Models\ProductBarcode;
+use App\Models\ProductUnit;
+use App\Models\User;
+use App\Models\Vendor;
+use Laravel\Sanctum\Sanctum;
+
+// What the till is told about selling units, barcodes and negative stock.
+
+function catalogueContext(array $productAttributes = [], array $vendorAttributes = []): array
+{
+    $owner = User::factory()->create();
+
+    $vendor = Vendor::create(array_merge([
+        'user_id' => $owner->id, 'name' => 'Drinks Depot', 'pos_min_margin_percent' => 0,
+    ], $vendorAttributes));
+
+    $product = Product::create(array_merge([
+        'vendor_id'      => $vendor->id,
+        'category_id'    => Category::create(['name' => 'Drinks'])->id,
+        'name'           => 'Coke 50cl',
+        'base_unit'      => 'Bottle',
+        'barcode'        => '6001',
+        'price'          => 450,
+        'wholesale_price' => 420,
+        'cost_price'     => 350,
+        'stock_quantity' => 60,
+        'status'         => 'published',
+        'show_in_pos'    => true,
+    ], $productAttributes));
+
+    $crate = ProductUnit::create([
+        'product_id' => $product->id, 'name' => 'Crate', 'conversion_factor' => 24,
+        'price' => 9700, 'wholesale_price' => 9400,
+    ]);
+
+    ProductBarcode::create(['product_id' => $product->id, 'product_unit_id' => $crate->id, 'barcode' => '6024']);
+
+    Sanctum::actingAs($owner);
+
+    return compact('owner', 'vendor', 'product', 'crate');
+}
+
+it('sends each product with its units, prices, floors and barcodes', function () {
+    $ctx = catalogueContext();
+
+    $row = $this->getJson('/api/pos/products?vendor_id=' . $ctx['vendor']->id)
+        ->assertOk()
+        ->json('0');
+
+    expect($row['base_unit'])->toBe('Bottle')
+        ->and($row['allow_negative'])->toBeFalse()
+        ->and($row['units'])->toHaveCount(2)
+        ->and($row['units'][0])->toMatchArray(['name' => 'Bottle', 'conversion_factor' => 1, 'price' => 450.0, 'wholesale_price' => 420.0])
+        ->and($row['units'][1])->toMatchArray(['name' => 'Crate', 'conversion_factor' => 24, 'price' => 9700.0, 'wholesale_price' => 9400.0])
+        // Haggling is on and a cost is known, so a crate may go down to the
+        // cost of the 24 bottles inside it (24 × ₦350), never below.
+        ->and($row['units'][1]['wholesale_min_price'])->toEqual(8400)
+        ->and(collect($row['barcodes'])->pluck('barcode')->sort()->values()->all())->toBe(['6001', '6024'])
+        ->and($row)->not->toHaveKey('cost_price');
+});
+
+it('finds a product by a unit barcode', function () {
+    $ctx = catalogueContext();
+
+    $this->getJson('/api/pos/products/search?vendor_id=' . $ctx['vendor']->id . '&q=6024')
+        ->assertOk()
+        ->assertJsonPath('0.id', $ctx['product']->id);
+});
+
+it('keeps an out-of-stock product on the till only when it may sell below zero', function () {
+    $ctx = catalogueContext(['stock_quantity' => 0]);
+
+    expect($this->getJson('/api/pos/products?vendor_id=' . $ctx['vendor']->id)->json())->toBeEmpty();
+
+    $ctx['vendor']->update(['allow_negative_stock' => true]);
+
+    expect($this->getJson('/api/pos/products?vendor_id=' . $ctx['vendor']->id)->json())->toHaveCount(1);
+});
+
+it('lets a cashier set the default unit, but only to one of the product\'s own units', function () {
+    $ctx = catalogueContext();
+    $other = ProductUnit::create([
+        'product_id' => Product::create([
+            'vendor_id' => $ctx['vendor']->id, 'category_id' => $ctx['product']->category_id,
+            'name' => 'Fanta', 'price' => 400, 'status' => 'published',
+        ])->id,
+        'name' => 'Pack', 'conversion_factor' => 6, 'price' => 2300,
+    ]);
+
+    $this->postJson("/api/pos/products/{$ctx['product']->id}/default-unit", [
+        'vendor_id' => $ctx['vendor']->id, 'unit_id' => $ctx['crate']->id,
+    ])->assertOk();
+
+    expect($ctx['product']->fresh()->default_unit_id)->toBe($ctx['crate']->id);
+
+    $this->postJson("/api/pos/products/{$ctx['product']->id}/default-unit", [
+        'vendor_id' => $ctx['vendor']->id, 'unit_id' => $other->id,
+    ])->assertNotFound();
+});
+
+it('refuses a main barcode that already belongs to another product\'s unit', function () {
+    $ctx = catalogueContext();
+
+    expect(fn () => Product::create([
+        'vendor_id' => $ctx['vendor']->id, 'category_id' => $ctx['product']->category_id,
+        'name' => 'Clash', 'price' => 100, 'barcode' => '6024',
+    ]))->toThrow(\Illuminate\Validation\ValidationException::class);
+});

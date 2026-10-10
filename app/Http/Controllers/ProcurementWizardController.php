@@ -6,6 +6,7 @@ use App\Models\ProductStoreStock;
 use App\Models\Store;
 use App\Models\Supplier;
 use App\Models\Product;
+use App\Models\ProductUnit;
 use App\Models\Procurement;
 use App\Models\ProcurementItem;
 use App\Models\ProcurementLogisticsLeg;
@@ -139,7 +140,7 @@ class ProcurementWizardController extends Controller
             ->findOrFail(session('procurement.store_id'));
 
         $supplier = Supplier::findOrFail(session('procurement.supplier_id'));
-        $products = Product::where('vendor_id', $vendor->id)->orderBy('name')->get();
+        $products = Product::where('vendor_id', $vendor->id)->with('units')->orderBy('name')->get();
 
         // Which products already hold stock somewhere other than the branch
         // being delivered to. Those are the ones approval will refuse, because
@@ -163,6 +164,15 @@ class ProcurementWizardController extends Controller
             'receivable' => (int) $p->store_id === (int) $destination->id
                 || ! $heldElsewhere->has($p->id),
             'held_at' => $storeNames[$p->store_id] ?? null,
+            // The units it can be bought in — "Carton of 48" — so quantity and
+            // cost can be entered the way the invoice states them.
+            'base_unit' => $p->base_unit ?: 'Piece',
+            'units' => $p->units->where('is_active', true)->map(fn ($u) => [
+                'id'     => $u->id,
+                'name'   => $u->name,
+                'factor' => (int) $u->conversion_factor,
+                'is_base' => (bool) $u->is_base,
+            ])->values(),
         ])->values();
         $items    = session('procurement.items', []);
 
@@ -178,7 +188,18 @@ class ProcurementWizardController extends Controller
             'items.*.quantity'       => 'required|integer|min:1',
             'items.*.unit_cost'      => 'required|numeric|min:0',
             'items.*.selling_price'  => 'required|numeric|min:0',
+            // The unit bought in. Quantity and unit_cost above are then per
+            // that unit (5 cartons at ₦10,000), converted on submit.
+            'items.*.product_unit_id' => 'nullable|integer',
         ]);
+
+        // A unit has to belong to the product on its line.
+        foreach ($request->items as $i => $item) {
+            if (! empty($item['product_unit_id'])
+                && ! ProductUnit::where('product_id', $item['product_id'])->whereKey($item['product_unit_id'])->exists()) {
+                return back()->withErrors(["items.{$i}.product_unit_id" => 'That unit does not belong to the product on this line.'])->withInput();
+            }
+        }
 
         session(['procurement.items' => $request->items]);
 
@@ -297,13 +318,26 @@ class ProcurementWizardController extends Controller
 
 
             foreach ($items as $item) {
+                // Bought in a bigger unit: stock and cost are recorded per base
+                // unit — 5 cartons of 48 at ₦10,000 are 240 pieces at ₦208.33 —
+                // so approval, which reads only these two, adds the right number
+                // of pieces and sets cost_price per piece. What the invoice said
+                // is kept beside them.
+                $unit = ! empty($item['product_unit_id'])
+                    ? ProductUnit::where('product_id', $item['product_id'])->find($item['product_unit_id'])
+                    : null;
+                $factor = $unit ? max(1, (int) $unit->conversion_factor) : 1;
+
                 ProcurementItem::create([
                     'procurement_id' => $procurement->id,
                     'product_id'     => $item['product_id'],
                     'barcode'        => $item['barcode'] ?? null,
-                    'quantity'       => $item['quantity'],
-                    'unit_cost'      => $item['unit_cost'],
+                    'quantity'       => (int) $item['quantity'] * $factor,
+                    'unit_cost'      => $unit ? round((float) $item['unit_cost'] / $factor, 2) : $item['unit_cost'],
                     'selling_price'  => $item['selling_price'],
+                    'product_unit_id' => $unit?->id,
+                    'unit_qty'        => $unit ? (int) $item['quantity'] : null,
+                    'cost_per_unit'   => $unit ? $item['unit_cost'] : null,
                 ]);
             }
 

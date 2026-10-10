@@ -1,3 +1,5 @@
+import { findUnit, lineFields } from './units';
+
 /**
  * Turns a refused sale's lines back into cart lines.
  *
@@ -16,6 +18,18 @@ export function cartLinesFromSale(items = [], catalogue = []) {
     return items.map((item) => {
         const product = byId.get(item.product_id);
 
+        // Sold in a unit (a crate): the line comes back as that unit, with
+        // unit_qty crates at the crate price — not 24 bottles at it.
+        const unitFieldsFromSale = item.product_unit_id
+            ? {
+                unit_id:    item.product_unit_id,
+                unit_name:  item.unit_name ?? null,
+                factor:     item.unit_qty ? Math.max(1, Math.round(item.quantity / item.unit_qty)) : 1,
+                price_type: item.price_type ?? 'retail',
+            }
+            : {};
+        const qty = item.product_unit_id ? (item.unit_qty ?? item.quantity) : item.quantity;
+
         // Gone from this branch's catalogue since it was sold. Keep what the
         // sale recorded, so the cashier can at least see it and take it out.
         if (! product) {
@@ -25,7 +39,22 @@ export function cartLinesFromSale(items = [], catalogue = []) {
                 sku:          item.product_sku ?? null,
                 price:        item.unit_price,
                 listPrice:    item.unit_price,
-                qty:          item.quantity,
+                qty,
+                lineDiscount: item.discount_amount || 0,
+                ...unitFieldsFromSale,
+            };
+        }
+
+        const unit = item.product_unit_id ? findUnit(product, item.product_unit_id) : null;
+
+        if (unit) {
+            const fields = lineFields(unit, item.price_type ?? 'retail');
+
+            return {
+                ...product,
+                ...fields,
+                price:        Math.max(item.unit_price, fields.min_price),
+                qty,
                 lineDiscount: item.discount_amount || 0,
             };
         }

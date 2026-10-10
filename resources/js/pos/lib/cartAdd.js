@@ -1,3 +1,5 @@
+import { prepareLine } from './units';
+
 /**
  * Puts goods on a sale.
  *
@@ -16,13 +18,18 @@
  * Returns the new list and where the affected line ended up, because the till
  * highlights it and may open a price prompt on it next.
  */
-export function addToCart(cart = [], product, qty = 1) {
-    // Match on both product ID and the current selling price.
+export function addToCart(cart = [], product, qty = 1, priceType = 'retail') {
+    // Into its selling unit first — the one it was scanned as, or its default.
+    // A product with no units comes back unchanged.
+    product = prepareLine(product, priceType);
+
+    // Match on product ID, unit and the current selling price.
     // If a cashier discounted a line and then scans the product again,
     // it will appear as a new row at full price rather than merging into
-    // the discounted one.
-    const index = cart.findIndex((i) => 
-        i.id === product.id && 
+    // the discounted one. A crate and a bottle of the same drink are two lines.
+    const index = cart.findIndex((i) =>
+        i.id === product.id &&
+        (i.unit_id ?? null) === (product.unit_id ?? null) &&
         parseFloat(i.price) === parseFloat(product.price)
     );
 
@@ -61,13 +68,22 @@ export function roomFor(cart = [], product, exceptIndex = null) {
 
     if (product?.available_stock == null || !Number.isFinite(available)) return Infinity;
 
+    // The shop (or this product) sells below zero: nothing to stop at. The
+    // cart warns instead — see shortfallFor().
+    if (product?.allow_negative) return Infinity;
+
+    // Counted in base units, because a crate and a bottle draw on one shelf,
+    // then given back in the line's own unit: room for 2 crates, not 48.
+    const factor = Math.max(1, Number(product?.factor) || 1);
     const onShelf = available + (Number(product.reserved) || 0);
     const alreadyInSale = cart.reduce(
-        (total, line, i) => (i !== exceptIndex && line.id === product.id ? total + (Number(line.qty) || 0) : total),
+        (total, line, i) => (i !== exceptIndex && line.id === product.id
+            ? total + (Number(line.qty) || 0) * Math.max(1, Number(line.factor) || 1)
+            : total),
         0,
     );
 
-    return Math.max(0, onShelf - alreadyInSale);
+    return Math.max(0, Math.floor((onShelf - alreadyInSale) / factor));
 }
 
 /**

@@ -2,6 +2,8 @@
 
 namespace App\Filament\Vendor\Resources\Products\Schemas;
 
+use App\Models\Product;
+use App\Models\ProductBarcode;
 use App\Models\Store;
 use App\Models\Tag;
 use App\Services\ActiveStore;
@@ -11,6 +13,7 @@ use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\KeyValue;
 use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\Textarea;
@@ -44,6 +47,36 @@ class ProductForm
     public static function stripTransientAiFields(array $data): array
     {
         return array_diff_key($data, array_flip(self::AI_TRANSIENT_FIELDS));
+    }
+
+    /**
+     * A barcode is free if no OTHER product in this shop answers to it — as its
+     * main barcode or any extra one. This product's own codes are fine to keep.
+     */
+    public static function barcodeFreeRule(?int $productId): \Closure
+    {
+        return function (string $attribute, $value, \Closure $fail) use ($productId) {
+            $code = trim((string) $value);
+
+            if ($code === '') {
+                return;
+            }
+
+            $vendorId = filament()->getTenant()?->id;
+
+            $taken = ProductBarcode::where('vendor_id', $vendorId)
+                ->where('barcode', $code)
+                ->when($productId, fn ($q) => $q->where('product_id', '!=', $productId))
+                ->exists()
+                || Product::where('vendor_id', $vendorId)
+                    ->where('barcode', $code)
+                    ->when($productId, fn ($q) => $q->whereKeyNot($productId))
+                    ->exists();
+
+            if ($taken) {
+                $fail("Barcode {$code} is already used by another product in this shop.");
+            }
+        };
     }
 
     public static function canSeeCostPrice(): bool
@@ -469,6 +502,9 @@ class ProductForm
                                                                 ->label('Barcode')
                                                                 ->placeholder('e.g., 0123456789012')
                                                                 ->maxLength(100)
+                                                                // Also checked against other products' unit
+                                                                // barcodes, which the old unique index never saw.
+                                                                ->rule(fn ($livewire) => self::barcodeFreeRule(data_get($livewire, 'record.id')))
                                                                 ->extraFieldWrapperAttributes([
                                                                     'x-on:barcode-scanned.window' => "\$wire.set('data.barcode', \$event.detail.barcode)",
                                                                 ])
@@ -546,6 +582,116 @@ class ProductForm
                                                             : 'Cashiers can haggle on this product, but never below your minimum margin. Turn off to fix the price.')
                                                         ->default(true)
                                                         ->disabled(fn ($get) => blank($get('cost_price'))),
+                                                ]),
+
+                                            // Bottle / half crate / crate. Stock is
+                                            // always counted in the base unit; each
+                                            // extra unit says how many base units it
+                                            // holds and has its own price, set by
+                                            // hand — a crate is rarely 24 bottle prices.
+                                            Section::make('Selling Units')
+                                                ->description('Sell this product in more than one size, each with its own price and barcodes.')
+                                                ->schema([
+                                                    Grid::make(2)->schema([
+                                                        TextInput::make('base_unit')
+                                                            ->label('Base unit')
+                                                            ->placeholder('e.g., Bottle, Piece, Bag')
+                                                            ->default('Piece')
+                                                            ->required()
+                                                            ->maxLength(32)
+                                                            ->helperText('The smallest unit you sell. Stock is counted in this.'),
+
+                                                        TextInput::make('wholesale_price')
+                                                            ->label('Wholesale price (base unit)')
+                                                            ->numeric()
+                                                            ->minValue(0)
+                                                            ->prefix('₦')
+                                                            ->placeholder('Leave blank for retail only')
+                                                            ->helperText('The retail price is the Selling price above.'),
+                                                    ]),
+
+                                                    Select::make('negative_stock_override')
+                                                        ->label('Selling below zero stock')
+                                                        ->options([
+                                                            '1' => 'Allow for this product',
+                                                            '0' => 'Block for this product',
+                                                        ])
+                                                        ->placeholder('Follow shop setting')
+                                                        ->formatStateUsing(fn ($state) => $state === null ? null : ($state ? '1' : '0'))
+                                                        ->dehydrateStateUsing(fn ($state) => $state === null || $state === '' ? null : (bool) (int) $state)
+                                                        ->helperText('Shop setting is under Store Profile → Sales Point Settings.'),
+
+                                                    Repeater::make('extraBaseBarcodes')
+                                                        ->label(fn (Get $get) => 'More barcodes for one ' . ($get('base_unit') ?: 'Piece'))
+                                                        ->relationship('extraBaseBarcodes')
+                                                        ->simple(
+                                                            TextInput::make('barcode')
+                                                                ->required()
+                                                                ->maxLength(100)
+                                                                ->distinct()
+                                                                ->rule(fn ($livewire) => self::barcodeFreeRule(data_get($livewire, 'record.id'))),
+                                                        )
+                                                        ->defaultItems(0)
+                                                        ->addActionLabel('Add barcode'),
+
+                                                    Repeater::make('extraUnits')
+                                                        ->label('Other units')
+                                                        ->relationship('extraUnits')
+                                                        ->orderColumn('sort_order')
+                                                        ->defaultItems(0)
+                                                        ->addActionLabel('Add unit')
+                                                        ->itemLabel(fn (array $state): ?string => filled($state['name'] ?? null)
+                                                            ? $state['name'] . (filled($state['conversion_factor'] ?? null) ? ' (' . $state['conversion_factor'] . ')' : '')
+                                                            : null)
+                                                        ->collapsible()
+                                                        ->schema([
+                                                            Grid::make(2)->schema([
+                                                                TextInput::make('name')
+                                                                    ->label('Unit name')
+                                                                    ->placeholder('e.g., Crate, Half Crate, Carton')
+                                                                    ->required()
+                                                                    ->maxLength(64)
+                                                                    ->distinct(),
+
+                                                                TextInput::make('conversion_factor')
+                                                                    ->label(fn (Get $get) => 'How many ' . ($get('../../base_unit') ?: 'base units') . ' in one?')
+                                                                    ->integer()
+                                                                    ->minValue(1)
+                                                                    ->required()
+                                                                    ->default(1),
+
+                                                                TextInput::make('price')
+                                                                    ->label('Retail price')
+                                                                    ->numeric()
+                                                                    ->minValue(0)
+                                                                    ->prefix('₦')
+                                                                    ->required(),
+
+                                                                TextInput::make('wholesale_price')
+                                                                    ->label('Wholesale price')
+                                                                    ->numeric()
+                                                                    ->minValue(0)
+                                                                    ->prefix('₦')
+                                                                    ->placeholder('Leave blank for retail only'),
+                                                            ]),
+
+                                                            Repeater::make('barcodes')
+                                                                ->label('Barcodes for this unit')
+                                                                ->relationship('barcodes')
+                                                                ->simple(
+                                                                    TextInput::make('barcode')
+                                                                        ->required()
+                                                                        ->maxLength(100)
+                                                                        ->distinct()
+                                                                        ->rule(fn ($livewire) => self::barcodeFreeRule(data_get($livewire, 'record.id'))),
+                                                                )
+                                                                ->defaultItems(0)
+                                                                ->addActionLabel('Add barcode'),
+
+                                                            Toggle::make('is_active')
+                                                                ->label('On sale')
+                                                                ->default(true),
+                                                        ]),
                                                 ]),
 
                                             Section::make('Inventory')

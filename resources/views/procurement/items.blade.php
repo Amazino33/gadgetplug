@@ -185,6 +185,12 @@
                         class="product-search w-full px-3 py-2 border border-[#becab5] dark:border-zinc-600 rounded-lg text-sm focus:border-[#016c00] focus:ring-2 focus:ring-[#016c00]/20 outline-none bg-white dark:bg-zinc-900 dark:text-zinc-100">
                     <input type="hidden" name="items[${idx}][product_id]" id="productId_${idx}" value="${prefillProduct?.id ?? ''}">
                     <div id="productResults_${idx}" class="hidden absolute z-20 top-full left-0 right-0 mt-1 bg-white dark:bg-zinc-900 border border-[#becab5] dark:border-zinc-600 rounded-lg shadow-lg max-h-56 overflow-y-auto"></div>
+                    {{-- The unit bought in. Quantity and cost on this line are
+                         then per that unit — 5 cartons at ₦10,000 — and stock is
+                         converted to base units when the order is saved. Hidden
+                         for a product sold in one unit only. --}}
+                    <select name="items[${idx}][product_unit_id]" id="unit_${idx}" onchange="recalculate(); saveDraft();"
+                        class="hidden mt-2 w-full px-3 py-1.5 border border-[#becab5] dark:border-zinc-600 rounded-lg text-xs bg-white dark:bg-zinc-900 dark:text-zinc-100"></select>
                 </div>
 
                 {{-- Barcode and quantity are one line, and so are cost and
@@ -227,7 +233,7 @@
                 <div class="flex gap-3 lg:contents">
 
                 <div class="flex-1 min-w-0 lg:w-36 lg:flex-none">
-                    <label class="text-[10px] font-bold text-[#6f7b68] dark:text-zinc-500 uppercase tracking-wider block mb-1">Unit Cost</label>
+                    <label class="text-[10px] font-bold text-[#6f7b68] dark:text-zinc-500 uppercase tracking-wider block mb-1">Cost per unit</label>
                     <div class="relative">
                         <span class="absolute left-2 top-2 text-[#6f7b68] dark:text-zinc-400 text-sm font-bold">₦</span>
                         <input type="number" name="items[${idx}][unit_cost]" placeholder="0.00" min="0" step="0.01"
@@ -257,6 +263,7 @@
             </div>`;
 
             list.insertAdjacentHTML('beforeend', html);
+            if (prefillProduct) fillUnits(idx, prefillProduct, prefill?.product_unit_id);
             renumberRows();
             updateCount();
             saveDraft();
@@ -336,7 +343,29 @@
                 quantity:      row.querySelector('[name*="[quantity]"]')?.value || 1,
                 unit_cost:     row.querySelector('[name*="[unit_cost]"]')?.value || '',
                 selling_price: row.querySelector('[name*="[selling_price]"]')?.value || '',
+                product_unit_id: row.querySelector('[name*="[product_unit_id]"]')?.value || '',
             }));
+        }
+
+        /** Offers the units a product can be bought in; hidden when it has only one. */
+        function fillUnits(idx, product, selectedId = null) {
+            const select = document.getElementById(`unit_${idx}`);
+            if (!select) return;
+
+            const units = product?.units ?? [];
+
+            if (units.length < 2) {
+                select.innerHTML = '';
+                select.classList.add('hidden');
+                return;
+            }
+
+            select.innerHTML = units.map(u => {
+                const label = u.factor > 1 ? `${u.name} of ${u.factor} ${product.base_unit}` : u.name;
+                const selected = selectedId ? String(u.id) === String(selectedId) : u.is_base;
+                return `<option value="${u.id}" ${selected ? 'selected' : ''}>${escapeHtml(label)}</option>`;
+            }).join('');
+            select.classList.remove('hidden');
         }
 
         function hasContent(items) {
@@ -474,6 +503,8 @@
 
             const priceInput = document.getElementById(`price_${idx}`);
             if (priceInput && !priceInput.value) priceInput.value = product.price;
+
+            fillUnits(idx, product);
 
             recalculate();
             saveDraft();
