@@ -58,6 +58,26 @@ class RowParser
                 continue;
             }
 
+            // SKUs and barcodes are codes, not numbers. Excel shows a long one
+            // as 6.15E+12 and, once saved that way, the real digits are gone —
+            // so that is refused rather than guessed at. A trailing ".0" is
+            // only Excel's number formatting and is dropped.
+            if ($field->isIdentifier()) {
+                if (preg_match('/^\d+(\.\d+)?e[+-]?\d+$/i', $raw)) {
+                    $errors[] = sprintf(
+                        '%s "%s" was shortened by Excel into scientific notation, so the real digits are lost. Format the column as Text, re-enter the codes and save again.',
+                        $field->label(),
+                        $raw,
+                    );
+
+                    continue;
+                }
+
+                $values[$field->value] = preg_match('/^\d+\.0+$/', $raw) ? preg_replace('/\.0+$/', '', $raw) : $raw;
+
+                continue;
+            }
+
             $parsed = match ($field->type()) {
                 FieldType::Decimal => $this->number($raw),
                 FieldType::Integer => $this->integer($raw),
@@ -71,7 +91,10 @@ class RowParser
                 continue;
             }
 
-            if (in_array($field->type(), [FieldType::Decimal, FieldType::Integer], true) && $parsed < 0) {
+            // Opening stock is the one number allowed below zero: goods already
+            // sold before the catalogue existed.
+            if ($field !== ProductField::Quantity
+                && in_array($field->type(), [FieldType::Decimal, FieldType::Integer], true) && $parsed < 0) {
                 $errors[] = sprintf('%s cannot be negative (got %s).', $field->label(), $raw);
 
                 continue;

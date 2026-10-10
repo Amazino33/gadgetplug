@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Import;
 
 use App\Models\Product;
+use App\Models\ProductBarcode;
 use App\Models\Vendor;
 use App\Support\Import\ProductField;
 use Illuminate\Support\Collection;
@@ -41,8 +42,17 @@ class ImportPreparer
         $byBarcode = $this->existingIndex($vendor, 'barcode');
         $names     = Product::where('vendor_id', $vendor->id)->pluck('name', 'id')->all();
 
+        // Every code the shop already answers to — main, extra and unit
+        // barcodes — and which product holds it.
+        $codeOwners = ProductBarcode::where('vendor_id', $vendor->id)
+            ->pluck('product_id', 'barcode')
+            ->map(fn ($id) => (int) $id)
+            ->all() + $byBarcode;
+
         $seenSku     = [];
         $seenBarcode = [];
+        // Extra and unit barcodes already claimed earlier in this file.
+        $seenCode    = [];
 
         $rows = collect();
 
@@ -155,6 +165,35 @@ class ImportPreparer
                 $errors[] = 'Price is missing. A new product needs one, because it cannot be sold without a price.';
             }
 
+            // ── Selling units and extra barcodes ──
+            // Problems here never stop the product: the unit or barcode at
+            // fault is left out and the row says why.
+            [, $unitWarnings] = self::unitsFor($values);
+            $warnings = [...$warnings, ...$unitWarnings];
+
+            // A main barcode another product already carries as a unit or
+            // extra code. Kept off this product rather than stealing it.
+            if ($barcode !== '' && ! isset($byBarcode[$barcode])
+                && isset($codeOwners[$barcode]) && $codeOwners[$barcode] !== $matchedId) {
+                $warnings[] = self::barcodeTakenMessage($barcode);
+                unset($values[ProductField::Barcode->value]);
+
+                if ($sku === '') {
+                    $errors[] = 'Barcode "'.$barcode.'" belongs to another product and there is no SKU, so this row has nothing to be matched on.';
+                }
+            }
+
+            foreach (self::extraCodesIn($values) as $code) {
+                if (isset($codeOwners[$code]) && $codeOwners[$code] !== $matchedId) {
+                    $warnings[] = self::barcodeTakenMessage($code);
+                } elseif ((isset($seenCode[$code]) && $seenCode[$code] !== $line)
+                    || (isset($seenBarcode[$code]) && $seenBarcode[$code] !== $line)) {
+                    $warnings[] = sprintf('Barcode "%s" is already used on line %d of this file, so it was skipped here.', $code, $seenCode[$code] ?? $seenBarcode[$code]);
+                } else {
+                    $seenCode[$code] = $line;
+                }
+            }
+
             $rows->push(new ParsedRow(
                 line: $line,
                 values: $values,
@@ -166,6 +205,95 @@ class ImportPreparer
         }
 
         return $rows;
+    }
+
+    /**
+     * The extra units a row describes, and why any were left out.
+     *
+     * Shared with ProductImporter so the preview and the write agree on what a
+     * row means. A unit needs a name and a whole-number "Contains" of 2 or
+     * more; a price of 0 (or none, for a new unit) saves it switched off.
+     *
+     * @param  array<string, mixed>  $values
+     * @return array{0: array<int, array{slot: int, name: string, contains: int, price: float|null, wholesale: float|null, barcode: string, active: bool}>, 1: array<int, string>}
+     */
+    public static function unitsFor(array $values): array
+    {
+        $units    = [];
+        $warnings = [];
+        $names    = [];
+
+        foreach (ProductField::UNIT_SLOTS as $n) {
+            $f    = ProductField::unitFields($n);
+            $name = trim((string) ($values[$f['name']->value] ?? ''));
+
+            if ($name === '') {
+                $others = array_filter([$f['contains'], $f['price'], $f['wholesale'], $f['barcode']], fn ($field) => filled($values[$field->value] ?? null));
+
+                if ($others !== []) {
+                    $warnings[] = "Unit {$n} has values but no name, so it was skipped.";
+                }
+
+                continue;
+            }
+
+            $label    = "Unit {$n} ({$name})";
+            $rawCount = trim((string) ($values[$f['contains']->value] ?? ''));
+
+            if (! preg_match('/^\d+(\.0+)?$/', $rawCount) || (int) $rawCount < 2) {
+                $warnings[] = sprintf(
+                    '%s was skipped: Contains must be a whole number of 2 or more (got "%s").',
+                    $label,
+                    $rawCount === '' ? 'blank' : $rawCount,
+                );
+
+                continue;
+            }
+
+            if (isset($names[mb_strtolower($name)])) {
+                $warnings[] = "{$label} was skipped: another unit on this row has the same name.";
+
+                continue;
+            }
+
+            $names[mb_strtolower($name)] = true;
+
+            $price = $values[$f['price']->value] ?? null;
+
+            if ($price === null) {
+                $warnings[] = "{$label} has no price: a new unit is saved switched off, an existing one keeps its price.";
+            } elseif ((float) $price <= 0) {
+                $warnings[] = "{$label} has a price of 0, so it is saved switched off.";
+            }
+
+            $units[] = [
+                'slot'      => $n,
+                'name'      => mb_substr($name, 0, 64),
+                'contains'  => (int) $rawCount,
+                'price'     => $price === null ? null : (float) $price,
+                'wholesale' => isset($values[$f['wholesale']->value]) ? (float) $values[$f['wholesale']->value] : null,
+                'barcode'   => trim((string) ($values[$f['barcode']->value] ?? '')),
+                'active'    => $price !== null && (float) $price > 0,
+            ];
+        }
+
+        return [$units, $warnings];
+    }
+
+    /** Alt Barcode and every unit barcode on the row, in column order. */
+    public static function extraCodesIn(array $values): array
+    {
+        $fields = [ProductField::AltBarcode, ProductField::Unit2Barcode, ProductField::Unit3Barcode, ProductField::Unit4Barcode];
+
+        return array_values(array_filter(array_map(
+            fn (ProductField $f) => trim((string) ($values[$f->value] ?? '')),
+            $fields,
+        )));
+    }
+
+    public static function barcodeTakenMessage(string $code): string
+    {
+        return sprintf('Barcode "%s" is already used by another product in this shop, so it was skipped.', $code);
     }
 
     /**

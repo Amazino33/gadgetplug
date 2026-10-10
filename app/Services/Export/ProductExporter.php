@@ -76,6 +76,9 @@ class ProductExporter
         $path = $this->temporaryPath(null, $format, 'gadgetplug-product-template');
 
         $this->write($path, $format, function (callable $writeRow) {
+            // One product sold two ways: a single charger and a pack of 10,
+            // each priced by hand. "Unit" is the base unit, and stock and
+            // Quantity are counted in it.
             $writeRow(collect(ProductField::exportColumns())->map(fn (ProductField $f) => match ($f) {
                 ProductField::Name              => 'Anker 20W USB-C Charger',
                 // Blank: set by GadgetPlug, and ignored on a vendor's import.
@@ -97,8 +100,13 @@ class ProductExporter
                 ProductField::Status            => 'Yes',
                 ProductField::ShowOnline        => 'Yes',
                 ProductField::ShowInPos         => 'Yes',
-                // Left blank on purpose: filling it in would suggest it imports.
+                // Opening stock for a new product, in base units (chargers).
+                // Blank here so the example adds nothing to a real shelf.
                 ProductField::Quantity          => '',
+                ProductField::Unit2Name         => 'Pack of 10',
+                ProductField::Unit2Contains     => '10',
+                ProductField::Unit2Price        => '105000',
+                default                         => '',
             })->all());
         });
 
@@ -128,7 +136,48 @@ class ProductExporter
             // margin; blank is the truth that nobody has entered one.
             ProductField::CostPrice  => $product->cost_price === null ? '' : (string) $product->cost_price,
             ProductField::Quantity   => (string) $product->stock_quantity,
-            default                  => (string) ($product->{$field->value} ?? ''),
+            // The base unit. measurement_unit as it always was; the form's
+            // base unit only when someone has set one and the old column is empty.
+            ProductField::MeasurementUnit => (string) ($product->measurement_unit
+                ?: ($product->base_unit && $product->base_unit !== 'Piece' ? $product->base_unit : '')),
+            ProductField::WholesalePrice  => $product->wholesale_price === null ? '' : (string) $product->wholesale_price,
+            ProductField::AltBarcode      => (string) ($this->altBarcode($product) ?? ''),
+            default                  => $field->unitSlot() !== null
+                ? $this->unitCell($product, $field)
+                : (string) ($product->{$field->value} ?? ''),
+        };
+    }
+
+    /** A base-unit barcode other than the main one, if the product has any. */
+    private function altBarcode(Product $product): ?string
+    {
+        return $product->barcodes
+            ->whereNull('product_unit_id')
+            ->first(fn ($b) => $b->barcode !== $product->barcode)
+            ?->barcode;
+    }
+
+    /**
+     * Unit 2–4: the product's extra units in their display order. A product
+     * with more than three extra units exports the first three.
+     */
+    private function unitCell(Product $product, ProductField $field): string
+    {
+        $unit = $product->units->where('is_base', false)->values()->get($field->unitSlot() - 2);
+
+        if ($unit === null) {
+            return '';
+        }
+
+        $parts = ProductField::unitFields($field->unitSlot());
+
+        return match ($field) {
+            $parts['name']      => (string) $unit->name,
+            $parts['contains']  => (string) $unit->conversion_factor,
+            $parts['price']     => (string) $unit->price,
+            $parts['wholesale'] => $unit->wholesale_price === null ? '' : (string) $unit->wholesale_price,
+            $parts['barcode']   => (string) ($product->barcodes->firstWhere('product_unit_id', $unit->id)?->barcode ?? ''),
+            default             => '',
         };
     }
 
@@ -140,7 +189,7 @@ class ProductExporter
     private function query(Vendor $vendor, array $filters): Builder
     {
         return Product::query()
-            ->with(['category:id,name', 'supplier:id,name'])
+            ->with(['category:id,name', 'supplier:id,name', 'units', 'barcodes'])
             ->where('vendor_id', $vendor->id)
             ->when(filled($filters['category_id'] ?? null), fn ($q) => $q->where('category_id', $filters['category_id']))
             ->when(filled($filters['status'] ?? null), fn ($q) => $q->where('status', $filters['status']))

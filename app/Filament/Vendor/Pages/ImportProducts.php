@@ -22,6 +22,7 @@ use Illuminate\Support\Collection;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 use UnitEnum;
 
@@ -421,11 +422,17 @@ class ImportProducts extends Page
                 'total_rows'    => $rows->count(),
                 'skipped_count' => $skipped->count(),
                 'status'        => 'running',
-                'errors'        => $skipped->take(200)->map(fn (ParsedRow $row) => [
+                // Every one, not a sample: this list is downloaded and worked
+                // through line by line to fix the file.
+                'errors'        => $skipped->map(fn (ParsedRow $row) => [
                     'line'   => $row->line,
                     'name'   => $row->name(),
                     'errors' => $row->errors,
                 ])->values()->all(),
+                // What the preview already knew about the rows that will go in.
+                'warnings'      => app(ProductImporter::class)->warningPayload(
+                    $rows->filter(fn (ParsedRow $row) => $row->isImportable()),
+                ),
             ]);
 
             $this->resultLogId = $log->id;
@@ -476,7 +483,7 @@ class ImportProducts extends Page
                 return;
             }
 
-            $counts = app(ProductImporter::class)->applyChunk($batch, filament()->getTenant());
+            $counts = app(ProductImporter::class)->applyChunk($batch, filament()->getTenant(), auth()->id());
         } catch (Throwable $e) {
             $this->failed($e);
 
@@ -485,9 +492,18 @@ class ImportProducts extends Page
 
         $log = $this->result();
 
+        // A row that could not be written is undone on its own and listed with
+        // its line and reason; the rest of the batch stands.
         $log?->update([
             'created_count' => $log->created_count + $counts['created'],
             'updated_count' => $log->updated_count + $counts['updated'],
+            'skipped_count' => $log->skipped_count + count($counts['failures']),
+            'units_created_count'  => $log->units_created_count + $counts['units_created'],
+            'units_updated_count'  => $log->units_updated_count + $counts['units_updated'],
+            'barcodes_added_count' => $log->barcodes_added_count + $counts['barcodes_added'],
+            'opening_stock_count'  => $log->opening_stock_count + $counts['opening_stock'],
+            'errors'   => [...($log->errors ?? []), ...$counts['failures']],
+            'warnings' => ProductImporter::mergeWarnings($log->warnings ?? [], $counts['warnings']),
         ]);
 
         $this->processed += $batch->count();
@@ -581,6 +597,39 @@ class ImportProducts extends Page
         }
 
         return response()->download($log->snapshot_path);
+    }
+
+    /**
+     * Every error and warning from this run, one per line with its row number,
+     * as a CSV the vendor can sort and work through against their file.
+     */
+    public function downloadReport(): ?StreamedResponse
+    {
+        $log = $this->result();
+
+        if ($log === null) {
+            return null;
+        }
+
+        $lines = collect($log->errors ?? [])
+            ->flatMap(fn (array $e) => collect($e['errors'] ?? [])->map(fn ($message) => [$e['line'] ?? '', $e['name'] ?? '', 'Not imported', $message]))
+            ->merge(collect($log->warnings ?? [])->map(fn (array $w) => [$w['line'] ?? '', $w['name'] ?? '', 'Warning', $w['message'] ?? '']))
+            ->sortBy(fn (array $l) => (int) $l[0])
+            ->values();
+
+        $name = 'import-report-'.$log->id.'.csv';
+
+        return response()->streamDownload(function () use ($lines, $log) {
+            $out = fopen('php://output', 'w');
+            fputcsv($out, ['Summary', $log->summary().', '.$log->unitsSummary()]);
+            fputcsv($out, ['Row', 'Product', 'Type', 'Message']);
+
+            foreach ($lines as $line) {
+                fputcsv($out, $line);
+            }
+
+            fclose($out);
+        }, $name, ['Content-Type' => 'text/csv']);
     }
 
     public function startOver(): void

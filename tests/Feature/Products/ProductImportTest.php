@@ -108,12 +108,17 @@ it('maps headers from a POS it has never seen, by shape alone', function () {
     ]);
 });
 
-it('never offers stock as something an import can write', function () {
-    $mapping = app(ColumnMapper::class)->guess(['Name', 'SKU', 'Quantity', 'Stock On Hand']);
+it('maps a quantity column to opening stock', function () {
+    $mapping = app(ColumnMapper::class)->guess(['Name', 'SKU', 'Quantity']);
 
-    expect($mapping)->not->toHaveKey('Quantity')
-        ->and($mapping)->not->toHaveKey('Stock On Hand')
-        ->and(array_values($mapping))->not->toContain('quantity');
+    expect($mapping['Quantity'] ?? null)->toBe('quantity');
+});
+
+it('maps "Wholesale" to the wholesale price, never to cost', function () {
+    $mapping = app(ColumnMapper::class)->guess(['Name', 'Cost', 'Wholesale']);
+
+    expect($mapping['Wholesale'] ?? null)->toBe('wholesale_price')
+        ->and($mapping['Cost'] ?? null)->toBe('cost_price');
 });
 
 it('does not let two columns claim the same field', function () {
@@ -154,7 +159,7 @@ it('imports a whole Aronium file into an empty catalogue', function () {
         ->and($charger->supplier->name)->toBe('Lagos Electronics');
 });
 
-it('leaves stock at zero even though the file states a quantity', function () {
+it('books the file\'s quantity as opening stock for a new product, through the ledger', function () {
     $vendor = importVendor();
 
     $path = csvFile(aroniumCsv(
@@ -163,9 +168,25 @@ it('leaves stock at zero even though the file states a quantity', function () {
 
     runImport($path, $vendor);
 
-    // 14 units are in the file. Writing them would desync the per-store mirror
-    // and leave a stock movement with no ledger entry behind it.
-    expect(Product::firstOrFail()->stock_quantity)->toBe(0);
+    $product = Product::firstOrFail();
+
+    // Never written to the stock column directly: one ledgered movement into
+    // the product's home branch, which the mirror then reflects.
+    expect($product->stock_quantity)->toBe(14)
+        ->and(\App\Models\InventoryLedger::where('product_id', $product->id)->sole())
+        ->transaction_type->toBe('stock_adjustment')
+        ->quantity_change->toBe(14)
+        ->description->toBe('Opening stock — import');
+});
+
+it('never changes the stock of a product that already exists', function () {
+    $vendor = importVendor();
+    $row = 'Anker 20W Charger,Chargers,ANK-20W,6009880111,pcs,7500,46.6,11000,0,False,True,False,False,True,Fast charger,%d,Lagos Electronics,10,50,True,5';
+
+    runImport(csvFile(aroniumCsv(sprintf($row, 14))), $vendor);
+    runImport(csvFile(aroniumCsv(sprintf($row, 99))), $vendor);
+
+    expect(Product::firstOrFail()->stock_quantity)->toBe(14);
 });
 
 it('creates each category and supplier once, however many rows name them', function () {
@@ -507,8 +528,9 @@ it('exports every field an import can read back', function () {
         'Low Stock Threshold' => '5',
         'Is Service'          => 'No',
         'Status'              => 'published',
-        // Written for the vendor to read, never read back in.
-        'Quantity'            => '0',
+        // The file's 14 became the new product's opening stock, and the
+        // export reports what is on hand.
+        'Quantity'            => '14',
     ]);
 });
 
@@ -591,9 +613,11 @@ it('offers a blank template that imports cleanly as one product', function () {
 
     expect($log->created_count)->toBe(1)
         ->and($log->skipped_count)->toBe(0)
-        ->and(Product::firstOrFail()->name)->toBe('Anker 20W USB-C Charger')
-        // The example leaves Quantity blank so nobody reads it as importable.
-        ->and(Product::firstOrFail()->stock_quantity)->toBe(0);
+        ->and(Product::firstOrFail()->name)->toBe('Egg')
+        // The example leaves Quantity blank so it adds nothing to a real shelf.
+        ->and(Product::firstOrFail()->stock_quantity)->toBe(0)
+        // And it carries the Crate and Half Crate it is there to show.
+        ->and($log->units_created_count)->toBe(2);
 });
 
 it('writes an xlsx export that reads back with the same headers', function () {

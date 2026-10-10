@@ -394,6 +394,7 @@
         <x-filament::section wire:key="import-step-done" heading="Import finished">
             @if ($log)
                 <p class="text-lg font-semibold text-gray-900 dark:text-white">{{ $log->summary() }}</p>
+                <p class="mt-1 text-sm font-medium text-gray-700 dark:text-gray-300">{{ $log->unitsSummary() }}</p>
                 <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">
                     From <strong>{{ $log->file_name }}</strong> on {{ $log->created_at->format('d M Y, g:ia') }}@if ($log->store), into <strong>{{ $log->store->name }}</strong>@endif.
                     Recorded in the import history as run by <strong>{{ $log->actorLabel() }}</strong>.
@@ -408,7 +409,39 @@
                     </div>
                 @endif
 
+                @php
+                    $problemRows = collect($log->errors ?? [])->filter(fn ($e) => filled($e['line'] ?? null));
+                    $warningRows = collect($log->warnings ?? []);
+                @endphp
+
+                @if ($problemRows->isNotEmpty() || $warningRows->isNotEmpty())
+                    <div class="mt-4 rounded-lg border border-gray-200 dark:border-white/10">
+                        <p class="px-4 py-2 text-sm font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-white/10">
+                            {{ $problemRows->count() }} row(s) not imported · {{ $warningRows->count() }} warning(s)
+                            <span class="font-normal text-gray-500 dark:text-gray-400">— the first 50 are shown; the report has every one.</span>
+                        </p>
+                        <ul class="max-h-72 overflow-y-auto divide-y divide-gray-100 dark:divide-white/5 text-sm">
+                            @foreach ($problemRows->take(50) as $problem)
+                                <li class="px-4 py-2 text-red-700 dark:text-red-300">
+                                    <span class="font-mono">Row {{ $problem['line'] }}</span> · {{ $problem['name'] }} — {{ implode(' ', $problem['errors'] ?? []) }}
+                                </li>
+                            @endforeach
+                            @foreach ($warningRows->take(50) as $warning)
+                                <li class="px-4 py-2 text-amber-800 dark:text-amber-200">
+                                    <span class="font-mono">Row {{ $warning['line'] }}</span> · {{ $warning['name'] }} — {{ $warning['message'] }}
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+
                 <div class="mt-5 flex flex-wrap gap-3">
+                    @if ($problemRows->isNotEmpty() || $warningRows->isNotEmpty())
+                        <x-filament::button color="warning" outlined wire:click="downloadReport">
+                            Download report (CSV)
+                        </x-filament::button>
+                    @endif
+
                     <x-filament::button
                         tag="a"
                         href="{{ \App\Filament\Vendor\Resources\Products\ProductResource::getUrl('index') }}">

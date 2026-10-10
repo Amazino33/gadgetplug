@@ -19,6 +19,11 @@ class ImportLog extends Model
 
     protected $casts = [
         'errors'             => 'array',
+        'warnings'           => 'array',
+        'units_created_count'  => 'integer',
+        'units_updated_count'  => 'integer',
+        'barcodes_added_count' => 'integer',
+        'opening_stock_count'  => 'integer',
         'total_rows'         => 'integer',
         'created_count'      => 'integer',
         'updated_count'      => 'integer',
@@ -75,6 +80,18 @@ class ImportLog extends Model
             $this->created_count,
             $this->updated_count,
             $this->skipped_count,
+        );
+    }
+
+    /** What the run did beyond products: units, barcodes and opening stock. */
+    public function unitsSummary(): string
+    {
+        return sprintf(
+            '%d units created, %d units updated, %d barcodes added, %d opening stock entries',
+            $this->units_created_count,
+            $this->units_updated_count,
+            $this->barcodes_added_count,
+            $this->opening_stock_count,
         );
     }
 
