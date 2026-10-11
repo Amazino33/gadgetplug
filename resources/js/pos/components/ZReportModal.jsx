@@ -22,7 +22,9 @@ export default function ZReportModal({ session, onClose }) {
     const [state, setState] = useState('loading');
 
     useEffect(() => {
-        if (!session?.id) {
+        const vendorId = localStorage.getItem('pos_vendor_id');
+
+        if (!vendorId) {
             setState('none');
 
             return;
@@ -30,7 +32,11 @@ export default function ZReportModal({ session, onClose }) {
 
         let cancelled = false;
 
-        api.get(`/sessions/${session.id}/z-report`)
+        // Today's slip for whoever is signed in, worked out by the server. It
+        // used to be asked for by the session id the till remembered, which
+        // could be yesterday's closed day — or nothing, if today had not
+        // reached the server yet — and either way showed no sales.
+        api.get('/sessions/today/z-report', { params: { vendor_id: vendorId } })
             .then(({ data }) => {
                 if (cancelled) return;
                 setReport(data);
@@ -44,12 +50,16 @@ export default function ZReportModal({ session, onClose }) {
             });
 
         return () => { cancelled = true; };
-    }, [session?.id]);
+    }, []);
 
     const printReport = () => {
         if (!report) return;
 
-        printDocument(zReportHtml(report, session, { ...vendorSettings(), cashier_name: cashierName() }));
+        // The remembered session only describes this slip if it is the same
+        // day; otherwise its opening time would be printed on today's report.
+        const sameSession = session?.id != null && Number(session.id) === Number(report.pos_session_id);
+
+        printDocument(zReportHtml(report, sameSession ? session : {}, { ...vendorSettings(), cashier_name: cashierName() }));
     };
 
     return (
@@ -90,7 +100,8 @@ export default function ZReportModal({ session, onClose }) {
                     {state === 'ready' && report && (
                         <>
                             <p className="mb-4 text-center text-xs text-gray-400">
-                                {new Date(report.generated_at).toLocaleString('en-NG')}
+                                {report.report_date ? `${String(report.report_date).slice(0, 10)} · ` : ''}
+                                {report.transaction_count ?? 0} sale(s) · {new Date(report.generated_at).toLocaleString('en-NG')}
                             </p>
 
                             <div className="space-y-3">

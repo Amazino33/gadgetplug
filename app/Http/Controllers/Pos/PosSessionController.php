@@ -285,6 +285,48 @@ class PosSessionController extends Controller
         ]);
     }
 
+    /**
+     * Today's Z-report for the cashier at this till, whatever session the
+     * till happens to remember.
+     *
+     * The till used to ask by the session id it had cached, and that cache
+     * outlived the day: after a cash-up the next morning's till could still be
+     * holding yesterday's closed session (or none, if the new day had not yet
+     * reached the server), so the slip it fetched was the wrong day or
+     * nothing — "No sales data" in the middle of a busy shift. The server
+     * knows which day it is and who is asking, so it answers that instead.
+     */
+    public function todayZReport(Request $request): JsonResponse
+    {
+        $request->validate(['vendor_id' => 'required|integer']);
+
+        $cashier = $request->user();
+        $storeId = TillStore::resolve($cashier, (int) $request->vendor_id);
+        $today   = BusinessDate::today();
+
+        $session = PosSession::where('vendor_id', $request->vendor_id)
+            ->where('store_id', $storeId)
+            ->where('cashier_id', $cashier->id)
+            ->whereDate('business_date', $today)
+            ->latest('id')
+            ->first();
+
+        // The day was opened on the till but has not reached the server yet
+        // (no signal at opening). Its sales may well have — they are found by
+        // cashier, branch and date, not by session — so the slip is built
+        // from them all the same, with no float on record yet.
+        $session ??= new PosSession([
+            'vendor_id'     => (int) $request->vendor_id,
+            'store_id'      => $storeId,
+            'cashier_id'    => $cashier->id,
+            'business_date' => $today,
+            'opening_float' => 0,
+            'status'        => PosSession::STATUS_OPEN,
+        ]);
+
+        return $this->zReport($session);
+    }
+
     public function zReport(PosSession $session): JsonResponse
     {
         $report = $session->zReport;

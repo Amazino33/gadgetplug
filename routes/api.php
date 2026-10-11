@@ -64,6 +64,8 @@ Route::prefix('pos')->middleware(NoStoreApiResponse::class)->group(function () {
         // explain a gap, and they do it from the panel.
         Route::post('sessions/open',               [PosSessionController::class, 'open']);
         Route::post('sessions/{session}/close',    [PosSessionController::class, 'close']);
+        // Before {session}: "today" would otherwise be read as a session id.
+        Route::get('sessions/today/z-report',      [PosSessionController::class, 'todayZReport']);
         Route::get('sessions/{session}/z-report',  [PosSessionController::class, 'zReport']);
         Route::get('sessions/active',              [PosSessionController::class, 'active']);
         Route::get('sessions/history',             [PosSessionController::class, 'history']);

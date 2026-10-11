@@ -216,8 +216,16 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
     // so its sales cannot be stamped with one. This asks again once, when the
     // component has a shift but no session — the background sync keeps trying
     // regardless, and the sale queue does not depend on the answer.
+    //
+    // A remembered session from another day counts as none: the cache
+    // outlives a cash-up, so the morning after, a till that opened offline
+    // was still holding yesterday's closed session and never asked again.
     useEffect(() => {
-        if (session || !shift) return;
+        if (!shift) return;
+
+        const sameDay = session && String(session.business_date ?? '').slice(0, 10) === shift.business_date;
+
+        if (sameDay) return;
 
         announceShift(shift)
             .then((opened) => setSession(opened ?? cachedSession()))
