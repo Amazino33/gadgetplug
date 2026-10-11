@@ -55,19 +55,19 @@ test('there is no cap on how many sales can be held at once', function () {
         ->assertJsonCount(5);
 });
 
-test('a different cashier on the same vendor can still see a held sale', function () {
+test('a held sale belongs to the cashier who held it — another cashier neither sees nor touches it', function () {
     $data = suspendedSaleVendor();
 
     $firstCashier = User::factory()->create();
     $data['vendor']->users()->syncWithoutDetaching([$firstCashier->id]);
 
     Sanctum::actingAs($firstCashier);
-    $this->postJson('/api/pos/suspended', [
+    $id = $this->postJson('/api/pos/suspended', [
         'vendor_id'   => $data['vendor']->id,
         'label'       => 'Hold 2',
         'customer_id' => null,
         'cart_data'   => ['items' => [['id' => 1, 'name' => 'Widget', 'price' => 500, 'qty' => 1]], 'customer' => null],
-    ])->assertCreated();
+    ])->assertCreated()->json('id');
 
     $secondCashier = User::factory()->create();
     $data['vendor']->users()->syncWithoutDetaching([$secondCashier->id]);
@@ -75,6 +75,13 @@ test('a different cashier on the same vendor can still see a held sale', functio
     Sanctum::actingAs($secondCashier);
     $this->getJson('/api/pos/suspended?vendor_id=' . $data['vendor']->id)
         ->assertOk()
+        ->assertJsonCount(0);
+    $this->postJson("/api/pos/suspended/{$id}/resume", ['vendor_id' => $data['vendor']->id])->assertNotFound();
+    $this->deleteJson("/api/pos/suspended/{$id}", ['vendor_id' => $data['vendor']->id])->assertNotFound();
+
+    // Still there, and still the first cashier's.
+    Sanctum::actingAs($firstCashier);
+    $this->getJson('/api/pos/suspended?vendor_id=' . $data['vendor']->id)
         ->assertJsonCount(1)
         ->assertJsonPath('0.label', 'Hold 2');
 });

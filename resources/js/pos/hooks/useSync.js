@@ -81,7 +81,7 @@ export function useSync(vendorId, cashierId, onStuckSalesChange) {
 
         await syncPickingPayments();
         // Sales held, resumed or discarded here while offline.
-        try { await syncHeldSales(vendorId); } catch { /* next sync tries again */ }
+        try { await syncHeldSales(vendorId, cashierId); } catch { /* next sync tries again */ }
         await syncShifts();
         await reportStuck();
     };

@@ -250,17 +250,17 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
         try {
             const { data } = await api.get('/suspended', { params: { vendor_id: vendorId } });
             serverList = data;
-            cacheServerList(vendorId, data);
+            cacheServerList(vendorId, user?.id, data);
         } catch {
-            serverList = cachedServerList(vendorId);
+            serverList = cachedServerList(vendorId, user?.id);
         }
 
         try {
-            setPendingSales(await mergedHeldSales(vendorId, serverList));
+            setPendingSales(await mergedHeldSales(vendorId, user?.id, serverList));
         } catch {
             setPendingSales(serverList);
         }
-    }, [vendorId]);
+    }, [vendorId, user?.id]);
 
     const [pendingProcurementsCount, setPendingProcurementsCount] = useState(0);
 
@@ -304,7 +304,7 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
             // No connection: hold it on this till. It uploads by itself when
             // the connection returns, and other tills see it from then on.
             try {
-                await holdLocally(vendorId, payload);
+                await holdLocally(vendorId, user?.id, payload);
             } catch {
                 setPendingError("Couldn't hold this sale — it has NOT been saved. Try again.");
                 return;
@@ -344,7 +344,7 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
             // server's list once the connection returns.
             setCart(sale.cart_data?.items || []);
             setCustomer(sale.cart_data?.customer || null);
-            await queueRemoval(vendorId, sale.id);
+            await queueRemoval(vendorId, user?.id, sale.id);
         }
 
         loadPendingSales();
@@ -369,7 +369,7 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
                 return;
             }
 
-            await queueRemoval(vendorId, id);
+            await queueRemoval(vendorId, user?.id, id);
         }
 
         loadPendingSales();

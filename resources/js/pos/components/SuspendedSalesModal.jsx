@@ -29,7 +29,7 @@ export default function SuspendedSalesModal({ sales = [], cartEmpty, error, onRe
                         <p className="text-[11px] text-gray-400 mt-0.5">
                             {sales.length === 0
                                 ? 'Nothing on hold'
-                                : `${sales.length} on hold · from any till`}
+                                : `${sales.length} on hold · held by you`}
                         </p>
                     </div>
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
@@ -54,7 +54,7 @@ export default function SuspendedSalesModal({ sales = [], cartEmpty, error, onRe
                 {offline && (
                     <div className="shrink-0 px-6 py-2.5 bg-gray-50 dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700">
                         <p className="text-[11px] text-gray-600 dark:text-gray-300">
-                            <span className="font-semibold">Offline.</span> Showing the last list from the server. A sale held at another till could also be resumed there until this till reconnects.
+                            <span className="font-semibold">Offline.</span> Showing your held sales as last saved. Holding, resuming and discarding still work and catch up when the connection returns.
                         </p>
                     </div>
                 )}
@@ -106,7 +106,7 @@ export default function SuspendedSalesModal({ sales = [], cartEmpty, error, onRe
                                         </p>
                                         {sale.local && (
                                             <p className="mt-1 inline-block rounded-full bg-amber-100 dark:bg-amber-900/50 px-2 py-0.5 text-[10px] font-semibold text-amber-800 dark:text-amber-300">
-                                                On this till only · shared with other tills when back online
+                                                On this till only · uploads when back online
                                             </p>
                                         )}
                                     </button>

@@ -11,7 +11,14 @@ import { db } from './db';
  * the server's list sent later.
  */
 
-const CACHE_KEY = (vendorId) => `pos_suspended_cache:${vendorId}`;
+// Per cashier: held sales are each cashier's own, and a till is often shared.
+const CACHE_KEY = (vendorId, cashierId) => `pos_suspended_cache:${vendorId}:${cashierId}`;
+
+/**
+ * Whether a queued row is this cashier's. Rows queued by the first build of
+ * this feature carry no cashier, and are treated as whoever is signed in.
+ */
+const ownedBy = (cashierId) => (row) => row.cashier_id == null || Number(row.cashier_id) === Number(cashierId);
 
 /** A reference the server uses to save an uploaded hold once, however often it is retried. */
 export function newClientRef() {
@@ -27,10 +34,11 @@ export function unreachable(error) {
 }
 
 /** Holds a sale on this till, to be uploaded when the connection returns. */
-export async function holdLocally(vendorId, payload) {
+export async function holdLocally(vendorId, cashierId, payload) {
     await db.heldSales.add({
         kind:       'hold',
         vendor_id:  Number(vendorId),
+        cashier_id: Number(cashierId),
         client_ref: payload.client_ref ?? newClientRef(),
         payload,
         created_at: new Date().toISOString(),
@@ -38,10 +46,11 @@ export async function holdLocally(vendorId, payload) {
 }
 
 /** Remembers that a server-held sale was resumed or discarded here while offline. */
-export async function queueRemoval(vendorId, serverId) {
+export async function queueRemoval(vendorId, cashierId, serverId) {
     await db.heldSales.add({
         kind:       'remove',
         vendor_id:  Number(vendorId),
+        cashier_id: Number(cashierId),
         server_id:  serverId,
         created_at: new Date().toISOString(),
     });
@@ -52,17 +61,17 @@ export async function dropLocalHold(localId) {
 }
 
 /** The last list the server gave, for when it cannot be asked. */
-export function cachedServerList(vendorId) {
+export function cachedServerList(vendorId, cashierId) {
     try {
-        return JSON.parse(localStorage.getItem(CACHE_KEY(vendorId)) ?? '[]');
+        return JSON.parse(localStorage.getItem(CACHE_KEY(vendorId, cashierId)) ?? '[]');
     } catch {
         return [];
     }
 }
 
-export function cacheServerList(vendorId, list) {
+export function cacheServerList(vendorId, cashierId, list) {
     try {
-        localStorage.setItem(CACHE_KEY(vendorId), JSON.stringify(list ?? []));
+        localStorage.setItem(CACHE_KEY(vendorId, cashierId), JSON.stringify(list ?? []));
     } catch { /* storage full — the live list still shows */ }
 }
 
@@ -71,8 +80,8 @@ export function cacheServerList(vendorId, list) {
  * less anything taken off it here while offline, plus anything held here and
  * not yet uploaded — those marked `local`.
  */
-export async function mergedHeldSales(vendorId, serverList) {
-    const rows = await db.heldSales.where('vendor_id').equals(Number(vendorId)).toArray();
+export async function mergedHeldSales(vendorId, cashierId, serverList) {
+    const rows = (await db.heldSales.where('vendor_id').equals(Number(vendorId)).toArray()).filter(ownedBy(cashierId));
 
     const removed = new Set(rows.filter((r) => r.kind === 'remove').map((r) => r.server_id));
     const uploadedRefs = new Set((serverList ?? []).map((s) => s.client_ref).filter(Boolean));
@@ -98,10 +107,12 @@ export async function mergedHeldSales(vendorId, serverList) {
  * only once the server has it; anything that cannot be sent waits for the next
  * sync. A removal the server no longer has (resumed elsewhere) is done.
  */
-export async function syncHeldSales(vendorId) {
-    if (! vendorId) return;
+export async function syncHeldSales(vendorId, cashierId) {
+    if (! vendorId || ! cashierId) return;
 
-    const rows = await db.heldSales.where('vendor_id').equals(Number(vendorId)).toArray();
+    // Only this cashier's: the server files an upload under whoever sends it,
+    // so another cashier's offline hold waits until they are signed in.
+    const rows = (await db.heldSales.where('vendor_id').equals(Number(vendorId)).toArray()).filter(ownedBy(cashierId));
 
     for (const row of rows) {
         try {

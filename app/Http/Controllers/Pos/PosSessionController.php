@@ -424,7 +424,12 @@ class PosSessionController extends Controller
     {
         $request->validate(['vendor_id' => 'required|integer']);
 
+        // Each cashier's own held sales only. They used to be shared across
+        // every till in the shop, so one cashier's held customers turned up on
+        // another cashier's screen to be resumed — and rung up — by the wrong
+        // person, into the wrong drawer.
         $sales = PosSuspendedSale::where('vendor_id', $request->vendor_id)
+            ->where('cashier_id', $request->user()->id)
             ->with('customer:id,name,phone')
             ->oldest()
             ->get();
@@ -447,6 +452,7 @@ class PosSessionController extends Controller
 
         if ($request->filled('client_ref')) {
             $existing = PosSuspendedSale::where('vendor_id', $request->vendor_id)
+                ->where('cashier_id', $request->user()->id)
                 ->where('client_ref', $request->client_ref)
                 ->first();
 
@@ -471,6 +477,9 @@ class PosSessionController extends Controller
     {
         $request->validate(['vendor_id' => 'required|integer']);
         abort_unless($suspendedSale->vendor_id === (int) $request->vendor_id, 404);
+        // Only the cashier who held it. Another cashier's held sale is not
+        // theirs to see, so it is "not found" rather than "forbidden".
+        abort_unless((int) $suspendedSale->cashier_id === $request->user()->id, 404);
 
         $data = $suspendedSale->toArray();
         $suspendedSale->delete();
@@ -482,6 +491,7 @@ class PosSessionController extends Controller
     {
         $request->validate(['vendor_id' => 'required|integer']);
         abort_unless($suspendedSale->vendor_id === (int) $request->vendor_id, 404);
+        abort_unless((int) $suspendedSale->cashier_id === $request->user()->id, 404);
 
         $suspendedSale->delete();
 
