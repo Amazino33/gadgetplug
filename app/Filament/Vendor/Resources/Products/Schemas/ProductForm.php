@@ -517,6 +517,25 @@ class ProductForm
                                                                         ),
                                                                 ),
 
+                                                            // Other codes for the same single item —
+                                                            // the same product from two manufacturers,
+                                                            // or an old label still on the shelf. Any
+                                                            // of them scans as this product. Codes for
+                                                            // a bigger unit (a crate) are set on that
+                                                            // unit under Selling Units.
+                                                            Repeater::make('extraBaseBarcodes')
+                                                                ->label('Alternative barcodes')
+                                                                ->relationship('extraBaseBarcodes')
+                                                                ->simple(
+                                                                    TextInput::make('barcode')
+                                                                        ->required()
+                                                                        ->maxLength(100)
+                                                                        ->distinct()
+                                                                        ->rule(fn ($livewire) => self::barcodeFreeRule(data_get($livewire, 'record.id'))),
+                                                                )
+                                                                ->defaultItems(0)
+                                                                ->addActionLabel('Add alternative barcode'),
+
                                                             // Where it comes from.
                                                             //
                                                             // Vendor-scoped, and creatable inline
@@ -620,19 +639,6 @@ class ProductForm
                                                         ->formatStateUsing(fn ($state) => $state === null ? null : ($state ? '1' : '0'))
                                                         ->dehydrateStateUsing(fn ($state) => $state === null || $state === '' ? null : (bool) (int) $state)
                                                         ->helperText('Shop setting is under Store Profile → Sales Point Settings.'),
-
-                                                    Repeater::make('extraBaseBarcodes')
-                                                        ->label(fn (Get $get) => 'More barcodes for one ' . ($get('base_unit') ?: 'Piece'))
-                                                        ->relationship('extraBaseBarcodes')
-                                                        ->simple(
-                                                            TextInput::make('barcode')
-                                                                ->required()
-                                                                ->maxLength(100)
-                                                                ->distinct()
-                                                                ->rule(fn ($livewire) => self::barcodeFreeRule(data_get($livewire, 'record.id'))),
-                                                        )
-                                                        ->defaultItems(0)
-                                                        ->addActionLabel('Add barcode'),
 
                                                     Repeater::make('extraUnits')
                                                         ->label('Other units')

@@ -255,6 +255,30 @@ const SearchBar = forwardRef(function SearchBar({
         debounceRef.current = setTimeout(() => search(q), 120);
     };
 
+    /**
+     * The server's answer to a scan the device did not recognise, or null.
+     * Short timeout: a hand is hovering over the counter. What it finds is
+     * written to the device so the next scan of it is instant.
+     */
+    const scanFromServer = async (code) => {
+        if (!navigator.onLine) return null;
+
+        try {
+            const { data } = await api.get('/products/search', {
+                params: { vendor_id: vendorId, q: code },
+                timeout: 3000,
+            });
+
+            if (!Array.isArray(data)) return null;
+
+            try { await db.products.bulkPut(data); } catch { /* the next catalogue reload brings it */ }
+
+            return scanFor({ query: code, results: data, burst: true });
+        } catch {
+            return null;
+        }
+    };
+
     const commit = async () => {
         const trimmed = query.trim();
 
@@ -297,10 +321,24 @@ const SearchBar = forwardRef(function SearchBar({
 
             if (scanned) { takeScan(scanned); return; }
 
-            // Shaped like a barcode, and nothing carries it. Say so and stop:
-            // falling through here would offer a quantity of whatever product
-            // merely happened to contain those digits somewhere in its name.
-            if (looksLikeBarcode(trimmed)) { reportUnknownBarcode(trimmed); return; }
+            // Shaped like a barcode, and nothing on the device carries it. The
+            // device's copy is up to ten minutes old, so a barcode added in the
+            // admin panel since — an alternative code, a crate's code, a new
+            // product — is asked about once before the scan is called unknown.
+            // Only on a miss: a scan the device knows never waits.
+            if (looksLikeBarcode(trimmed)) {
+                const fromServer = await scanFromServer(trimmed);
+
+                if (inputRef.current && inputRef.current.value.trim() !== trimmed) return;
+
+                if (fromServer) { takeScan(fromServer); return; }
+
+                // Nothing carries it anywhere. Say so and stop: falling through
+                // here would offer a quantity of whatever product merely
+                // happened to contain those digits somewhere in its name.
+                reportUnknownBarcode(trimmed);
+                return;
+            }
         }
 
         // Only ever adds the row that is highlighted on screen. See

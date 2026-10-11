@@ -339,3 +339,40 @@ describe('the server keeps the figures fresh without slowing anything down', () 
         expect(screen.queryByText('Samsung 25W Charger')).toBeNull();
     });
 });
+
+describe('a scan the device does not know yet', () => {
+    // An alternative barcode added in the admin panel after this till last
+    // reloaded its catalogue. The server knows it; the device does not.
+    const mentos = {
+        id: 9, name: 'Mentos 87.5g', sku: '3519', barcode: '8935001726999', price: 600, available_stock: 20,
+        barcodes: [{ barcode: '8935001726999', unit_id: null }, { barcode: '8935001726166', unit_id: null }],
+    };
+
+    it('asks the server before calling it unknown, and rings it up', async () => {
+        const api = (await import('../lib/api')).default;
+        api.get.mockImplementation(async (url, config) => ({
+            data: config?.params?.q === '8935001726166' ? [mentos] : [],
+        }));
+
+        const onScan = vi.fn();
+        render(<SearchBar vendorId={1} onSelect={vi.fn()} onScan={onScan} />);
+
+        await type('8935001726166{Enter}');
+
+        await waitFor(() => expect(onScan).toHaveBeenCalledWith(expect.objectContaining({ id: 9 })));
+        expect(screen.queryByText(/No product for barcode/)).toBeNull();
+    });
+
+    it('still says unknown when the server does not know it either', async () => {
+        const api = (await import('../lib/api')).default;
+        api.get.mockResolvedValue({ data: [] });
+
+        const onScan = vi.fn();
+        render(<SearchBar vendorId={1} onSelect={vi.fn()} onScan={onScan} />);
+
+        await type('5550001112223{Enter}');
+
+        expect(await screen.findByText(/No product for barcode 5550001112223/)).toBeDefined();
+        expect(onScan).not.toHaveBeenCalled();
+    });
+});
