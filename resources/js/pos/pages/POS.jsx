@@ -152,6 +152,10 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
     // Set by the vendor in Store Profile. A till that logged in before the
     // setting existed has no key, and keeps asking as it always did.
     const ASK_QUANTITY = vendorSettings.ask_quantity ?? true;
+    // Whether a cashier may change a unit price. Off unless the vendor turned
+    // it on in Store Profile — and the server holds to it whatever the till
+    // sends, so this only decides what the screen offers.
+    const ALLOW_PRICE_CHANGE = vendorSettings.allow_price_change ?? false;
 
     const [cart, setCart]                 = useState(() => {
         try { return JSON.parse(localStorage.getItem('pos_cart')) || []; } catch { return []; }
@@ -570,6 +574,14 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
     // ── Totals ───────────────────────────────────────────────────────
 
     const subtotal       = cart.reduce((s, i) => s + i.price * i.qty - (i.lineDiscount || 0), 0);
+
+    // "3 products · 7 items": lines, and units as sold — 2 Packs is 2 items,
+    // not the 24 pieces inside them. Nothing when the cart is empty.
+    const cartCountsText = cart.length === 0 ? '' : (() => {
+        const items = cart.reduce((n, i) => n + (Number(i.qty) || 0), 0);
+
+        return `${cart.length} ${cart.length === 1 ? 'product' : 'products'} · ${items} ${items === 1 ? 'item' : 'items'}`;
+    })();
 
     // The least this cart may sell for, the same sum the server works out in
     // PosPriceFloor::guard(). Every line can sit exactly on its own floor and
@@ -1007,17 +1019,27 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
                         onSelect={handleCartSelect}
                         onQtyChange={updateQty}
                         onRemove={removeItem}
-                        onPriceEdit={(idx) => { setSelectedIdx(idx); setModal('price'); }}
+                        onPriceEdit={(idx) => { if (!ALLOW_PRICE_CHANGE) return; setSelectedIdx(idx); setModal('price'); }}
                         onUnitChange={changeLineUnit}
                         onPriceTypeChange={changeLinePriceType}
                         onSetDefaultUnit={setDefaultUnit}
+                        allowPriceChange={ALLOW_PRICE_CHANGE}
+                        // A typed quantity ends with the caret back in the scan
+                        // box, so the next scan just goes. After the field has
+                        // gone, which is why it waits a tick.
+                        onQtyEditDone={() => setTimeout(() => searchRef.current?.focus(), 0)}
                     />
                 </div>
 
                 {/* ── DESKTOP totals footer ─────────────────────────── */}
                 <div className="hidden md:flex flex-col bg-white dark:bg-gray-900 border-t-2 border-gray-100 dark:border-gray-800 px-6 py-4 shrink-0">
-                    <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400 mb-1">
-                        <span>Subtotal</span><span className="font-mono tabular-nums">{fmt(subtotal)}</span>
+                    {/* Subtotal left, amount right, and between them how many
+                        products and items — muted, no currency, no bold, so it
+                        is never read as an amount. */}
+                    <div className="grid grid-cols-[auto_1fr_auto] items-baseline gap-3 text-sm text-gray-500 dark:text-gray-400 mb-1">
+                        <span>Subtotal</span>
+                        <span className="text-center text-xs text-gray-400 dark:text-gray-500">{cartCountsText}</span>
+                        <span className="font-mono tabular-nums">{fmt(subtotal)}</span>
                     </div>
                     {discountAmount > 0 && (
                         <div className="flex justify-between text-sm text-[#F97316] mb-1">
@@ -1090,6 +1112,9 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
                     {/* Totals + CHARGE */}
                     <div className="flex items-center gap-3 px-3 pb-4">
                         <div className="flex-1 min-w-0">
+                            {cartCountsText && (
+                                <p className="text-[11px] text-gray-400 dark:text-gray-500">{cartCountsText}</p>
+                            )}
                             <div className="flex justify-between text-xs text-gray-400 dark:text-gray-500">
                                 <span>Subtotal</span><span>{fmt(subtotal)}</span>
                             </div>
@@ -1334,7 +1359,7 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
                     max={roomFor(cart, cart[selectedIdx], selectedIdx)}
                     onConfirm={(qty) => { updateQty(selectedIdx, qty); setModal(null); }}
                     onClose={() => setModal(null)}
-                    onNegotiate={() => setModal('price')}
+                    onNegotiate={ALLOW_PRICE_CHANGE ? () => setModal('price') : undefined}
                 />
             )}
             {/* Saying how many of a just-picked product to put in the sale:
@@ -1347,10 +1372,10 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
                     hint="Type the quantity and press Enter · Esc cancels"
                     onConfirm={confirmPending}
                     onClose={cancelPending}
-                    onNegotiate={negotiatePending}
+                    onNegotiate={ALLOW_PRICE_CHANGE ? negotiatePending : undefined}
                 />
             )}
-            {modal === 'price' && selectedIdx !== null && (
+            {modal === 'price' && ALLOW_PRICE_CHANGE && selectedIdx !== null && (
                 <PriceModal
                     item={cart[selectedIdx]}
                     onConfirm={(price) => { updatePrice(selectedIdx, price); setModal(null); }}

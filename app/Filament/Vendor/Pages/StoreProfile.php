@@ -56,6 +56,7 @@ class StoreProfile extends Page
             'pos_min_margin_percent'       => $vendor->pos_min_margin_percent ?? 0,
             'allow_negative_stock'         => (bool) $vendor->allow_negative_stock,
             'pos_ask_quantity'             => $vendor->pos_ask_quantity ?? true,
+            'pos_allow_price_change'       => (bool) $vendor->pos_allow_price_change,
             'pos_blind_count_frequency'    => $vendor->pos_blind_count_frequency ?? 'daily',
             'pos_blind_count_custom_days'  => $vendor->pos_blind_count_custom_days ?? 3,
         ]);
@@ -183,6 +184,13 @@ class StoreProfile extends Page
                             ->label('Ask for quantity when adding items')
                             ->helperText('When on, the till asks how many every time a product is searched or scanned. When off, each product goes into the sale at 1 — change it from the cart if needed.')
                             ->default(true),
+
+                        // Off: every sale is at the catalogue price, and the
+                        // server ignores any other price a till sends.
+                        Toggle::make('pos_allow_price_change')
+                            ->label('Allow unit price change at sales point')
+                            ->helperText('When on, cashiers can click a price in the cart to change it — never below your minimum margin. When off, items always sell at their retail or wholesale price.')
+                            ->default(false),
                     ]),
 
                 Section::make('Bank Details for Payouts')
@@ -228,6 +236,7 @@ class StoreProfile extends Page
             'pos_min_margin_percent'       => (float) ($data['pos_min_margin_percent'] ?? 0),
             'allow_negative_stock'         => (bool) ($data['allow_negative_stock'] ?? false),
             'pos_ask_quantity'             => (bool) ($data['pos_ask_quantity'] ?? true),
+            'pos_allow_price_change'       => (bool) ($data['pos_allow_price_change'] ?? false),
             'pos_blind_count_frequency'    => $data['pos_blind_count_frequency'] ?? 'daily',
             'pos_blind_count_custom_days'  => ($data['pos_blind_count_frequency'] ?? 'daily') === 'custom'
                 ? (int) ($data['pos_blind_count_custom_days'] ?? 3)

@@ -47,13 +47,65 @@ final class SaleLineResolver
 
         $lines = [];
 
+        // Price changes at the till are the vendor's choice, and off unless
+        // they turn it on. Off, the price a till sends is not believed at all:
+        // every line is repriced from the catalogue — the unit's own price, at
+        // retail or wholesale as the line says — whatever arrived.
+        $catalogueOnly = ! (bool) $vendor->pos_allow_price_change;
+
         foreach ($items as $key => $item) {
-            $lines[$key] = empty($item['product_unit_id'])
+            $line = empty($item['product_unit_id'])
                 ? $this->legacyLine($item)
                 : $this->unitLine($item);
+
+            $lines[$key] = $catalogueOnly ? $this->atCataloguePrice($line) : $line + ['price_forced' => false];
         }
 
         return $lines;
+    }
+
+    /**
+     * The line at the catalogue price, with `price_forced` saying whether
+     * that changed what the till sent.
+     */
+    private function atCataloguePrice(array $line): array
+    {
+        $product = $this->products->get((int) $line['product_id']);
+
+        // Not this vendor's product: left for the price floor's own check to
+        // refuse, exactly as before.
+        if (! $product) {
+            return $line + ['price_forced' => false];
+        }
+
+        if ($line['product_unit_id']) {
+            $unit = $product->units->firstWhere('id', (int) $line['product_unit_id']);
+            $wholesale = $line['price_type'] === 'wholesale';
+
+            $price = $unit->is_base
+                ? (float) ($wholesale && $product->wholesale_price !== null ? $product->wholesale_price : $product->price)
+                : (float) ($wholesale && $unit->wholesale_price !== null ? $unit->wholesale_price : $unit->price);
+
+            $forced = abs($price - (float) $line['sold_unit_price']) > 0.004;
+            $gross  = $price * (int) $line['unit_qty'];
+
+            return array_merge($line, [
+                'sold_unit_price' => $price,
+                'unit_price'      => round($gross / max(1, (int) $line['quantity']), 2),
+                'line_gross'      => $gross,
+                'price_forced'    => $forced,
+            ]);
+        }
+
+        // A line from a till without units sells in the base unit at retail.
+        $price  = (float) $product->price;
+        $forced = abs($price - (float) $line['unit_price']) > 0.004;
+
+        return array_merge($line, [
+            'unit_price'   => $price,
+            'line_gross'   => $price * (int) $line['quantity'],
+            'price_forced' => $forced,
+        ]);
     }
 
     /** The products the last resolve() looked up, keyed by id. */

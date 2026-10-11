@@ -11,9 +11,34 @@
  * every function here leaves it exactly as it was.
  */
 
-/** The units this product can be sold in, base unit first. */
+const factorOf = (u) => Number(u?.conversion_factor ?? u?.factor ?? 1);
+
+/**
+ * The units this product can be sold in, smallest to largest — by how many
+ * base units each holds, never by the order they were created in. pcs, Half
+ * Pack, Pack reads the same way on every product.
+ */
 export function unitsOf(product) {
-    return Array.isArray(product?.units) ? product.units.filter((u) => u && u.is_active !== false) : [];
+    return Array.isArray(product?.units)
+        ? product.units
+            .filter((u) => u && u.is_active !== false)
+            .sort((a, b) => factorOf(a) - factorOf(b) || Number(a.id) - Number(b.id))
+        : [];
+}
+
+/**
+ * A unit name short enough for a crowded segmented control: "Half Pack" →
+ * "½ Pk". The full name always goes in the tooltip.
+ */
+const SHORT_WORDS = { pack: 'Pk', crate: 'Cr', carton: 'Ctn', bottle: 'Btl', piece: 'Pc', pieces: 'Pcs', dozen: 'Dz', bundle: 'Bdl', bag: 'Bag', box: 'Box', tray: 'Tray' };
+
+export function shortUnitName(name = '') {
+    const words = String(name).trim().split(/\s+/);
+
+    return words.map((w, i) => {
+        if (i === 0 && /^half$/i.test(w) && words.length > 1) return '½';
+        return SHORT_WORDS[w.toLowerCase()] ?? (w.length > 5 ? `${w.slice(0, 4)}.` : w);
+    }).join(' ');
 }
 
 export function findUnit(product, unitId) {

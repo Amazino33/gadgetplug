@@ -29,6 +29,27 @@ class PosSyncController extends Controller
      * Accept a batch of offline sales collected in IndexedDB and persist them.
      * Each sale carries a client-generated `offline_id` so we can deduplicate.
      */
+    /**
+     * A queued sale's money worked out again from lines repriced at the
+     * catalogue price: subtotal from the lines, the till's own cart discount,
+     * and VAT at the rate the till charged (none if it charged none).
+     */
+    private static function repriced(array $payload, array $lines, Vendor $vendor): array
+    {
+        $subtotal = collect($lines)->sum(fn ($l) => $l['line_gross'] - (float) ($l['discount_amount'] ?? 0));
+        $discount = (float) ($payload['discount_amount'] ?? 0);
+        $vatRate  = (float) ($payload['vat_amount'] ?? 0) > 0
+            ? (float) ($payload['vat_rate'] ?? $vendor->pos_vat_rate ?? 7.5)
+            : 0.0;
+        $vat = round(($subtotal - $discount) * ($vatRate / 100), 2);
+
+        return array_merge($payload, [
+            'subtotal'   => round($subtotal, 2),
+            'vat_amount' => $vat,
+            'total'      => round($subtotal - $discount + $vat, 2),
+        ]);
+    }
+
     public function sync(Request $request, AdjustStockAction $adjustStock, PosPriceFloor $priceFloor): JsonResponse
     {
         $request->validate([
@@ -100,6 +121,14 @@ class PosSyncController extends Controller
                 $resolver = app(SaleLineResolver::class);
                 $lines    = $resolver->resolve($vendor, $payload['items']);
                 $products = $resolver->products();
+
+                // The vendor does not allow price changes and this till sent
+                // other prices: the lines are at the catalogue price now, so
+                // the sale's money is worked out again from them rather than
+                // taken from the till.
+                if (collect($lines)->contains('price_forced', true)) {
+                    $payload = self::repriced($payload, $lines, $vendor);
+                }
 
                 $priceFloor->guard(
                     $vendor,
@@ -192,7 +221,7 @@ class PosSyncController extends Controller
                             // A line from a till without units keeps the total
                             // it sent, exactly as before. A unit line's money is
                             // the unit price times the units sold.
-                            'total'           => $item['product_unit_id']
+                            'total'           => $item['product_unit_id'] || $item['price_forced']
                                 ? $item['line_gross'] - (float) ($item['discount_amount'] ?? 0)
                                 : $item['total'],
                         ]);

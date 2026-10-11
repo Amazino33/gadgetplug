@@ -136,7 +136,7 @@ it('sells at the wholesale price, which the floor would otherwise refuse', funct
 });
 
 it('treats a wholesale request on a unit with no wholesale price as retail', function () {
-    $ctx = unitsContext();
+    $ctx = unitsContext([], ['pos_allow_price_change' => true]);
 
     // The half crate has no wholesale price, so ₦4,000 is below its ₦5,000 retail floor.
     unitSale($ctx, [unitLine($ctx, $ctx['half'], 1, 4000, 'wholesale')])->assertStatus(422);
@@ -220,4 +220,67 @@ it('syncs an offline crate sale the same way', function () {
 
     expect((int) PosSaleItem::firstOrFail()->quantity)->toBe(24)
         ->and($ctx['product']->fresh()->stock_quantity)->toBe(36);
+});
+
+// ── Price lock ───────────────────────────────────────────────────────────────
+
+it('with price changes off, ignores a tampered price and sells at the catalogue price', function () {
+    $ctx = unitsContext();
+
+    expect((bool) $ctx['vendor']->pos_allow_price_change)->toBeFalse();
+
+    // A crate posted at ₦100 instead of ₦9,700.
+    unitSale($ctx, [unitLine($ctx, $ctx['crate'], 1, 100)])->assertCreated();
+
+    $item = PosSaleItem::firstOrFail();
+
+    expect((float) $item->sold_unit_price)->toBe(9700.0)
+        ->and((float) $item->total)->toBe(9700.0)
+        ->and((float) $item->sale->total)->toBe(9700.0);
+});
+
+it('with price changes off, reprices at the wholesale price when the line is wholesale', function () {
+    $ctx = unitsContext();
+
+    unitSale($ctx, [unitLine($ctx, $ctx['crate'], 1, 1, 'wholesale')])->assertCreated();
+
+    expect((float) PosSaleItem::firstOrFail()->total)->toBe(9400.0);
+});
+
+it('with price changes off, reprices a tampered offline sale and works its total out again', function () {
+    $ctx = unitsContext();
+    Sanctum::actingAs($ctx['owner']);
+
+    $this->postJson('/api/pos/sync', [
+        'vendor_id' => $ctx['vendor']->id,
+        'sales'     => [[
+            'offline_id'     => 'tampered-1',
+            'items'          => [
+                unitLine($ctx, $ctx['crate'], 1, 100) + ['total' => 100],
+                // A line from an older till, no unit: base unit at retail.
+                ['product_id' => $ctx['product']->id, 'product_name' => 'Coke 50cl', 'unit_price' => 1, 'quantity' => 2, 'total' => 2],
+            ],
+            'payment_method' => 'cash',
+            'subtotal'       => 102,
+            'total'          => 102,
+            'vat_amount'     => 0,
+            'completed_at'   => now()->toIso8601String(),
+        ]],
+    ])->assertOk()->assertJsonFragment(['status' => 'synced']);
+
+    $sale = \App\Models\PosSale::firstOrFail();
+
+    expect((float) $sale->subtotal)->toBe(10600.0)       // 9,700 + 2 × 450
+        ->and((float) $sale->total)->toBe(10600.0)
+        ->and((float) PosSaleItem::where('unit_qty', null)->value('total'))->toBe(900.0);
+});
+
+it('with price changes on, still lets a negotiated price through — never below the floor', function () {
+    $ctx = unitsContext(['allow_pos_price_override' => true], ['pos_allow_price_change' => true]);
+
+    // Crate floor: 24 × ₦350 cost = ₦8,400.
+    unitSale($ctx, [unitLine($ctx, $ctx['crate'], 1, 9000)])->assertCreated();
+    expect((float) PosSaleItem::firstOrFail()->total)->toBe(9000.0);
+
+    unitSale($ctx, [unitLine($ctx, $ctx['crate'], 1, 8000)])->assertStatus(422);
 });

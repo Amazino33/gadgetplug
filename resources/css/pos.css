@@ -29,3 +29,38 @@ body {
        first. This is the one print rule the page still needs. */
     #receipt-print-frame { display: none !important; }
 }
+
+/* ── Cart rows ────────────────────────────────────────────────────────────────
+   Every row and the heading share these fixed column widths, so the quantity,
+   unit, price and total controls line up straight down the cart. One line per
+   item from 1100px; below that, two lines — thumb, name, total and × on top,
+   quantity, unit and price beneath — with controls kept at tap size. */
+.cart-row {
+    display: grid;
+    align-items: center;
+    column-gap: 0.75rem;
+    row-gap: 0.375rem;
+    min-height: 56px;
+    padding: 0.5rem 1rem 0.5rem 1.5rem;
+    grid-template-columns: 36px 124px minmax(0, 1fr) minmax(0, 1fr) 104px 32px;
+    grid-template-areas:
+        "thumb name  name  name  total remove"
+        ".     qty   unit  price price .";
+}
+.cart-head { display: none; min-height: 0; padding-top: 0.75rem; padding-bottom: 0.75rem; }
+
+@media (min-width: 1100px) {
+    .cart-row {
+        grid-template-columns: 36px minmax(0, 1fr) 124px 176px 104px 112px 32px;
+        grid-template-areas: "thumb name qty unit price total remove";
+    }
+    .cart-head { display: grid; }
+}
+
+.cart-thumb  { grid-area: thumb; }
+.cart-name   { grid-area: name; }
+.cart-qty    { grid-area: qty; }
+.cart-unit   { grid-area: unit; }
+.cart-price  { grid-area: price; justify-self: end; }
+.cart-total  { grid-area: total; }
+.cart-remove { grid-area: remove; }

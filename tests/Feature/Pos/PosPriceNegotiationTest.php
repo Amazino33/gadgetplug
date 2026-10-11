@@ -20,6 +20,8 @@ function negotiationContext(array $vendorAttributes = [], array $productAttribut
         'user_id'                => $owner->id,
         'name'                   => 'Leisure Hub',
         'pos_min_margin_percent' => 0,
+        // Haggling is the vendor's choice; these cover how it behaves when allowed.
+        'pos_allow_price_change' => true,
     ], $vendorAttributes));
 
     $category = Category::create(['name' => 'Chargers']);

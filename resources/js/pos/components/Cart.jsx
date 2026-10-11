@@ -1,104 +1,302 @@
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { fmt } from '../lib/format';
 import { roomFor } from '../lib/cartAdd';
-import { shortfallFor, stockText, unitsOf } from '../lib/units';
+import { shortUnitName, shortfallFor, stockText, unitsOf } from '../lib/units';
 
-// Clicks inside a row must not also select it (desktop) or start a swipe (mobile).
+// Clicks inside a row's controls must not also select the row (desktop) or
+// start a swipe (mobile).
 const stop = (e) => e.stopPropagation();
 
-/**
- * The unit chips, price type and stock notes under a cart line.
- *
- * Renders nothing extra for a product with no units — a catalogue cached
- * before units existed looks exactly as it always did.
- */
-function LineUnits({ items, item, idx, onUnitChange, onPriceTypeChange, onSetDefaultUnit }) {
-    const units = unitsOf(item);
-    const hasWholesale = units.some((u) => u.wholesale_price != null);
-    const stock = stockText(item);
-    const short = item.allow_negative ? shortfallFor(items, item) : 0;
-    const atLimit = ! item.allow_negative && Number.isFinite(roomFor(items, item, idx)) && item.qty >= roomFor(items, item, idx);
+// ── Pieces shared by every row ────────────────────────────────────────────────
 
-    if (units.length === 0 && ! stock) return null;
+/** A soft background picked from the name, so the same product always looks the same. */
+const THUMB_COLOURS = [
+    'bg-green-100 text-green-800', 'bg-blue-100 text-blue-800', 'bg-amber-100 text-amber-800',
+    'bg-rose-100 text-rose-800', 'bg-violet-100 text-violet-800', 'bg-teal-100 text-teal-800',
+];
+
+function initials(name = '') {
+    const words = String(name).trim().split(/\s+/).filter(Boolean);
+
+    return (words.length > 1 ? words[0][0] + words[1][0] : (words[0] ?? '?').slice(0, 2)).toUpperCase();
+}
+
+function Thumb({ item, size = 'w-9 h-9' }) {
+    if (item.image) {
+        return <img src={item.image} className={`${size} rounded-lg object-cover shrink-0`} alt="" />;
+    }
+
+    const hash = [...String(item.name ?? '')].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
 
     return (
-        <div className="mt-1.5 space-y-1" onClick={stop} onPointerDown={stop}>
-            {units.length > 1 && (
-                <div className="flex flex-wrap items-center gap-1">
-                    {units.map((u) => {
-                        const active = Number(u.id) === Number(item.unit_id);
-                        return (
-                            <button
-                                key={u.id}
-                                type="button"
-                                onClick={() => onUnitChange?.(idx, u.id)}
-                                aria-pressed={active}
-                                className={`px-2 py-0.5 rounded-full text-[11px] font-semibold border transition-colors ${
-                                    active
-                                        ? 'bg-[#068B03] border-[#068B03] text-white'
-                                        : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-[#068B03]'
-                                }`}
-                            >
-                                {u.name}
-                            </button>
-                        );
-                    })}
-                    {item.unit_id != null && Number(item.unit_id) !== Number(item.default_unit_id) && (
-                        <button
-                            type="button"
-                            onClick={() => onSetDefaultUnit?.(idx, item.unit_id)}
-                            title="Add this product as this unit from now on"
-                            className="text-[11px] text-[#068B03] dark:text-green-400 underline decoration-dotted underline-offset-2"
-                        >
-                            Set as default
-                        </button>
-                    )}
-                </div>
+        <div className={`${size} rounded-lg shrink-0 flex items-center justify-center text-[11px] font-bold ${THUMB_COLOURS[hash % THUMB_COLOURS.length]}`}>
+            {initials(item.name)}
+        </div>
+    );
+}
+
+/**
+ * Only when it matters: below the product's low-stock level, or more in this
+ * sale (in base pieces) than the shelf holds. The full stock is in the name's
+ * tooltip instead of taking a line of every row.
+ */
+function StockBadge({ items, item }) {
+    const exceeds = shortfallFor(items, item) > 0;
+
+    if (exceeds) {
+        return <span className="shrink-0 rounded px-1.5 py-px text-[10px] font-bold bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300">Exceeds stock</span>;
+    }
+
+    if (item.is_low_stock) {
+        return <span className="shrink-0 rounded px-1.5 py-px text-[10px] font-bold bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300">Low</span>;
+    }
+
+    return null;
+}
+
+function nameTooltip(item) {
+    const stock = stockText(item);
+
+    return stock ? `${item.name}\nIn stock: ${stock}` : item.name;
+}
+
+/**
+ * One pill split into segments, exactly one active, smallest unit first. A
+ * product sold in one unit shows that unit as plain text, so the column still
+ * lines up.
+ */
+function UnitSegments({ item, idx, onUnitChange }) {
+    const units = unitsOf(item);
+
+    if (units.length < 2) {
+        return (
+            <span className="text-xs text-gray-400 dark:text-gray-500 truncate" title={item.unit_name ?? item.base_unit ?? ''}>
+                {item.unit_name ?? item.base_unit ?? ''}
+            </span>
+        );
+    }
+
+    // Abbreviated only when the full names would not fit the column.
+    const crowded = units.reduce((n, u) => n + String(u.name).length, 0) > 14;
+
+    return (
+        <div role="group" aria-label="Selling unit" className="inline-flex max-w-full rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden" onClick={stop} onPointerDown={stop}>
+            {units.map((u) => {
+                const active = Number(u.id) === Number(item.unit_id);
+
+                return (
+                    <button
+                        key={u.id}
+                        type="button"
+                        title={u.name}
+                        aria-pressed={active}
+                        onClick={() => onUnitChange?.(idx, u.id)}
+                        className={`min-h-9 px-2 text-xs font-semibold whitespace-nowrap border-r last:border-r-0 border-gray-200 dark:border-gray-700 transition-colors ${
+                            active
+                                ? 'bg-[#068B03] text-white'
+                                : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
+                        }`}
+                    >
+                        {crowded ? shortUnitName(u.name) : u.name}
+                    </button>
+                );
+            })}
+        </div>
+    );
+}
+
+/**
+ * − [qty] +. Tapping the number makes it a field with the value selected:
+ * Enter or leaving it commits, Esc cancels, and anything that is not a whole
+ * number of 1 or more is put back as it was. Quantities are whole units — the
+ * database counts stock in whole base pieces.
+ */
+function QtyStepper({ items, item, idx, onQtyChange, onQtyEditDone }) {
+    const [editing, setEditing] = useState(false);
+    const [draft, setDraft] = useState('');
+    const inputRef = useRef(null);
+    // Enter and Esc have already decided; the blur that follows the field
+    // disappearing must not decide again (Esc would otherwise commit).
+    const settledRef = useRef(false);
+    const room = roomFor(items, item, idx);
+    const plusDisabled = item.qty + 1 > room;
+
+    useEffect(() => {
+        if (editing) inputRef.current?.select();
+    }, [editing]);
+
+    const commit = (focusSearchAfter) => {
+        const n = Number(draft);
+
+        if (Number.isInteger(n) && n >= 1 && n !== item.qty) onQtyChange(idx, n);
+
+        setEditing(false);
+        if (focusSearchAfter) onQtyEditDone?.();
+    };
+
+    const btn = 'w-9 h-9 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 font-bold text-sm flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed';
+
+    return (
+        <div className="flex items-center gap-1.5" onClick={stop} onPointerDown={stop}>
+            <button type="button" aria-label="One less" onClick={() => onQtyChange(idx, item.qty - 1)} className={btn}>−</button>
+
+            {editing ? (
+                <input
+                    ref={inputRef}
+                    type="text"
+                    inputMode="numeric"
+                    aria-label="Quantity"
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value.replace(/[^\d]/g, ''))}
+                    onKeyDown={(e) => {
+                        if (e.key === 'Enter') { e.preventDefault(); settledRef.current = true; commit(true); }
+                        if (e.key === 'Escape') { e.preventDefault(); settledRef.current = true; setEditing(false); onQtyEditDone?.(); }
+                    }}
+                    onBlur={() => {
+                        if (settledRef.current) { settledRef.current = false; return; }
+                        commit(false);
+                    }}
+                    className="w-11 h-9 rounded-md border-2 border-[#068B03] bg-white dark:bg-gray-900 text-center text-sm font-semibold font-mono tabular-nums outline-none dark:text-gray-100"
+                />
+            ) : (
+                <button
+                    type="button"
+                    title="Tap to type a quantity"
+                    onClick={() => { settledRef.current = false; setDraft(String(item.qty)); setEditing(true); }}
+                    className="w-11 h-9 rounded-md text-center text-sm font-semibold font-mono tabular-nums hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-200"
+                >
+                    {item.qty}
+                </button>
             )}
 
-            {hasWholesale && (
-                <div className="flex items-center gap-1 text-[11px]">
-                    {['retail', 'wholesale'].map((type) => (
-                        <button
-                            key={type}
-                            type="button"
-                            onClick={() => onPriceTypeChange?.(idx, type)}
-                            aria-pressed={item.price_type === type}
-                            className={`px-1.5 py-0.5 rounded font-semibold capitalize ${
-                                item.price_type === type
-                                    ? 'bg-gray-800 text-white dark:bg-gray-200 dark:text-gray-900'
-                                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
-                            }`}
-                        >
-                            {type}
-                        </button>
-                    ))}
-                    {item.wholesaleMissing && (
-                        <span className="text-gray-400 dark:text-gray-500">No wholesale price for {item.unit_name} — retail used</span>
-                    )}
-                </div>
-            )}
+            <button
+                type="button"
+                aria-label="One more"
+                onClick={() => onQtyChange(idx, item.qty + 1)}
+                // Stops at what the shelf holds, as the quantity box does.
+                disabled={plusDisabled}
+                title={plusDisabled ? 'No more on the shelf at this branch' : undefined}
+                className={btn}
+            >+</button>
+        </div>
+    );
+}
 
-            {stock && (
-                <p className="text-[11px] text-gray-400 dark:text-gray-500">In stock: {stock}</p>
-            )}
+/** Retail or wholesale for this one line, under its price — only where a wholesale price exists. */
+function PriceType({ item, idx, onPriceTypeChange }) {
+    if (! unitsOf(item).some((u) => u.wholesale_price != null)) return null;
 
-            {short > 0 && (
-                <p role="status" className="text-[11px] font-semibold text-amber-700 bg-amber-50 dark:text-amber-300 dark:bg-amber-950 rounded px-1.5 py-0.5 inline-block">
-                    Sells {short} below stock — allowed for this product
-                </p>
-            )}
+    const next = item.price_type === 'wholesale' ? 'retail' : 'wholesale';
 
-            {atLimit && (
-                <p className="text-[11px] font-semibold text-red-600 dark:text-red-400">
-                    That is all the stock at this branch.
-                </p>
+    return (
+        <button
+            type="button"
+            onClick={(e) => { stop(e); onPriceTypeChange?.(idx, next); }}
+            title={item.wholesaleMissing ? `No wholesale price for ${item.unit_name} — sold at retail` : `Switch this line to ${next}`}
+            className={`text-[10px] font-semibold uppercase tracking-wide ${item.price_type === 'wholesale' ? 'text-violet-600 dark:text-violet-400' : 'text-gray-400 dark:text-gray-500'} hover:underline`}
+        >
+            {item.wholesaleMissing ? 'retail*' : item.price_type ?? 'retail'}
+        </button>
+    );
+}
+
+function UnitPrice({ item, idx, allowPriceChange, onPriceEdit, onPriceTypeChange }) {
+    const editable = allowPriceChange && item.can_negotiate;
+
+    return (
+        <div className="flex flex-col items-end leading-tight" onClick={stop}>
+            {editable ? (
+                <button
+                    type="button"
+                    onClick={() => onPriceEdit(idx)}
+                    title="Click to change this price"
+                    className="text-sm text-gray-700 dark:text-gray-300 underline decoration-dotted underline-offset-4 hover:text-[#068B03] dark:hover:text-green-400 font-mono tabular-nums"
+                >
+                    {fmt(item.price)}
+                </button>
+            ) : (
+                <span className="text-sm text-gray-700 dark:text-gray-300 font-mono tabular-nums">{fmt(item.price)}</span>
+            )}
+            {item.listPrice > item.price ? (
+                <span className="text-[10px] text-gray-400 dark:text-gray-500 line-through font-mono tabular-nums">{fmt(item.listPrice)}</span>
+            ) : (
+                <PriceType item={item} idx={idx} onPriceTypeChange={onPriceTypeChange} />
             )}
         </div>
     );
 }
 
-function MobileCartRow({ items, item, idx, isSelected, onSelect, onRemove, unitHandlers }) {
+function RemoveButton({ idx, onRemove }) {
+    return (
+        <button
+            type="button"
+            aria-label="Remove item"
+            onClick={(e) => { stop(e); onRemove(idx); }}
+            className="w-8 h-9 flex items-center justify-center text-gray-300 dark:text-gray-600 hover:text-red-400 dark:hover:text-red-400 transition-colors"
+        >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+        </button>
+    );
+}
+
+// ── Desktop / tablet row ──────────────────────────────────────────────────────
+
+/**
+ * One line per item on a wide screen, every control in a fixed-width column so
+ * they line up down the cart; two lines below 1100px (see .cart-row in pos.css).
+ */
+function CartRow({ items, item, idx, isSelected, allowPriceChange, handlers }) {
+    const { onSelect, onQtyChange, onRemove, onPriceEdit, onUnitChange, onPriceTypeChange, onSetDefaultUnit, onQtyEditDone } = handlers;
+    const lineTotal = item.price * item.qty - (item.lineDiscount || 0);
+    const canMakeDefault = unitsOf(item).length > 1 && item.unit_id != null && Number(item.unit_id) !== Number(item.default_unit_id);
+
+    return (
+        <div
+            onClick={() => onSelect(idx)}
+            className={`cart-row border-b border-gray-50 dark:border-gray-800 cursor-pointer transition-colors ${
+                isSelected ? 'bg-green-50 dark:bg-green-950' : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+            }`}
+        >
+            <div className="cart-thumb"><Thumb item={item} /></div>
+
+            {/* Two short lines: the name, and the code beneath it. */}
+            <div className="cart-name min-w-0">
+                <p className="text-sm font-medium text-gray-800 dark:text-gray-100 truncate" title={nameTooltip(item)}>{item.name}</p>
+                <div className="flex items-center gap-1.5 min-w-0 mt-0.5">
+                    {item.sku && <span className="text-[11px] text-gray-400 dark:text-gray-500 truncate">{item.sku}</span>}
+                    <StockBadge items={items} item={item} />
+                    {item.lineDiscount > 0 && (
+                        <span className="shrink-0 text-[10px] text-brand-orange font-mono tabular-nums">−{fmt(item.lineDiscount)}</span>
+                    )}
+                    {isSelected && canMakeDefault && (
+                        <button
+                            type="button"
+                            onClick={(e) => { stop(e); onSetDefaultUnit?.(idx, item.unit_id); }}
+                            title="Add this product as this unit from now on"
+                            className="shrink-0 text-[10px] text-[#068B03] dark:text-green-400 underline decoration-dotted underline-offset-2"
+                        >
+                            Make {item.unit_name} default
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            <div className="cart-qty"><QtyStepper items={items} item={item} idx={idx} onQtyChange={onQtyChange} onQtyEditDone={onQtyEditDone} /></div>
+            <div className="cart-unit min-w-0"><UnitSegments item={item} idx={idx} onUnitChange={onUnitChange} /></div>
+            <div className="cart-price">
+                <UnitPrice item={item} idx={idx} allowPriceChange={allowPriceChange} onPriceEdit={onPriceEdit} onPriceTypeChange={onPriceTypeChange} />
+            </div>
+            <div className="cart-total text-right text-sm font-semibold text-gray-800 dark:text-gray-100 font-mono tabular-nums">{fmt(lineTotal)}</div>
+            <div className="cart-remove"><RemoveButton idx={idx} onRemove={onRemove} /></div>
+        </div>
+    );
+}
+
+// ── Phone row: swipe left to delete ───────────────────────────────────────────
+
+function MobileCartRow({ items, item, idx, isSelected, onSelect, onRemove, onUnitChange }) {
     const rowRef   = useRef(null);
     const startX   = useRef(0);
     const snapTx   = useRef(0);
@@ -177,27 +375,21 @@ function MobileCartRow({ items, item, idx, isSelected, onSelect, onRemove, unitH
                 onPointerUp={onPointerUp}
                 onPointerCancel={onPointerUp}
             >
-                {item.image
-                    ? <img src={item.image} className="w-11 h-11 rounded-xl object-cover shrink-0" alt="" />
-                    : <div className="w-11 h-11 rounded-xl bg-gray-100 shrink-0" />
-                }
+                <Thumb item={item} size="w-11 h-11" />
                 <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">{item.name}</p>
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 font-mono tabular-nums">
-                        {item.sku && <span className="font-sans">{item.sku} · </span>}{fmt(item.price)}
-                        {item.listPrice > item.price && (
-                            <span className="line-through ml-1.5 opacity-70">{fmt(item.listPrice)}</span>
-                        )}
-                    </p>
-                    {item.lineDiscount > 0 && (
-                        <span className="inline-block mt-1 text-xs bg-orange-50 text-orange-600 font-semibold px-2 py-0.5 rounded-full font-mono tabular-nums">
-                            −{fmt(item.lineDiscount)}
+                    <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate" title={nameTooltip(item)}>{item.name}</p>
+                    <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+                        <span className="text-xs text-gray-400 dark:text-gray-500 font-mono tabular-nums truncate">
+                            {item.sku && <span className="font-sans">{item.sku} · </span>}{fmt(item.price)}
                         </span>
+                        <StockBadge items={items} item={item} />
+                    </div>
+                    {unitsOf(item).length > 1 && (
+                        <div className="mt-1.5"><UnitSegments item={item} idx={idx} onUnitChange={onUnitChange} /></div>
                     )}
-                    <LineUnits items={items} item={item} idx={idx} {...unitHandlers} />
                 </div>
                 <div className="text-right shrink-0">
-                    <p className="text-xs text-gray-400 dark:text-gray-500 font-mono tabular-nums">×{item.qty}{item.unit_name && unitsOf(item).length > 1 ? ` ${item.unit_name}` : ''}</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 font-mono tabular-nums">×{item.qty}</p>
                     <p className="text-sm font-bold text-gray-800 dark:text-gray-100 font-mono tabular-nums">{fmt(lineTotal)}</p>
                 </div>
             </div>
@@ -205,10 +397,16 @@ function MobileCartRow({ items, item, idx, isSelected, onSelect, onRemove, unitH
     );
 }
 
-export default function Cart({ items, selectedIdx, onSelect, onQtyChange, onRemove, onPriceEdit, onUnitChange, onPriceTypeChange, onSetDefaultUnit }) {
-    const unitHandlers = { onUnitChange, onPriceTypeChange, onSetDefaultUnit };
+// ── The cart ──────────────────────────────────────────────────────────────────
+
+export default function Cart({
+    items, selectedIdx, onSelect, onQtyChange, onRemove, onPriceEdit,
+    onUnitChange, onPriceTypeChange, onSetDefaultUnit, onQtyEditDone,
+    allowPriceChange = false,
+}) {
     // Two units of one product are two lines, so the id alone is not unique.
     const lineKey = (item, idx) => `${item.id}-${item.unit_id ?? 'x'}-${idx}`;
+    const handlers = { onSelect, onQtyChange, onRemove, onPriceEdit, onUnitChange, onPriceTypeChange, onSetDefaultUnit, onQtyEditDone };
 
     if (items.length === 0) {
         return (
@@ -226,7 +424,7 @@ export default function Cart({ items, selectedIdx, onSelect, onQtyChange, onRemo
 
     return (
         <>
-            {/* ── Mobile: swipeable card rows ─────────────────── */}
+            {/* ── Phone: swipeable cards ─────────────────── */}
             <div className="md:hidden py-2">
                 {items.map((item, idx) => (
                     <MobileCartRow
@@ -237,99 +435,36 @@ export default function Cart({ items, selectedIdx, onSelect, onQtyChange, onRemo
                         isSelected={idx === selectedIdx}
                         onSelect={onSelect}
                         onRemove={onRemove}
-                        unitHandlers={unitHandlers}
+                        onUnitChange={onUnitChange}
                     />
                 ))}
             </div>
 
-            {/* ── Desktop: table layout ───────────────────────── */}
-            <table className="hidden md:table w-full">
-                <thead className="sticky top-0 bg-gray-50 dark:bg-gray-950 z-10">
-                    <tr className="text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wide">
-                        <th className="px-6 py-3 text-left font-medium">Product</th>
-                        <th className="px-4 py-3 text-center font-medium w-32">Qty</th>
-                        <th className="px-4 py-3 text-right font-medium w-36">Unit Price</th>
-                        <th className="px-4 py-3 text-right font-medium w-36">Total</th>
-                        <th className="px-4 py-3 w-10"></th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {items.map((item, idx) => {
-                        const lineTotal  = item.price * item.qty - (item.lineDiscount || 0);
-                        const isSelected = idx === selectedIdx;
+            {/* ── Tablet & desktop: aligned grid rows ─────── */}
+            <div className="hidden md:block">
+                {/* Headings share the rows' columns, so only on the one-line layout. */}
+                <div className="cart-row cart-head sticky top-0 bg-gray-50 dark:bg-gray-950 z-10 text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wide font-medium">
+                    <span className="cart-thumb" />
+                    <span className="cart-name">Product</span>
+                    <span className="cart-qty text-center">Qty</span>
+                    <span className="cart-unit">Unit</span>
+                    <span className="cart-price text-right">Unit Price</span>
+                    <span className="cart-total text-right">Total</span>
+                    <span className="cart-remove" />
+                </div>
 
-                        return (
-                            <tr
-                                key={lineKey(item, idx)}
-                                onClick={() => onSelect(idx)}
-                                className={`border-b border-gray-50 dark:border-gray-800 cursor-pointer transition-colors ${
-                                    isSelected ? 'bg-green-50 dark:bg-green-950' : 'hover:bg-gray-50 dark:hover:bg-gray-800'
-                                }`}
-                            >
-                                <td className="px-6 py-4">
-                                    <div className="flex items-center gap-3">
-                                        {item.image
-                                            ? <img src={item.image} className="w-10 h-10 rounded-lg object-cover shrink-0" alt="" />
-                                            : <div className="w-10 h-10 rounded-lg bg-gray-100 shrink-0" />
-                                        }
-                                        <div>
-                                            <p className="text-sm font-medium text-gray-800 dark:text-gray-100">{item.name}</p>
-                                            {item.sku && <p className="text-xs text-gray-400 dark:text-gray-500">{item.sku}</p>}
-                                            {item.lineDiscount > 0 && (
-                                                <p className="text-xs text-brand-orange font-mono tabular-nums">Discount: −{fmt(item.lineDiscount)}</p>
-                                            )}
-                                            <LineUnits items={items} item={item} idx={idx} {...unitHandlers} />
-                                        </div>
-                                    </div>
-                                </td>
-                                <td className="px-4 py-4 text-center">
-                                    <div className="flex items-center justify-center gap-2">
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); onQtyChange(idx, item.qty - 1); }}
-                                            className="w-7 h-7 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 font-bold text-sm flex items-center justify-center"
-                                        >−</button>
-                                        <span className="w-8 text-center text-sm font-semibold dark:text-gray-200 font-mono tabular-nums">{item.qty}</span>
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); onQtyChange(idx, item.qty + 1); }}
-                                            // Stops at what the shelf holds, as the quantity box does.
-                                            disabled={item.qty + 1 > roomFor(items, item, idx)}
-                                            title={item.qty + 1 > roomFor(items, item, idx) ? 'No more on the shelf at this branch' : undefined}
-                                            className="w-7 h-7 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 font-bold text-sm flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
-                                        >+</button>
-                                    </div>
-                                </td>
-                                <td className="px-4 py-4 text-right">
-                                    {item.can_negotiate ? (
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); onPriceEdit(idx); }}
-                                            title="Click to negotiate this price"
-                                            className="text-sm text-gray-600 dark:text-gray-400 underline decoration-dotted underline-offset-4 hover:text-[#068B03] dark:hover:text-green-400 font-mono tabular-nums"
-                                        >
-                                            {fmt(item.price)}
-                                        </button>
-                                    ) : (
-                                        <span className="text-sm text-gray-600 dark:text-gray-400 font-mono tabular-nums">{fmt(item.price)}</span>
-                                    )}
-                                    {item.listPrice > item.price && (
-                                        <p className="text-xs text-gray-400 dark:text-gray-500 line-through font-mono tabular-nums">{fmt(item.listPrice)}</p>
-                                    )}
-                                </td>
-                                <td className="px-4 py-4 text-right text-sm font-semibold text-gray-800 dark:text-gray-100 font-mono tabular-nums">{fmt(lineTotal)}</td>
-                                <td className="px-4 py-4 text-center">
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); onRemove(idx); }}
-                                        className="text-gray-300 dark:text-gray-600 hover:text-red-400 dark:hover:text-red-400 transition-colors"
-                                    >
-                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                        </svg>
-                                    </button>
-                                </td>
-                            </tr>
-                        );
-                    })}
-                </tbody>
-            </table>
+                {items.map((item, idx) => (
+                    <CartRow
+                        key={lineKey(item, idx)}
+                        items={items}
+                        item={item}
+                        idx={idx}
+                        isSelected={idx === selectedIdx}
+                        allowPriceChange={allowPriceChange}
+                        handlers={handlers}
+                    />
+                ))}
+            </div>
         </>
     );
 }

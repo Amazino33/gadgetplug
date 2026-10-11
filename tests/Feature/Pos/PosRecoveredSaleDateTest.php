@@ -94,6 +94,9 @@ test('the same sale rung on the live till is stamped now, which is why a correct
 
 test('a corrected sale still has to clear the price floor — the date is all that is carried over', function () {
     $ctx = recoveredSaleContext();
+    // The floor only matters where price changes are allowed; with them off
+    // the price is reset to the catalogue's before the floor is reached.
+    $ctx['vendor']->update(['pos_allow_price_change' => true]);
 
     // Below the floor: this product does not allow negotiation, so its floor is
     // the list price. Backdating must not become a way past that.

@@ -36,6 +36,8 @@ class TillProfile
             'vat_enabled'  => (bool) ($vendor->pos_vat_enabled ?? true),
             'vat_rate'     => (float) ($vendor->pos_vat_rate ?? 7.5),
             'ask_quantity' => (bool) ($vendor->pos_ask_quantity ?? true),
+            // Off unless the vendor turns it on; the server enforces it either way.
+            'allow_price_change' => (bool) ($vendor->pos_allow_price_change ?? false),
             'vendor_name'  => $vendor?->name,
             'receipt'      => self::receipt($vendor),
             'store'        => self::store($cashier, $vendor),
