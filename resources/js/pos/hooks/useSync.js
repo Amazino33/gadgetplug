@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { db } from '../lib/db';
 import api from '../lib/api';
 import { fetchCatalogue } from '../lib/catalogue';
+import { syncHeldSales } from '../lib/heldSales';
 import { markSaleSynced } from '../lib/salesHistory';
 import { salesToSync } from '../lib/syncQueue';
 import { markPickingPaymentSynced, pendingPickingPayments, prunePickingPayments } from '../lib/pickings';
@@ -79,6 +80,8 @@ export function useSync(vendorId, cashierId, onStuckSalesChange) {
         }
 
         await syncPickingPayments();
+        // Sales held, resumed or discarded here while offline.
+        try { await syncHeldSales(vendorId); } catch { /* next sync tries again */ }
         await syncShifts();
         await reportStuck();
     };

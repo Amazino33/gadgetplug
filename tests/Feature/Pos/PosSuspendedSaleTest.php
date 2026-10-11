@@ -174,3 +174,37 @@ test('the held-sale list carries everything the picker shows', function () {
         ->assertJsonPath('0.cart_data.items.0.price', 4500)
         ->assertJsonPath('0.cart_data.items.1.name', 'Oraimo Buds');
 });
+
+test('a hold uploaded twice with the same reference is saved once', function () {
+    $data = suspendedSaleVendor();
+    Sanctum::actingAs($data['owner']);
+
+    $payload = [
+        'vendor_id'  => $data['vendor']->id,
+        'label'      => 'Held offline',
+        'cart_data'  => ['items' => [['id' => 1, 'name' => 'Widget', 'price' => 500, 'qty' => 1]], 'customer' => null],
+        'client_ref' => 'hold-abc',
+    ];
+
+    $first  = $this->postJson('/api/pos/suspended', $payload)->assertCreated()->json('id');
+    $second = $this->postJson('/api/pos/suspended', $payload)->assertOk()->json('id');
+
+    expect($second)->toBe($first)
+        ->and(PosSuspendedSale::count())->toBe(1);
+
+    $this->getJson('/api/pos/suspended?vendor_id=' . $data['vendor']->id)
+        ->assertJsonPath('0.client_ref', 'hold-abc');
+});
+
+test('a held sale already resumed elsewhere answers 404 to a late discard', function () {
+    $data = suspendedSaleVendor();
+    Sanctum::actingAs($data['owner']);
+
+    $id = $this->postJson('/api/pos/suspended', [
+        'vendor_id' => $data['vendor']->id, 'cart_data' => ['items' => [], 'customer' => null],
+    ])->json('id');
+
+    $this->postJson("/api/pos/suspended/{$id}/resume", ['vendor_id' => $data['vendor']->id])->assertOk();
+
+    $this->deleteJson("/api/pos/suspended/{$id}", ['vendor_id' => $data['vendor']->id])->assertNotFound();
+});

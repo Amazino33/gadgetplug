@@ -76,4 +76,15 @@ db.version(5).stores({
     refunds: '++id, cashier_id, created_at, offline_id',
 });
 
+// v6 lets a sale be held, resumed or discarded with no signal.
+//
+// Held sales live on the server so any till in the branch can pick one up, and
+// so suspending used to fail outright offline. heldSales is this till's queue:
+// a 'hold' row is a sale held here and not yet uploaded; a 'remove' row is a
+// sale from the server's list that was resumed or discarded here while
+// offline, waiting to be taken off the server's list.
+db.version(6).stores({
+    heldSales: '++id, kind, vendor_id, client_ref',
+});
+
 export default db;

@@ -6,6 +6,10 @@ import { createCheckoutId } from '../lib/checkoutId';
 import { cartFloorTotal } from '../lib/cartFloor';
 import { addToCart, roomFor } from '../lib/cartAdd';
 import { findUnit, lineFields, prepareLine } from '../lib/units';
+import {
+    cacheServerList, cachedServerList, dropLocalHold, holdLocally,
+    mergedHeldSales, newClientRef, queueRemoval, unreachable,
+} from '../lib/heldSales';
 import { shouldRedirectTypingToSearch } from '../lib/typeAhead';
 import { db } from '../lib/db';
 import { pruneOldSales, recordSale } from '../lib/salesHistory';
@@ -237,11 +241,25 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
     // whichever cashier gets to it. Polled so a sale suspended on one
     // terminal shows up here without needing a manual refresh.
 
+    // The server's list when it answers, the last one it gave when it does
+    // not — and in both cases, with anything held or taken off here while
+    // offline folded in, so the list matches what this till has done.
     const loadPendingSales = useCallback(async () => {
+        let serverList;
+
         try {
             const { data } = await api.get('/suspended', { params: { vendor_id: vendorId } });
-            setPendingSales(data);
-        } catch { /* offline — keep showing the last known list */ }
+            serverList = data;
+            cacheServerList(vendorId, data);
+        } catch {
+            serverList = cachedServerList(vendorId);
+        }
+
+        try {
+            setPendingSales(await mergedHeldSales(vendorId, serverList));
+        } catch {
+            setPendingSales(serverList);
+        }
     }, [vendorId]);
 
     const [pendingProcurementsCount, setPendingProcurementsCount] = useState(0);
@@ -266,41 +284,95 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
     const suspendCurrentSale = async () => {
         if (cartEmpty) return;
         setPendingError(null);
+
+        const payload = {
+            customer_id: customer?.id ?? null,
+            label:       customer?.name ?? null,
+            cart_data:   { items: cart, customer },
+            client_ref:  newClientRef(),
+        };
+
         try {
-            await api.post('/suspended', {
-                vendor_id:   vendorId,
-                customer_id: customer?.id ?? null,
-                label:       customer?.name ?? null,
-                cart_data:   { items: cart, customer },
-            });
-            clearCart();
-            loadPendingSales();
-        } catch {
-            setPendingError("Couldn't hold this sale — it has NOT been saved. Check your connection and try again.");
+            await api.post('/suspended', { vendor_id: vendorId, ...payload });
+        } catch (error) {
+            // The server answered and said no: nothing was held, say so.
+            if (! unreachable(error)) {
+                setPendingError("Couldn't hold this sale — it has NOT been saved. Try again.");
+                return;
+            }
+
+            // No connection: hold it on this till. It uploads by itself when
+            // the connection returns, and other tills see it from then on.
+            try {
+                await holdLocally(vendorId, payload);
+            } catch {
+                setPendingError("Couldn't hold this sale — it has NOT been saved. Try again.");
+                return;
+            }
         }
+
+        clearCart();
+        loadPendingSales();
     };
 
     const resumePendingSale = async (sale) => {
         if (!cartEmpty) return;
         setPendingError(null);
+
+        // Held on this till and never uploaded: it is entirely ours to resume.
+        if (sale.local) {
+            await dropLocalHold(sale.local_id);
+            setCart(sale.cart_data?.items || []);
+            setCustomer(sale.cart_data?.customer || null);
+            loadPendingSales();
+            return;
+        }
+
         try {
             const { data } = await api.post(`/suspended/${sale.id}/resume`, { vendor_id: vendorId });
             setCart(data.cart_data.items || []);
             setCustomer(data.cart_data.customer || null);
-            loadPendingSales();
-        } catch {
-            setPendingError("Couldn't resume this sale — check your connection and try again.");
+        } catch (error) {
+            if (! unreachable(error)) {
+                // Most likely already resumed at another till.
+                setPendingError("This sale is no longer on hold — it may have been resumed at another till.");
+                loadPendingSales();
+                return;
+            }
+
+            // Offline: resume from the copy this till has, and take it off the
+            // server's list once the connection returns.
+            setCart(sale.cart_data?.items || []);
+            setCustomer(sale.cart_data?.customer || null);
+            await queueRemoval(vendorId, sale.id);
         }
+
+        loadPendingSales();
     };
 
     const clearPendingSale = async (id) => {
         setPendingError(null);
+
+        const sale = pendingSales.find((s) => s.id === id);
+
+        if (sale?.local) {
+            await dropLocalHold(sale.local_id);
+            loadPendingSales();
+            return;
+        }
+
         try {
             await api.delete(`/suspended/${id}`, { data: { vendor_id: vendorId } });
-            loadPendingSales();
-        } catch {
-            setPendingError("Couldn't discard this held sale — check your connection and try again.");
+        } catch (error) {
+            if (! unreachable(error)) {
+                setPendingError("Couldn't discard this held sale — try again.");
+                return;
+            }
+
+            await queueRemoval(vendorId, id);
         }
+
+        loadPendingSales();
     };
 
     // ── Cart operations ──────────────────────────────────────────────

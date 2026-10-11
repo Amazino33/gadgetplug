@@ -8,6 +8,8 @@ import { fmt, timeAgo } from '../lib/format';
 // from the top bar now, and lists the items so the right sale can be picked
 // without resuming each one to look.
 export default function SuspendedSalesModal({ sales = [], cartEmpty, error, onResume, onDiscard, onClose }) {
+    const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+
     const saleTotal = (sale) =>
         (sale.cart_data?.items ?? []).reduce(
             // Mirrors the cart's own line arithmetic, line discount included,
@@ -46,6 +48,17 @@ export default function SuspendedSalesModal({ sales = [], cartEmpty, error, onRe
                     </div>
                 )}
 
+                {/* Offline, the shared list is the last one the server gave.
+                    Holding, resuming and discarding all still work; the server
+                    catches up when the connection returns. */}
+                {offline && (
+                    <div className="shrink-0 px-6 py-2.5 bg-gray-50 dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700">
+                        <p className="text-[11px] text-gray-600 dark:text-gray-300">
+                            <span className="font-semibold">Offline.</span> Showing the last list from the server. A sale held at another till could also be resumed there until this till reconnects.
+                        </p>
+                    </div>
+                )}
+
                 {/* Said once, up top, rather than repeated under every row */}
                 {!cartEmpty && sales.length > 0 && (
                     <div className="shrink-0 px-6 py-2.5 bg-amber-50 dark:bg-amber-950/40 border-b border-amber-100 dark:border-amber-900">
@@ -79,7 +92,7 @@ export default function SuspendedSalesModal({ sales = [], cartEmpty, error, onRe
                                     >
                                         <div className="flex items-center justify-between gap-2">
                                             <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">
-                                                {sale.label || sale.customer?.name || `Sale #${sale.id}`}
+                                                {sale.label || sale.customer?.name || (sale.local ? 'Held sale' : `Sale #${sale.id}`)}
                                             </p>
                                             <p className="text-sm font-bold text-gray-800 dark:text-gray-100 shrink-0">
                                                 {fmt(saleTotal(sale))}
@@ -91,6 +104,11 @@ export default function SuspendedSalesModal({ sales = [], cartEmpty, error, onRe
                                         <p className="text-[10px] text-gray-400 mt-0.5">
                                             {items.length} item(s) · held {timeAgo(sale.created_at)}
                                         </p>
+                                        {sale.local && (
+                                            <p className="mt-1 inline-block rounded-full bg-amber-100 dark:bg-amber-900/50 px-2 py-0.5 text-[10px] font-semibold text-amber-800 dark:text-amber-300">
+                                                On this till only · shared with other tills when back online
+                                            </p>
+                                        )}
                                     </button>
 
                                     <button

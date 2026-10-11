@@ -439,11 +439,26 @@ class PosSessionController extends Controller
             'label'       => 'nullable|string|max:80',
             'customer_id' => 'nullable|integer',
             'cart_data'   => 'required|array',
+            // The till's own reference for this hold. A sale held offline is
+            // uploaded later, perhaps more than once if a response is lost;
+            // the same reference returns the one already saved.
+            'client_ref'  => 'nullable|string|max:64',
         ]);
+
+        if ($request->filled('client_ref')) {
+            $existing = PosSuspendedSale::where('vendor_id', $request->vendor_id)
+                ->where('client_ref', $request->client_ref)
+                ->first();
+
+            if ($existing) {
+                return response()->json($existing, 200);
+            }
+        }
 
         $suspended = PosSuspendedSale::create([
             'vendor_id'   => $request->vendor_id,
             'cashier_id'  => $request->user()->id,
+            'client_ref'  => $request->client_ref,
             'customer_id' => $request->customer_id,
             'label'       => $request->label,
             'cart_data'   => $request->cart_data,
