@@ -78,3 +78,45 @@ describe('signing in to a branch', () => {
         expect(screen.getByText(/choosing the branch you are in/)).toBeTruthy();
     });
 });
+
+describe('a right PIN always signs in', () => {
+    it('even when the product download fails, instead of calling the PIN invalid', async () => {
+        api.post.mockResolvedValueOnce(signedIn);
+        // The catalogue times out — easy with thousands of products.
+        api.get.mockRejectedValueOnce(Object.assign(new Error('timeout of 30000ms exceeded'), { code: 'ECONNABORTED' }));
+
+        const onLogin = vi.fn();
+        render(<Login onLogin={onLogin} />);
+        typePin('1234');
+
+        await waitFor(() => expect(onLogin).toHaveBeenCalledWith(signedIn.data.user, 2, signedIn.data.store));
+        expect(screen.queryByText(/invalid pin/i)).toBeNull();
+        expect(localStorage.getItem('pos_token')).toBe('t');
+    });
+
+    it('blames the connection, not the PIN, when the server cannot be reached', async () => {
+        api.post.mockRejectedValueOnce(new Error('Network Error'));
+
+        render(<Login onLogin={() => {}} />);
+        typePin('1234');
+
+        expect(await screen.findByText(/could not reach the server/i)).toBeTruthy();
+        expect(screen.queryByText(/invalid pin/i)).toBeNull();
+    });
+
+    it('sends one sign-in, not two, when Enter follows the fourth digit', async () => {
+        let release;
+        api.post.mockImplementationOnce(() => new Promise((resolve) => { release = () => resolve(signedIn); }));
+
+        const onLogin = vi.fn();
+        render(<Login onLogin={onLogin} />);
+        typePin('1234');
+        fireEvent.keyDown(screen.getByLabelText('PIN'), { key: 'Enter' });
+
+        await waitFor(() => expect(release).toBeDefined());
+        release();
+
+        await waitFor(() => expect(onLogin).toHaveBeenCalledTimes(1));
+        expect(api.post).toHaveBeenCalledTimes(1);
+    });
+});

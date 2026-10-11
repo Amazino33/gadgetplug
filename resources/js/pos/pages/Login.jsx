@@ -26,6 +26,9 @@ export default function Login({ onLogin }) {
         }
     });
     const [loading, setLoading] = useState(false);
+    // What the till is doing after the PIN was accepted, so a long catalogue
+    // download reads as progress rather than a frozen screen.
+    const [status, setStatus]   = useState('');
     // Offered when the PIN belongs to someone who works in several branches:
     // the till has to know which one it is standing in before it can sell.
     const [branches, setBranches] = useState(null);
@@ -43,40 +46,30 @@ export default function Login({ onLogin }) {
 
     const backspace = () => setPin((p) => p.slice(0, -1));
 
+    // One sign-in at a time. Four digits submit by themselves and Enter submits
+    // too, so a quick cashier could send two logins at once.
+    const submittingRef = useRef(false);
+
     const submit = async (storeId = null) => {
-        if (!vendorId || pin.length < 4) return;
+        if (!vendorId || pin.length < 4 || submittingRef.current) return;
+        submittingRef.current = true;
         setLoading(true);
+        setStatus('');
         setError('');
+
+        let data;
+
         try {
-            const { data } = await api.post('/auth/login', {
+            ({ data } = await api.post('/auth/login', {
                 vendor_id: Number(vendorId),
                 pin,
                 store_id:  storeId ?? undefined,
-            });
-            localStorage.setItem('pos_token', data.token);
-            localStorage.setItem('pos_vendor_id', String(vendorId));
-            localStorage.setItem('pos_user', JSON.stringify(data.user));
-            localStorage.setItem('pos_store', JSON.stringify(data.store ?? null));
-            localStorage.setItem('pos_vendor_settings', JSON.stringify(data.vendor ?? { vat_enabled: true, vat_rate: 7.5 }));
-
-            // A page at a time — see fetchCatalogue() for why one big request
-            // stopped working once a shop had thousands of products.
-            const products = await fetchCatalogue(vendorId);
-            await db.products.clear();
-            await db.products.bulkPut(products);
-
-            // Customers too, so a credit sale can still name who owes when the
-            // connection drops. Non-fatal on its own: failing to cache them must
-            // never stop a cashier signing in and trading.
-            try {
-                const { data: customers } = await api.get('/customers', { params: { vendor_id: vendorId } });
-                await db.customers.clear();
-                await db.customers.bulkPut(customers);
-            } catch { /* offline or refused — the till still opens */ }
-
-            onLogin(data.user, Number(vendorId), data.store ?? null);
+            }));
         } catch (e) {
             const body = e?.response?.data;
+
+            submittingRef.current = false;
+            setLoading(false);
 
             // The PIN was right; the till just needs to know which branch.
             // The PIN is kept so choosing one signs straight in.
@@ -89,14 +82,55 @@ export default function Login({ onLogin }) {
             // A wrong PIN says so. Anything else the server explained — no
             // branch assigned, the account blocked — is shown as it said it,
             // because "Invalid PIN" would send the cashier retyping a PIN that
-            // was never the problem.
+            // was never the problem. No answer at all is a connection problem,
+            // not a PIN problem.
             setBranches(null);
-            setError(e?.response?.status === 401 || !body?.message ? 'Invalid PIN. Try again.' : body.message);
+            setError(
+                ! e?.response ? 'Could not reach the server. Check the connection and try again.'
+                : e.response.status === 401 || ! body?.message ? 'Invalid PIN. Try again.'
+                : body.message,
+            );
             setPin('');
             pinInputRef.current?.focus();
-        } finally {
-            setLoading(false);
+            return;
         }
+
+        // The PIN is right from here on, and the cashier is signed in.
+        localStorage.setItem('pos_token', data.token);
+        localStorage.setItem('pos_vendor_id', String(vendorId));
+        localStorage.setItem('pos_user', JSON.stringify(data.user));
+        localStorage.setItem('pos_store', JSON.stringify(data.store ?? null));
+        localStorage.setItem('pos_vendor_settings', JSON.stringify(data.vendor ?? { vat_enabled: true, vat_rate: 7.5 }));
+
+        // The catalogue used to be part of signing in, so a download that
+        // failed or timed out — easy with thousands of products — was reported
+        // as "Invalid PIN" with the right PIN, and only a reload (which found
+        // the sign-in already saved) got the cashier in. It is still fetched
+        // here, but it can no longer stop anyone signing in: if it fails, the
+        // till opens on the copy it has and refreshes it in the background.
+        setStatus('Loading your products…');
+
+        try {
+            // A page at a time — see fetchCatalogue() for why one big request
+            // stopped working once a shop had thousands of products.
+            const products = await fetchCatalogue(vendorId);
+            await db.products.clear();
+            await db.products.bulkPut(products);
+        } catch { /* the till's background refresh fetches it again */ }
+
+        // Customers too, so a credit sale can still name who owes when the
+        // connection drops. Non-fatal on its own: failing to cache them must
+        // never stop a cashier signing in and trading.
+        try {
+            const { data: customers } = await api.get('/customers', { params: { vendor_id: vendorId } });
+            await db.customers.clear();
+            await db.customers.bulkPut(customers);
+        } catch { /* offline or refused — the till still opens */ }
+
+        submittingRef.current = false;
+        setLoading(false);
+        setStatus('');
+        onLogin(data.user, Number(vendorId), data.store ?? null);
     };
 
     useEffect(() => {
@@ -224,7 +258,9 @@ export default function Login({ onLogin }) {
 
                 {error
                     ? <p className="text-red-500 text-xs text-center mb-4">{error}</p>
-                    : <div className="mb-4" />
+                    : status
+                        ? <p role="status" className="text-[#068B03] dark:text-green-400 text-xs text-center mb-4">{status}</p>
+                        : <div className="mb-4" />
                 }
 
                 {/* Numpad */}
