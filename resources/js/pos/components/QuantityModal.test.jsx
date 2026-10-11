@@ -122,4 +122,17 @@ describe('QuantityModal', () => {
             expect(onConfirm).toHaveBeenCalledWith(0);
         });
     });
+
+    it('refuses a barcode scanned into the box, even with no shelf limit', async () => {
+        // Asking on every scan means the next item scanned before this box is
+        // answered types its barcode here. On a shop that sells below zero
+        // max is Infinity, so nothing else would stop it going in as a count.
+        const onConfirm = vi.fn();
+        render(<QuantityModal item={item} onConfirm={onConfirm} onClose={vi.fn()} />);
+
+        await userEvent.keyboard('6001234567890{Enter}');
+
+        expect(onConfirm).not.toHaveBeenCalled();
+        expect(screen.getByText(/looks like a barcode/i)).toBeDefined();
+    });
 });

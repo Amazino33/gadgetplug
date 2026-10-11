@@ -124,6 +124,17 @@ it('still sends the VAT settings the till computes with', function () {
         ->and($vendor['vendor_name'])->toBe('Credit Store');
 });
 
+it('tells the till whether to ask for a quantity, asking unless the vendor turned it off', function () {
+    $ctx = debtTenderContext();
+
+    // A store that never opened Store Profile keeps the quantity box.
+    expect(loginAsTill($ctx)->assertOk()->json('vendor.ask_quantity'))->toBeTrue();
+
+    $ctx['vendor']->forceFill(['pos_ask_quantity' => false])->save();
+
+    expect(loginAsTill($ctx)->assertOk()->json('vendor.ask_quantity'))->toBeFalse();
+});
+
 it('sends the layout again when a session is opened, so a change need not wait for a logout', function () {
     $ctx = debtTenderContext();
     Sanctum::actingAs($ctx['owner']);

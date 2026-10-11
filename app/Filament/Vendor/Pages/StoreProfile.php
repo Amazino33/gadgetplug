@@ -55,6 +55,7 @@ class StoreProfile extends Page
             'pos_blind_count_participants' => $vendor->pos_blind_count_participants ?? 2,
             'pos_min_margin_percent'       => $vendor->pos_min_margin_percent ?? 0,
             'allow_negative_stock'         => (bool) $vendor->allow_negative_stock,
+            'pos_ask_quantity'             => $vendor->pos_ask_quantity ?? true,
             'pos_blind_count_frequency'    => $vendor->pos_blind_count_frequency ?? 'daily',
             'pos_blind_count_custom_days'  => $vendor->pos_blind_count_custom_days ?? 3,
         ]);
@@ -174,6 +175,14 @@ class StoreProfile extends Page
                             ->label('Allow selling below zero stock')
                             ->helperText('When on, the till can sell more than your records say you have — useful when goods arrive before they are entered. Shortfalls appear on the Negative Stock report.')
                             ->default(false),
+
+                        // On is how search has always behaved. Scans follow it
+                        // too, so a shop that sells in bulk is asked every
+                        // time and one that sells singles is asked never.
+                        Toggle::make('pos_ask_quantity')
+                            ->label('Ask for quantity when adding items')
+                            ->helperText('When on, the till asks how many every time a product is searched or scanned. When off, each product goes into the sale at 1 — change it from the cart if needed.')
+                            ->default(true),
                     ]),
 
                 Section::make('Bank Details for Payouts')
@@ -218,6 +227,7 @@ class StoreProfile extends Page
             'pos_blind_count_participants' => (int) ($data['pos_blind_count_participants'] ?? 2),
             'pos_min_margin_percent'       => (float) ($data['pos_min_margin_percent'] ?? 0),
             'allow_negative_stock'         => (bool) ($data['allow_negative_stock'] ?? false),
+            'pos_ask_quantity'             => (bool) ($data['pos_ask_quantity'] ?? true),
             'pos_blind_count_frequency'    => $data['pos_blind_count_frequency'] ?? 'daily',
             'pos_blind_count_custom_days'  => ($data['pos_blind_count_frequency'] ?? 'daily') === 'custom'
                 ? (int) ($data['pos_blind_count_custom_days'] ?? 3)

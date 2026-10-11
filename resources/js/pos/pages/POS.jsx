@@ -149,6 +149,9 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
     const vendorSettings = JSON.parse(localStorage.getItem('pos_vendor_settings') ?? '{}');
     const VAT_ENABLED = vendorSettings.vat_enabled ?? true;
     const VAT_RATE    = vendorSettings.vat_rate    ?? 7.5;
+    // Set by the vendor in Store Profile. A till that logged in before the
+    // setting existed has no key, and keeps asking as it always did.
+    const ASK_QUANTITY = vendorSettings.ask_quantity ?? true;
 
     const [cart, setCart]                 = useState(() => {
         try { return JSON.parse(localStorage.getItem('pos_cart')) || []; } catch { return []; }
@@ -410,6 +413,14 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
         setPendingProduct(prepareLine(product, priceModeRef.current));
         setModal('addQuantity');
     }, []);
+
+    // Every way a product reaches the sale — picked from search, scanned in
+    // the search box, scanned by the camera — comes through here, so the
+    // vendor's "ask for quantity" setting means the same thing for all three.
+    const pickProduct = useCallback((product) => {
+        if (ASK_QUANTITY) askQuantityFor(product);
+        else addProduct(product, 1);
+    }, [ASK_QUANTITY, askQuantityFor, addProduct]);
 
     // ── Selling units ────────────────────────────────────────────────
 
@@ -871,11 +882,11 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
                             cannot mean anything else. */}
                         <SearchBar
                             vendorId={vendorId}
-                            onSelect={askQuantityFor}
-                            onScan={addProduct}
+                            onSelect={pickProduct}
+                            onScan={pickProduct}
                             autoFocus={false}
                         />
-                        <BarcodeScanner vendorId={vendorId} onProductFound={addProduct} />
+                        <BarcodeScanner vendorId={vendorId} onProductFound={pickProduct} />
                     </div>
                 </div>
 
@@ -893,12 +904,12 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
                         <SearchBar
                             ref={searchRef}
                             vendorId={vendorId}
-                            onSelect={askQuantityFor}
-                            onScan={addProduct}
+                            onSelect={pickProduct}
+                            onScan={pickProduct}
                             autoHighlight
                         />
                     </div>
-                    <BarcodeScanner vendorId={vendorId} onProductFound={addProduct} />
+                    <BarcodeScanner vendorId={vendorId} onProductFound={pickProduct} />
                     <button
                         onClick={() => setModal('suspendedSales')}
                         className={`flex items-center gap-1.5 shrink-0 rounded-xl border px-3 py-2.5 text-xs font-semibold transition-colors ${

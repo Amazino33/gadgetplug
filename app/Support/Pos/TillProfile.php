@@ -33,14 +33,15 @@ class TillProfile
     public static function for(User $cashier, ?Vendor $vendor): array
     {
         return [
-            'vat_enabled' => (bool) ($vendor->pos_vat_enabled ?? true),
-            'vat_rate'    => (float) ($vendor->pos_vat_rate ?? 7.5),
-            'vendor_name' => $vendor?->name,
-            'receipt'     => self::receipt($vendor),
-            'store'       => self::store($cashier, $vendor),
+            'vat_enabled'  => (bool) ($vendor->pos_vat_enabled ?? true),
+            'vat_rate'     => (float) ($vendor->pos_vat_rate ?? 7.5),
+            'ask_quantity' => (bool) ($vendor->pos_ask_quantity ?? true),
+            'vendor_name'  => $vendor?->name,
+            'receipt'      => self::receipt($vendor),
+            'store'        => self::store($cashier, $vendor),
             // Which till screens to offer. Only decides what is shown — every
             // endpoint behind them checks the same permission again.
-            'can'         => [
+            'can'          => [
                 'view_sales_history' => $vendor !== null
                     && $cashier->hasVendorPermission((int) $vendor->id, 'view_sales_history'),
             ],

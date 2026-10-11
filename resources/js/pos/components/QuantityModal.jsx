@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useKeyboard } from '../hooks/useKeyboard';
+import { looksLikeBarcode } from '../lib/scanSignal';
 
 // Two jobs, told apart by the wording rather than by different components:
 // changing the quantity of a line already in the cart (the default), and
@@ -47,10 +48,17 @@ export default function QuantityModal({
         return !isNaN(n) && n > max;
     })();
 
+    // A scanner types its digits and an Enter into whatever holds the keyboard.
+    // When the till asks for a quantity on every scan, the next item scanned
+    // before this box is answered lands here — and on a shop that sells below
+    // zero there is no shelf limit to stop 6001234567890 going in as a count.
+    const scannedIn = looksLikeBarcode(qty);
+    const blocked   = overStock || scannedIn;
+
     const confirm = () => {
         const n = typedQty();
 
-        if (!isNaN(n) && n >= 0 && n <= max) onConfirm(n);
+        if (!blocked && !isNaN(n) && n >= 0 && n <= max) onConfirm(n);
     };
 
     // Carries the quantity out with it. Negotiating from here used to lose
@@ -61,7 +69,7 @@ export default function QuantityModal({
     const negotiate = () => {
         const n = typedQty();
 
-        if (overStock) return;
+        if (blocked) return;
 
         onNegotiate(!isNaN(n) && n >= 1 ? n : 1);
     };
@@ -86,12 +94,16 @@ export default function QuantityModal({
                     // input would have allowed through on its own.
                     onChange={(e) => setQty(e.target.value.replace(/[^0-9]/g, ''))}
                     className={`w-full border-2 rounded-xl px-4 py-3 text-4xl font-bold text-center focus:outline-none mb-4 ${
-                        overStock
+                        blocked
                             ? 'border-red-400 text-red-600 focus:border-red-500'
                             : 'border-gray-200 text-gray-800 focus:border-[#068B03]'
                     }`}
                 />
-                {overStock ? (
+                {scannedIn ? (
+                    <p className="text-xs text-red-600 font-semibold text-center mb-4">
+                        That looks like a barcode, not a quantity. Clear it and finish this item first.
+                    </p>
+                ) : overStock ? (
                     <p className="text-xs text-red-600 font-semibold text-center mb-4">
                         {max === 0
                             ? 'None left on the shelf at this branch.'
@@ -115,7 +127,7 @@ export default function QuantityModal({
                         Cancel
                     </button>
                     <button onClick={confirm}
-                        disabled={overStock}
+                        disabled={blocked}
                         className="flex-1 py-2.5 rounded-xl bg-[#068B03] text-white text-sm font-bold hover:bg-[#057002] disabled:opacity-40 disabled:cursor-not-allowed">
                         Set [Enter]
                     </button>

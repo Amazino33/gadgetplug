@@ -17,8 +17,9 @@ import { addToCart } from '../lib/cartAdd';
 // took, an Enter that both opened the box and confirmed it.
 //
 // The harness mirrors POS's wiring (same components, same addToCart, same
-// pending-product rule) so the test can run without a session, a network or
-// a Dexie database behind it.
+// pending-product rule, same pickProduct switch on the vendor's "ask for
+// quantity" setting) so the test can run without a session, a network or a
+// Dexie database behind it.
 
 const charger = { id: 1, name: 'Samsung 25W Charger', sku: 'SAM-25', barcode: '6001234567890', price: 5300, available_stock: 4 };
 const cable   = { id: 2, name: 'Samsung Cable',       sku: 'SAM-CB', barcode: '6009876543210', price: 1500, available_stock: 9 };
@@ -37,7 +38,7 @@ vi.mock('../lib/db', () => ({
 
 vi.mock('../lib/api', () => ({ default: { get: vi.fn() } }));
 
-function Till() {
+function Till({ askQuantity = true }) {
     const [cart, setCart] = useState([]);
     const [pending, setPending] = useState(null);
     const searchRef = useRef(null);
@@ -53,14 +54,20 @@ function Till() {
         else setTimeout(() => searchRef.current?.focus(), 0);
     };
 
+    // POS's pickProduct: search and scan go the same way.
+    const pickProduct = (p) => {
+        if (askQuantity) { setPending(p); handOverKeyboard(true); }
+        else addProduct(p, 1);
+    };
+
     return (
         <div>
             <SearchBar
                 ref={searchRef}
                 vendorId={1}
                 autoHighlight
-                onSelect={(p) => { setPending(p); handOverKeyboard(true); }}
-                onScan={addProduct}
+                onSelect={pickProduct}
+                onScan={pickProduct}
             />
             {pending && (
                 <QuantityModal
@@ -176,8 +183,8 @@ describe('the keyboard-only sell loop', () => {
         expect(cartLines()).toEqual(['Samsung 25W Charger x5']);
     });
 
-    it('rings a scan straight up without ever showing the quantity box', async () => {
-        render(<Till />);
+    it('rings a scan straight up without the quantity box when the vendor turned asking off', async () => {
+        render(<Till askQuantity={false} />);
 
         await type('6009876543210');
         expect(await screen.findByText('Samsung Cable')).toBeDefined();
@@ -190,7 +197,7 @@ describe('the keyboard-only sell loop', () => {
     });
 
     it('counts each scan of the same product', async () => {
-        render(<Till />);
+        render(<Till askQuantity={false} />);
 
         for (let i = 0; i < 3; i++) {
             await type('6009876543210');
@@ -207,6 +214,8 @@ describe('the keyboard-only sell loop', () => {
 
         await type('6009876543210');
         expect(await screen.findByText('Samsung Cable')).toBeDefined();
+        await userEvent.keyboard('{Enter}');
+        await waitFor(() => expect(document.activeElement).toBe(quantityBox()));
         await userEvent.keyboard('{Enter}');
         await waitFor(() => expect(cartLines()).toEqual(['Samsung Cable x1']));
 
@@ -231,5 +240,34 @@ describe('the keyboard-only sell loop', () => {
 
         expect(box().value).toBe('');
         expect(quantityBox().value).toBe('7');
+    });
+});
+
+describe("the vendor's ask-for-quantity setting", () => {
+    it('asks how many on a scan when it is on', async () => {
+        render(<Till />);
+
+        await type('6009876543210');
+        expect(await screen.findByText('Samsung Cable')).toBeDefined();
+        await userEvent.keyboard('{Enter}');
+
+        await waitFor(() => expect(document.activeElement).toBe(quantityBox()));
+        expect(screen.queryAllByRole('listitem')).toHaveLength(0);
+
+        await userEvent.keyboard('6{Enter}');
+
+        await waitFor(() => expect(cartLines()).toEqual(['Samsung Cable x6']));
+        await waitFor(() => expect(document.activeElement).toBe(box()));
+    });
+
+    it('puts a searched product in at one, with no box, when it is off', async () => {
+        render(<Till askQuantity={false} />);
+
+        await type('charger');
+        expect(await screen.findByText('Samsung 25W Charger')).toBeDefined();
+        await userEvent.keyboard('{Enter}');
+
+        await waitFor(() => expect(cartLines()).toEqual(['Samsung 25W Charger x1']));
+        expect(quantityBox()).toBeNull();
     });
 });
