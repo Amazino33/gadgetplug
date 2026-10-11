@@ -214,14 +214,28 @@ class ReceiptSettings extends Page
         $data   = $this->form->getState();
         $vendor = filament()->getTenant();
 
+        // The goal and reward are hidden while the loyalty card is off, so the
+        // form does not send them then — reading them anyway crashed the save
+        // ("Undefined array key loyalty_reward_text"). Written only when sent,
+        // so turning the card off and on again brings back what was there.
+        $loyaltyDetails = [];
+
+        if (array_key_exists('loyalty_goal', $data)) {
+            $loyaltyDetails['loyalty_goal'] = (int) ($data['loyalty_goal'] ?: 10);
+        }
+
+        if (array_key_exists('loyalty_reward_text', $data)) {
+            $loyaltyDetails['loyalty_reward_text'] = $data['loyalty_reward_text'] ?: null;
+        }
+
         VendorReceiptSetting::updateOrCreate(
             ['vendor_id' => $vendor->id],
             [
-                'header_name'          => $data['header_name'] ?: null,
-                'header_tagline'       => $data['header_tagline'] ?: null,
-                'header_address'       => $data['header_address'] ?: null,
-                'header_phone'         => $data['header_phone'] ?: null,
-                'header_extra'         => $data['header_extra'] ?: null,
+                'header_name'          => ($data['header_name'] ?? null) ?: null,
+                'header_tagline'       => ($data['header_tagline'] ?? null) ?: null,
+                'header_address'       => ($data['header_address'] ?? null) ?: null,
+                'header_phone'         => ($data['header_phone'] ?? null) ?: null,
+                'header_extra'         => ($data['header_extra'] ?? null) ?: null,
                 'show_logo'            => (bool) ($data['show_logo'] ?? false),
                 'header_alignment'     => $data['header_alignment'] ?? 'center',
                 'show_receipt_number'  => (bool) ($data['show_receipt_number'] ?? true),
@@ -229,21 +243,19 @@ class ReceiptSettings extends Page
                 'show_customer'        => (bool) ($data['show_customer'] ?? true),
                 'show_datetime'        => (bool) ($data['show_datetime'] ?? true),
                 'show_item_unit_price' => (bool) ($data['show_item_unit_price'] ?? true),
-                'footer_text'          => $data['footer_text'] ?: null,
+                'footer_text'          => ($data['footer_text'] ?? null) ?: null,
                 'footer_alignment'     => $data['footer_alignment'] ?? 'center',
                 'feed_lines'           => (int) ($data['feed_lines'] ?? 2),
 
                 'show_qr'              => (bool) ($data['show_qr'] ?? true),
-                'qr_caption'           => $data['qr_caption'] ?: null,
-                'banner_image'         => $data['banner_image'] ?: null,
-                'banner_link'          => $data['banner_link'] ?: null,
-                'cta_label'            => $data['cta_label'] ?: null,
-                'cta_link'             => $data['cta_link'] ?: null,
+                'qr_caption'           => ($data['qr_caption'] ?? null) ?: null,
+                'banner_image'         => ($data['banner_image'] ?? null) ?: null,
+                'banner_link'          => ($data['banner_link'] ?? null) ?: null,
+                'cta_label'            => ($data['cta_label'] ?? null) ?: null,
+                'cta_link'             => ($data['cta_link'] ?? null) ?: null,
 
                 'loyalty_enabled'      => (bool) ($data['loyalty_enabled'] ?? false),
-                'loyalty_goal'         => (int) ($data['loyalty_goal'] ?? 10),
-                'loyalty_reward_text'  => $data['loyalty_reward_text'] ?: null,
-            ]
+            ] + $loyaltyDetails
         );
 
         Notification::make()->title('Receipt settings saved')->success()->send();
