@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { db } from '../lib/db';
 import api from '../lib/api';
+import { fetchCatalogue } from '../lib/catalogue';
 import { markSaleSynced } from '../lib/salesHistory';
 import { salesToSync } from '../lib/syncQueue';
 import { markPickingPaymentSynced, pendingPickingPayments, prunePickingPayments } from '../lib/pickings';
@@ -280,7 +281,9 @@ export function useSync(vendorId, cashierId, onStuckSalesChange) {
         if (!navigator.onLine || !vendorId) return;
 
         try {
-            const { data } = await api.get('/products', { params: { vendor_id: vendorId } });
+            // Paged: one request for thousands of products ran the server out
+            // of memory, and this refresh then silently kept the old copy.
+            const data = await fetchCatalogue(vendorId);
 
             if (!Array.isArray(data) || data.length === 0) return;
 

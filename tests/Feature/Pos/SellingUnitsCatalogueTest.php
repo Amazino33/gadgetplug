@@ -135,3 +135,26 @@ it('says why a scanned code is not on sale at the till', function () {
     $ctx['vendor']->update(['allow_negative_stock' => true]);
     $this->getJson($url . '6001')->assertJson(['reason' => null]);
 });
+
+it('hands the catalogue out a page at a time, in id order, and whole without a limit', function () {
+    $ctx = catalogueContext();
+
+    foreach (range(1, 4) as $i) {
+        Product::create([
+            'vendor_id' => $ctx['vendor']->id, 'category_id' => $ctx['product']->category_id,
+            'name' => "Extra {$i}", 'price' => 100, 'stock_quantity' => 5, 'status' => 'published', 'show_in_pos' => true,
+        ]);
+    }
+
+    $base = '/api/pos/products?vendor_id=' . $ctx['vendor']->id;
+
+    $first  = collect($this->getJson($base . '&after_id=0&limit=2')->assertOk()->json())->pluck('id');
+    $second = collect($this->getJson($base . '&after_id=' . $first->last() . '&limit=2')->json())->pluck('id');
+    $third  = collect($this->getJson($base . '&after_id=' . $second->last() . '&limit=2')->json())->pluck('id');
+
+    expect($first)->toHaveCount(2)
+        ->and($second)->toHaveCount(2)
+        ->and($third)->toHaveCount(1)
+        ->and($first->merge($second)->merge($third)->all())->toBe(Product::orderBy('id')->pluck('id')->all())
+        ->and($this->getJson($base)->json())->toHaveCount(5);
+});

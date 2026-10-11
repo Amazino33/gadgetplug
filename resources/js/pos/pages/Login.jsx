@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import api from '../lib/api';
+import { fetchCatalogue } from '../lib/catalogue';
 import { db } from '../lib/db';
 
 const DOTS = 4;
@@ -58,7 +59,9 @@ export default function Login({ onLogin }) {
             localStorage.setItem('pos_store', JSON.stringify(data.store ?? null));
             localStorage.setItem('pos_vendor_settings', JSON.stringify(data.vendor ?? { vat_enabled: true, vat_rate: 7.5 }));
 
-            const { data: products } = await api.get('/products', { params: { vendor_id: vendorId } });
+            // A page at a time — see fetchCatalogue() for why one big request
+            // stopped working once a shop had thousands of products.
+            const products = await fetchCatalogue(vendorId);
             await db.products.clear();
             await db.products.bulkPut(products);
 

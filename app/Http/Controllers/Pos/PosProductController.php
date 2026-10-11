@@ -28,12 +28,27 @@ class PosProductController extends Controller
     // device; filtering here means it never arrives.
     public function index(Request $request): JsonResponse
     {
-        $request->validate(['vendor_id' => 'required|integer']);
+        $request->validate([
+            'vendor_id' => 'required|integer',
+            // Paging. A catalogue of thousands built in one response ran past
+            // shared hosting's memory limit (8,000 products peaked near 180MB),
+            // the request died, and the till silently kept whatever copy it
+            // had — so only products a cashier had searched for would scan.
+            // The till now asks for a page at a time, in id order.
+            'after_id'  => 'nullable|integer|min:0',
+            'limit'     => 'nullable|integer|min:1|max:1000',
+        ]);
 
         $vendor = Vendor::findOrFail($request->vendor_id);
 
         $products = $this->branchCatalogue($request)
             ->with(['media', 'units', 'barcodes'])
+            // Without a limit: the whole catalogue, exactly as before, for a
+            // till still running the older code.
+            ->when($request->filled('limit'), fn ($q) => $q
+                ->where('products.id', '>', (int) $request->input('after_id', 0))
+                ->orderBy('products.id')
+                ->limit((int) $request->input('limit')))
             ->get()
             ->map(fn ($p) => $this->format($p, $vendor));
 
