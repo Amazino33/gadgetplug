@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
 import api from '../lib/api';
-import { fetchCatalogue } from '../lib/catalogue';
 import { db } from '../lib/db';
 
 const DOTS = 4;
@@ -26,9 +25,6 @@ export default function Login({ onLogin }) {
         }
     });
     const [loading, setLoading] = useState(false);
-    // What the till is doing after the PIN was accepted, so a long catalogue
-    // download reads as progress rather than a frozen screen.
-    const [status, setStatus]   = useState('');
     // Offered when the PIN belongs to someone who works in several branches:
     // the till has to know which one it is standing in before it can sell.
     const [branches, setBranches] = useState(null);
@@ -54,7 +50,6 @@ export default function Login({ onLogin }) {
         if (!vendorId || pin.length < 4 || submittingRef.current) return;
         submittingRef.current = true;
         setLoading(true);
-        setStatus('');
         setError('');
 
         let data;
@@ -102,34 +97,33 @@ export default function Login({ onLogin }) {
         localStorage.setItem('pos_store', JSON.stringify(data.store ?? null));
         localStorage.setItem('pos_vendor_settings', JSON.stringify(data.vendor ?? { vat_enabled: true, vat_rate: 7.5 }));
 
-        // The catalogue used to be part of signing in, so a download that
-        // failed or timed out — easy with thousands of products — was reported
-        // as "Invalid PIN" with the right PIN, and only a reload (which found
-        // the sign-in already saved) got the cashier in. It is still fetched
-        // here, but it can no longer stop anyone signing in: if it fails, the
-        // till opens on the copy it has and refreshes it in the background.
-        setStatus('Loading your products…');
+        // Straight into the till. The product catalogue is NOT downloaded here
+        // any more: with thousands of products that took long enough to look
+        // like the PIN had failed. The till starts its own background refresh
+        // the moment it opens (useSync), and sells meanwhile from the copy it
+        // has — asking the server about anything it does not know yet.
+        //
+        // The one thing that cannot wait: products saved for a DIFFERENT shop
+        // or branch on this device. Clearing them is instant, and means the
+        // till never offers another branch's goods while the new list arrives.
+        const owner = `${vendorId}:${data.store?.id ?? ''}`;
 
-        try {
-            // A page at a time — see fetchCatalogue() for why one big request
-            // stopped working once a shop had thousands of products.
-            const products = await fetchCatalogue(vendorId);
-            await db.products.clear();
-            await db.products.bulkPut(products);
-        } catch { /* the till's background refresh fetches it again */ }
+        if (localStorage.getItem('pos_catalogue_owner') !== owner) {
+            try { await db.products.clear(); } catch { /* nothing cached to clear */ }
+            localStorage.setItem('pos_catalogue_owner', owner);
+        }
 
         // Customers too, so a credit sale can still name who owes when the
-        // connection drops. Non-fatal on its own: failing to cache them must
-        // never stop a cashier signing in and trading.
-        try {
-            const { data: customers } = await api.get('/customers', { params: { vendor_id: vendorId } });
-            await db.customers.clear();
-            await db.customers.bulkPut(customers);
-        } catch { /* offline or refused — the till still opens */ }
+        // connection drops — in the background, for the same reason.
+        api.get('/customers', { params: { vendor_id: vendorId } })
+            .then(async ({ data: customers }) => {
+                await db.customers.clear();
+                await db.customers.bulkPut(customers);
+            })
+            .catch(() => { /* offline or refused — the till still opens */ });
 
         submittingRef.current = false;
         setLoading(false);
-        setStatus('');
         onLogin(data.user, Number(vendorId), data.store ?? null);
     };
 
@@ -258,9 +252,7 @@ export default function Login({ onLogin }) {
 
                 {error
                     ? <p className="text-red-500 text-xs text-center mb-4">{error}</p>
-                    : status
-                        ? <p role="status" className="text-[#068B03] dark:text-green-400 text-xs text-center mb-4">{status}</p>
-                        : <div className="mb-4" />
+                    : <div className="mb-4" />
                 }
 
                 {/* Numpad */}

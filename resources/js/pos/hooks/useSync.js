@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { db } from '../lib/db';
 import api from '../lib/api';
 import { fetchCatalogue } from '../lib/catalogue';
@@ -24,6 +24,11 @@ const WRONG_DAY = 'session_wrong_day';
 export function useSync(vendorId, cashierId, onStuckSalesChange) {
     const timerRef = useRef(null);
     const catalogueTimerRef = useRef(null);
+    // The catalogue now loads after sign-in rather than during it, so the till
+    // says when it is still arriving; and one load at a time, since a few
+    // thousand products take a moment and a timer tick can land mid-way.
+    const [catalogueLoading, setCatalogueLoading] = useState(false);
+    const catalogueBusyRef = useRef(false);
 
     const reportStuck = async () => {
         if (!onStuckSalesChange) return;
@@ -278,7 +283,10 @@ export function useSync(vendorId, cashierId, onStuckSalesChange) {
      * cannot read a half-empty catalogue.
      */
     const refreshCatalogue = async () => {
-        if (!navigator.onLine || !vendorId) return;
+        if (!navigator.onLine || !vendorId || catalogueBusyRef.current) return;
+
+        catalogueBusyRef.current = true;
+        setCatalogueLoading(true);
 
         try {
             // Paged: one request for thousands of products ran the server out
@@ -294,6 +302,9 @@ export function useSync(vendorId, cashierId, onStuckSalesChange) {
         } catch {
             // Offline or refused — the catalogue already on the device stays
             // exactly as it is, which is what keeps the till sellable.
+        } finally {
+            catalogueBusyRef.current = false;
+            setCatalogueLoading(false);
         }
     };
 
@@ -318,5 +329,5 @@ export function useSync(vendorId, cashierId, onStuckSalesChange) {
         };
     }, [vendorId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    return { syncNow: sync, refreshCatalogue };
+    return { syncNow: sync, refreshCatalogue, catalogueLoading };
 }

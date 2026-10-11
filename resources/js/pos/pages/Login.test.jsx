@@ -120,3 +120,46 @@ describe('a right PIN always signs in', () => {
         expect(api.post).toHaveBeenCalledTimes(1);
     });
 });
+
+describe('the till opens as soon as the PIN is right', () => {
+    it('does not wait for any download before letting the cashier in', async () => {
+        api.post.mockResolvedValueOnce(signedIn);
+        // Every background request hangs — the till must open regardless.
+        api.get.mockImplementation(() => new Promise(() => {}));
+
+        const onLogin = vi.fn();
+        render(<Login onLogin={onLogin} />);
+        typePin('1234');
+
+        await waitFor(() => expect(onLogin).toHaveBeenCalledTimes(1));
+        expect(api.get).not.toHaveBeenCalledWith('/products', expect.anything());
+    });
+
+    it('keeps the saved products for the same branch, and clears them for a different one', async () => {
+        const { db } = await import('../lib/db');
+        await db.products.clear();
+        await db.products.put({ id: 1, name: 'Cached', barcode: '111', sku: 'C1' });
+
+        api.get.mockResolvedValue({ data: [] });
+
+        // Same shop and branch as last time: the device's copy stays.
+        localStorage.setItem('pos_catalogue_owner', '2:9');
+        api.post.mockResolvedValueOnce(signedIn);
+        const onLogin = vi.fn();
+        const { unmount } = render(<Login onLogin={onLogin} />);
+        typePin('1234');
+        await waitFor(() => expect(onLogin).toHaveBeenCalled());
+        expect(await db.products.count()).toBe(1);
+        unmount();
+
+        // Another branch on this device: its products must not linger.
+        localStorage.setItem('pos_catalogue_owner', '2:4');
+        api.post.mockResolvedValueOnce(signedIn);
+        const onLogin2 = vi.fn();
+        render(<Login onLogin={onLogin2} />);
+        typePin('1234');
+        await waitFor(() => expect(onLogin2).toHaveBeenCalled());
+        expect(await db.products.count()).toBe(0);
+        expect(localStorage.getItem('pos_catalogue_owner')).toBe('2:9');
+    });
+});

@@ -197,7 +197,7 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
 
     const searchRef = useRef(null);
 
-    const { syncNow } = useSync(vendorId, user?.id, setStuckSales);
+    const { syncNow, catalogueLoading } = useSync(vendorId, user?.id, setStuckSales);
 
     // Older than the retention window is not this till's business to hold.
     useEffect(() => {
@@ -878,6 +878,19 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
                         <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">👤 {customer.name}</span>
                         {customer.phone && <span className="text-xs text-blue-400 dark:text-blue-500">{customer.phone}</span>}
                         <button onClick={() => setCustomer(null)} className="ml-auto text-xs text-blue-400 dark:text-blue-500 hover:text-red-500">✕</button>
+                    </div>
+                )}
+
+                {/* Products arrive after sign-in now, not before it. Selling
+                    goes on meanwhile: search and scan ask the server about
+                    anything the device does not have yet. */}
+                {catalogueLoading && (
+                    <div role="status" className="flex items-center gap-2 px-4 md:px-6 py-1.5 bg-green-50 dark:bg-green-950/40 border-b border-green-100 dark:border-green-900 text-[11px] text-[#068B03] dark:text-green-400 shrink-0">
+                        <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                        </svg>
+                        Updating products… you can keep selling — search and scan still work.
                     </div>
                 )}
 
