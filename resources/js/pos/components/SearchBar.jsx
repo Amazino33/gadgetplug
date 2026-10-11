@@ -27,6 +27,7 @@ const SearchBar = forwardRef(function SearchBar({
     const [open, setOpen]       = useState(false);
     const [activeIndex, setActiveIndex] = useState(-1);
     const [scanMiss, setScanMiss]       = useState('');
+    const [scanMissWhy, setScanMissWhy] = useState(null);
     const inputRef              = useRef(null);
     const debounceRef           = useRef(null);
     const rootRef               = useRef(null);
@@ -231,19 +232,42 @@ const SearchBar = forwardRef(function SearchBar({
         inputRef.current?.focus();
     };
 
-    const reportUnknownBarcode = (barcode) => {
+    const reportUnknownBarcode = (barcode, why = null) => {
         // Cleared, not left in the box: a scanner sends its payload and an
         // Enter with no regard for what is already there, so leaving the
         // missed barcode behind means the next scan arrives concatenated
         // onto it and misses too. The message carries the digits instead.
         reset();
         setScanMiss(barcode);
+        setScanMissWhy(why);
         inputRef.current?.focus();
 
         // Brief, because it is a note and not a decision. It also clears on
-        // the next keystroke — whichever comes first.
+        // the next keystroke — whichever comes first. A reason gets longer,
+        // because somebody has to read it and act on it.
         clearTimeout(scanMissTimerRef.current);
-        scanMissTimerRef.current = setTimeout(() => setScanMiss(''), 4000);
+        scanMissTimerRef.current = setTimeout(() => setScanMiss(''), why ? 10000 : 4000);
+    };
+
+    /**
+     * Why a code the shop does know is not on sale here — a draft, hidden
+     * from the Sales Point, at another branch, out of stock — or null when the
+     * shop has no such code at all. Online only; offline the till can only
+     * say it does not know the code.
+     */
+    const whyNotSellable = async (code) => {
+        if (!navigator.onLine) return null;
+
+        try {
+            const { data } = await api.get('/products/why-not-sellable', {
+                params: { vendor_id: vendorId, code },
+                timeout: 3000,
+            });
+
+            return data?.found && data.reason ? { name: data.name, reason: data.reason } : null;
+        } catch {
+            return null;
+        }
     };
 
     const onChange = (e) => {
@@ -333,10 +357,15 @@ const SearchBar = forwardRef(function SearchBar({
 
                 if (fromServer) { takeScan(fromServer); return; }
 
-                // Nothing carries it anywhere. Say so and stop: falling through
-                // here would offer a quantity of whatever product merely
-                // happened to contain those digits somewhere in its name.
-                reportUnknownBarcode(trimmed);
+                // Not on sale at this till. Say so — and why, when the shop
+                // does have the code — and stop: falling through here would
+                // offer a quantity of whatever product merely happened to
+                // contain those digits somewhere in its name.
+                const why = await whyNotSellable(trimmed);
+
+                if (inputRef.current && inputRef.current.value.trim() !== trimmed) return;
+
+                reportUnknownBarcode(trimmed, why);
                 return;
             }
         }
@@ -407,7 +436,13 @@ const SearchBar = forwardRef(function SearchBar({
 
             {scanMiss && (
                 <div role="status" className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-900 border border-amber-200 dark:border-amber-700 rounded-xl shadow-lg z-50 px-4 py-3">
-                    <p className="text-xs text-amber-700 dark:text-amber-400">No product for barcode {scanMiss}.</p>
+                    {scanMissWhy ? (
+                        <p className="text-xs text-amber-700 dark:text-amber-400">
+                            <span className="font-semibold">{scanMissWhy.name}</span> ({scanMiss}) can't be sold here: {scanMissWhy.reason}
+                        </p>
+                    ) : (
+                        <p className="text-xs text-amber-700 dark:text-amber-400">No product for barcode {scanMiss}.</p>
+                    )}
                 </div>
             )}
 

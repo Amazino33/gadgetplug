@@ -41,6 +41,61 @@ class PosProductController extends Controller
     }
 
     /**
+     * Why a scanned code is not on sale at this till, in words a cashier can
+     * pass on.
+     *
+     * Asked only after a scan found nothing. "No product for barcode" was all a
+     * till could say, whether the code is unknown or belongs to a product that
+     * is a draft, hidden from the Sales Point, at another branch or out of
+     * stock — four problems with four different fixes, all looking the same.
+     */
+    public function whyNotSellable(Request $request): JsonResponse
+    {
+        $request->validate([
+            'vendor_id' => 'required|integer',
+            'code'      => 'required|string|max:100',
+        ]);
+
+        $code = trim($request->code);
+
+        $product = Product::where('vendor_id', $request->vendor_id)
+            ->where(fn ($q) => $q
+                ->where('barcode', $code)
+                ->orWhere('sku', $code)
+                ->orWhereIn('id', ProductBarcode::select('product_id')
+                    ->where('vendor_id', $request->vendor_id)
+                    ->where('barcode', $code)))
+            ->first();
+
+        if ($product === null) {
+            return response()->json(['found' => false]);
+        }
+
+        $storeId = TillStore::resolve($request->user(), (int) $request->vendor_id);
+        $vendor  = Vendor::find($request->vendor_id);
+
+        $live = Product::whereKey($product->id)->published()->exists();
+        $row  = ProductStoreStock::where('product_id', $product->id)->where('store_id', $storeId)->first();
+        $onShelf = $row ? (int) $row->quantity - (int) $row->reserved : 0;
+
+        $reason = match (true) {
+            ! $live                       => 'it is not published (it is a draft, archived or scheduled). Set its Status to Published.',
+            ! $product->show_in_pos       => '"Show in POS" is turned off on the product.',
+            (int) $product->store_id !== $storeId
+                                          => 'it belongs to another branch.',
+            $onShelf <= 0 && ! NegativeStock::allowed($product, $vendor)
+                                          => 'it has no stock at this branch. Add stock with a count, a procurement or Stock Adjustment — or allow selling below zero.',
+            default                       => null,
+        };
+
+        return response()->json([
+            'found'  => true,
+            'name'   => $product->name,
+            'reason' => $reason,
+        ]);
+    }
+
+    /**
      * Makes a unit the one this product goes into the cart as.
      *
      * Any cashier may: it changes how the till behaves, not what anything

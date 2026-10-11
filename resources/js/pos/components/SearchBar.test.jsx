@@ -376,3 +376,21 @@ describe('a scan the device does not know yet', () => {
         expect(onScan).not.toHaveBeenCalled();
     });
 });
+
+describe('a scan the shop knows but cannot sell here', () => {
+    it('names the product and says why instead of "No product"', async () => {
+        const api = (await import('../lib/api')).default;
+        api.get.mockImplementation(async (url) => (url === '/products/why-not-sellable'
+            ? { data: { found: true, name: 'Mentos 87.5g', reason: 'it is not published (it is a draft, archived or scheduled). Set its Status to Published.' } }
+            : { data: [] }));
+
+        const onScan = vi.fn();
+        render(<SearchBar vendorId={1} onSelect={vi.fn()} onScan={onScan} />);
+
+        await type('8935001726999{Enter}');
+
+        expect(await screen.findByText(/can't be sold here: it is not published/)).toBeDefined();
+        expect(screen.getByText('Mentos 87.5g')).toBeDefined();
+        expect(onScan).not.toHaveBeenCalled();
+    });
+});

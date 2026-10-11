@@ -110,3 +110,28 @@ it('refuses a main barcode that already belongs to another product\'s unit', fun
         'name' => 'Clash', 'price' => 100, 'barcode' => '6024',
     ]))->toThrow(\Illuminate\Validation\ValidationException::class);
 });
+
+it('says why a scanned code is not on sale at the till', function () {
+    $ctx = catalogueContext();
+    $url = '/api/pos/products/why-not-sellable?vendor_id=' . $ctx['vendor']->id . '&code=';
+
+    // Sellable: nothing to explain.
+    $this->getJson($url . '6001')->assertOk()->assertJson(['found' => true, 'reason' => null]);
+
+    // Unknown everywhere in this shop.
+    $this->getJson($url . '0000000000')->assertOk()->assertJson(['found' => false]);
+
+    // A unit's own code is recognised too.
+    $ctx['product']->update(['status' => 'draft']);
+    expect($this->getJson($url . '6024')->json('reason'))->toContain('not published');
+
+    $ctx['product']->update(['status' => 'published', 'show_in_pos' => false]);
+    expect($this->getJson($url . '6001')->json('reason'))->toContain('Show in POS');
+
+    $ctx['product']->update(['show_in_pos' => true]);
+    app(\App\Actions\Inventory\AdjustStockAction::class)->execute($ctx['product']->id, -60, 'stock_adjustment');
+    expect($this->getJson($url . '6001')->json('reason'))->toContain('no stock');
+
+    $ctx['vendor']->update(['allow_negative_stock' => true]);
+    $this->getJson($url . '6001')->assertJson(['reason' => null]);
+});
