@@ -94,6 +94,10 @@ class ListProducts extends ListRecords
             ->when($this->search !== '', fn (Builder $query) => $query->where(
                 fn (Builder $q) => $q->where('name', 'like', "%{$this->search}%")
                     ->orWhere('sku', 'like', "%{$this->search}%")
+                    // A scanned barcode finds the product too: its main code,
+                    // an extra code, or a carton's own.
+                    ->orWhere('products.barcode', 'like', "%{$this->search}%")
+                    ->orWhereHas('barcodes', fn (Builder $b) => $b->where('barcode', 'like', "%{$this->search}%"))
             ))
             ->when($this->statusFilter, fn (Builder $query) => $query->where('status', $this->statusFilter))
             // Column-qualified: getEloquentQuery() already joins for the
