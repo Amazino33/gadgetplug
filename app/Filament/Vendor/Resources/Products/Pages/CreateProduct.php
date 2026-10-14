@@ -2,38 +2,31 @@
 
 namespace App\Filament\Vendor\Resources\Products\Pages;
 
+use App\Filament\Vendor\Resources\Products\Pages\Concerns\ConfiguresProductPage;
 use App\Filament\Vendor\Resources\Products\ProductResource;
 use App\Filament\Vendor\Resources\Products\Schemas\ProductForm;
 use Filament\Resources\Pages\CreateRecord;
-use Filament\Support\Enums\Width;
 
 class CreateProduct extends CreateRecord
 {
+    use ConfiguresProductPage;
+
     protected static string $resource = ProductResource::class;
-
-    // This form is two real columns of content, not a narrow single-column
-    // one. At the panel default it was rendering at roughly half the space
-    // available, which wrapped the selects onto two lines and pushed the
-    // page well past one screen. Full width is what makes the pairings in
-    // ProductForm actually sit side by side.
-    public function getMaxContentWidth(): Width | string | null
-    {
-        return Width::Full;
-    }
-
-    // The form runs close to three screens tall, so unpinned Save buttons mean
-    // scrolling to the bottom every time — including after a correction made at
-    // the top. Overridden per page rather than set on the panel: this is a
-    // property of a long form, not of every form in the panel.
-    public function areFormActionsSticky(): bool
-    {
-        return true;
-    }
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        $data = ProductForm::stripTransientAiFields($data);
+        $manual = (bool) ($data['sku_manual'] ?? false);
+
+        $data = ProductForm::stripTransientFields($data);
         $data['vendor_id'] = filament()->getTenant()->id;
+
+        // The SKU on screen while typing is only a preview. Unless the vendor
+        // chose to write their own, it is dropped here and Product::saving()
+        // generates the real one — so two products created at once never share
+        // a preview.
+        if (! $manual) {
+            unset($data['sku']);
+        }
 
         // The home-store field is only shown to the owner. For anyone else the
         // product is homed in the branch they are working in — never left
@@ -41,6 +34,11 @@ class CreateProduct extends CreateRecord
         $data['store_id'] ??= \App\Services\ActiveStore::currentId();
 
         return $data;
+    }
+
+    protected function afterCreate(): void
+    {
+        $this->syncDefaultUnit();
     }
 
     protected function getFormActions(): array

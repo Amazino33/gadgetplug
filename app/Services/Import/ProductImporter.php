@@ -452,8 +452,14 @@ class ProductImporter
 
         // "Unit" is the base unit: stock and Quantity are counted in it, and
         // it names the base selling unit at the till.
+        //
+        // The column may be headed "Unit", "Base Unit" or "Measurement Unit" -
+        // all map to this one field (see ProductField::aliases). base_unit is
+        // the source of truth; measurement_unit is still written, mirroring it,
+        // because older exports and anything reading that column expect it.
         if (filled($attributes['measurement_unit'] ?? null)) {
             $attributes['base_unit'] = mb_substr((string) $attributes['measurement_unit'], 0, 32);
+            $attributes['measurement_unit'] = $attributes['base_unit'];
         }
 
         return $attributes;

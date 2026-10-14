@@ -224,7 +224,7 @@ enum ProductField: string
             self::Description     => ['description', 'details', 'notes', 'long description'],
             self::OnlineName      => ['online name', 'onlinename', 'online title', 'web name', 'display name', 'seo name', 'seo title'],
             self::MetaDescription => ['meta description', 'metadescription', 'seo description', 'search description'],
-            self::MeasurementUnit => ['unit', 'measurementunit', 'measurement unit', 'uom', 'unit of measure', 'measure'],
+            self::MeasurementUnit => ['unit', 'base unit', 'baseunit', 'base_unit', 'measurementunit', 'measurement unit', 'uom', 'unit of measure', 'measure'],
             // "Wholesale" used to land here, which wrote a selling price into
             // the cost column. It is Wholesale Price's now.
             self::CostPrice       => ['cost', 'cost price', 'costprice', 'buy price', 'buying price', 'purchase price', 'unit cost'],

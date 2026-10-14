@@ -96,7 +96,7 @@ test('the create form still offers every advanced field, just not up front', fun
     // Advanced — present in the schema, collapsed on arrival.
     foreach ([
         'images', 'brand', 'sku', 'barcode', 'supplier_id', 'description',
-        'specifications', 'allow_pos_price_override', 'measurement_unit',
+        'allow_pos_price_override', 'base_unit', 'negative_stock_override',
         'low_stock_threshold', 'reorder_point', 'preferred_quantity', 'is_service',
         'show_online', 'show_in_pos', 'tags',
     ] as $field) {

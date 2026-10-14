@@ -2,30 +2,19 @@
 
 namespace App\Filament\Vendor\Resources\Products\Pages;
 
+use App\Filament\Vendor\Resources\Products\Pages\Concerns\ConfiguresProductPage;
 use App\Filament\Vendor\Resources\Products\ProductResource;
 use App\Filament\Vendor\Resources\Products\Schemas\ProductForm;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
-use Filament\Support\Enums\Width;
 
 class EditProduct extends EditRecord
 {
+    use ConfiguresProductPage;
+
     protected static string $resource = ProductResource::class;
-
-    // Matches CreateProduct — see the note there for why the panel default
-    // is too narrow for this particular form.
-    public function getMaxContentWidth(): Width | string | null
-    {
-        return Width::Full;
-    }
-
-    // Matches CreateProduct — same long form, same reason.
-    public function areFormActionsSticky(): bool
-    {
-        return true;
-    }
 
     // Archiving lives here rather than as a third button in the form's status
     // control: it is a different kind of decision from draft-vs-live (it pulls
@@ -38,6 +27,25 @@ class EditProduct extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            // Draft/Published lives here rather than in the form: it is a
+            // decision about the product, made on its own, not a field to fill
+            // in alongside the price. (The create form keeps it as a field,
+            // since a new product has no header to put it in.) Hidden while
+            // archived - Restore is the way back from there.
+            Action::make('publish')
+                ->label('Publish')
+                ->icon('heroicon-o-check-circle')
+                ->color('success')
+                ->visible(fn (): bool => $this->record->status === 'draft')
+                ->action(fn () => $this->setStatus('published', 'Product published.')),
+
+            Action::make('unpublish')
+                ->label('Move to draft')
+                ->icon('heroicon-o-pencil-square')
+                ->color('gray')
+                ->visible(fn (): bool => $this->record->status === 'published')
+                ->action(fn () => $this->setStatus('draft', 'Product moved to draft.')),
+
             Action::make('archive')
                 ->label('Archive')
                 ->icon('heroicon-o-archive-box')
@@ -85,8 +93,22 @@ class EditProduct extends EditRecord
         ];
     }
 
+    private function setStatus(string $status, string $title): void
+    {
+        $this->record->update(['status' => $status]);
+        $this->refreshFormData(['status']);
+
+        Notification::make()->title($title)->success()->send();
+    }
+
     protected function mutateFormDataBeforeFill(array $data): array
     {
+        // Which unit the till opens the product in, as the form's radio
+        // expresses it: 'base', or 'unit:{name}' for a bigger one.
+        $default = $this->record->units()->find($this->record->default_unit_id);
+
+        $data['default_unit_choice'] = ($default && ! $default->is_base) ? 'unit:'.$default->name : 'base';
+
         $data['images'] = $this->record
             ->getMedia('product-images')
             ->pluck('uuid')
@@ -97,6 +119,11 @@ class EditProduct extends EditRecord
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        return ProductForm::stripTransientAiFields($data);
+        return ProductForm::stripTransientFields($data);
+    }
+
+    protected function afterSave(): void
+    {
+        $this->syncDefaultUnit();
     }
 }

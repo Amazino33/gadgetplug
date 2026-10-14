@@ -79,7 +79,11 @@ class PosProductController extends Controller
                 ->orWhere('sku', $code)
                 ->orWhereIn('id', ProductBarcode::select('product_id')
                     ->where('vendor_id', $request->vendor_id)
-                    ->where('barcode', $code)))
+                    ->where('barcode', $code))
+                // A unit's own SKU (ALC-CASTLI-0042-CR12) opens that unit.
+                ->orWhereIn('id', ProductUnit::select('product_id')
+                    ->where('vendor_id', $request->vendor_id)
+                    ->where('sku', $code)))
             ->first();
 
         if ($product === null) {
@@ -159,6 +163,10 @@ class PosProductController extends Controller
                 ->orWhereIn('products.id', ProductBarcode::select('product_id')
                     ->where('vendor_id', $request->vendor_id)
                     ->where('barcode', $q))
+                // A unit's own SKU, e.g. ALC-CASTLI-0042-CR12.
+                ->orWhereIn('products.id', ProductUnit::select('product_id')
+                    ->where('vendor_id', $request->vendor_id)
+                    ->where('sku', $q))
             )
             ->with(['media', 'units', 'barcodes'])
             ->limit(20)
@@ -267,8 +275,16 @@ class PosProductController extends Controller
             'allow_negative'  => NegativeStock::allowed($p, $vendor),
             'units'           => $this->formatUnits($p, $vendor),
             // Every code this product answers to; unit_id null = base unit.
+            // A bigger unit's SKU is listed with its barcodes: the till already
+            // opens the right unit for any code in this list, and a SKU typed
+            // or scanned is just another code for it.
             'barcodes'        => $p->relationLoaded('barcodes')
-                ? $p->barcodes->map(fn ($b) => ['barcode' => $b->barcode, 'unit_id' => $b->product_unit_id])->values()
+                ? $p->barcodes->map(fn ($b) => ['barcode' => $b->barcode, 'unit_id' => $b->product_unit_id])
+                    ->concat($p->relationLoaded('units')
+                        ? $p->units->filter(fn ($u) => ! $u->is_base && filled($u->sku))
+                            ->map(fn ($u) => ['barcode' => $u->sku, 'unit_id' => $u->id])
+                        : [])
+                    ->values()
                 : [],
         ];
     }

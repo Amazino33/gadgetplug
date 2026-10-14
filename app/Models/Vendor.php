@@ -21,12 +21,13 @@ class Vendor extends Model
         'pos_min_margin_percent', 'online_sales_enabled', 'initial_capital',
         'dashboard_blocked', 'dashboard_blocked_reason', 'dashboard_blocked_at',
         'restock_window_days', 'restock_lead_time_days', 'restock_target_cover_days', 'restock_safety_buffer_days',
-        'allow_negative_stock', 'pos_ask_quantity', 'pos_allow_price_change',
+        'allow_negative_stock', 'pos_ask_quantity', 'pos_allow_price_change', 'enable_gadget_fields',
     ];
 
     protected $casts = [
         'pos_min_margin_percent'     => 'decimal:2',
         'allow_negative_stock'      => 'boolean',
+        'enable_gadget_fields'      => 'boolean',
         'pos_ask_quantity'          => 'boolean',
         'pos_allow_price_change'    => 'boolean',
         'online_sales_enabled'      => 'boolean',
@@ -40,7 +41,17 @@ class Vendor extends Model
     ];
 
     /**
-     * "City, State" — or whichever half of it the store has filled in.
+     * Whether this shop sells things with specifications and serial numbers
+     * (phones, laptops). Everyone else never sees those two fields; their saved
+     * values are kept either way.
+     */
+    public function usesGadgetFields(): bool
+    {
+        return (bool) $this->enable_gadget_fields;
+    }
+
+    /**
+     * "City, State"— or whichever half of it the store has filled in.
      *
      * Null when neither is set, so a caller can hide the whole line rather
      * than print a dangling separator. Most stores have set nothing, which is

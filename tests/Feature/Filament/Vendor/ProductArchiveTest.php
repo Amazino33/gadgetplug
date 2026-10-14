@@ -113,14 +113,28 @@ test('the create page offers no archive action — there is nothing yet to archi
         ->assertActionDoesNotExist('restore');
 });
 
-test('a product can still be moved between draft and published on the form', function () {
+test('a product moves between draft and published from the header, not the form', function () {
     $data = setUpArchiveVendor('draft');
     actAsArchiveOwner($data);
 
     Livewire::test(EditProduct::class, ['record' => $data['product']->getRouteKey()])
-        ->fillForm(['status' => 'published'])
-        ->call('save')
-        ->assertHasNoFormErrors();
+        ->assertActionVisible('publish')
+        ->assertActionHidden('unpublish')
+        ->callAction('publish');
 
     expect($data['product']->fresh()->status)->toBe('published');
+
+    Livewire::test(EditProduct::class, ['record' => $data['product']->getRouteKey()])
+        ->assertActionVisible('unpublish')
+        ->assertActionHidden('publish')
+        ->callAction('unpublish');
+
+    expect($data['product']->fresh()->status)->toBe('draft');
+});
+
+test('the create form still has the Draft / Published choice', function () {
+    $data = setUpArchiveVendor();
+    actAsArchiveOwner($data);
+
+    Livewire::test(CreateProduct::class)->assertFormFieldIsVisible('status');
 });

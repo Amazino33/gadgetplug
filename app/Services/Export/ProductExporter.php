@@ -136,10 +136,12 @@ class ProductExporter
             // margin; blank is the truth that nobody has entered one.
             ProductField::CostPrice  => $product->cost_price === null ? '' : (string) $product->cost_price,
             ProductField::Quantity   => (string) $product->stock_quantity,
-            // The base unit. measurement_unit as it always was; the form's
-            // base unit only when someone has set one and the old column is empty.
-            ProductField::MeasurementUnit => (string) ($product->measurement_unit
-                ?: ($product->base_unit && $product->base_unit !== 'Piece' ? $product->base_unit : '')),
+            // The base unit - the form's base_unit is the source of truth now.
+            // The old measurement_unit fills in only for a product that never
+            // had a base unit chosen (still the "Piece" default).
+            ProductField::MeasurementUnit => (string) (($product->base_unit && $product->base_unit !== 'Piece')
+                ? $product->base_unit
+                : ($product->measurement_unit ?: '')),
             ProductField::WholesalePrice  => $product->wholesale_price === null ? '' : (string) $product->wholesale_price,
             ProductField::AltBarcode      => (string) ($this->altBarcode($product) ?? ''),
             default                  => $field->unitSlot() !== null

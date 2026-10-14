@@ -59,7 +59,10 @@ it('sends each product with its units, prices, floors and barcodes', function ()
         // Haggling is on and a cost is known, so a crate may go down to the
         // cost of the 24 bottles inside it (24 × ₦350), never below.
         ->and($row['units'][1]['wholesale_min_price'])->toEqual(8400)
-        ->and(collect($row['barcodes'])->pluck('barcode')->sort()->values()->all())->toBe(['6001', '6024'])
+        // The crate's SKU is listed with its barcodes, so the till opens the
+        // crate for it exactly as it does for a scan.
+        ->and(collect($row['barcodes'])->pluck('barcode')->sort()->values()->all())
+            ->toBe(collect(['6001', '6024', $row['units'][1] ? ProductUnit::find($row['units'][1]['id'])->sku : null])->sort()->values()->all())
         ->and($row)->not->toHaveKey('cost_price');
 });
 

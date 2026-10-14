@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\Products\SkuGenerator;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -33,6 +34,16 @@ class ProductUnit extends Model
         static::saving(function (ProductUnit $unit) {
             if ($unit->product_id && ! $unit->vendor_id) {
                 $unit->vendor_id = Product::whereKey($unit->product_id)->value('vendor_id');
+            }
+
+            // A bigger unit answers to its own code: {product SKU}-{CR}{12}.
+            // The base unit uses the product's SKU, so it keeps none of its own.
+            if (! $unit->is_base && blank($unit->sku) && $unit->product_id) {
+                $productSku = Product::whereKey($unit->product_id)->value('sku');
+
+                if (filled($productSku)) {
+                    $unit->sku = app(SkuGenerator::class)->forUnit($unit, $productSku);
+                }
             }
         });
     }

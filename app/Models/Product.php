@@ -5,7 +5,9 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
+use App\Services\Products\SkuGenerator;
 use App\Services\VendorLink\LinkedPricing;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -166,8 +168,23 @@ class Product extends Model implements HasMedia
         'negative_stock_override' => 'boolean',
     ];
 
+    /** True while the SKU on this instance was made by SkuGenerator, so a clash can be retried. */
+    private bool $skuWasGenerated = false;
+
     protected static function booted(): void
     {
+        // Every product ends up with a SKU. Filled in when blank - on create,
+        // and on any later save that blanked it - rather than only in the form,
+        // because imports, seeders and linked listings create products too.
+        static::saving(function (Product $product) {
+            if (blank($product->sku)) {
+                $product->sku = app(SkuGenerator::class)->generate($product);
+                $product->skuWasGenerated = true;
+            } elseif (is_string($product->sku)) {
+                $product->sku = trim($product->sku);
+            }
+        });
+
         // Every product has a base selling unit that mirrors its own price, and
         // its main barcode is findable in product_barcodes. Kept in step here
         // rather than at each place a price or barcode changes — the form, the
@@ -177,6 +194,30 @@ class Product extends Model implements HasMedia
             $product->syncBaseUnit();
             $product->syncMainBarcode();
         });
+    }
+
+    /**
+     * Two creates at the same moment can both be handed the same next SKU; the
+     * unique index lets one through. The loser asks the generator for another
+     * number and tries again, up to five times, instead of surfacing a raw
+     * 1062. A SKU the vendor typed is never retried - that clash is theirs to
+     * fix, and the form reports it before it ever gets here.
+     */
+    protected function performInsert(Builder $query)
+    {
+        $attempts = 0;
+
+        while (true) {
+            try {
+                return parent::performInsert($query);
+            } catch (UniqueConstraintViolationException $e) {
+                if (! $this->skuWasGenerated || ++$attempts >= 5 || ! str_contains($e->getMessage(), 'sku')) {
+                    throw $e;
+                }
+
+                $this->sku = app(SkuGenerator::class)->for($this->vendor_id, $this->category_id, $this->name, null, $attempts);
+            }
+        }
     }
 
     /** Every selling unit, base unit first. */
