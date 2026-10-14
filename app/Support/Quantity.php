@@ -33,6 +33,27 @@ final class Quantity
         return self::isWhole($rounded) ? (int) round($rounded) : $rounded;
     }
 
+    /**
+     * A quantity someone typed: "19", "19.5", "19½" or "½". Null when it is
+     * not a number at all. Whether a half is allowed is errorFor()'s job.
+     */
+    public static function parse(mixed $raw): int|float|null
+    {
+        $text = trim((string) $raw);
+
+        if ($text === '') {
+            return null;
+        }
+
+        // "19½" is 19.5 and "½" is 0.5; nothing else is rewritten.
+        if (str_ends_with($text, '½')) {
+            $whole = trim(mb_substr($text, 0, -1));
+            $text  = ($whole === '' ? '0' : $whole).'.5';
+        }
+
+        return is_numeric($text) ? self::of($text) : null;
+    }
+
     public static function isWhole(mixed $value): bool
     {
         $float = (float) $value;
@@ -162,6 +183,22 @@ final class Quantity
         }
 
         return rtrim(rtrim(number_format($quantity, self::SCALE, '.', ''), '0'), '.');
+    }
+
+    /**
+     * For the screens that used number_format(): "1,200" for a whole quantity,
+     * exactly as before, and "19½" for a half — where number_format(19.5)
+     * would have printed "20".
+     */
+    public static function display(mixed $value, Vendor|bool|null $halves = null): string
+    {
+        if ($value === null || $value === '') {
+            return '';
+        }
+
+        $quantity = self::of($value);
+
+        return is_int($quantity) ? number_format($quantity) : self::format($quantity, $halves ?? true);
     }
 
     /** SQL that is true where a quantity column holds a fraction. Same on MySQL and SQLite. */

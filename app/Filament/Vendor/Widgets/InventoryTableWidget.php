@@ -87,13 +87,17 @@ class InventoryTableWidget extends BaseWidget
                     ->color(fn (int $state): string => $state > 0 ? 'warning' : 'gray')
                     ->tooltip('Paid orders awaiting dispatch — still physically in your shop'),
 
+                // Exact, halves included: available_stock is the online
+                // store's whole-unit figure, and this is the shop's own view.
                 Tables\Columns\TextColumn::make('available_stock')
                     ->label('Available to Sell')
+                    ->getStateUsing(fn (Product $r): int|float => max(0, Quantity::sub($r->stock_quantity, $r->reserved_stock)))
+                    ->formatStateUsing(fn ($state): string => Quantity::format($state, filament()->getTenant()))
                     ->sortable(query: fn ($query, $direction) =>
                         $query->orderByRaw(Quantity::availableSql()." {$direction}")
                     )
                     ->badge()
-                    ->color(fn (int $state): string => match (true) {
+                    ->color(fn (int|float $state): string => match (true) {
                         $state <= 0  => 'danger',
                         $state < 5   => 'warning',
                         default      => 'success',
@@ -141,11 +145,15 @@ class InventoryTableWidget extends BaseWidget
                 Tables\Columns\TextColumn::make('stock_status')
                     ->label('Status')
                     ->badge()
-                    ->getStateUsing(fn (Product $r): string => match (true) {
-                        $r->available_stock === 0 && $r->stock_quantity > 0 => 'All Reserved',
-                        $r->available_stock === 0 => 'Out of Stock',
-                        $r->available_stock < 5   => 'Low Stock',
-                        default                    => 'Healthy',
+                    ->getStateUsing(function (Product $r): string {
+                        $available = max(0, Quantity::sub($r->stock_quantity, $r->reserved_stock));
+
+                        return match (true) {
+                            $available === 0 && $r->stock_quantity > 0 => 'All Reserved',
+                            $available === 0 => 'Out of Stock',
+                            $available < 5   => 'Low Stock',
+                            default          => 'Healthy',
+                        };
                     })
                     ->color(fn (string $state): string => match ($state) {
                         'Out of Stock', 'All Reserved' => 'danger',

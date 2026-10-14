@@ -2,6 +2,7 @@
 
 namespace App\Filament\Vendor\Resources\Pickers\Pages;
 
+use App\Support\Quantity;
 use App\Filament\Vendor\Resources\Pickers\PickerResource;
 use App\Filament\Vendor\Resources\Pickers\RelationManagers\HoldingsRelationManager;
 use App\Models\Picker;
@@ -47,7 +48,7 @@ class ViewPicker extends ViewRecord
 
                     TextEntry::make('units_held')
                         ->label('Units held')
-                        ->state(fn () => number_format($this->heldUnits($picker))),
+                        ->state(fn () => \App\Support\Quantity::display($this->heldUnits($picker))),
 
                     TextEntry::make('value_out')
                         ->label('Worth today')
@@ -85,9 +86,9 @@ class ViewPicker extends ViewRecord
             ?? ['units' => 0, 'value' => 0.0];
     }
 
-    private function heldUnits(Picker $picker): int
+    private function heldUnits(Picker $picker): int|float
     {
-        return (int) $this->outstanding($picker)['units'];
+        return Quantity::of($this->outstanding($picker)['units']);
     }
 
     private function valueOut(Picker $picker): float
@@ -136,7 +137,7 @@ class ViewPicker extends ViewRecord
                 . '<td class="py-2 pr-4 text-gray-500 dark:text-gray-400">' . e($entry->created_at?->format('d M Y')) . '</td>'
                 . '<td class="py-2 pr-4">' . $label . '</td>'
                 . '<td class="py-2 pr-4 text-gray-950 dark:text-white">' . e($entry->product_name) . '</td>'
-                . '<td class="py-2 pr-4 text-right">' . (int) $entry->quantity . '</td>'
+                . '<td class="py-2 pr-4 text-right">' . e(Quantity::format($entry->quantity, filament()->getTenant())) . '</td>'
                 . '<td class="py-2 pr-4 text-right">' . $amount . '</td>'
                 . '<td class="py-2 text-gray-500 dark:text-gray-400">' . e($entry->staff_name ?? '—') . '</td>'
                 . '</tr>';

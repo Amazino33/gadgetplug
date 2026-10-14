@@ -15,16 +15,32 @@ import { findUnit, lineFields } from './units';
 export function cartLinesFromSale(items = [], catalogue = []) {
     const byId = new Map(catalogue.filter(Boolean).map((p) => [p.id, p]));
 
+    // Every unit the cached catalogue knows, by id, so a line's factor comes
+    // from the unit itself.
+    const unitsById = new Map(
+        catalogue.filter(Boolean).flatMap((p) => (Array.isArray(p.units) ? p.units : []).map((u) => [Number(u.id), u])),
+    );
+
     return items.map((item) => {
         const product = byId.get(item.product_id);
+
+        // How many base units one sold unit is. Read from the unit, never
+        // worked back from quantity ÷ unit_qty: with halves that division is
+        // a guess, and rounding it can turn a crate of 24 into something
+        // else. The old sum is kept only for a unit the catalogue no longer
+        // has.
+        const knownUnit = item.product_unit_id ? unitsById.get(Number(item.product_unit_id)) : null;
+        const factor    = knownUnit
+            ? Math.max(1, Number(knownUnit.conversion_factor ?? knownUnit.factor ?? 1))
+            : (item.unit_qty ? Math.max(1, Math.round(item.quantity / item.unit_qty)) : 1);
 
         // Sold in a unit (a crate): the line comes back as that unit, with
         // unit_qty crates at the crate price — not 24 bottles at it.
         const unitFieldsFromSale = item.product_unit_id
             ? {
                 unit_id:    item.product_unit_id,
-                unit_name:  item.unit_name ?? null,
-                factor:     item.unit_qty ? Math.max(1, Math.round(item.quantity / item.unit_qty)) : 1,
+                unit_name:  item.unit_name ?? knownUnit?.name ?? null,
+                factor,
                 price_type: item.price_type ?? 'retail',
             }
             : {};

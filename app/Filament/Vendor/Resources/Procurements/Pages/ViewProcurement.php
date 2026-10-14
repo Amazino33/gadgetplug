@@ -2,6 +2,8 @@
 
 namespace App\Filament\Vendor\Resources\Procurements\Pages;
 
+use App\Filament\Support\QuantityInput;
+use App\Support\Quantity;
 use App\Filament\Vendor\Resources\Procurements\ProcurementResource;
 use App\Models\FinancialAccount;
 use App\Models\Procurement;
@@ -354,10 +356,10 @@ class ViewProcurement extends ViewRecord
         }
 
         return [
-            TextInput::make('quantity')
+            QuantityInput::apply(TextInput::make('quantity'), allowZero: true)
                 ->label('Quantity received')
-                ->helperText('Recorded: ' . number_format($item->quantity))
-                ->numeric()->minValue(0)->required()
+                ->helperText('Recorded: ' . Quantity::format($item->quantity, filament()->getTenant()))
+                ->required()
                 ->default($item->verifiedQuantity()),
             TextInput::make('unit_cost')
                 ->label('Unit cost')

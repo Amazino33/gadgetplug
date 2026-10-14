@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useKeyboard } from '../hooks/useKeyboard';
 import { looksLikeBarcode } from '../lib/scanSignal';
+import { formatQty, halvesEnabled, parseQty, qtyError } from '../lib/halves';
 
 // Two jobs, told apart by the wording rather than by different components:
 // changing the quantity of a line already in the cart (the default), and
@@ -18,7 +19,8 @@ export default function QuantityModal({
     // already has elsewhere. See roomFor() in lib/cartAdd.
     max   = Infinity,
 }) {
-    const [qty, setQty] = useState(String(item.qty));
+    const halves = halvesEnabled();
+    const [qty, setQty] = useState(halves ? formatQty(item.qty, true) : String(item.qty));
     const inputRef = useRef(null);
 
     // Opens holding the keyboard with the current quantity selected, so the
@@ -40,7 +42,15 @@ export default function QuantityModal({
 
     // An emptied box means "leave it as it was" — the alternative is Enter
     // doing nothing at all, which reads as the till being stuck.
-    const typedQty = () => (qty.trim() === '' ? item.qty : parseInt(qty, 10));
+    const typedQty = () => (qty.trim() === '' ? item.qty : (parseQty(qty) ?? NaN));
+
+    // 2.3 in a halves shop, or 2.5 anywhere else. Zero is allowed through —
+    // it is how this box removes a line.
+    const stepError = (() => {
+        const n = typedQty();
+
+        return ! isNaN(n) && n > 0 ? qtyError(n, halves) : null;
+    })();
 
     const overStock = (() => {
         const n = typedQty();
@@ -53,7 +63,7 @@ export default function QuantityModal({
     // before this box is answered lands here — and on a shop that sells below
     // zero there is no shelf limit to stop 6001234567890 going in as a count.
     const scannedIn = looksLikeBarcode(qty);
-    const blocked   = overStock || scannedIn;
+    const blocked   = overStock || scannedIn || stepError !== null;
 
     const confirm = () => {
         const n = typedQty();
@@ -71,7 +81,7 @@ export default function QuantityModal({
 
         if (blocked) return;
 
-        onNegotiate(!isNaN(n) && n >= 1 ? n : 1);
+        onNegotiate(!isNaN(n) && n > 0 ? n : 1);
     };
 
     useKeyboard({ Enter: confirm, Escape: onClose }, [qty], { allowInInput: true });
@@ -84,15 +94,16 @@ export default function QuantityModal({
                 <input
                     ref={inputRef}
                     type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
+                    inputMode={halves ? 'decimal' : 'numeric'}
+                    pattern={halves ? undefined : '[0-9]*'}
                     autoComplete="off"
                     aria-label="Quantity"
                     value={qty}
                     // Digits only: a text input is what makes select() reliable,
                     // so it has to refuse the "e", "+" and "-" that a number
                     // input would have allowed through on its own.
-                    onChange={(e) => setQty(e.target.value.replace(/[^0-9]/g, ''))}
+                    // A halves shop may type 2.5 or 2½; everyone else digits only.
+                    onChange={(e) => setQty(halves ? e.target.value.replace(/[^0-9.½]/g, '') : e.target.value.replace(/[^0-9]/g, ''))}
                     className={`w-full border-2 rounded-xl px-4 py-3 text-4xl font-bold text-center focus:outline-none mb-4 ${
                         blocked
                             ? 'border-red-400 text-red-600 focus:border-red-500'
@@ -103,11 +114,13 @@ export default function QuantityModal({
                     <p className="text-xs text-red-600 font-semibold text-center mb-4">
                         That looks like a barcode, not a quantity. Clear it and finish this item first.
                     </p>
+                ) : stepError ? (
+                    <p className="text-xs text-red-600 font-semibold text-center mb-4">{stepError}</p>
                 ) : overStock ? (
                     <p className="text-xs text-red-600 font-semibold text-center mb-4">
                         {max === 0
                             ? 'None left on the shelf at this branch.'
-                            : `Only ${max} left on the shelf at this branch.`}
+                            : `Only ${formatQty(max, halves)} left on the shelf at this branch.`}
                     </p>
                 ) : (
                     <p className="text-xs text-gray-400 text-center mb-4">{hint}</p>

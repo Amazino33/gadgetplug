@@ -40,7 +40,7 @@ class InventoryOverviewWidget extends BaseWidget
             ->when($this->storeFilter, fn ($q) => $q->where('store_id', $this->storeFilter));
 
         $totalSKUs   = (clone $base)->count();
-        $totalUnits  = (int)   (clone $base)->sum('stock_quantity');
+        $totalUnits  = \App\Support\Quantity::of((clone $base)->sum('stock_quantity'));
         $retailValue = (float) (clone $base)->sum(DB::raw('stock_quantity * price'));
         $costValue   = (float) (clone $base)->sum(DB::raw('stock_quantity * cost_price'));
         $profit      = $retailValue - $costValue;
@@ -60,7 +60,7 @@ class InventoryOverviewWidget extends BaseWidget
                 ->descriptionIcon('heroicon-m-squares-2x2')
                 ->color('primary'),
 
-            Stat::make('Units in Stock', number_format($totalUnits))
+            Stat::make('Units in Stock', \App\Support\Quantity::display($totalUnits))
                 ->description('Total individual items currently held')
                 ->descriptionIcon('heroicon-m-cube-transparent')
                 ->color('info'),
@@ -80,7 +80,7 @@ class InventoryOverviewWidget extends BaseWidget
                 ->descriptionIcon('heroicon-m-arrow-trending-up')
                 ->color($profit >= 0 ? 'success' : 'danger'),
 
-            Stat::make('Out on Picking', number_format($onTrust['units']))
+            Stat::make('Out on Picking', \App\Support\Quantity::display($onTrust['units']))
                 ->description(
                     $onTrust['units'] > 0
                         ? '₦' . number_format($onTrust['value']) . ' with pickers · ₦' . number_format($retailValue + $onTrust['value']) . ' owned in all'

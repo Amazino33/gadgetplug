@@ -44,7 +44,7 @@
             <div class="rounded-lg bg-gray-50 p-3 dark:bg-gray-800">
                 <p class="text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">Total Qty</p>
                 <p class="mt-1 text-xl font-bold text-gray-900 dark:text-white">
-                    {{ number_format($record->verifiedQuantity()) }}
+                    {{ \App\Support\Quantity::display($record->verifiedQuantity(), filament()->getTenant()) }}
                 </p>
                 @if ($record->verifiedQuantity() !== $record->recordedQuantity())
                     <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
@@ -121,9 +121,9 @@
             <div class="mt-3 grid grid-cols-3 gap-2 text-center">
                 <div class="rounded-lg bg-gray-50 py-2 dark:bg-gray-800">
                     <p class="text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Qty</p>
-                    <p class="mt-0.5 font-bold text-gray-900 dark:text-white">{{ number_format($item->verifiedQuantity()) }}</p>
+                    <p class="mt-0.5 font-bold text-gray-900 dark:text-white">{{ \App\Support\Quantity::display($item->verifiedQuantity(), filament()->getTenant()) }}</p>
                     @if ($qtyVar !== 0)
-                        <p class="text-[11px] text-gray-500 line-through dark:text-gray-400">{{ number_format($item->quantity) }}</p>
+                        <p class="text-[11px] text-gray-500 line-through dark:text-gray-400">{{ \App\Support\Quantity::display($item->quantity, filament()->getTenant()) }}</p>
                     @endif
                 </div>
 
@@ -152,13 +152,13 @@
                     <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
                         @if ($qtyVar !== 0)
                             <span class="text-gray-700 dark:text-gray-300">
-                                Qty <span class="font-medium">{{ number_format($item->quantity) }}</span>
-                                &rarr; <span class="font-semibold">{{ number_format($item->verifiedQuantity()) }}</span>
+                                Qty <span class="font-medium">{{ \App\Support\Quantity::display($item->quantity, filament()->getTenant()) }}</span>
+                                &rarr; <span class="font-semibold">{{ \App\Support\Quantity::display($item->verifiedQuantity(), filament()->getTenant()) }}</span>
                                 <span @class([
                                     'ml-1 font-semibold',
                                     'text-red-600 dark:text-red-400' => $qtyVar < 0,
                                     'text-green-600 dark:text-green-400' => $qtyVar > 0,
-                                ])>({{ $qtyVar > 0 ? '+' : '' }}{{ number_format($qtyVar) }})</span>
+                                ])>({{ $qtyVar > 0 ? '+' : '' }}{{ \App\Support\Quantity::display($qtyVar) }})</span>
                             </span>
                         @endif
 

@@ -68,11 +68,11 @@
                 {{-- Quantity and price on their own line so a long product name
                      never pushes the figures off the side of a phone. --}}
                 <div class="mt-0.5 flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-                    <span>{{ number_format($qty) }} &times; &#8358;{{ number_format($cost, 2) }}</span>
+                    <span>{{ \App\Support\Quantity::display($qty) }} &times; &#8358;{{ number_format($cost, 2) }}</span>
 
                     @if ($corrected)
                         <span class="rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
-                            was {{ number_format($item->quantity) }} &times; &#8358;{{ number_format((float) $item->unit_cost, 2) }}
+                            was {{ \App\Support\Quantity::display($item->quantity, filament()->getTenant()) }} &times; &#8358;{{ number_format((float) $item->unit_cost, 2) }}
                         </span>
                     @endif
                 </div>

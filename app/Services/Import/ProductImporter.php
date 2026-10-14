@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Import;
 
+use App\Support\Quantity;
 use App\Actions\Inventory\AdjustStockAction;
 use App\Models\Category;
 use App\Models\ImportLog;
@@ -60,6 +61,23 @@ class ProductImporter
         bool $performedByAdmin = false,
         ?int $storeId = null,
     ): ImportLog {
+        // Opening stock in halves only for a shop that sells halves. Checked
+        // here, where the shop is known, so the row is skipped with a reason
+        // rather than its half quietly dropped.
+        $rows = $rows->map(function (ParsedRow $row) use ($vendor) {
+            $quantity = $row->value(ProductField::Quantity->value);
+
+            if ($quantity === null || Quantity::isWhole($quantity)) {
+                return $row;
+            }
+
+            return Quantity::allowsHalves($vendor) && Quantity::isHalfStep($quantity)
+                ? $row
+                : $row->withError(Quantity::allowsHalves($vendor)
+                    ? 'Quantity goes in halves: ½, 1, 1½ …'
+                    : 'Quantity must be a whole number.');
+        });
+
         $importable = $rows->filter(fn (ParsedRow $row) => $row->isImportable())->values();
         $skipped    = $rows->reject(fn (ParsedRow $row) => $row->isImportable())->values();
 
@@ -268,10 +286,10 @@ class ProductImporter
             // here whatever the shop's setting: it records goods already sold.
             $quantity = $row->value(ProductField::Quantity->value);
 
-            if ($quantity !== null && (int) $quantity !== 0 && ! $product->is_service) {
+            if ($quantity !== null && Quantity::of($quantity) !== 0 && ! $product->is_service) {
                 app(AdjustStockAction::class)->execute(
                     productId: $product->id,
-                    quantityChanged: (int) $quantity,
+                    quantityChanged: Quantity::of($quantity),
                     transactionType: 'stock_adjustment',
                     userId: $userId,
                     reference: 'IMPORT',

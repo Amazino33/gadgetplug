@@ -52,7 +52,7 @@
                                     @endif
                                 </td>
                                 <td class="px-4 py-3 text-gray-500 dark:text-gray-400">{{ $product->category?->name ?? '—' }}</td>
-                                <td class="px-4 py-3 text-right text-gray-700 dark:text-gray-300">{{ number_format($result->currentStock) }}</td>
+                                <td class="px-4 py-3 text-right text-gray-700 dark:text-gray-300">{{ \App\Support\Quantity::display($result->currentStock) }}</td>
                                 <td class="px-4 py-3 text-right text-gray-700 dark:text-gray-300">{{ number_format($result->dailyVelocity, 2) }}/day</td>
                                 <td class="px-4 py-3 text-right text-gray-700 dark:text-gray-300">
                                     {{ $result->daysOfCover !== null ? number_format($result->daysOfCover, 1) : '—' }}

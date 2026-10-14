@@ -225,6 +225,9 @@
                 {{ $item['quantity'] }}
                 @if($settings->show_item_unit_price)
                     &times; {{ $money($item['unit_price']) }}
+                    @if(! empty($item['half_price']))
+                        (½ at {{ $money($item['half_price']) }})
+                    @endif
                 @endif
             </span>
             <span class="item-amt">{{ $money($item['total']) }}</span>

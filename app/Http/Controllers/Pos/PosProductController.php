@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Pos;
 
+use App\Services\Pos\HalfPricing;
 use App\Support\Quantity;
 use App\Http\Controllers\Controller;
 use App\Models\Product;
@@ -235,7 +236,7 @@ class PosProductController extends Controller
             'products.allow_pos_price_override', 'products.stock_quantity',
             'products.reserved_stock', 'products.low_stock_threshold',
             'products.vendor_id', 'products.store_id',
-            'products.base_unit', 'products.wholesale_price',
+            'products.base_unit', 'products.wholesale_price', 'products.half_price',
             'products.default_unit_id', 'products.negative_stock_override',
         ];
     }
@@ -303,8 +304,9 @@ class PosProductController extends Controller
         }
 
         $margin = (float) ($vendor->pos_min_margin_percent ?? 0);
+        $halves = Quantity::allowsHalves($vendor);
 
-        return $p->units->where('is_active', true)->map(function (ProductUnit $u) use ($p, $margin) {
+        return $p->units->where('is_active', true)->map(function (ProductUnit $u) use ($p, $margin, $halves) {
             // The base unit's retail price is the product's own price, which
             // for a resold listing is quoted live from the supplier.
             $price     = $u->is_base ? (float) $p->price : (float) $u->price;
@@ -312,7 +314,12 @@ class PosProductController extends Controller
                 ? ($p->wholesale_price !== null ? (float) $p->wholesale_price : null)
                 : ($u->wholesale_price !== null ? (float) $u->wholesale_price : null);
 
-            return [
+            // What half of this unit sells for at retail — set, or half the
+            // price. Only a shop that sells halves is sent it; the till works
+            // out the wholesale half itself, which is always exactly half.
+            $half = $halves ? ['half_price' => HalfPricing::listHalfPrice($p, $u, 'retail')] : [];
+
+            return $half + [
                 'id'                  => $u->id,
                 'name'                => $u->name,
                 'conversion_factor'   => (int) $u->conversion_factor,

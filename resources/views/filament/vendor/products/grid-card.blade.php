@@ -3,11 +3,12 @@
     // ViewColumn, so there's no $getRecord() closure to call.
     $imgUrl = $record->catalogueImageUrl('thumb'); // a resold listing shows its supplier's photo
     $available = $record->storeAvailable();
+    $availableText = \App\Support\Quantity::format($available, filament()->getTenant());
 
     $badge = match (true) {
         $available === 0        => ['Out of stock', 'bg-red-500 text-white'],
-        $record->isStoreLowStock()    => ["{$available} left", 'bg-amber-500 text-white'],
-        default                  => ["{$available} in stock", 'bg-emerald-500 text-white'],
+        $record->isStoreLowStock()    => ["{$availableText} left", 'bg-amber-500 text-white'],
+        default                  => ["{$availableText} in stock", 'bg-emerald-500 text-white'],
     };
 
     $eyebrow = trim(collect([$record->category?->name, $record->brand])->filter()->implode(' · '));

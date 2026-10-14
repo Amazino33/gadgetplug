@@ -2,6 +2,7 @@
 
 namespace App\Services\Messaging;
 
+use App\Support\Quantity;
 use App\Models\DeliveryMessage;
 use App\Models\MessageTemplate;
 use App\Models\Order;
@@ -245,7 +246,8 @@ class StorekeeperNotifier
         }
 
         $lines = $products->map(
-            fn (Product $product): string => '• '.$product->name.' — '.$product->stock_quantity.' left'
+            // "19½ left" for a shop that sells halves; the plain number otherwise.
+            fn (Product $product): string => '• '.$product->name.' — '.Quantity::format($product->stock_quantity, $vendor).' left'
         )->implode("\n");
 
         return $this->notify(

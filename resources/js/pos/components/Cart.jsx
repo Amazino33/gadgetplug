@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { fmt } from '../lib/format';
 import { roomFor } from '../lib/cartAdd';
 import { shortUnitName, shortfallFor, stockText, unitsOf } from '../lib/units';
+import { cleanQty, formatQty, halvesEnabled, hasHalf, lineNet, parseQty, qtyError, qtyStep } from '../lib/halves';
 
 // Clicks inside a row's controls must not also select the row (desktop) or
 // start a swipe (mobile).
@@ -107,47 +108,67 @@ function UnitSegments({ item, idx, onUnitChange }) {
 
 /**
  * − [qty] +. Tapping the number makes it a field with the value selected:
- * Enter or leaving it commits, Esc cancels, and anything that is not a whole
- * number of 1 or more is put back as it was. Quantities are whole units — the
- * database counts stock in whole base pieces.
+ * Enter or leaving it commits, Esc cancels, and anything not acceptable is put
+ * back as it was. Quantities are whole units — or, for a shop that sells
+ * halves, half-steps: the buttons move by ½, the field takes 2.5 or 2½, and a
+ * ½ button adds or takes away the half on its own.
  */
 function QtyStepper({ items, item, idx, onQtyChange, onQtyEditDone }) {
     const [editing, setEditing] = useState(false);
     const [draft, setDraft] = useState('');
+    const [error, setError] = useState(null);
     const inputRef = useRef(null);
     // Enter and Esc have already decided; the blur that follows the field
     // disappearing must not decide again (Esc would otherwise commit).
     const settledRef = useRef(false);
+    const halves = halvesEnabled();
+    const step = qtyStep(halves);
     const room = roomFor(items, item, idx);
-    const plusDisabled = item.qty + 1 > room;
+    const plusDisabled = cleanQty(item.qty + step) > room;
 
     useEffect(() => {
         if (editing) inputRef.current?.select();
     }, [editing]);
 
     const commit = (focusSearchAfter) => {
-        const n = Number(draft);
+        const n = parseQty(draft);
+        const problem = qtyError(n, halves);
 
-        if (Number.isInteger(n) && n >= 1 && n !== item.qty) onQtyChange(idx, n);
+        if (problem) {
+            // Shown, not silently swallowed: 2.3 in a halves shop is a typo
+            // worth saying so about. An emptied box just means "as it was".
+            setError(draft.trim() === '' ? null : problem);
+        } else {
+            setError(null);
+            if (n !== item.qty) onQtyChange(idx, cleanQty(n));
+        }
 
         setEditing(false);
         if (focusSearchAfter) onQtyEditDone?.();
+    };
+
+    // The ½ button: 2 → 2½ and 2½ → 2. Nothing to take from ½ itself — that
+    // is what − or the bin is for.
+    const toggleHalf = () => {
+        const next = hasHalf(item.qty) ? cleanQty(item.qty - 0.5) : cleanQty(item.qty + 0.5);
+
+        if (next > 0 && next <= room) onQtyChange(idx, next);
     };
 
     const btn = 'w-9 h-9 rounded-full bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 font-bold text-sm flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed';
 
     return (
         <div className="flex items-center gap-1.5" onClick={stop} onPointerDown={stop}>
-            <button type="button" aria-label="One less" onClick={() => onQtyChange(idx, item.qty - 1)} className={btn}>−</button>
+            <button type="button" aria-label={halves ? 'Half less' : 'One less'} onClick={() => onQtyChange(idx, cleanQty(item.qty - step))} className={btn}>−</button>
 
             {editing ? (
                 <input
                     ref={inputRef}
                     type="text"
-                    inputMode="numeric"
+                    inputMode={halves ? 'decimal' : 'numeric'}
                     aria-label="Quantity"
                     value={draft}
-                    onChange={(e) => setDraft(e.target.value.replace(/[^\d]/g, ''))}
+                    onChange={(e) => setDraft(halves ? e.target.value.replace(/[^\d.½]/g, '') : e.target.value.replace(/[^\d]/g, ''))}
                     onKeyDown={(e) => {
                         if (e.key === 'Enter') { e.preventDefault(); settledRef.current = true; commit(true); }
                         if (e.key === 'Escape') { e.preventDefault(); settledRef.current = true; setEditing(false); onQtyEditDone?.(); }
@@ -162,22 +183,37 @@ function QtyStepper({ items, item, idx, onQtyChange, onQtyEditDone }) {
                 <button
                     type="button"
                     title="Tap to type a quantity"
-                    onClick={() => { settledRef.current = false; setDraft(String(item.qty)); setEditing(true); }}
+                    onClick={() => { settledRef.current = false; setError(null); setDraft(String(item.qty)); setEditing(true); }}
                     className="w-11 h-9 rounded-md text-center text-sm font-semibold font-mono tabular-nums hover:bg-gray-100 dark:hover:bg-gray-800 dark:text-gray-200"
                 >
-                    {item.qty}
+                    {formatQty(item.qty, halves)}
                 </button>
             )}
 
             <button
                 type="button"
-                aria-label="One more"
-                onClick={() => onQtyChange(idx, item.qty + 1)}
+                aria-label={halves ? 'Half more' : 'One more'}
+                onClick={() => onQtyChange(idx, cleanQty(item.qty + step))}
                 // Stops at what the shelf holds, as the quantity box does.
                 disabled={plusDisabled}
                 title={plusDisabled ? 'No more on the shelf at this branch' : undefined}
                 className={btn}
             >+</button>
+
+            {halves && (
+                <button
+                    type="button"
+                    aria-label={hasHalf(item.qty) ? 'Take off the half' : 'Add a half'}
+                    aria-pressed={hasHalf(item.qty)}
+                    onClick={toggleHalf}
+                    disabled={item.qty <= 0.5 || (! hasHalf(item.qty) && cleanQty(item.qty + 0.5) > room)}
+                    className={`${btn} ${hasHalf(item.qty) ? '!bg-[#068B03] !text-white' : ''}`}
+                >½</button>
+            )}
+
+            {error && (
+                <span role="alert" className="text-[11px] text-red-600 whitespace-nowrap">{error}</span>
+            )}
         </div>
     );
 }
@@ -249,7 +285,7 @@ function RemoveButton({ idx, onRemove }) {
  */
 function CartRow({ items, item, idx, isSelected, allowPriceChange, handlers }) {
     const { onSelect, onQtyChange, onRemove, onPriceEdit, onUnitChange, onPriceTypeChange, onSetDefaultUnit, onQtyEditDone } = handlers;
-    const lineTotal = item.price * item.qty - (item.lineDiscount || 0);
+    const lineTotal = lineNet(item);
     const canMakeDefault = unitsOf(item).length > 1 && item.unit_id != null && Number(item.unit_id) !== Number(item.default_unit_id);
 
     return (
@@ -307,7 +343,7 @@ function MobileCartRow({ items, item, idx, isSelected, onSelect, onRemove, onUni
     const CLOSE = 0;
     const GATE  = -44;
 
-    const lineTotal = item.price * item.qty - (item.lineDiscount || 0);
+    const lineTotal = lineNet(item);
 
     const onPointerDown = (e) => {
         active.current = true;
@@ -389,7 +425,7 @@ function MobileCartRow({ items, item, idx, isSelected, onSelect, onRemove, onUni
                     )}
                 </div>
                 <div className="text-right shrink-0">
-                    <p className="text-xs text-gray-400 dark:text-gray-500 font-mono tabular-nums">×{item.qty}</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 font-mono tabular-nums">×{formatQty(item.qty)}</p>
                     <p className="text-sm font-bold text-gray-800 dark:text-gray-100 font-mono tabular-nums">{fmt(lineTotal)}</p>
                 </div>
             </div>

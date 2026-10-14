@@ -308,6 +308,9 @@
         showSearch: false,
         searchQuery: '',
         submitting: false,
+        // A shop that sells halves counts in halves: ± moves by ½ and a typed
+        // 7.5 is kept. Everyone else counts whole units, exactly as before.
+        halves: @js(\App\Support\Quantity::allowsHalves(filament()->getTenant())),
 
         init() {
             this.products.forEach(p => { this.entries[p.id] = { count: 0, note: null }; });
@@ -357,7 +360,8 @@
 
         step(dir) {
             const current = this.entries[this.currentProductId].count ?? 0;
-            this.setCount(dir === 'inc' ? current + 1 : Math.max(0, current - 1));
+            const unit = this.halves ? 0.5 : 1;
+            this.setCount(dir === 'inc' ? current + unit : Math.max(0, current - unit));
         },
         startHold(dir) {
             this.step(dir);
@@ -371,7 +375,7 @@
         },
         setCount(v) {
             if (!this.currentProductId) return;
-            v = (v === '' || v === null || isNaN(v)) ? 0 : Math.max(0, Math.trunc(Number(v)));
+            v = (v === '' || v === null || isNaN(v)) ? 0 : Math.max(0, this.halves ? Math.round(Number(v) * 2) / 2 : Math.trunc(Number(v)));
             this.entries[this.currentProductId].count = v;
             this.persist();
         },
@@ -562,7 +566,8 @@
 
                 <div class="flex-1 min-w-0 text-center">
                     <input type="number"
-                        inputmode="numeric"
+                        :inputmode="halves ? 'decimal' : 'numeric'"
+                        :step="halves ? 0.5 : 1"
                         aria-label="Counted quantity"
                         x-model.number="entries[currentProductId].count"
                         @blur="clampCount()"

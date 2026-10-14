@@ -35,7 +35,7 @@
                                 </td>
                                 <td class="px-4 py-3 text-gray-500 dark:text-gray-400">{{ $row->store_name ?? '—' }}</td>
                                 <td class="px-4 py-3 text-right font-semibold text-red-600 dark:text-red-400">
-                                    {{ number_format(abs((int) $row->quantity)) }} {{ $row->base_unit ?: 'Piece' }}
+                                    {{ \App\Support\Quantity::display(abs(\App\Support\Quantity::of($row->quantity)), filament()->getTenant()) }} {{ $row->base_unit ?: 'Piece' }}
                                 </td>
                                 <td class="px-4 py-3 text-gray-700 dark:text-gray-300">
                                     {{ $row->last_sold_at ? \Illuminate\Support\Carbon::parse($row->last_sold_at)->format('d M Y, H:i') : '—' }}
@@ -82,8 +82,8 @@
                                 </td>
                                 <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{{ $sale->product_name }}</td>
                                 <td class="px-4 py-3 text-right text-gray-700 dark:text-gray-300">
-                                    @if ($sale->unit_qty !== null && (int) $sale->unit_qty !== (int) $sale->quantity)
-                                        {{ $sale->unit_qty }} {{ $sale->unit_name }} ({{ $sale->quantity }})
+                                    @if ($sale->unit_qty !== null && \App\Support\Quantity::of($sale->unit_qty) !== \App\Support\Quantity::of($sale->quantity))
+                                        {{ \App\Support\Quantity::display($sale->unit_qty, filament()->getTenant()) }} {{ $sale->unit_name }} ({{ \App\Support\Quantity::display($sale->quantity, filament()->getTenant()) }})
                                     @else
                                         {{ $sale->quantity }}
                                     @endif

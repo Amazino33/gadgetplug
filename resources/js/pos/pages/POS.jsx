@@ -6,6 +6,7 @@ import { createCheckoutId } from '../lib/checkoutId';
 import { cartFloorTotal } from '../lib/cartFloor';
 import { addToCart, roomFor } from '../lib/cartAdd';
 import { findUnit, lineFields, prepareLine } from '../lib/units';
+import { formatQty, halfUnitPrice, hasHalf, lineNet } from '../lib/halves';
 import {
     cacheServerList, cachedServerList, dropLocalHold, holdLocally,
     mergedHeldSales, newClientRef, queueRemoval, unreachable,
@@ -516,7 +517,9 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
     }, [pendingProduct, addProduct]);
 
     const updateQty = (idx, qty) => {
-        if (qty < 1) { removeItem(idx); return; }
+        // Zero (or less) takes the line out. ½ is a real quantity for a shop
+        // that sells halves; everyone else never reaches here with one.
+        if (qty <= 0) { removeItem(idx); return; }
         setCart((prev) => {
             // Belt and braces, like the price floor below: the quantity box
             // and the + button already stop at the shelf.
@@ -573,14 +576,14 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
 
     // ── Totals ───────────────────────────────────────────────────────
 
-    const subtotal       = cart.reduce((s, i) => s + i.price * i.qty - (i.lineDiscount || 0), 0);
+    const subtotal       = cart.reduce((s, i) => s + lineNet(i), 0);
 
     // "3 products · 7 items": lines, and units as sold — 2 Packs is 2 items,
     // not the 24 pieces inside them. Nothing when the cart is empty.
     const cartCountsText = cart.length === 0 ? '' : (() => {
         const items = cart.reduce((n, i) => n + (Number(i.qty) || 0), 0);
 
-        return `${cart.length} ${cart.length === 1 ? 'product' : 'products'} · ${items} ${items === 1 ? 'item' : 'items'}`;
+        return `${cart.length} ${cart.length === 1 ? 'product' : 'products'} · ${formatQty(items)} ${items === 1 ? 'item' : 'items'}`;
     })();
 
     // The least this cart may sell for, the same sum the server works out in
@@ -652,11 +655,15 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
                 // and the receipt both read a sensible number.
                 quantity:        item.qty * (item.factor || 1),
                 discount_amount: item.lineDiscount || 0,
-                total:           item.price * item.qty - (item.lineDiscount || 0),
+                total:           lineNet(item),
                 product_unit_id: item.unit_id ?? null,
                 unit_qty:        item.unit_id != null ? item.qty : null,
                 unit_name:       item.unit_name ?? null,
                 sold_unit_price: item.unit_id != null ? item.price : null,
+                // What the half of a "1½ Crate" line was charged. Only sent
+                // with a half in it; the server reprices it from the catalogue
+                // unless price changes are on, and checks the floor either way.
+                ...(hasHalf(item.qty) ? { half_unit_price: halfUnitPrice(item) } : {}),
                 price_type:      item.price_type ?? 'retail',
             })),
             discount_amount:         discountAmount,

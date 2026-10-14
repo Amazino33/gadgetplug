@@ -63,7 +63,7 @@ new class extends Component {
                 'price'    => (float) $product->price,
                 'quantity' => $qty,
                 'subtotal' => (float) ($product->price * $qty),
-                'max'      => $item['max'] ?? $product->stock_quantity,
+                'max'      => $item['max'] ?? \App\Support\Quantity::wholeUnits($product->stock_quantity),
                 'thumb'    => $product->catalogueImageUrl('thumb'),
                 'slug'     => $product->slug,
             ];

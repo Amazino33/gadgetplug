@@ -2,6 +2,8 @@
 
 namespace App\Filament\Vendor\Resources\Pickers\Pages;
 
+use App\Filament\Support\QuantityInput;
+use App\Support\Quantity;
 use App\Actions\Pickings\ReleaseToPickerAction;
 use App\Filament\Vendor\Resources\Pickers\PickerResource;
 use App\Models\Picker;
@@ -131,10 +133,8 @@ class ListPickers extends ListRecords
                             ->searchable()
                             ->required(),
 
-                        TextInput::make('quantity')
+                        QuantityInput::apply(TextInput::make('quantity'))
                             ->label('Quantity')
-                            ->numeric()
-                            ->minValue(1)
                             ->default(1)
                             ->required(),
                     ])
@@ -155,7 +155,7 @@ class ListPickers extends ListRecords
                         store: (int) $storeId,
                         lines: array_map(fn ($row) => [
                             'product_id' => (int) $row['product_id'],
-                            'quantity'   => (int) $row['quantity'],
+                            'quantity'   => Quantity::of($row['quantity']),
                         ], $data['items']),
                         userId: auth()->id(),
                     );

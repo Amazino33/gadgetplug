@@ -187,10 +187,10 @@
                     <p class="mt-1 text-gray-600 dark:text-gray-300">
                         The closing count covers
                         <strong>{{ number_format($movement['closing_products']) }}</strong>
-                        product(s), {{ number_format($movement['closing_units']) }} units.
+                        product(s), {{ \App\Support\Quantity::display($movement['closing_units']) }} units.
                         The branch's records show
                         <strong>{{ number_format($rec['products']) }}</strong>
-                        product(s) on hand, {{ number_format($rec['units']) }} units,
+                        product(s) on hand, {{ \App\Support\Quantity::display($rec['units']) }} units,
                         worth {{ $money($rec['selling']) }} at selling price
                         ({{ $money($rec['cost']) }} at cost).
                     </p>
@@ -337,7 +337,7 @@
                     <p class="mt-1 font-mono text-2xl font-bold text-gray-800 dark:text-gray-100">{{ $money($movement['opening_selling']) }}</p>
                     <p class="text-xs text-gray-500 dark:text-gray-400">
                         @if ($opening['count_id'])
-                            {{ number_format($movement['opening_units']) }} units over {{ number_format($movement['opening_products']) }} product(s)
+                            {{ \App\Support\Quantity::display($movement['opening_units']) }} units over {{ number_format($movement['opening_products']) }} product(s)
                             · {{ $opening['carried'] ? 'carried forward from the last close' : 'chosen' }}
                         @else
                             No opening count selected
@@ -349,7 +349,7 @@
                     <p class="mt-1 font-mono text-2xl font-bold text-gray-800 dark:text-gray-100">{{ $money($movement['closing_selling']) }}</p>
                     <p class="text-xs text-gray-500 dark:text-gray-400">
                         @if ($view['closing'])
-                            {{ number_format($movement['closing_units']) }} units over {{ number_format($movement['closing_products']) }} product(s)
+                            {{ \App\Support\Quantity::display($movement['closing_units']) }} units over {{ number_format($movement['closing_products']) }} product(s)
                         @else
                             No closing count selected
                         @endif

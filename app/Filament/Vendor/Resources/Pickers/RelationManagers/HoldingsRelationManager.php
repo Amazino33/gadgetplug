@@ -2,6 +2,8 @@
 
 namespace App\Filament\Vendor\Resources\Pickers\RelationManagers;
 
+use App\Filament\Support\QuantityInput;
+use App\Support\Quantity;
 use App\Actions\Pickings\ReturnFromPickerAction;
 use App\Actions\Pickings\WriteOffPickingAction;
 use App\Models\PickingItem;
@@ -98,9 +100,9 @@ class HoldingsRelationManager extends RelationManager
             . ' where picking_item_id = picking_items.id' . $filter . ')';
     }
 
-    private static function stillHeld(PickingItem $record): int
+    private static function stillHeld(PickingItem $record): int|float
     {
-        return max(0, $record->quantity - (int) $record->accounted_units);
+        return max(0, Quantity::sub($record->quantity, $record->accounted_units ?? 0));
     }
 
     private function returnAction(): Action
@@ -113,10 +115,8 @@ class HoldingsRelationManager extends RelationManager
             ->modalHeading('Goods brought back')
             ->modalDescription('They go back on the shelf of the branch they left.')
             ->schema(fn (PickingItem $record) => [
-                TextInput::make('quantity')
+                QuantityInput::apply(TextInput::make('quantity'))
                     ->label('How many came back')
-                    ->numeric()
-                    ->minValue(1)
                     ->maxValue(self::stillHeld($record))
                     ->default(self::stillHeld($record))
                     ->required(),
@@ -127,7 +127,7 @@ class HoldingsRelationManager extends RelationManager
                 try {
                     app(ReturnFromPickerAction::class)->execute(
                         item: $record,
-                        quantity: (int) $data['quantity'],
+                        quantity: Quantity::of($data['quantity']),
                         userId: auth()->id(),
                         note: $data['note'] ?? null,
                     );
@@ -153,10 +153,8 @@ class HoldingsRelationManager extends RelationManager
             ->modalHeading('Give up on these goods')
             ->modalDescription('Nothing returns to the shelf — these units are gone. This records that you have stopped chasing them.')
             ->schema(fn (PickingItem $record) => [
-                TextInput::make('quantity')
+                QuantityInput::apply(TextInput::make('quantity'))
                     ->label('How many to write off')
-                    ->numeric()
-                    ->minValue(1)
                     ->maxValue(self::stillHeld($record))
                     ->default(self::stillHeld($record))
                     ->required(),
@@ -167,7 +165,7 @@ class HoldingsRelationManager extends RelationManager
                 try {
                     app(WriteOffPickingAction::class)->execute(
                         item: $record,
-                        quantity: (int) $data['quantity'],
+                        quantity: Quantity::of($data['quantity']),
                         userId: auth()->id(),
                         note: $data['note'] ?? null,
                     );

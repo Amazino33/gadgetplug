@@ -455,8 +455,9 @@ class BlindCount extends Page
         $session = $this->getSession();
         if (! $session) return;
 
-        $now  = now();
-        $rows = [];
+        $now    = now();
+        $rows   = [];
+        $halves = Quantity::allowsHalves(filament()->getTenant());
 
         foreach ($session->product_order as $index => $productId) {
             $entry = $entries[$productId] ?? null;
@@ -475,7 +476,9 @@ class BlindCount extends Page
                 'user_id'                => auth()->id(),
                 'product_id'             => $productId,
                 'position'               => $index + 1,
-                'count'                  => (int) $count,
+                // In halves for a shop that sells them (7½ crates); whole for
+                // everyone else, as the screen already enforces.
+                'count'                  => $halves ? Quantity::of(round((float) $count * 2) / 2) : (int) $count,
                 'note'                   => $note,
                 'counted_at'             => $now,
                 'created_at'             => $now,

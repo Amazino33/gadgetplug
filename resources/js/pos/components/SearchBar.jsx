@@ -4,6 +4,7 @@ import api from '../lib/api';
 import { createLatestSearch } from '../lib/latestSearch';
 import { highlightIndexFor, selectionForEnter } from '../lib/searchSelection';
 import { createBurstTracker, looksLikeBarcode, scanFor } from '../lib/scanSignal';
+import { formatQty } from '../lib/halves';
 
 // How long after the device's answer the server is asked. Long enough that
 // someone still typing does not send a request per letter.
@@ -484,7 +485,7 @@ const SearchBar = forwardRef(function SearchBar({
                             <div className="text-right shrink-0">
                                 <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">₦{Number(p.price).toLocaleString()}</p>
                                 <p className={`text-xs ${p.is_low_stock ? 'text-orange-500' : 'text-gray-400 dark:text-gray-500'}`}>
-                                    {p.available_stock} left
+                                    {formatQty(p.available_stock)} left
                                 </p>
                                 {p.reserved > 0 && (
                                     <p className="text-[11px] text-amber-600 dark:text-amber-400" title="Held by online order(s) not yet dispatched">

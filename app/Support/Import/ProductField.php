@@ -200,7 +200,10 @@ enum ProductField: string
             self::CostPrice, self::Price, self::WholesalePrice,
             self::Unit2Price, self::Unit3Price, self::Unit4Price,
             self::Unit2WholesalePrice, self::Unit3WholesalePrice, self::Unit4WholesalePrice => FieldType::Decimal,
-            self::ReorderPoint, self::PreferredQuantity, self::LowStockThreshold, self::Quantity => FieldType::Integer,
+            self::ReorderPoint, self::PreferredQuantity, self::LowStockThreshold => FieldType::Integer,
+            // Decimal so a shop that sells halves can open with 19.5 crates;
+            // ProductImporter refuses a fraction from every other shop.
+            self::Quantity => FieldType::Decimal,
             self::IsService, self::ShowOnline, self::ShowInPos => FieldType::Boolean,
             // Contains is checked when the unit is built, so a bad value skips
             // that one unit with a warning instead of refusing the whole row.

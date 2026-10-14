@@ -2,6 +2,7 @@
 
 namespace App\Filament\Vendor\Resources\Products\Pages;
 
+use App\Support\Quantity;
 use App\Filament\Vendor\Resources\Products\ProductResource;
 use App\Filament\Vendor\Resources\Products\Schemas\ProductForm;
 use App\Models\Product;
@@ -146,11 +147,16 @@ class ViewProduct extends ViewRecord
 
     private function stockTiles(Product $record): string
     {
+        // The shop's own figures, halves included ("19½" for a shop that sells
+        // them) — not available_stock, which is the online whole-unit figure.
+        $halves    = filament()->getTenant();
+        $available = max(0, Quantity::sub($record->stock_quantity, $record->reserved_stock));
+
         $tiles = [
-            ['On shelf', $record->stock_quantity, 'text-gray-950 dark:text-white'],
-            ['Reserved', $record->reserved_stock, $record->reserved_stock > 0 ? 'text-yellow-600 dark:text-yellow-400' : 'text-gray-950 dark:text-white'],
-            ['Available', $record->available_stock, match (true) {
-                $record->available_stock === 0 => 'text-red-600 dark:text-red-400',
+            ['On shelf', Quantity::format($record->stock_quantity, $halves), 'text-gray-950 dark:text-white'],
+            ['Reserved', Quantity::format($record->reserved_stock, $halves), $record->reserved_stock > 0 ? 'text-yellow-600 dark:text-yellow-400' : 'text-gray-950 dark:text-white'],
+            ['Available', Quantity::format($available, $halves), match (true) {
+                $available === 0 => 'text-red-600 dark:text-red-400',
                 $record->is_low_stock           => 'text-yellow-600 dark:text-yellow-400',
                 default                         => 'text-green-600 dark:text-green-400',
             }],

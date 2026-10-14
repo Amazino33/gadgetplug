@@ -21,6 +21,8 @@
  * 1-bit, no grey.
  */
 
+import { formatQty, hasHalf } from './halves';
+
 const ALIGNMENTS = { left: 'al-left', center: 'al-center', right: 'al-right' };
 
 /** 1-bit head, no grey: everything is bold black on white. See the notes inline. */
@@ -302,10 +304,27 @@ export function receiptHtml(sale, config = {}) {
         const name = item.product_name ?? item.name ?? '';
         // Sold in a bigger unit: "1 Crate × ₦9,700", not "24 × ₦404.17".
         const inUnit   = item.unit_qty != null && Number(item.unit_qty) !== Number(item.quantity);
-        const qtyLabel = inUnit ? `${item.unit_qty} ${item.unit_name ?? ''}`.trim() : item.quantity;
-        const each     = inUnit ? (item.sold_unit_price ?? item.unit_price) : item.unit_price;
+        let qtyLabel   = inUnit ? `${item.unit_qty} ${item.unit_name ?? ''}`.trim() : item.quantity;
+        let each       = inUnit ? (item.sold_unit_price ?? item.unit_price) : item.unit_price;
+        let halfNote   = '';
+
+        // A line with a half in it (only a shop that sells halves has one):
+        // "1½ Crate × ₦10,100", and when the half had its own price, say so —
+        // otherwise 1½ × ₦10,100 would not add up to the ₦15,300 printed.
+        const units = item.unit_qty ?? item.quantity;
+
+        if (hasHalf(units)) {
+            qtyLabel = `${formatQty(units, true)} ${item.unit_name ?? ''}`.trim();
+            each     = item.sold_unit_price ?? item.unit_price;
+
+            const half = item.half_unit_price;
+            if (half != null && Math.abs(Number(half) - Math.round(Number(each) * 50) / 100) > 0.004) {
+                halfNote = ` (½ at ${money(half)})`;
+            }
+        }
+
         const qty  = settings.show_item_unit_price !== false
-            ? `${escapeHtml(qtyLabel)} &times; ${escapeHtml(money(each))}`
+            ? `${escapeHtml(qtyLabel)} &times; ${escapeHtml(money(each))}${escapeHtml(halfNote)}`
             : escapeHtml(qtyLabel);
 
         return `<div class="item">

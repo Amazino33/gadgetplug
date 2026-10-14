@@ -123,7 +123,7 @@
         <h2>Where the money is tied up</h2>
         <table class="keep">
             <tr class="row">
-                <td>Stock on hand <span class="muted">(at cost, {{ number_format($pos['stock_units'] ?? 0) }} units)</span></td>
+                <td>Stock on hand <span class="muted">(at cost, {{ \App\Support\Quantity::display($pos['stock_units'] ?? 0) }} units)</span></td>
                 <td class="num">{{ $money($pos['stock_at_cost'] ?? 0) }}</td>
             </tr>
             <tr class="row"><td>Cash still to be handed over</td><td class="num">{{ $money($pos['cash_outstanding'] ?? 0) }}</td></tr>

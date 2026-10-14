@@ -138,7 +138,7 @@
                                     </div>
                                 </td>
                                 <td class="px-6 py-3 text-right text-gray-700 dark:text-gray-300">{{ number_format($store['orders']) }}</td>
-                                <td class="px-6 py-3 text-right text-gray-700 dark:text-gray-300">{{ number_format($store['units']) }}</td>
+                                <td class="px-6 py-3 text-right text-gray-700 dark:text-gray-300">{{ \App\Support\Quantity::display($store['units']) }}</td>
                                 <td class="px-6 py-3 text-right font-medium text-gray-950 dark:text-white">₦{{ number_format($store['revenue'], 2) }}</td>
                             </tr>
                         @endforeach
@@ -205,7 +205,7 @@
                         @foreach ($topProducts as $product)
                             <tr>
                                 <td class="px-6 py-3 text-gray-950 dark:text-white">{{ $product['name'] }}</td>
-                                <td class="px-6 py-3 text-right text-gray-700 dark:text-gray-300">{{ number_format($product['units']) }}</td>
+                                <td class="px-6 py-3 text-right text-gray-700 dark:text-gray-300">{{ \App\Support\Quantity::display($product['units']) }}</td>
                                 <td class="px-6 py-3 text-right font-medium text-gray-950 dark:text-white">₦{{ number_format($product['revenue'], 2) }}</td>
                                 <td @class([
                                     'px-6 py-3 text-right font-medium',

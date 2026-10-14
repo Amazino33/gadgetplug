@@ -2,6 +2,7 @@
 
 namespace App\Filament\Vendor\Pages;
 
+use Illuminate\Validation\ValidationException;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -57,6 +58,7 @@ class StoreProfile extends Page
             'allow_negative_stock'         => (bool) $vendor->allow_negative_stock,
             'pos_ask_quantity'             => $vendor->pos_ask_quantity ?? true,
             'pos_allow_price_change'       => (bool) $vendor->pos_allow_price_change,
+            'allow_half_quantities'        => (bool) $vendor->allow_half_quantities,
             'pos_blind_count_frequency'    => $vendor->pos_blind_count_frequency ?? 'daily',
             'pos_blind_count_custom_days'  => $vendor->pos_blind_count_custom_days ?? 3,
         ]);
@@ -191,6 +193,14 @@ class StoreProfile extends Page
                             ->label('Allow unit price change at sales point')
                             ->helperText('When on, cashiers can click a price in the cart to change it — never below your minimum margin. When off, items always sell at their retail or wholesale price.')
                             ->default(false),
+
+                        // For the shops that split crates. Turning it off is
+                        // refused while any product still holds a half — the
+                        // Vendor model says which ones, and that shows here.
+                        Toggle::make('allow_half_quantities')
+                            ->label('Allow half quantities (e.g. half crate)')
+                            ->helperText('When on, every product can be sold and counted in halves — ½, 1½, 2½. Each unit gets an optional half price on the product form. It cannot be turned off again while any product still holds a half.')
+                            ->default(false),
                     ]),
 
                 Section::make('Bank Details for Payouts')
@@ -237,20 +247,37 @@ class StoreProfile extends Page
             'allow_negative_stock'         => (bool) ($data['allow_negative_stock'] ?? false),
             'pos_ask_quantity'             => (bool) ($data['pos_ask_quantity'] ?? true),
             'pos_allow_price_change'       => (bool) ($data['pos_allow_price_change'] ?? false),
+            'allow_half_quantities'        => (bool) ($data['allow_half_quantities'] ?? false),
             'pos_blind_count_frequency'    => $data['pos_blind_count_frequency'] ?? 'daily',
             'pos_blind_count_custom_days'  => ($data['pos_blind_count_frequency'] ?? 'daily') === 'custom'
                 ? (int) ($data['pos_blind_count_custom_days'] ?? 3)
                 : null,
         ];
 
-        // If name changed, let the sluggable trait regenerate a unique slug
-        if ($data['name'] !== $vendor->name) {
-            $updateData['name'] = $data['name'];
-            $vendor->fill($updateData);
-            $vendor->generateSlug(); // spatie/laravel-sluggable — unique slug auto-handled
-            $vendor->save();
-        } else {
-            $vendor->update($updateData);
+        try {
+            // If name changed, let the sluggable trait regenerate a unique slug
+            if ($data['name'] !== $vendor->name) {
+                $updateData['name'] = $data['name'];
+                $vendor->fill($updateData);
+                $vendor->generateSlug(); // spatie/laravel-sluggable — unique slug auto-handled
+                $vendor->save();
+            } else {
+                $vendor->update($updateData);
+            }
+        } catch (ValidationException $e) {
+            // Turning half quantities off while a product still holds a half.
+            // Nothing was saved; say why on the toggle and at the top.
+            $message = $e->errors()['allow_half_quantities'][0] ?? $e->getMessage();
+            $vendor->refresh();
+
+            Notification::make()
+                ->title('Half quantities are still on')
+                ->body($message)
+                ->danger()
+                ->persistent()
+                ->send();
+
+            throw ValidationException::withMessages(['data.allow_half_quantities' => $message]);
         }
 
         Notification::make()

@@ -105,7 +105,7 @@
                     <span class="font-semibold">Stock value is understated.</span>
                     {{ $report['balances']['inventory_missing_cost_count'] }}
                     {{ \Illuminate\Support\Str::plural('product', $report['balances']['inventory_missing_cost_count']) }}
-                    holding {{ number_format($report['balances']['inventory_missing_cost_units']) }}
+                    holding {{ \App\Support\Quantity::display($report['balances']['inventory_missing_cost_units']) }}
                     {{ \Illuminate\Support\Str::plural('unit', $report['balances']['inventory_missing_cost_units']) }}
                     {{ $report['balances']['inventory_missing_cost_count'] === 1 ? 'has' : 'have' }}
                     no cost price recorded, so those goods are counted as worth nothing here. Set their cost price to see the real figure.

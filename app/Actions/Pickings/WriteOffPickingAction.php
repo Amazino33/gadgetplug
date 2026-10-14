@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Actions\Pickings;
 
+use App\Models\Picking;
+use App\Models\Vendor;
+use App\Support\Quantity;
 use App\Models\PickingItem;
 use App\Models\PickingLedgerEntry;
 use App\Services\Pickings\PickingLedger;
@@ -29,8 +32,10 @@ class WriteOffPickingAction
         ?int $userId = null,
         ?string $note = null,
     ): PickingLedgerEntry {
-        if ($quantity < 1) {
-            throw new RuntimeException('A write-off has to cover at least one unit.');
+        $vendor = Vendor::find(Picking::whereKey($item->picking_id)->value('vendor_id'));
+
+        if ($error = Quantity::errorFor($vendor, $quantity)) {
+            throw new RuntimeException($quantity <= 0 ? 'A write-off has to cover at least one unit.' : $error);
         }
 
         return DB::transaction(function () use ($item, $quantity, $userId, $note) {
@@ -39,7 +44,7 @@ class WriteOffPickingAction
 
             if ($quantity > $held) {
                 throw new RuntimeException(
-                    $held === 0
+                    Quantity::of($held) === 0
                         ? 'Nothing is still out on that line.'
                         : "Only {$held} of that line is still out.",
                 );

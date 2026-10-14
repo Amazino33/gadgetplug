@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Pickings;
 
+use App\Support\Quantity;
 use App\Actions\Finance\RecognizePosSaleRevenueAction;
 use App\Models\Picker;
 use App\Models\PickingItem;
@@ -130,15 +131,19 @@ class RecordPickingPaymentAction
             // 6 and the 4 and leaves 5 against the 10 — spending in strict order
             // would sink 9,000 into the 10,000 and settle the 4,000 not at all,
             // which is a worse answer for the picker and not what was asked for.
+            // A shop that sells halves settles in halves, at half the price —
+            // otherwise the last ½ crate of a picking could never be paid off.
+            $step = Quantity::allowsHalves($picker->vendor) ? 0.5 : 1;
+
             foreach ($lines as $index => $line) {
-                if ($remaining <= 0 || $line['held'] < 1) {
+                if ($remaining <= 0 || $line['held'] < $step) {
                     continue;
                 }
 
-                $affordable = (int) floor(($line['credit'] + $remaining) / $line['price']);
-                $units = min($line['held'], $affordable);
+                $affordable = Quantity::of(floor(($line['credit'] + $remaining) / ($line['price'] * $step) + 0.000001) * $step);
+                $units = Quantity::of(min($line['held'], $affordable));
 
-                if ($units < 1) {
+                if ($units < $step) {
                     continue;
                 }
 
@@ -147,7 +152,7 @@ class RecordPickingPaymentAction
                 $this->writePayment($picker, $line['item'], $units, $assign, $line['price'], $userId, $reference);
 
                 $remaining = round($remaining - $assign, 2);
-                $lines[$index]['held'] -= $units;
+                $lines[$index]['held'] = Quantity::sub($lines[$index]['held'], $units);
                 $lines[$index]['credit'] = 0.0;
 
                 $settled[] = [
@@ -162,7 +167,7 @@ class RecordPickingPaymentAction
             // N5,000 sitting against the phone until the rest of it arrives.
             if ($remaining > 0) {
                 foreach ($lines as $line) {
-                    if ($line['held'] < 1) {
+                    if ($line['held'] < $step) {
                         continue;
                     }
 
@@ -211,7 +216,7 @@ class RecordPickingPaymentAction
     private function writePayment(
         Picker $picker,
         PickingItem $item,
-        int $units,
+        int|float $units,
         float $amount,
         float $price,
         int $userId,

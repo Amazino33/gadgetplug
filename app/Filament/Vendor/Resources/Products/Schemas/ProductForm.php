@@ -119,6 +119,33 @@ class ProductForm
         return (bool) filament()->getTenant()?->usesGadgetFields();
     }
 
+    /**
+     * Whether this shop sells halves (½ crate). Every other shop never sees a
+     * half price, and whatever is saved in one is left alone.
+     */
+    public static function usesHalfQuantities(): bool
+    {
+        return (bool) filament()->getTenant()?->allow_half_quantities;
+    }
+
+    /**
+     * The optional price for half of a unit. Blank means exactly half of
+     * $priceField, which the placeholder shows as it is typed.
+     */
+    private static function halfPriceInput(string $priceField): TextInput
+    {
+        return TextInput::make('half_price')
+            ->numeric()
+            ->minValue(0)
+            ->prefix('₦')
+            ->placeholder(function (Get $get) use ($priceField): string {
+                $price = (float) $get($priceField);
+
+                return $price > 0 ? 'Auto: ₦'.number_format(round($price / 2, 2), 2) : 'Auto: half';
+            })
+            ->hint('Price for half of this unit. Leave blank to charge exactly half.');
+    }
+
     /** "bottle", "crate" — the base unit as it reads inside a sentence. */
     private static function unitWord(?string $baseUnit): string
     {
@@ -590,6 +617,11 @@ class ProductForm
                     ->prefix('₦')
                     ->placeholder('Leave blank for retail only')
                     ->helperText('The retail price is the Selling price above.'),
+
+                ...(self::usesHalfQuantities() ? [
+                    self::halfPriceInput('price')
+                        ->label(fn (Get $get) => 'Half price / ½ '.self::unitWord($get('base_unit'))),
+                ] : []),
             ]),
 
             // One choice for the whole product, so there can never be two.
@@ -624,6 +656,7 @@ class ProductForm
                     TableColumn::make('SKU')->width('170px'),
                     TableColumn::make('Retail')->markAsRequired(),
                     TableColumn::make('Wholesale'),
+                    ...(self::usesHalfQuantities() ? [TableColumn::make('Half')] : []),
                     TableColumn::make('Per single'),
                     TableColumn::make('On sale')->width('80px'),
                     TableColumn::make('Barcodes')->width('200px'),
@@ -663,6 +696,8 @@ class ProductForm
                         ->minValue(0)
                         ->prefix('₦')
                         ->placeholder('Retail only'),
+
+                    ...(self::usesHalfQuantities() ? [self::halfPriceInput('price')->hiddenLabel()] : []),
 
                     Placeholder::make('per_single')
                         ->hiddenLabel()

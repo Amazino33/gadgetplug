@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Pickings;
 
+use App\Support\Quantity;
 use App\Actions\Inventory\AdjustStockAction;
 use App\Models\Picker;
 use App\Models\Picking;
@@ -62,10 +63,10 @@ class ReleaseToPickerAction
             ]);
 
             foreach ($lines as $line) {
-                $quantity = (int) ($line['quantity'] ?? 0);
+                $quantity = Quantity::of($line['quantity'] ?? 0);
 
-                if ($quantity < 1) {
-                    throw new RuntimeException('Every line must take at least one unit.');
+                if ($error = Quantity::errorFor($picker->vendor, $quantity)) {
+                    throw new RuntimeException($quantity <= 0 ? 'Every line must take at least one unit.' : $error);
                 }
 
                 $product = Product::where('vendor_id', $picker->vendor_id)

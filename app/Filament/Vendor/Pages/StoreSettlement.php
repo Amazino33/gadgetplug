@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Filament\Vendor\Pages;
 
+use App\Filament\Support\QuantityInput;
+use App\Support\Quantity;
 use App\Actions\Cash\GenerateSettlementStatementAction;
 use App\Filament\Vendor\Pages\AccountClose;
 use App\Actions\Inventory\ApproveStockCountAction;
@@ -155,10 +157,8 @@ class StoreSettlement extends Page
                                 ->required()
                                 ->distinct(),
 
-                            TextInput::make('counted')
+                            QuantityInput::apply(TextInput::make('counted'), allowZero: true)
                                 ->label('Counted')
-                                ->numeric()
-                                ->minValue(0)
                                 ->required(),
                         ])
                         ->columns(2)
@@ -172,7 +172,7 @@ class StoreSettlement extends Page
 
                     $counts = collect($data['lines'] ?? [])
                         ->filter(fn ($line) => filled($line['product_id'] ?? null))
-                        ->mapWithKeys(fn ($line) => [(int) $line['product_id'] => (int) $line['counted']])
+                        ->mapWithKeys(fn ($line) => [(int) $line['product_id'] => Quantity::of($line['counted'])])
                         ->all();
 
                     if ($counts === []) {

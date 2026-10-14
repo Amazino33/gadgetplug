@@ -1,4 +1,5 @@
 import { prepareLine } from './units';
+import { floorToStep } from './halves';
 
 /**
  * Puts goods on a sale.
@@ -83,7 +84,9 @@ export function roomFor(cart = [], product, exceptIndex = null) {
         0,
     );
 
-    return Math.max(0, Math.floor((onShelf - alreadyInSale) / factor));
+    // Whole units — or half-steps for a shop that sells halves, where 19½
+    // crates on the shelf is room for 19½, not 19.
+    return Math.max(0, floorToStep((onShelf - alreadyInSale) / factor));
 }
 
 /**

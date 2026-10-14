@@ -38,6 +38,9 @@ class TillProfile
             'ask_quantity' => (bool) ($vendor->pos_ask_quantity ?? true),
             // Off unless the vendor turns it on; the server enforces it either way.
             'allow_price_change' => (bool) ($vendor->pos_allow_price_change ?? false),
+            // ½, 1½ crates. Off for every shop but the few that split crates;
+            // the server refuses a half from anyone else whatever a till sends.
+            'allow_half_quantities' => (bool) ($vendor->allow_half_quantities ?? false),
             'vendor_name'  => $vendor?->name,
             'receipt'      => self::receipt($vendor),
             'store'        => self::store($cashier, $vendor),

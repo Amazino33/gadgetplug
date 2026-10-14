@@ -2,6 +2,7 @@
 
 namespace App\Actions\Inventory;
 
+use App\Support\Quantity;
 use App\Models\AuditSession;
 use Illuminate\Support\Facades\DB;
 use Exception;
@@ -14,7 +15,7 @@ class ProcessAuditCountAction
     /**
      * @throws Exception
      */
-    public function execute(AuditSession $audit, int $storeKeeperBId, int $countB)
+    public function execute(AuditSession $audit, int $storeKeeperBId, int|float $countB)
     {
         return DB::transaction(function () use ($audit, $storeKeeperBId, $countB) {
             // 1. Lock the session so two people can't verify it at the exact same millisecond
@@ -34,7 +35,7 @@ class ProcessAuditCountAction
             $audit->count_b = $countB;
 
             // 4. The match logic
-            if ($audit->count_a === $audit->count_b) {
+            if (Quantity::of($audit->count_a) === Quantity::of($audit->count_b)) {
                 $audit->status = 'verified';
 
                 // The branch this count actually belongs to, and what the
@@ -44,7 +45,7 @@ class ProcessAuditCountAction
                 // counted while the one actually walked stays wrong.
                 $storeId            = $audit->resolvedStoreId();
                 $currentSystemStock = $audit->branchSystemStock();
-                $quantityDifference = $audit->count_b - $currentSystemStock;
+                $quantityDifference = Quantity::sub($audit->count_b, $currentSystemStock);
 
                 // Only write to the ledger if the stock actually changed
                 if ($quantityDifference !== 0) {

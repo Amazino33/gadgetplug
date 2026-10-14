@@ -17,7 +17,7 @@
             <div class="rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 p-4">
                 <p class="text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Stock value (retail)</p>
                 <p class="mt-1 font-montserrat text-xl font-bold text-gray-900 dark:text-white">₦{{ number_format($totals['retail_value'], 2) }}</p>
-                <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ number_format($totals['units']) }} units across {{ count($rows) }} {{ Str::plural('store', count($rows)) }}</p>
+                <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ \App\Support\Quantity::display($totals['units']) }} units across {{ count($rows) }} {{ Str::plural('store', count($rows)) }}</p>
             </div>
 
             @if ($showCost)
@@ -35,7 +35,7 @@
             <div class="rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 p-4">
                 <p class="text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Sold — {{ $this->periodLabel() }}</p>
                 <p class="mt-1 font-montserrat text-xl font-bold text-gray-900 dark:text-white">₦{{ number_format($totals['sales_revenue'], 2) }}</p>
-                <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ number_format($totals['sales_units']) }} units</p>
+                <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ \App\Support\Quantity::display($totals['sales_units']) }} units</p>
             </div>
 
             <div class="rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 p-4">
@@ -81,7 +81,7 @@
                             </td>
                             <td class="whitespace-nowrap px-4 py-3 text-right">
                                 <p class="font-montserrat text-sm font-bold text-gray-900 dark:text-white">₦{{ number_format($row['sales_revenue'], 2) }}</p>
-                                <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ number_format($row['sales_units']) }} units</p>
+                                <p class="text-[11px] text-gray-500 dark:text-gray-400">{{ \App\Support\Quantity::display($row['sales_units']) }} units</p>
                             </td>
                             <td class="whitespace-nowrap px-4 py-3 text-right text-sm text-gray-900 dark:text-white">₦{{ number_format($row['retail_value'], 2) }}</td>
                             @if ($showCost)

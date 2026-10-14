@@ -98,7 +98,7 @@
                                     {{ $this->saved[$id] === 0 ? 'Already correct' : 'Saved ' . ($this->saved[$id] > 0 ? '+' : '') . $this->saved[$id] }}
                                 </span>
                                 @endif
-                                <input type="text" inputmode="numeric" data-count-input
+                                <input type="text" inputmode="{{ \App\Support\Quantity::allowsHalves(filament()->getTenant()) ? 'decimal' : 'numeric' }}" data-count-input
                                     wire:model="counts.{{ $id }}"
                                     x-on:input="typed = $event.target.value.trim()"
                                     x-on:keydown.enter.prevent="$wire.setStock({{ $id }}).then(() => next($el))"

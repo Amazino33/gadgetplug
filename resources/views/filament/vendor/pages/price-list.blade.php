@@ -51,9 +51,9 @@
             @foreach($products as $product)
             <div class="px-4 py-2.5 flex items-baseline justify-between gap-3">
                 <div class="min-w-0">
-                    <p class="text-sm leading-tight {{ (int) $product->stock_quantity <= 0 ? 'text-[#5a7a5c]' : 'text-white' }}">
+                    <p class="text-sm leading-tight {{ \App\Support\Quantity::of($product->stock_quantity) <= 0 ? 'text-[#5a7a5c]' : 'text-white' }}">
                         {{ $product->name }}
-                        @if((int) $product->stock_quantity <= 0)
+                        @if(\App\Support\Quantity::of($product->stock_quantity) <= 0)
                         <span class="text-[10px] text-[#c96a6a] font-semibold uppercase ml-1">out of stock</span>
                         @endif
                     </p>
@@ -61,7 +61,7 @@
                     <p class="text-[#3a5a3c] text-[11px] font-mono mt-0.5 truncate">{{ $product->sku }}</p>
                     @endif
                 </div>
-                <p class="shrink-0 text-sm font-bold whitespace-nowrap {{ (int) $product->stock_quantity <= 0 ? 'text-[#5a7a5c]' : 'text-[#4caf50]' }}">
+                <p class="shrink-0 text-sm font-bold whitespace-nowrap {{ \App\Support\Quantity::of($product->stock_quantity) <= 0 ? 'text-[#5a7a5c]' : 'text-[#4caf50]' }}">
                     &#8358;{{ number_format((float) $product->price, 2) }}
                 </p>
             </div>

@@ -53,10 +53,9 @@ class PosReceiptController extends Controller
             'payments'     => $sale->payments,
             'items'        => $sale->items->map(fn ($item) => [
                 'name'       => $item->product_name,
-                // "1 Crate × ₦9,700", not "24 × ₦404.17". Unchanged for a
-                // line sold in its base unit.
-                'quantity'   => $item->soldInLargerUnit() ? "{$item->unit_qty} {$item->unit_name}" : $item->quantity,
-                'unit_price' => $item->soldInLargerUnit() ? $item->sold_unit_price : $item->unit_price,
+                // "1 Crate × ₦9,700" and "1½ Crate × ₦10,100" — see
+                // PosSaleItem::receiptLine(). Unchanged for a base-unit line.
+                ...$item->receiptLine(),
                 'total'      => $item->total,
             ]),
             // VAT is a vendor setting; the old receipt hardcoded "VAT (7.5%)"

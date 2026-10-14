@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\Quantity;
+use App\Rules\QuantityStep;
 use App\Models\ProductStoreStock;
 use App\Models\Store;
 use App\Models\Supplier;
@@ -185,7 +187,7 @@ class ProcurementWizardController extends Controller
             'items'                  => 'required|array|min:1',
             'items.*.product_id'     => 'required|exists:products,id',
             'items.*.barcode'        => 'nullable|string',
-            'items.*.quantity'       => 'required|integer|min:1',
+            'items.*.quantity'       => ['required', 'numeric', new QuantityStep($this->resolveAuthorizedVendor($request))],
             'items.*.unit_cost'      => 'required|numeric|min:0',
             'items.*.selling_price'  => 'required|numeric|min:0',
             // The unit bought in. Quantity and unit_cost above are then per
@@ -332,11 +334,11 @@ class ProcurementWizardController extends Controller
                     'procurement_id' => $procurement->id,
                     'product_id'     => $item['product_id'],
                     'barcode'        => $item['barcode'] ?? null,
-                    'quantity'       => (int) $item['quantity'] * $factor,
+                    'quantity'       => Quantity::mul($item['quantity'], $factor),
                     'unit_cost'      => $unit ? round((float) $item['unit_cost'] / $factor, 2) : $item['unit_cost'],
                     'selling_price'  => $item['selling_price'],
                     'product_unit_id' => $unit?->id,
-                    'unit_qty'        => $unit ? (int) $item['quantity'] : null,
+                    'unit_qty'        => $unit ? Quantity::of($item['quantity']) : null,
                     'cost_per_unit'   => $unit ? $item['unit_cost'] : null,
                 ]);
             }

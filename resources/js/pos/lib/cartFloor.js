@@ -12,6 +12,8 @@
  * allow and the server then refused.
  */
 
+import { lineFloorTotal, lineNet } from './halves';
+
 /** Half a kobo, matching the server's epsilon, so a price sitting exactly on its floor passes. */
 const EPSILON = 0.005;
 
@@ -20,16 +22,16 @@ export function lineFloor(item) {
     return item.min_price ?? item.listPrice ?? item.price ?? 0;
 }
 
+// A half is held to half the unit's floor and charged its own half price
+// (see lib/halves.js). For a whole quantity these are floor × qty and
+// price × qty, exactly as before.
 export function cartFloorTotal(cart = []) {
-    return cart.reduce((total, item) => total + lineFloor(item) * (item.qty ?? 0), 0);
+    return cart.reduce((total, item) => total + lineFloorTotal(item, lineFloor(item)), 0);
 }
 
 /** What the goods come to before any cart-level discount, net of line discounts. */
 export function cartSubtotal(cart = []) {
-    return cart.reduce(
-        (total, item) => total + (item.price ?? 0) * (item.qty ?? 0) - (item.lineDiscount || 0),
-        0,
-    );
+    return cart.reduce((total, item) => total + lineNet(item), 0);
 }
 
 /**

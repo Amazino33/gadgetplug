@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Filament\Vendor\Resources\AuditSessions;
 
+use App\Filament\Support\QuantityInput;
+use App\Support\Quantity;
 use App\Filament\Vendor\Resources\AuditSessions\Pages;
 use App\Filament\Vendor\Resources\Products\Schemas\ProductForm;
 use App\Models\AuditSession;
@@ -511,11 +513,9 @@ class AuditSessionResource extends Resource
                     ->modalHeading('Verify Physical Stock')
                     ->slideOver()
                     ->form([
-                        TextInput::make('count_b')
+                        QuantityInput::apply(TextInput::make('count_b'), allowZero: true)
                             ->label('My Physical Count')
-                            ->numeric()
-                            ->required()
-                            ->minValue(0),
+                            ->required(),
                     ])
                     ->visible(fn (AuditSession $record): bool =>
                         $record->status === 'pending' &&
@@ -523,7 +523,7 @@ class AuditSessionResource extends Resource
                     )
                     ->action(function (AuditSession $record, array $data, ProcessAuditCountAction $processAudit): void {
                         try {
-                            $audit = $processAudit->execute($record, auth()->id(), (int) $data['count_b']);
+                            $audit = $processAudit->execute($record, auth()->id(), Quantity::of($data['count_b']));
 
                             if ($audit->status === 'verified') {
                                 Notification::make()->title('Match! Stock Updated.')->success()->send();
@@ -568,11 +568,9 @@ class AuditSessionResource extends Resource
                     )
                     ->slideOver()
                     ->form([
-                        TextInput::make('manager_override_count')
+                        QuantityInput::apply(TextInput::make('manager_override_count'), allowZero: true)
                             ->label('Final Correct Stock')
-                            ->numeric()
-                            ->required()
-                            ->minValue(0),
+                            ->required(),
                         Select::make('reason_code')
                             ->label('Reason for Discrepancy')
                             ->options([
@@ -593,7 +591,7 @@ class AuditSessionResource extends Resource
                     ->action(function (AuditSession $record, array $data, AdjustStockAction $adjustStock): void {
                         self::applyOverride(
                             $record,
-                            (int) $data['manager_override_count'],
+                            Quantity::of($data['manager_override_count']),
                             $data['reason_code'],
                             $adjustStock,
                         );
@@ -870,13 +868,13 @@ class AuditSessionResource extends Resource
      */
     private static function applyOverride(
         AuditSession $record,
-        int $finalCount,
+        int|float $finalCount,
         string $reasonCode,
         AdjustStockAction $adjustStock,
     ): void {
         $storeId            = $record->resolvedStoreId();
         $currentSystemStock = $record->branchSystemStock();
-        $difference         = $finalCount - $currentSystemStock;
+        $difference         = Quantity::sub($finalCount, $currentSystemStock);
 
         // Only a shortfall is a loss. Finding more than expected is not a gain
         // to be booked here.

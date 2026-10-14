@@ -2,6 +2,7 @@
 
 namespace App\Filament\Vendor\Resources\Products\Tables;
 
+use App\Filament\Support\QuantityInput;
 use App\Support\Quantity;
 use App\Filament\Vendor\Resources\Products\Schemas\ProductForm;
 use App\Models\AuditSession;
@@ -189,11 +190,9 @@ class ProductsTable
                     ->modalDescription('Enter your physical count. A second storekeeper will verify this.')
                     ->slideOver()
                     ->form([
-                        TextInput::make('count_a')
+                        QuantityInput::apply(TextInput::make('count_a'), allowZero: true)
                             ->label('My Physical Count')
-                            ->numeric()
-                            ->required()
-                            ->minValue(0),
+                            ->required(),
                     ])
                     ->visible(fn (?Product $record): bool =>
                         $record !== null &&
@@ -204,7 +203,7 @@ class ProductsTable
                             'vendor_id'         => $record->vendor_id,
                             'product_id'        => $record->id,
                             'storekeeper_a_id'  => auth()->id(),
-                            'count_a'           => $data['count_a'],
+                            'count_a'           => Quantity::of($data['count_a']),
                             'status'            => 'pending',
                         ]);
                     })

@@ -11,6 +11,8 @@
  * every function here leaves it exactly as it was.
  */
 
+import { formatQty } from './halves';
+
 const factorOf = (u) => Number(u?.conversion_factor ?? u?.factor ?? 1);
 
 /**
@@ -96,6 +98,9 @@ export function lineFields(unit, priceType = 'retail') {
         min_price:        floor,
         can_negotiate:    floor < price,
         wholesaleMissing,
+        // What half of this unit sells for at retail, sent only to a shop that
+        // sells halves; see lib/halves.js for how a line uses it.
+        half_price:       unit.half_price ?? null,
     };
 }
 
@@ -142,7 +147,8 @@ export function carriesBarcode(product, code) {
 }
 
 function plural(name, count) {
-    if (count === 1 || /s$/i.test(name)) return name;
+    // "½ Crate" and "1 Crate", "1½ Crates".
+    if (count <= 1 || /s$/i.test(name)) return name;
 
     return `${name}s`;
 }
@@ -166,7 +172,7 @@ export function stockText(product) {
         .sort((a, b) => Number(b.conversion_factor) - Number(a.conversion_factor))[0];
 
     if (! biggest || available <= 0) {
-        return available < 0 ? `${available} (owed)` : String(available);
+        return available < 0 ? `${formatQty(available)} (owed)` : formatQty(available);
     }
 
     const factor = Number(biggest.conversion_factor);
@@ -176,9 +182,9 @@ export function stockText(product) {
 
     const parts = [];
     if (whole > 0) parts.push(`${whole} ${plural(biggest.name, whole)}`);
-    if (rest > 0) parts.push(`${rest} ${plural(baseName, rest)}`);
+    if (rest > 0) parts.push(`${formatQty(rest)} ${plural(baseName, rest)}`);
 
-    return `${parts.join(' + ')} (${available})`;
+    return `${parts.join(' + ')} (${formatQty(available)})`;
 }
 
 /**

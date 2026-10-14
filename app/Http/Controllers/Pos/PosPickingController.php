@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Pos;
 
+use App\Models\Vendor;
+use App\Rules\QuantityStep;
 use App\Support\Quantity;
 use App\Actions\Pickings\RecordPickingPaymentAction;
 use App\Actions\Pickings\ReleaseToPickerAction;
@@ -123,7 +125,7 @@ class PosPickingController extends Controller
             'picker_id'         => 'required|integer',
             'items'             => 'required|array|min:1',
             'items.*.product_id' => 'required|integer',
-            'items.*.quantity'  => 'required|integer|min:1',
+            'items.*.quantity'  => ['required', 'numeric', new QuantityStep(Vendor::find($request->input('vendor_id')))],
             'notes'             => 'nullable|string|max:500',
         ]);
 
@@ -140,7 +142,7 @@ class PosPickingController extends Controller
                 store: TillStore::resolve($request->user(), $vendorId),
                 lines: array_map(fn ($row) => [
                     'product_id' => (int) $row['product_id'],
-                    'quantity'   => (int) $row['quantity'],
+                    'quantity'   => Quantity::of($row['quantity']),
                 ], $request->items),
                 userId: $request->user()->id,
                 notes: $request->notes,

@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Pos;
 
+use App\Services\Pos\HalfPricing;
+use App\Rules\QuantityStep;
 use App\Support\Quantity;
 use App\Actions\Finance\RecognizePosSaleRevenueAction;
 use App\Actions\Pos\ChargeCustomerDebtAction;
@@ -34,6 +36,32 @@ class PosSaleController extends Controller
      * The ledger line for a sale. Unchanged for a line sold in its base unit;
      * a crate reads "x1 Crate (24)" so the movement explains itself.
      */
+    /**
+     * What returning $quantity base units of a line refunds, for a shop that
+     * sells halves.
+     *
+     * The line's money as a function of how much of it there is — whole units
+     * at the sold unit price, a half at the half price — evaluated before and
+     * after this return. Returning ½ of "1½ Crates for ₦15,300" refunds the
+     * ₦5,200 the half cost; a second ½ refunds ₦4,900; every return together
+     * comes to exactly what the line cost, less its discount.
+     */
+    public static function exactRefund(PosSaleItem $line, int|float $alreadyReturned, int|float $quantity): float
+    {
+        $sold   = Quantity::of($line->unit_qty ?? $line->quantity);
+        $factor = $line->unit_qty ? (float) $line->quantity / (float) $line->unit_qty : 1.0;
+        $price  = (float) ($line->sold_unit_price ?? $line->unit_price);
+        $half   = $line->half_unit_price !== null ? (float) $line->half_unit_price : null;
+
+        $before = Quantity::of((float) $alreadyReturned / $factor);
+        $after  = Quantity::of(((float) $alreadyReturned + (float) $quantity) / $factor);
+
+        $gross    = HalfPricing::lineTotal($price, $half, $after) - HalfPricing::lineTotal($price, $half, $before);
+        $discount = (float) $line->discount_amount * (($after - $before) / max($sold, 0.001));
+
+        return round($gross - $discount, 2);
+    }
+
     public static function stockDescription(string $prefix, array $item): string
     {
         if (! empty($item['unit_qty']) && Quantity::of($item['unit_qty']) !== Quantity::of($item['quantity'])) {
@@ -72,6 +100,9 @@ class PosSaleController extends Controller
 
     public function store(Request $request, AdjustStockAction $adjustStock, PosPriceFloor $priceFloor, RecognizePosSaleRevenueAction $revenue): JsonResponse
     {
+        // Read before validating: whether a line may hold a half is the shop's.
+        $halvesVendor = Vendor::find($request->input('vendor_id'));
+
         $request->validate([
             'vendor_id'                  => 'required|integer',
             // The till's own id for this checkout. Not required — an older
@@ -90,12 +121,15 @@ class PosSaleController extends Controller
             'items.*.product_name'       => 'required|string',
             'items.*.product_sku'        => 'nullable|string',
             'items.*.unit_price'         => 'required|numeric|min:0',
-            'items.*.quantity'           => 'required|integer|min:1',
+            // Whole, or a half-step for a shop that sells halves — by the
+            // switch as it is right now. (Offline sync is kinder; see there.)
+            'items.*.quantity'           => ['required', 'numeric', new QuantityStep($halvesVendor)],
             'items.*.discount_amount'    => 'nullable|numeric|min:0',
             // Selling units. All optional: a till without them sends the
             // lines it always did and they are read exactly as before.
             'items.*.product_unit_id'    => 'nullable|integer',
-            'items.*.unit_qty'           => 'nullable|integer|min:1',
+            'items.*.unit_qty'           => ['nullable', 'numeric', new QuantityStep($halvesVendor)],
+            'items.*.half_unit_price'    => 'nullable|numeric|min:0',
             'items.*.price_type'         => 'nullable|in:retail,wholesale',
             'discount_amount'            => 'nullable|numeric|min:0',
             'discount_type'              => 'nullable|in:percentage,fixed',
@@ -452,7 +486,7 @@ class PosSaleController extends Controller
         $request->validate([
             'items'              => 'required|array|min:1',
             'items.*.product_id' => 'required|integer',
-            'items.*.quantity'   => 'required|integer|min:1',
+            'items.*.quantity'   => ['required', 'numeric', new QuantityStep($vendor)],
             'refund_method'      => 'required|in:cash,card,bank_transfer,store_credit',
             'reason'             => 'nullable|string|max:255',
         ]);
@@ -476,7 +510,7 @@ class PosSaleController extends Controller
                 ], 422);
             }
 
-            $maxReturnable = $saleItem->quantity - ($alreadyReturned[$item['product_id']] ?? 0);
+            $maxReturnable = Quantity::sub($saleItem->quantity, $alreadyReturned[$item['product_id']] ?? 0);
 
             if ($item['quantity'] > $maxReturnable) {
                 return response()->json([
@@ -485,13 +519,19 @@ class PosSaleController extends Controller
             }
         }
 
-        $return = DB::transaction(function () use ($request, $sale, $adjustStock, $alreadyReturned, $revenue) {
+        $exactRefunds = Quantity::allowsHalves($vendor);
+
+        $return = DB::transaction(function () use ($request, $sale, $adjustStock, $alreadyReturned, $revenue, $exactRefunds) {
             $returnItems  = [];
             $refundAmount = 0;
 
             foreach ($request->items as $item) {
                 $saleItem      = $sale->items->firstWhere('product_id', $item['product_id']);
-                $itemTotal     = $saleItem->unit_price * $item['quantity'];
+                // A shop that sells halves refunds what the goods actually
+                // cost, half price included; everyone else exactly as before.
+                $itemTotal     = $exactRefunds
+                    ? self::exactRefund($saleItem, $alreadyReturned[$item['product_id']] ?? 0, $item['quantity'])
+                    : $saleItem->unit_price * $item['quantity'];
                 $refundAmount += $itemTotal;
 
                 $returnItems[] = [

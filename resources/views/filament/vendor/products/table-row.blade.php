@@ -1,6 +1,7 @@
 @php
     $imgUrl = $product->catalogueImageUrl('thumb'); // a resold listing shows its supplier's photo
     $available = $product->storeAvailable();
+    $availableText = \App\Support\Quantity::format($available, filament()->getTenant());
 
     $stockDot = match (true) {
         $available === 0        => 'bg-red-500',
@@ -9,8 +10,8 @@
     };
     $stockLabel = match (true) {
         $available === 0        => 'Out of stock',
-        $product->isStoreLowStock()   => "Low stock ({$available})",
-        default                  => "{$available} available",
+        $product->isStoreLowStock()   => "Low stock ({$availableText})",
+        default                  => "{$availableText} available",
     };
     $stockTextClass = match (true) {
         $available === 0        => 'text-red-600 dark:text-red-400',

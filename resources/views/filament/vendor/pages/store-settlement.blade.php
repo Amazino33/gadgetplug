@@ -355,7 +355,7 @@
             <dl class="mt-3 space-y-2 text-sm">
                 <div class="flex justify-between">
                     <dt class="text-gray-500 dark:text-gray-400">
-                        Stock on hand <span class="text-xs">(at cost, {{ number_format($pos['stock_units']) }} units)</span>
+                        Stock on hand <span class="text-xs">(at cost, {{ \App\Support\Quantity::display($pos['stock_units']) }} units)</span>
                     </dt>
                     <dd class="font-mono">{{ $money($pos['stock_at_cost']) }}</dd>
                 </div>
@@ -372,7 +372,7 @@
                         Pickings out on trust
                         {{-- Labelled, not silently mixed: this one line is at
                              selling price while every other is at cost. --}}
-                        <span class="text-xs">(at selling price, {{ number_format($pos['pickings_units']) }} units)</span>
+                        <span class="text-xs">(at selling price, {{ \App\Support\Quantity::display($pos['pickings_units']) }} units)</span>
                     </dt>
                     <dd class="font-mono">{{ $money($pos['pickings_retail']) }}</dd>
                 </div>

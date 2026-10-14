@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Pos;
 
+use App\Models\Vendor;
+use App\Rules\QuantityStep;
 use App\Support\Quantity;
 use App\Http\Controllers\Controller;
 use App\Models\Procurement;
@@ -109,7 +111,9 @@ class PosProcurementController extends Controller
         $data = $request->validate([
             'vendor_id'         => 'required|integer',
             'lines'             => 'required|array|min:1',
-            'lines.*.quantity'  => 'nullable|integer|min:0',
+            // Zero is a real answer here (nothing arrived); a half only for a
+            // shop that sells halves.
+            'lines.*.quantity'  => ['nullable', 'numeric', 'min:0', new QuantityStep(Vendor::find($request->input('vendor_id')), allowZero: true)],
             'lines.*.unit_cost' => 'nullable|numeric|min:0',
             'note'              => 'nullable|string|max:1000',
         ]);

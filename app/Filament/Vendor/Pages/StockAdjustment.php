@@ -82,7 +82,7 @@ class StockAdjustment extends Page
     /** @var array<int|string, mixed> typed shelf totals, keyed by product id */
     public array $counts = [];
 
-    /** @var array<int, int> product id => change just saved, for the row's confirmation */
+    /** @var array<int, int|float> product id => change just saved, for the row's confirmation */
     public array $saved = [];
 
     /** Pasted rows: an identifier and a quantity per line. */
@@ -143,15 +143,21 @@ class StockAdjustment extends Page
         foreach ($lines as $line) {
             [$key, $qtyRaw] = $this->splitLine($line);
 
-            if ($key === '' || $qtyRaw === null || ! is_numeric($qtyRaw)) {
+            $qty = Quantity::parse($qtyRaw);
+
+            if ($key === '' || $qty === null) {
                 $this->preview[] = $this->row($line, null, null, 'Could not read this line');
                 continue;
             }
 
-            $qty = (int) $qtyRaw;
-
             if ($qty < 0) {
                 $this->preview[] = $this->row($line, null, null, 'Quantity cannot be negative');
+                continue;
+            }
+
+            // A half only for a shop that sells halves; 0 is a real count.
+            if ($qty > 0 && ($error = Quantity::errorFor($vendor, $qty))) {
+                $this->preview[] = $this->row($line, null, null, $error);
                 continue;
             }
 
@@ -214,7 +220,7 @@ class StockAdjustment extends Page
             }
 
             // Nothing to do when the sheet already agrees with the system
-            if ((int) $row['change'] === 0) {
+            if (Quantity::of($row['change']) === 0) {
                 $skipped++;
                 continue;
             }
@@ -222,7 +228,7 @@ class StockAdjustment extends Page
             try {
                 $adjust->execute(
                     productId:       (int) $row['product_id'],
-                    quantityChanged: (int) $row['change'],
+                    quantityChanged: Quantity::of($row['change']),
                     transactionType: 'stock_adjustment',
                     userId:          auth()->id(),
                     reference:       'Stock adjustment',
@@ -319,10 +325,14 @@ class StockAdjustment extends Page
     {
         abort_unless(static::canAccess(), 403);
 
-        $raw = trim((string) ($this->counts[$productId] ?? ''));
+        $vendor = filament()->getTenant();
+        $typed  = Quantity::parse($this->counts[$productId] ?? '');
 
-        if ($raw === '' || ! ctype_digit($raw)) {
-            $this->addError("counts.{$productId}", 'Enter a whole number, 0 or more.');
+        // 0 or more; whole, or in halves (19½) for a shop that sells halves.
+        if ($typed === null || $typed < 0 || ($typed > 0 && Quantity::errorFor($vendor, $typed))) {
+            $this->addError("counts.{$productId}", Quantity::allowsHalves($vendor)
+                ? 'Enter 0 or more, in halves if needed — e.g. 19½.'
+                : 'Enter a whole number, 0 or more.');
             return;
         }
 
@@ -345,7 +355,7 @@ class StockAdjustment extends Page
             return;
         }
 
-        $change = (int) $raw - $this->currentStock($product);
+        $change = Quantity::sub($typed, $this->currentStock($product));
 
         $this->resetErrorBag("counts.{$productId}");
 
@@ -436,7 +446,7 @@ class StockAdjustment extends Page
     }
 
     /** @return array<string, mixed> */
-    private function row(string $line, ?Product $product, ?int $target, ?string $error): array
+    private function row(string $line, ?Product $product, int|float|null $target, ?string $error): array
     {
         $current = $product ? $this->currentStock($product) : null;
 
@@ -447,7 +457,7 @@ class StockAdjustment extends Page
             'sku'        => $product?->sku ?? '',
             'current'    => $current,
             'target'     => $target,
-            'change'     => ($product && $target !== null) ? $target - $current : null,
+            'change'     => ($product && $target !== null) ? Quantity::sub($target, $current) : null,
             'error'      => $error,
         ];
     }

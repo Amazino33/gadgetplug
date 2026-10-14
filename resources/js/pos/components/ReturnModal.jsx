@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { fmt } from '../lib/format';
 import api from '../lib/api';
 import { recordRefund } from '../lib/salesHistory';
+import { cleanQty, formatQty, halvesEnabled, qtyStep } from '../lib/halves';
 
 export default function ReturnModal({ vendorId, cashierId, onClose }) {
     const [step, setStep]         = useState('lookup');
@@ -36,8 +37,11 @@ export default function ReturnModal({ vendorId, cashierId, onClose }) {
         }
     };
 
+    // A shop that sells halves returns in halves too; everyone else in whole units.
+    const step = qtyStep(halvesEnabled());
+
     const adjust = (productId, delta, max) =>
-        setSelected((s) => ({ ...s, [productId]: Math.min(max, Math.max(0, (s[productId] || 0) + delta)) }));
+        setSelected((s) => ({ ...s, [productId]: Math.min(max, Math.max(0, cleanQty((s[productId] || 0) + delta))) }));
 
     const refundTotal = sale
         ? sale.items.reduce((sum, item) => sum + (selected[item.product_id] || 0) * item.unit_price, 0)
@@ -148,15 +152,15 @@ export default function ReturnModal({ vendorId, cashierId, onClose }) {
                                             <p className="text-sm font-medium text-gray-800 truncate">{item.product_name}</p>
                                             <p className="text-xs text-gray-400">
                                                 {fmt(item.unit_price)} ×{' '}
-                                                {item.returnable} returnable
-                                                {item.returned > 0 && ` (${item.returned} already returned)`}
+                                                {formatQty(item.returnable)} returnable
+                                                {item.returned > 0 && ` (${formatQty(item.returned)} already returned)`}
                                             </p>
                                         </div>
                                         <div className="flex items-center gap-2 shrink-0">
-                                            <button onClick={() => adjust(item.product_id, -1, item.returnable)}
+                                            <button onClick={() => adjust(item.product_id, -step, item.returnable)}
                                                 className="w-7 h-7 rounded-full bg-white border border-gray-200 text-gray-600 font-bold text-sm flex items-center justify-center">−</button>
-                                            <span className="w-6 text-center text-sm font-semibold">{selected[item.product_id] || 0}</span>
-                                            <button onClick={() => adjust(item.product_id, +1, item.returnable)}
+                                            <span className="w-6 text-center text-sm font-semibold">{formatQty(selected[item.product_id] || 0)}</span>
+                                            <button onClick={() => adjust(item.product_id, +step, item.returnable)}
                                                 className="w-7 h-7 rounded-full bg-white border border-gray-200 text-gray-600 font-bold text-sm flex items-center justify-center">+</button>
                                         </div>
                                     </div>

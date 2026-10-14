@@ -5,6 +5,7 @@ import { cacheReceipt, cachedReceipt } from '../lib/salesHistory';
 import { printDocument } from '../lib/printDocument';
 import { receiptHtml } from '../lib/receiptDocument';
 import { vendorSettings } from '../lib/vendorSettings';
+import { formatQty, hasHalf } from '../lib/halves';
 
 const CONFIG = window.POS_CONFIG ?? {};
 
@@ -198,7 +199,16 @@ export default function ReceiptModal({ sale, onNewSale, isReprint = false }) {
                             <div key={i} className="flex justify-between items-start gap-2">
                                 <div className="flex-1 min-w-0">
                                     <p className="text-xs font-medium text-gray-800 truncate">{item.product_name}</p>
-                                    <p className="text-xs text-gray-400">{fmt(item.unit_price)} × {item.quantity}</p>
+                                    {/* A line with a half: "₦10,100 × 1½ Crate", priced per
+                                        unit sold rather than as an average per base unit. */}
+                                    {hasHalf(item.unit_qty ?? item.quantity) ? (
+                                        <p className="text-xs text-gray-400">
+                                            {fmt(item.sold_unit_price ?? item.unit_price)} × {formatQty(item.unit_qty ?? item.quantity, true)} {item.unit_name ?? ''}
+                                            {item.half_unit_price != null && ` (½ at ${fmt(item.half_unit_price)})`}
+                                        </p>
+                                    ) : (
+                                        <p className="text-xs text-gray-400">{fmt(item.unit_price)} × {item.quantity}</p>
+                                    )}
                                 </div>
                                 <p className="text-xs font-semibold text-gray-700 shrink-0">{fmt(item.total)}</p>
                             </div>

@@ -108,7 +108,7 @@ class ProcurementReview
                 }
 
                 $quantity = array_key_exists('quantity', $values) && $values['quantity'] !== null
-                    ? (int) $values['quantity']
+                    ? Quantity::of($values['quantity'])
                     : $item->verifiedQuantity();
 
                 $unitCost = array_key_exists('unit_cost', $values) && $values['unit_cost'] !== null
