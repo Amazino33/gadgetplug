@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Support\Quantity;
+use App\Casts\AsQuantity;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
@@ -157,14 +159,15 @@ class Product extends Model implements HasMedia
         'has_custom_price' => 'boolean',
         'allow_pos_price_override' => 'boolean',
         'specifications'  => 'array',
-        'stock_quantity'  => 'integer',
-        'reserved_stock'  => 'integer',
+        'stock_quantity'  => AsQuantity::class,
+        'reserved_stock'  => AsQuantity::class,
         'is_service'      => 'boolean',
         'reorder_point'      => 'integer',
         'preferred_quantity' => 'integer',
         'published_at'    => 'datetime',
         'unpublish_at'    => 'datetime',
         'wholesale_price' => 'decimal:2',
+        'half_price'      => 'decimal:2',
         'negative_stock_override' => 'boolean',
     ];
 
@@ -258,7 +261,7 @@ class Product extends Model implements HasMedia
     public function syncBaseUnit(): void
     {
         $relevant = $this->wasRecentlyCreated
-            || $this->wasChanged(['price', 'wholesale_price', 'base_unit'])
+            || $this->wasChanged(['price', 'wholesale_price', 'half_price', 'base_unit'])
             || ! $this->default_unit_id;
 
         if (! $relevant) {
@@ -272,6 +275,7 @@ class Product extends Model implements HasMedia
             // vendor actually saved.
             'price'           => $this->attributes['price'] ?? 0,
             'wholesale_price' => $this->attributes['wholesale_price'] ?? null,
+            'half_price'      => $this->attributes['half_price'] ?? null,
         ];
 
         $unit = ProductUnit::where('product_id', $this->id)->where('is_base', true)->first();
@@ -620,6 +624,11 @@ class Product extends Model implements HasMedia
      * supplier's. This is where every PHP reader of stock — the cart, the
      * product page, the checkout guard — resolves it, which is why the
      * interception is here rather than at each of them.
+     *
+     * Whole units only. This is the online store's figure, and the online
+     * store never sells a half: 19½ crates on the shelf is 19 that can be
+     * ordered. The till and the shop panel read storeAvailable(), which keeps
+     * the half.
      */
     public function getAvailableStockAttribute(): int
     {
@@ -627,7 +636,7 @@ class Product extends Model implements HasMedia
             return LinkedPricing::stockFor($this);
         }
 
-        return max(0, $this->stock_quantity - $this->reserved_stock);
+        return max(0, Quantity::wholeUnits(Quantity::sub($this->stock_quantity, $this->reserved_stock)));
     }
 
     /**
@@ -666,15 +675,17 @@ class Product extends Model implements HasMedia
     {
         return $query->where(function (Builder $q) {
             $q->where(function (Builder $own) {
+                // At least one WHOLE unit: half a crate cannot be ordered
+                // online. For whole stock, >= 1 is exactly the > 0 it was.
                 $own->whereNull('source_product_id')
-                    ->whereRaw('CAST(stock_quantity AS SIGNED) - CAST(reserved_stock AS SIGNED) > 0');
+                    ->whereRaw(Quantity::availableSql().' >= 1');
             })->orWhere(function (Builder $linked) {
                 $linked->whereNotNull('source_product_id')
                     ->whereExists(function ($sub) {
                         $sub->selectRaw('1')
                             ->from('products as src')
                             ->whereColumn('src.id', 'products.source_product_id')
-                            ->whereRaw('CAST(src.stock_quantity AS SIGNED) - CAST(src.reserved_stock AS SIGNED) > 0');
+                            ->whereRaw(Quantity::availableSql('src.').' >= 1');
                     })
                     // The arrangement has to still be on. A switched-off link
                     // stops the listing selling, the same as it stops it pricing.
@@ -697,23 +708,26 @@ class Product extends Model implements HasMedia
     // POS feed and storefront included — these fall back to the vendor-wide
     // mirror and behave exactly as available_stock always has. Deliberately
     // separate from available_stock so no existing reader changes meaning.
-    public function storeQuantity(): int
+    //
+    // Exact, halves included — unlike available_stock, which is the online
+    // store's whole-unit figure. An int for every whole quantity, as before.
+    public function storeQuantity(): int|float
     {
-        return array_key_exists('store_quantity', $this->attributes)
-            ? (int) $this->attributes['store_quantity']
-            : (int) $this->stock_quantity;
+        return Quantity::of(array_key_exists('store_quantity', $this->attributes)
+            ? $this->attributes['store_quantity']
+            : $this->stock_quantity);
     }
 
-    public function storeReserved(): int
+    public function storeReserved(): int|float
     {
-        return array_key_exists('store_reserved', $this->attributes)
-            ? (int) $this->attributes['store_reserved']
-            : (int) $this->reserved_stock;
+        return Quantity::of(array_key_exists('store_reserved', $this->attributes)
+            ? $this->attributes['store_reserved']
+            : $this->reserved_stock);
     }
 
-    public function storeAvailable(): int
+    public function storeAvailable(): int|float
     {
-        return max(0, $this->storeQuantity() - $this->storeReserved());
+        return max(0, Quantity::sub($this->storeQuantity(), $this->storeReserved()));
     }
 
     public function isStoreLowStock(): bool

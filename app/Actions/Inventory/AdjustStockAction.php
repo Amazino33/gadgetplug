@@ -9,6 +9,7 @@ use App\Models\ProductStoreStock;
 use App\Models\Store;
 use App\Services\Inventory\StockCostLayers;
 use App\Services\Inventory\StoreStock;
+use App\Support\Quantity;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\DB;
 use Exception;
@@ -20,7 +21,7 @@ class AdjustStockAction
      * when $allowNegative let a sale go below zero. Read straight after
      * execute(); the caller uses it to mark the sale's cost as estimated.
      */
-    public int $lastShortfall = 0;
+    public int|float $lastShortfall = 0;
 
     /**
      * $unitCost: what units coming IN cost, when the caller knows (goods back
@@ -36,7 +37,7 @@ class AdjustStockAction
      */
     public function execute(
         int $productId,
-        int $quantityChanged,
+        int|float $quantityChanged,
         string $transactionType,
         ?int $userId = null,
         ?string $reference = null,
@@ -48,6 +49,7 @@ class AdjustStockAction
         bool $allowNegative = false,
     ) {
         $this->lastShortfall = 0;
+        $quantityChanged = Quantity::of($quantityChanged);
 
         return DB::transaction(function () use ($productId, $quantityChanged, $transactionType, $userId, $reference, $description, $auditSessionId, $reasonCode, $store, $unitCost, $allowNegative) {
             // 1. PESSIMISTIC LOCK: Lock the product row until the transaction is done.
@@ -70,12 +72,12 @@ class AdjustStockAction
 
                 // Allowed below zero: the goods have left, so the row records
                 // the debt and a later delivery or count settles it.
-                $this->lastShortfall = abs($quantityChanged) - max(0, $row->quantity);
+                $this->lastShortfall = Quantity::sub(abs($quantityChanged), max(0, $row->quantity));
             }
 
             // 4. Move the stock. products.stock_quantity is not touched here —
             // ProductStoreStockObserver derives it from this row.
-            $row->quantity += $quantityChanged;
+            $row->quantity = Quantity::add($row->quantity, $quantityChanged);
             $row->save();
 
             // 4b. Keep the cost batches in step with the units. Inside this

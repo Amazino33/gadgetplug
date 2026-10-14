@@ -5,6 +5,7 @@ namespace App\Services\Pos;
 use App\Models\Product;
 use App\Models\ProductUnit;
 use App\Models\Vendor;
+use App\Support\Quantity;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
@@ -29,6 +30,8 @@ final class SaleLineResolver
     /** @var Collection<int, Product> */
     private Collection $products;
 
+    private bool $allowHalves = false;
+
     /**
      * @param  array<int|string, array<string, mixed>>  $items
      * @return array<int|string, array<string, mixed>>  Same keys as $items. Each line carries
@@ -37,8 +40,13 @@ final class SaleLineResolver
      *
      * @throws ValidationException
      */
-    public function resolve(Vendor $vendor, array $items): array
+    public function resolve(Vendor $vendor, array $items, ?bool $allowHalves = null): array
     {
+        // Whether a line may hold a half. The vendor's switch unless the caller
+        // decides — offline sync accepts halves from a shop that has ever sold
+        // them, because the sale may predate the switch going off.
+        $this->allowHalves = $allowHalves ?? Quantity::allowsHalves($vendor);
+
         $this->products = Product::where('vendor_id', $vendor->id)
             ->whereIn('id', collect($items)->pluck('product_id')->filter())
             ->with('units')
@@ -79,19 +87,20 @@ final class SaleLineResolver
         }
 
         if ($line['product_unit_id']) {
-            $unit = $product->units->firstWhere('id', (int) $line['product_unit_id']);
-            $wholesale = $line['price_type'] === 'wholesale';
+            $unit  = $product->units->firstWhere('id', (int) $line['product_unit_id']);
+            $price = HalfPricing::unitListPrice($product, $unit, $line['price_type']);
+            $half  = Quantity::hasHalf($line['unit_qty'])
+                ? HalfPricing::listHalfPrice($product, $unit, $line['price_type'])
+                : null;
 
-            $price = $unit->is_base
-                ? (float) ($wholesale && $product->wholesale_price !== null ? $product->wholesale_price : $product->price)
-                : (float) ($wholesale && $unit->wholesale_price !== null ? $unit->wholesale_price : $unit->price);
-
-            $forced = abs($price - (float) $line['sold_unit_price']) > 0.004;
-            $gross  = $price * (int) $line['unit_qty'];
+            $gross  = HalfPricing::lineTotal($price, $half, $line['unit_qty']);
+            $forced = abs($price - (float) $line['sold_unit_price']) > 0.004
+                || abs($gross - (float) $line['line_gross']) > 0.004;
 
             return array_merge($line, [
                 'sold_unit_price' => $price,
-                'unit_price'      => round($gross / max(1, (int) $line['quantity']), 2),
+                'half_unit_price' => $half,
+                'unit_price'      => round($gross / $line['quantity'], 2),
                 'line_gross'      => $gross,
                 'price_forced'    => $forced,
             ]);
@@ -99,12 +108,14 @@ final class SaleLineResolver
 
         // A line from a till without units sells in the base unit at retail.
         $price  = (float) $product->price;
+        $half   = Quantity::hasHalf($line['quantity']) ? HalfPricing::listHalfPrice($product, null, 'retail') : null;
         $forced = abs($price - (float) $line['unit_price']) > 0.004;
 
         return array_merge($line, [
-            'unit_price'   => $price,
-            'line_gross'   => $price * (int) $line['quantity'],
-            'price_forced' => $forced,
+            'unit_price'      => $price,
+            'half_unit_price' => $half,
+            'line_gross'      => HalfPricing::lineTotal($price, $half, $line['quantity']),
+            'price_forced'    => $forced,
         ]);
     }
 
@@ -116,18 +127,47 @@ final class SaleLineResolver
 
     private function legacyLine(array $item): array
     {
-        $quantity = (int) $item['quantity'];
+        $product  = $this->products->get((int) $item['product_id']);
+        $quantity = $this->quantityOf($item['quantity'] ?? null, $product?->name ?? ($item['product_name'] ?? 'A product'));
+        $price    = (float) $item['unit_price'];
+
+        // Only a shop that sells halves gets here with one; the half is priced
+        // like the base unit's half, from what the till charged per unit.
+        $half = Quantity::hasHalf($quantity) && $product
+            ? HalfPricing::halfPriceFor($product, null, 'retail', $price)
+            : null;
 
         return array_merge($item, [
             'quantity'        => $quantity,
-            'line_gross'      => (float) $item['unit_price'] * $quantity,
+            'line_gross'      => HalfPricing::lineTotal($price, $half, $quantity),
             'product_unit_id' => null,
             'unit_name'       => null,
             'unit_qty'        => null,
             'sold_unit_price' => null,
+            'half_unit_price' => $half,
             'price_type'      => 'retail',
             'conversion_factor' => 1,
         ]);
+    }
+
+    /**
+     * The quantity a line asks for, refused unless it is whole — or, for a
+     * shop that sells halves, a half-step. Never truncated: a cast to int used
+     * to turn ½ into 0 without a word.
+     *
+     * @throws ValidationException
+     */
+    private function quantityOf(mixed $value, string $productName): int|float
+    {
+        $error = Quantity::errorFor($this->allowHalves, $value);
+
+        if ($error !== null) {
+            throw ValidationException::withMessages([
+                'items' => sprintf('%s: %s', $productName, $error),
+            ]);
+        }
+
+        return Quantity::of($value);
     }
 
     private function unitLine(array $item): array
@@ -146,24 +186,30 @@ final class SaleLineResolver
             ]);
         }
 
-        $unitQty = (int) ($item['unit_qty'] ?? $item['quantity'] ?? 0);
-
-        if ($unitQty < 1) {
-            throw ValidationException::withMessages([
-                'items' => sprintf('%s needs a quantity of at least 1.', $product->name),
-            ]);
-        }
+        $unitQty = $this->quantityOf($item['unit_qty'] ?? $item['quantity'] ?? null, $product->name);
 
         $factor    = max(1, (int) $unit->conversion_factor);
-        $base      = $unitQty * $factor;
+        $base      = Quantity::mul($unitQty, $factor);
         $soldPrice = (float) $item['unit_price'];
-        $gross     = $soldPrice * $unitQty;
 
         // A wholesale price the unit does not have is retail — the till shows
         // it that way, and the floor below is worked out on the same basis.
         $priceType = ($item['price_type'] ?? 'retail') === 'wholesale' && $unit->wholesale_price !== null
             ? 'wholesale'
             : 'retail';
+
+        // The half of a "1½ Crate" line. A till that says what it charged for
+        // the half is believed (the price floor still checks it); otherwise it
+        // is the catalogue's half at list price, or half of a haggled price.
+        $half = null;
+
+        if (Quantity::hasHalf($unitQty)) {
+            $half = isset($item['half_unit_price']) && is_numeric($item['half_unit_price'])
+                ? round((float) $item['half_unit_price'], 2)
+                : HalfPricing::halfPriceFor($product, $unit, $priceType, $soldPrice);
+        }
+
+        $gross = HalfPricing::lineTotal($soldPrice, $half, $unitQty);
 
         return array_merge($item, [
             'quantity'          => $base,
@@ -175,6 +221,7 @@ final class SaleLineResolver
             'unit_name'         => $unit->name,
             'unit_qty'          => $unitQty,
             'sold_unit_price'   => $soldPrice,
+            'half_unit_price'   => $half,
             'price_type'        => $priceType,
             'conversion_factor' => $factor,
         ]);

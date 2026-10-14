@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Inventory;
 
+use App\Support\Quantity;
 use App\Models\ProductStoreStock;
 use App\Models\StockCostLayer;
 use Illuminate\Support\Facades\DB;
@@ -63,7 +64,7 @@ class StockValuation
 
         return [
             'value'                  => round((float) $row->value, 2),
-            'uncosted_units'         => (int) $row->uncosted_units,
+            'uncosted_units'         => Quantity::of($row->uncosted_units),
             'uncosted_product_count' => (int) $row->uncosted_products,
         ];
     }

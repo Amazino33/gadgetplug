@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Pos;
 
+use App\Support\Quantity;
 use App\Http\Controllers\Controller;
 use App\Models\Product;
 use App\Models\ProductBarcode;
@@ -95,7 +96,7 @@ class PosProductController extends Controller
 
         $live = Product::whereKey($product->id)->published()->exists();
         $row  = ProductStoreStock::where('product_id', $product->id)->where('store_id', $storeId)->first();
-        $onShelf = $row ? (int) $row->quantity - (int) $row->reserved : 0;
+        $onShelf = $row ? Quantity::sub($row->quantity, $row->reserved) : 0;
 
         $reason = match (true) {
             ! $live                       => 'it is not published (it is a draft, archived or scheduled). Set its Status to Published.',

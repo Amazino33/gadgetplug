@@ -22,6 +22,7 @@ class ProductUnit extends Model
         'conversion_factor' => 'integer',
         'price'             => 'decimal:2',
         'wholesale_price'   => 'decimal:2',
+        'half_price'        => 'decimal:2',
         'is_base'           => 'boolean',
         'is_active'         => 'boolean',
         'sort_order'        => 'integer',

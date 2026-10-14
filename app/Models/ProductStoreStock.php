@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\AsQuantity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -18,8 +19,8 @@ class ProductStoreStock extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'quantity' => 'integer',
-        'reserved' => 'integer',
+        'quantity' => AsQuantity::class,
+        'reserved' => AsQuantity::class,
     ];
 
     public function product(): BelongsTo

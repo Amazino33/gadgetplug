@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Vendor\Pages;
 
+use App\Support\Quantity;
 use App\Actions\Inventory\AdjustStockAction;
 use App\Services\ActiveStore;
 use App\Models\AuditSession;
@@ -347,10 +348,10 @@ class BlindCount extends Page
     // one branch's count against every branch's stock and report the rest of
     // the business as missing. Sessions from before stores fall back to the
     // vendor-wide mirror, which is what they were counted against.
-    private function systemQuantityFor(BlindCountSession $session, Product $product): int
+    private function systemQuantityFor(BlindCountSession $session, Product $product): int|float
     {
         if ($session->store_id === null) {
-            return (int) $product->stock_quantity;
+            return Quantity::of($product->stock_quantity);
         }
 
         return (int) (ProductStoreStock::where('product_id', $product->id)

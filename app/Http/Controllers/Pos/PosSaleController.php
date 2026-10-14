@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Pos;
 
+use App\Support\Quantity;
 use App\Actions\Finance\RecognizePosSaleRevenueAction;
 use App\Actions\Pos\ChargeCustomerDebtAction;
 use App\Actions\Pos\RecordSaleReversalAction;
@@ -35,7 +36,7 @@ class PosSaleController extends Controller
      */
     public static function stockDescription(string $prefix, array $item): string
     {
-        if (! empty($item['unit_qty']) && (int) $item['unit_qty'] !== (int) $item['quantity']) {
+        if (! empty($item['unit_qty']) && Quantity::of($item['unit_qty']) !== Quantity::of($item['quantity'])) {
             return "{$prefix} — {$item['product_name']} x{$item['unit_qty']} {$item['unit_name']} ({$item['quantity']})";
         }
 
@@ -53,7 +54,7 @@ class PosSaleController extends Controller
             'cost_estimated' => true,
             'unit_cost'      => $costPrice,
             'cost_total'     => $costPrice !== null
-                ? round((float) $costPrice * (int) $item['quantity'], 2)
+                ? round((float) $costPrice * Quantity::of($item['quantity']), 2)
                 : $batchCost,
         ];
     }
@@ -283,6 +284,7 @@ class PosSaleController extends Controller
                     'unit_name'       => $item['unit_name'],
                     'unit_qty'        => $item['unit_qty'],
                     'sold_unit_price' => $item['sold_unit_price'],
+                    'half_unit_price' => $item['half_unit_price'] ?? null,
                     'price_type'      => $item['price_type'],
                     'unit_price'   => $item['unit_price'],
                     'unit_cost'    => $costPrices[$item['product_id']] ?? null,

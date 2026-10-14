@@ -14,7 +14,7 @@ readonly class TopSellerRow
 {
     public function __construct(
         public Product $product,
-        public int $unitsSold,
+        public int|float $unitsSold,
         public float $revenue,
         public float $dailyVelocity,
     ) {}

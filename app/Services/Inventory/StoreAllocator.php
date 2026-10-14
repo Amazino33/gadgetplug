@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Inventory;
 
+use App\Support\Quantity;
 use App\Models\ProductStoreStock;
 use App\Models\Store;
 use Illuminate\Support\Collection;
@@ -105,9 +106,12 @@ class StoreAllocator
                 'product_store_stock.reserved',
                 'stores.is_default',
             ])
+            // Whole units only. This allocates online orders, which are always
+            // whole: a branch holding 19½ can fill 19 of them, never 20. For
+            // whole stock this is exactly quantity − reserved, as before.
             ->map(fn ($row) => [
                 'store_id'   => (int) $row->store_id,
-                'available'  => max(0, (int) $row->quantity - (int) $row->reserved),
+                'available'  => max(0, Quantity::wholeUnits(Quantity::sub($row->quantity, $row->reserved))),
                 'is_default' => (bool) $row->is_default,
             ])
             ->values();

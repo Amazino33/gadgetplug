@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Support\Quantity;
+use App\Casts\AsQuantity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
@@ -17,8 +19,8 @@ class StockCostLayer extends Model
 
     protected $casts = [
         'unit_cost'          => 'decimal:2',
-        'quantity_received'  => 'integer',
-        'quantity_remaining' => 'integer',
+        'quantity_received'  => AsQuantity::class,
+        'quantity_remaining' => AsQuantity::class,
         'received_at'        => 'datetime',
     ];
 
@@ -38,9 +40,9 @@ class StockCostLayer extends Model
     }
 
     /** Units of this layer already sold or otherwise moved out. */
-    public function quantityConsumed(): int
+    public function quantityConsumed(): int|float
     {
-        return $this->quantity_received - $this->quantity_remaining;
+        return Quantity::sub($this->quantity_received, $this->quantity_remaining);
     }
 
     public function isExhausted(): bool

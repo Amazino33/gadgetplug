@@ -31,7 +31,7 @@ class ReturnFromPickerAction
 
     public function execute(
         PickingItem $item,
-        int $quantity,
+        int|float $quantity,
         ?int $userId = null,
         ?string $note = null,
     ): PickingLedgerEntry {

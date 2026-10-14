@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Support\Quantity;
+use App\Casts\AsQuantity;
 use App\Services\ActiveStore;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -30,7 +32,10 @@ class AuditSession extends Model
 
     protected $casts = [
         'loss_value'      => 'decimal:2',
-        'system_quantity' => 'integer',
+        'system_quantity' => AsQuantity::class,
+        'count_a' => AsQuantity::class,
+        'count_b' => AsQuantity::class,
+        'manager_override_count' => AsQuantity::class,
     ];
 
     public function vendor(): BelongsTo
@@ -83,9 +88,9 @@ class AuditSession extends Model
      * The figure everyone has settled on. A manager override supersedes both
      * counts; otherwise B and A agree (that is what makes a row 'verified').
      */
-    public function countedQuantity(): int
+    public function countedQuantity(): int|float
     {
-        return (int) ($this->manager_override_count ?? $this->count_b ?? $this->count_a ?? 0);
+        return Quantity::of($this->manager_override_count ?? $this->count_b ?? $this->count_a ?? 0);
     }
 
     /**
@@ -99,13 +104,13 @@ class AuditSession extends Model
      * resolve: that one is measured against live stock, because its job is to
      * make the shelf figure right today. This one is the audit fact.
      */
-    public function countedVariance(): ?int
+    public function countedVariance(): int|float|null
     {
         if ($this->system_quantity === null) {
             return null;
         }
 
-        return $this->countedQuantity() - (int) $this->system_quantity;
+        return Quantity::sub($this->countedQuantity(), $this->system_quantity);
     }
 
     /** A count is only attributable once both parties (or the manager) have settled it. */
@@ -137,15 +142,15 @@ class AuditSession extends Model
      * mirror only when no branch could be resolved at all, so this never
      * measures one branch's count against every branch's stock.
      */
-    public function branchSystemStock(): int
+    public function branchSystemStock(): int|float
     {
         $storeId = $this->resolvedStoreId();
 
         if ($storeId === null) {
-            return (int) $this->product->stock_quantity;
+            return Quantity::of($this->product->stock_quantity);
         }
 
-        return (int) (ProductStoreStock::where('product_id', $this->product_id)
+        return Quantity::of(ProductStoreStock::where('product_id', $this->product_id)
             ->where('store_id', $storeId)
             ->value('quantity') ?? 0);
     }

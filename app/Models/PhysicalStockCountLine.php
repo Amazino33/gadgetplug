@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Support\Quantity;
+use App\Casts\AsQuantity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use LogicException;
@@ -22,8 +24,8 @@ class PhysicalStockCountLine extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'counted_quantity' => 'integer',
-        'system_quantity'  => 'integer',
+        'counted_quantity' => AsQuantity::class,
+        'system_quantity'  => AsQuantity::class,
         'unit_cost'        => 'decimal:2',
         'unit_price'       => 'decimal:2',
     ];
@@ -46,9 +48,9 @@ class PhysicalStockCountLine extends Model
     }
 
     /** Positive means missing, negative means more was found than expected. */
-    public function variance(): int
+    public function variance(): int|float
     {
-        return $this->system_quantity - $this->counted_quantity;
+        return Quantity::sub($this->system_quantity, $this->counted_quantity);
     }
 
     /** What the gap cost the business to buy. */

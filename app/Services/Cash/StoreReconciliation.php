@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Cash;
 
+use App\Support\Quantity;
 use App\Models\AccountabilityLedgerEntry;
 use App\Models\CashSubmission;
 use App\Models\Expense;
@@ -176,7 +177,7 @@ class StoreReconciliation
 
         return [
             'stock_at_cost'     => round((float) $stock->cost_value, 2),
-            'stock_units'       => (int) $stock->units,
+            'stock_units'       => Quantity::of($stock->units),
             // Stock with no cost price is left out of the value rather than
             // valued at nothing, so the total is visibly understated.
             'stock_uncosted'    => (int) $stock->missing_cost_count,
@@ -191,7 +192,7 @@ class StoreReconciliation
             'cash_outstanding'  => $cashOutstanding,
             'customer_debt'     => $debt,
             'pickings_retail'   => round((float) $pickings['value'], 2),
-            'pickings_units'    => (int) $pickings['units'],
+            'pickings_units'    => Quantity::of($pickings['units']),
             'staff_debts'       => max(0.0, $staffDebts),
 
             'total_balance'     => round(

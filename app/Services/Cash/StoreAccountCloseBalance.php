@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Cash;
 
+use App\Support\Quantity;
 use App\Models\CashSubmission;
 use App\Models\InventoryLedger;
 use App\Models\PhysicalStockCount;
@@ -105,7 +106,7 @@ class StoreAccountCloseBalance
                 'count_id'   => $baseline->count?->id,
                 'counted_at' => $baseline->count?->counted_at?->toDateTimeString(),
                 'products'   => $baseline->quantities()->count(),
-                'units'      => (int) $baseline->quantities()->sum(),
+                'units'      => Quantity::of($baseline->quantities()->sum()),
             ],
 
             'closing' => $closingCount ? [
@@ -405,7 +406,7 @@ class StoreAccountCloseBalance
 
         return [
             'products' => (int) ($row->products ?? 0),
-            'units'    => (int) ($row->units ?? 0),
+            'units'    => Quantity::of($row->units ?? 0),
             'cost'     => round((float) ($row->cost ?? 0), 2),
             'selling'  => round((float) ($row->selling ?? 0), 2),
         ];
@@ -432,10 +433,10 @@ class StoreAccountCloseBalance
         return [
             'units'   => (int) $lines->sum('counted_quantity'),
             'cost'    => round((float) $lines->sum(
-                fn ($l) => (int) $l->counted_quantity * (float) ($l->unit_cost ?? 0),
+                fn ($l) => Quantity::of($l->counted_quantity) * (float) ($l->unit_cost ?? 0),
             ), 2),
             'selling' => round((float) $lines->sum(
-                fn ($l) => (int) $l->counted_quantity * (float) ($l->unit_price ?? 0),
+                fn ($l) => Quantity::of($l->counted_quantity) * (float) ($l->unit_price ?? 0),
             ), 2),
             'uncosted' => $lines->filter(fn ($l) => $l->unit_cost === null)->count(),
             'unpriced' => $lines->filter(fn ($l) => $l->unit_price === null)->count(),
@@ -634,7 +635,7 @@ class StoreAccountCloseBalance
             $inOpening = $opening->has($productId);
             $openingUnits = (int) ($opening[$productId] ?? 0);
             $expected = $openingUnits + $move['received'] - $move['sold'];
-            $variance = $expected - (int) $line->counted_quantity;
+            $variance = Quantity::sub($expected, $line->counted_quantity);
 
             // 'other' is negative for movements out, so adding it back removes
             // their effect: a transfer of three units to another branch stops
@@ -652,7 +653,7 @@ class StoreAccountCloseBalance
                 'sold'        => $move['sold'],
                 'other_moves' => $move['other'],
                 'expected'    => $expected,
-                'counted'     => (int) $line->counted_quantity,
+                'counted'     => Quantity::of($line->counted_quantity),
                 'variance'    => $variance,
                 'unexplained' => $unexplained,
                 'unit_price'  => $price,

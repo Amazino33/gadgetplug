@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Support\Quantity;
+use App\Casts\AsQuantity;
 use App\Support\Accountability\FrozenLossSnapshot;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -21,7 +23,7 @@ class InventoryShortageCase extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'shortage_qty'        => 'integer',
+        'shortage_qty'        => AsQuantity::class,
         'unit_cost_snapshot'  => 'decimal:2',
         'unit_price_snapshot' => 'decimal:2',
         'charge_amount'       => 'decimal:2',
@@ -86,7 +88,7 @@ class InventoryShortageCase extends Model
     public function snapshot(): FrozenLossSnapshot
     {
         return FrozenLossSnapshot::fromFrozen(
-            shortageQty: (int) $this->shortage_qty,
+            shortageQty: Quantity::of($this->shortage_qty),
             unitCostSnapshot: (float) $this->unit_cost_snapshot,
             unitPriceSnapshot: (float) $this->unit_price_snapshot,
             priceFallback: (bool) $this->price_fallback,

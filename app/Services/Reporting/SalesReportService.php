@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Reporting;
 
+use App\Support\Quantity;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderItemStoreAllocation;
@@ -378,7 +379,7 @@ class SalesReportService
         return [
             'revenue' => (float) $row->revenue,
             'cost' => (float) $row->cost,
-            'units' => (int) $row->units,
+            'units' => Quantity::of($row->units),
             'orders' => (int) $row->orders,
             'estimated' => ((int) $row->estimated) > 0,
         ];
@@ -430,7 +431,7 @@ class SalesReportService
         return [
             'revenue' => max(0.0, (float) $sales->revenue - $refunds),
             'cost' => (float) $items->cost,
-            'units' => (int) $items->units,
+            'units' => Quantity::of($items->units),
             'orders' => (int) $sales->orders,
             'estimated' => ((int) $items->estimated) > 0,
         ];

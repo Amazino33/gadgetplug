@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Inventory;
 
+use App\Support\Quantity;
 use App\Models\PhysicalStockCount;
 use App\Models\User;
 use App\Services\AccountabilityLedger;
@@ -66,7 +67,7 @@ class ApproveStockCountAction
             // Ordered by product id for the same reason a sale is: these row
             // locks can deadlock against a concurrent till otherwise.
             foreach ($row->lines->sortBy('product_id') as $line) {
-                $delta = $line->counted_quantity - $line->system_quantity;
+                $delta = Quantity::sub($line->counted_quantity, $line->system_quantity);
 
                 if ($delta === 0) {
                     continue;
@@ -79,10 +80,10 @@ class ApproveStockCountAction
                     userId: $approver->id,
                     reference: 'COUNT-' . $row->id,
                     description: sprintf(
-                        'Stock count %s — books %d, counted %d',
+                        'Stock count %s — books %s, counted %s',
                         $delta < 0 ? 'shortfall' : 'overage',
-                        $line->system_quantity,
-                        $line->counted_quantity,
+                        Quantity::format($line->system_quantity),
+                        Quantity::format($line->counted_quantity),
                     ),
                     store: $row->store_id,
                 );

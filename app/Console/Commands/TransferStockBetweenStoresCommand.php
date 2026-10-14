@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Support\Quantity;
 use App\Actions\Inventory\AdjustStockAction;
 use App\Models\Product;
 use App\Models\ProductStoreStock;
@@ -147,7 +148,7 @@ class TransferStockBetweenStoresCommand extends Command
                 continue;
             }
 
-            $quantity = (int) $row->quantity;
+            $quantity = Quantity::of($row->quantity);
 
             try {
                 // Both halves together: a transfer that took the units off one

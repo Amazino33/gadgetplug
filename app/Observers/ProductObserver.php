@@ -2,6 +2,7 @@
 
 namespace App\Observers;
 
+use App\Support\Quantity;
 use App\Models\InventoryLedger;
 use App\Models\Product;
 use App\Models\ProductStoreStock;
@@ -173,16 +174,16 @@ class ProductObserver
                 ->lockForUpdate()
                 ->first();
 
-            $quantity = (int) ($source->quantity ?? 0);
-            $reserved = (int) ($source->reserved ?? 0);
+            $quantity = Quantity::of($source->quantity ?? 0);
+            $reserved = Quantity::of($source->reserved ?? 0);
 
             $destination = ProductStoreStock::firstOrNew([
                 'product_id' => $product->id,
                 'store_id'   => $to,
             ]);
 
-            $destination->quantity = (int) ($destination->quantity ?? 0) + $quantity;
-            $destination->reserved = (int) ($destination->reserved ?? 0) + $reserved;
+            $destination->quantity = Quantity::add($destination->quantity ?? 0, $quantity);
+            $destination->reserved = Quantity::add($destination->reserved ?? 0, $reserved);
             $destination->save();
 
             $source?->delete();
@@ -216,8 +217,8 @@ class ProductObserver
 
     public function created(Product $product): void
     {
-        $quantity = (int) ($product->stock_quantity ?? 0);
-        $reserved = (int) ($product->reserved_stock ?? 0);
+        $quantity = Quantity::of($product->stock_quantity ?? 0);
+        $reserved = Quantity::of($product->reserved_stock ?? 0);
 
         // Idempotent by (product, store): the Phase 2a backfill and the 2b
         // re-sync both write this same row, and neither may collide with this.

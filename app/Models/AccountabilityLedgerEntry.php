@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\AsQuantity;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -21,7 +22,7 @@ class AccountabilityLedgerEntry extends Model
     public const UPDATED_AT = null;
 
     protected $casts = [
-        'shortage_qty'        => 'integer',
+        'shortage_qty'        => AsQuantity::class,
         'unit_cost_snapshot'  => 'decimal:2',
         'unit_price_snapshot' => 'decimal:2',
         'charge_amount'       => 'decimal:2',

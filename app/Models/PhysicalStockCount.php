@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Support\Quantity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -142,7 +143,7 @@ class PhysicalStockCount extends Model
             ->sum(fn (PhysicalStockCountLine $l) => $l->varianceAtSellingPrice());
 
         return [
-            'units'             => (int) $units,
+            'units'             => Quantity::of($units),
             'value'             => round((float) $value, 2),
             'missing_at_selling' => round((float) $atSelling, 2),
             'lines_short'       => $lines->filter(fn ($l) => $l->variance() > 0)->count(),

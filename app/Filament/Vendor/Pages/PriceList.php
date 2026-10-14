@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Vendor\Pages;
 
+use App\Support\Quantity;
 use App\Models\Product;
 use Barryvdh\DomPDF\Facade\Pdf;
 use BackedEnum;
@@ -172,7 +173,7 @@ class PriceList extends Page
                     'type'  => 'item',
                     'name'  => $product->name,
                     'price' => number_format((float) $product->price, 2),
-                    'out'   => (int) $product->stock_quantity <= 0,
+                    'out'   => Quantity::of($product->stock_quantity) <= 0,
                     'units' => (float) $this->estimateLines((string) $product->name),
                 ];
             }

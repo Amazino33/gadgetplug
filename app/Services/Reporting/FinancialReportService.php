@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Reporting;
 
+use App\Support\Quantity;
 use App\Models\Expense;
 use App\Models\FinancialAccount;
 use App\Models\FinancialLedgerEntry;
@@ -311,8 +312,8 @@ class FinancialReportService
                 // was costed from its batches, cost_total covers the whole line
                 // and is spread back across its units, so returning some of a
                 // line reverses its share and no more.
-                $unitCost = ($soldLine?->cost_total !== null && (int) $soldLine->quantity > 0)
-                    ? (float) $soldLine->cost_total / (int) $soldLine->quantity
+                $unitCost = ($soldLine?->cost_total !== null && Quantity::of($soldLine->quantity) > 0)
+                    ? (float) $soldLine->cost_total / Quantity::of($soldLine->quantity)
                     : $soldLine?->unit_cost;
 
                 if ($unitCost === null) {

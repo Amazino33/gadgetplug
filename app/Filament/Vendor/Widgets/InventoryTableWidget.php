@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Vendor\Widgets;
 
+use App\Support\Quantity;
 use App\Models\InventoryLedger;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -89,7 +90,7 @@ class InventoryTableWidget extends BaseWidget
                 Tables\Columns\TextColumn::make('available_stock')
                     ->label('Available to Sell')
                     ->sortable(query: fn ($query, $direction) =>
-                        $query->orderByRaw("CAST(stock_quantity AS SIGNED) - CAST(reserved_stock AS SIGNED) {$direction}")
+                        $query->orderByRaw(Quantity::availableSql()." {$direction}")
                     )
                     ->badge()
                     ->color(fn (int $state): string => match (true) {
@@ -186,12 +187,12 @@ class InventoryTableWidget extends BaseWidget
                         'low'     => 'Low Stock',
                         'healthy' => 'Healthy',
                     ])
-                    ->query(fn (\Illuminate\Database\Eloquent\Builder $query, array $data) => match ($data['value'] ?? null) {
-                        'out'     => $query->whereRaw('CAST(stock_quantity AS SIGNED) - CAST(reserved_stock AS SIGNED) <= 0'),
-                        'low'     => $query->whereRaw('CAST(stock_quantity AS SIGNED) - CAST(reserved_stock AS SIGNED) > 0')
-                                       ->whereRaw('CAST(stock_quantity AS SIGNED) - CAST(reserved_stock AS SIGNED) < 5'),
-                        'healthy' => $query->whereRaw('CAST(stock_quantity AS SIGNED) - CAST(reserved_stock AS SIGNED) >= 5'),
-                        default   => $query,
+                    ->query(fn (\Illuminate\Database\Eloquent\Builder $q, array $data) => match ($data['value'] ?? null) {
+                        'out'     => $q->whereRaw(Quantity::availableSql().' <= 0'),
+                        'low'     => $q->whereRaw(Quantity::availableSql().' > 0')
+                                       ->whereRaw(Quantity::availableSql().' < 5'),
+                        'healthy' => $q->whereRaw(Quantity::availableSql().' >= 5'),
+                        default   => $q,
                     }),
             ])
             ->paginated([15, 25, 50]);

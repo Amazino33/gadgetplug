@@ -2,6 +2,7 @@
 
 namespace App\Filament\Vendor\Resources\Products\Tables;
 
+use App\Support\Quantity;
 use App\Filament\Vendor\Resources\Products\Schemas\ProductForm;
 use App\Models\AuditSession;
 use App\Models\Product;
@@ -97,7 +98,7 @@ class ProductsTable
                     ->label('On Shelf')
                     ->numeric()
                     ->sortable()
-                    ->state(fn (Product $record): int => (int) ($record->store_quantity ?? 0))
+                    ->state(fn (Product $record): int|float => Quantity::of($record->store_quantity ?? 0))
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->hidden($isGrid),
 
@@ -105,7 +106,7 @@ class ProductsTable
                     ->label('Reserved')
                     ->numeric()
                     ->sortable()
-                    ->state(fn (Product $record): int => (int) ($record->store_reserved ?? 0))
+                    ->state(fn (Product $record): int|float => Quantity::of($record->store_reserved ?? 0))
                     ->badge()
                     ->color(fn (int $state): string => $state > 0 ? 'warning' : 'gray')
                     ->toggleable(isToggledHiddenByDefault: true)
@@ -116,7 +117,7 @@ class ProductsTable
                     ->numeric()
                     ->state(fn (Product $record): int => max(
                         0,
-                        (int) ($record->store_quantity ?? 0) - (int) ($record->store_reserved ?? 0),
+                        Quantity::sub($record->store_quantity ?? 0, $record->store_reserved ?? 0),
                     ))
                     ->sortable(query: fn ($query, $direction) =>
                         $query->orderByRaw("COALESCE(store_quantity, 0) - COALESCE(store_reserved, 0) {$direction}")

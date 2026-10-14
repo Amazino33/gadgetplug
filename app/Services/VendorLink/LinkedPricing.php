@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\VendorLink;
 
+use App\Support\Quantity;
 use App\Models\Product;
 use App\Models\SupplierLink;
 use App\Services\VendorLink\Rounding\RoundingRules;
@@ -65,7 +66,9 @@ class LinkedPricing
             return 0;
         }
 
-        return max(0, (int) $source->stock_quantity - (int) $source->reserved_stock);
+        // Whole units: a listing sells online, and half a crate cannot be
+        // ordered online. 19½ at the supplier is 19 here.
+        return max(0, Quantity::wholeUnits(Quantity::sub($source->stock_quantity, $source->reserved_stock)));
     }
 
     /**

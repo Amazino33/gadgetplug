@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Inventory;
 
+use App\Support\Quantity;
 use App\Models\PhysicalStockCount;
 use App\Models\PhysicalStockCountLine;
 use App\Models\Product;
@@ -76,12 +77,12 @@ class RecordPhysicalCountAction
                 PhysicalStockCountLine::create([
                     'physical_stock_count_id' => $count->id,
                     'product_id'              => $productId,
-                    'counted_quantity'        => (int) $found,
+                    'counted_quantity'        => Quantity::of($found),
                     // Absent means the branch holds no row for it, which is a
                     // system figure of zero — and counting something the system
                     // does not think is there is exactly the kind of gap worth
                     // seeing.
-                    'system_quantity'         => (int) ($systemQuantities[$productId] ?? 0),
+                    'system_quantity'         => Quantity::of($systemQuantities[$productId] ?? 0),
                     // Both snapshotted now, for the same reason the system
                     // quantity is: a price that moved next week would silently
                     // restate what this gap was worth.

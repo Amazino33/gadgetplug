@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Inventory;
 
+use App\Support\Quantity;
 use App\Models\AuditSession;
 use App\Models\BlindCountSession;
 use App\Models\PhysicalStockCount;
@@ -75,7 +76,7 @@ class AdoptAuditCountAction
                 ->map(fn (AuditSession $line) => [
                     'product_id' => (int) $line->product_id,
                     'counted'    => $this->agreedCount($line),
-                    'system'     => (int) $line->system_quantity,
+                    'system'     => Quantity::of($line->system_quantity),
                 ])
                 ->filter(fn (array $row) => $row['counted'] !== null)
                 ->values();
@@ -133,14 +134,14 @@ class AdoptAuditCountAction
     }
 
     /** The number both sides — or a manager — actually settled on. */
-    private function agreedCount(AuditSession $line): ?int
+    private function agreedCount(AuditSession $line): int|float|null
     {
         if ($line->status === 'resolved_by_override' && $line->manager_override_count !== null) {
-            return (int) $line->manager_override_count;
+            return Quantity::of($line->manager_override_count);
         }
 
         if ($line->status === 'verified') {
-            return (int) $line->count_b;
+            return Quantity::of($line->count_b);
         }
 
         // Still disagreed, or never counted. No figure exists to adopt.

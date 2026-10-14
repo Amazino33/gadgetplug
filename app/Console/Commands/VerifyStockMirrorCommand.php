@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Support\Quantity;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -35,8 +36,8 @@ class VerifyStockMirrorCommand extends Command
             ->selectRaw('COUNT(product_store_stock.id) as store_rows')
             ->get();
 
-        $drifted = $products->filter(fn ($row) => (int) $row->mirror_quantity !== (int) $row->store_quantity
-            || (int) $row->mirror_reserved !== (int) $row->store_reserved);
+        $drifted = $products->filter(fn ($row) => Quantity::of($row->mirror_quantity) !== Quantity::of($row->store_quantity)
+            || Quantity::of($row->mirror_reserved) !== Quantity::of($row->store_reserved));
 
         $storeless = $products->filter(fn ($row) => (int) $row->store_rows === 0);
 

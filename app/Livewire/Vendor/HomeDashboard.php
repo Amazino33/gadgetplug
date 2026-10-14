@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Vendor;
 
+use App\Support\Quantity;
 use App\Services\ActiveStore;
 use App\Services\Reporting\SalesReportService;
 use App\Models\Product;
@@ -74,8 +75,8 @@ class HomeDashboard extends Component
             $lowStockCount = Product::where('vendor_id', $vendor->id)
                 ->where('status', 'published')
                 ->where('low_stock_threshold', '>', 0)
-                ->whereRaw('CAST(stock_quantity AS SIGNED) - CAST(reserved_stock AS SIGNED) > 0')
-                ->whereRaw('CAST(stock_quantity AS SIGNED) - CAST(reserved_stock AS SIGNED) < low_stock_threshold')
+                ->whereRaw(Quantity::availableSql().' > 0')
+                ->whereRaw(Quantity::availableSql().' < low_stock_threshold')
                 ->count();
         }
 

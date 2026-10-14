@@ -2,6 +2,7 @@
 
 namespace App\Observers;
 
+use App\Support\Quantity;
 use App\Models\Product;
 use App\Models\ProductStoreStock;
 use Illuminate\Support\Facades\DB;
@@ -59,8 +60,10 @@ class ProductStoreStockObserver
             // stock_quantity to the activity log, and writing around the model
             // would silently drop history that exists today.
             $product->update([
-                'stock_quantity' => (int) $totals->total_quantity,
-                'reserved_stock' => (int) $totals->total_reserved,
+                // Not (int): a shop that sells halves holds 19.5, and the
+                // mirror must say so. Whole for everyone else, as before.
+                'stock_quantity' => Quantity::of($totals->total_quantity),
+                'reserved_stock' => Quantity::of($totals->total_reserved),
             ]);
         });
     }

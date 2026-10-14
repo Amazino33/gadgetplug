@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Procurement;
 
+use App\Support\Quantity;
 use App\Actions\Procurement\ApproveProcurementAction;
 use App\Models\Procurement;
 use App\Models\ProcurementItem;
@@ -139,7 +140,7 @@ class ProcurementReview
                     // chaining it against the last counter-offer instead would
                     // make the number mean something different on every pass
                     // of the argument.
-                    'recorded_quantity'   => (int) $item->quantity,
+                    'recorded_quantity'   => Quantity::of($item->quantity),
                     'recorded_unit_cost'  => (float) $item->unit_cost,
                     'verified_quantity'   => $quantity,
                     'verified_unit_cost'  => $unitCost,

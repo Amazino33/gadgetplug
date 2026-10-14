@@ -5,6 +5,7 @@ namespace App\Services\Pos;
 use App\Models\Product;
 use App\Models\ProductUnit;
 use App\Models\Vendor;
+use App\Support\Quantity;
 use Illuminate\Validation\ValidationException;
 
 // The single place that decides how low a price may go at the till.
@@ -104,15 +105,20 @@ class PosPriceFloor
 
             if ($unit) {
                 $floor    = $this->floorForUnit($product, $unit, $item['price_type'] ?? 'retail', $margin);
-                $quantity = (int) $item['unit_qty'];
+                $quantity = Quantity::of($item['unit_qty']);
                 $lineNet  = (float) $item['line_gross'] - (float) ($item['discount_amount'] ?? 0);
             } else {
                 $floor    = $this->floorFor($product, $margin);
-                $quantity = (int) $item['quantity'];
-                $lineNet  = ((float) $item['unit_price'] * $quantity) - (float) ($item['discount_amount'] ?? 0);
+                $quantity = Quantity::of($item['quantity']);
+                // line_gross when the resolver supplied it: with a half in the
+                // line, unit price × quantity is not what the customer pays.
+                $lineNet  = (float) ($item['line_gross'] ?? (float) $item['unit_price'] * $quantity)
+                    - (float) ($item['discount_amount'] ?? 0);
             }
 
-            $lineTotalFloor = $floor * $quantity;
+            // Whole units at the unit's floor, and a half at half of it. For a
+            // whole quantity this is floor × quantity, as it always was.
+            $lineTotalFloor = HalfPricing::floorTotal($floor, $quantity);
 
             $floorTotal += $lineTotalFloor;
 

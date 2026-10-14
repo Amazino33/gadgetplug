@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\Quantity;
 use App\Models\AuditSession;
 use App\Models\StockAccountabilityEntry;
 use App\Models\User;
@@ -64,7 +65,7 @@ class StockAccountabilityLedger
                 return $existing;
             }
 
-            $variance = $audit->countedQuantity() - (int) $audit->system_quantity;
+            $variance = Quantity::sub($audit->countedQuantity(), $audit->system_quantity);
 
             // Cost is frozen here. cost_price moves with every restock, and an
             // amount someone owes must not change because stock was replenished

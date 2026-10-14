@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Support\Quantity;
+use App\Casts\AsQuantity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -19,6 +21,8 @@ class ProcurementItem extends Model
         'unit_cost'     => 'decimal:2',
         'selling_price' => 'decimal:2',
         'cost_per_unit' => 'decimal:2',
+        'quantity' => AsQuantity::class,
+        'unit_qty' => AsQuantity::class,
     ];
 
     public function productUnit(): BelongsTo
@@ -73,9 +77,9 @@ class ProcurementItem extends Model
      * happened. Only quantity and unit cost are ever correctable; product and
      * supplier are not in dispute, they are facts of the delivery.
      */
-    public function verifiedQuantity(): int
+    public function verifiedQuantity(): int|float
     {
-        return $this->latestCorrection()?->verified_quantity ?? (int) $this->quantity;
+        return Quantity::of($this->latestCorrection()?->verified_quantity ?? $this->quantity);
     }
 
     public function verifiedUnitCost(): float
@@ -91,9 +95,9 @@ class ProcurementItem extends Model
     }
 
     /** Units the approver says never arrived. Negative means short. */
-    public function quantityVariance(): int
+    public function quantityVariance(): int|float
     {
-        return $this->verifiedQuantity() - (int) $this->quantity;
+        return Quantity::sub($this->verifiedQuantity(), $this->quantity);
     }
 
     public function unitCostVariance(): float

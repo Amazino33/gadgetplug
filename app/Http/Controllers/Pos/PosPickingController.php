@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Pos;
 
+use App\Support\Quantity;
 use App\Actions\Pickings\RecordPickingPaymentAction;
 use App\Actions\Pickings\ReleaseToPickerAction;
 use App\Http\Controllers\Controller;
@@ -79,12 +80,12 @@ class PosPickingController extends Controller
                 'product_name' => $row->product_name,
                 'reference'    => $row->picking_reference,
                 'taken_at'     => $row->taken_at,
-                'held'         => (int) $row->held,
+                'held'         => Quantity::of($row->held),
                 'unit_price'   => (float) $row->unit_price,
                 // Already paid toward the next unit, so the till can show what
                 // is really left to pay rather than the full price again.
                 'credit'       => round((float) $row->credit, 2),
-                'outstanding'  => round((int) $row->held * (float) $row->unit_price - (float) $row->credit, 2),
+                'outstanding'  => round(Quantity::of($row->held) * (float) $row->unit_price - (float) $row->credit, 2),
             ])->values(),
         ])->values();
 

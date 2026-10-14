@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Pos;
 
+use Illuminate\Support\Facades\Log;
+use App\Support\Quantity;
 use App\Actions\Finance\RecognizePosSaleRevenueAction;
 use App\Actions\Inventory\AdjustStockAction;
 use App\Actions\Pos\ChargeCustomerDebtAction;
@@ -119,7 +121,20 @@ class PosSyncController extends Controller
                 // server's own unit records — the same resolver the counter
                 // path uses. Lines without a unit pass through untouched.
                 $resolver = app(SaleLineResolver::class);
-                $lines    = $resolver->resolve($vendor, $payload['items']);
+
+                // Halves are taken from a shop that sells them now OR ever has.
+                // A till may have rung ½ crate before the switch went off and
+                // only found signal afterwards; its clock cannot say which came
+                // first, so the sale is not dropped over it — only noted.
+                $acceptHalves = Quantity::acceptsHalvesOnSync($vendor);
+                $lines        = $resolver->resolve($vendor, $payload['items'], $acceptHalves);
+
+                if (! Quantity::allowsHalves($vendor) && collect($lines)->contains(fn ($l) => ! Quantity::isWhole($l['unit_qty'] ?? $l['quantity']))) {
+                    Log::warning('Offline sale with half quantities synced after the vendor turned halves off.', [
+                        'vendor_id'  => $vendor->id,
+                        'offline_id' => $payload['offline_id'] ?? null,
+                    ]);
+                }
                 $products = $resolver->products();
 
                 // The vendor does not allow price changes and this till sent
@@ -213,6 +228,7 @@ class PosSyncController extends Controller
                             'unit_name'       => $item['unit_name'],
                             'unit_qty'        => $item['unit_qty'],
                             'sold_unit_price' => $item['sold_unit_price'],
+                            'half_unit_price' => $item['half_unit_price'] ?? null,
                             'price_type'      => $item['price_type'],
                             'unit_price'      => $item['unit_price'],
                             'unit_cost'       => $costPrices[$item['product_id']] ?? null,

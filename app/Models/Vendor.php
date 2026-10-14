@@ -6,6 +6,9 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Collection;
 use App\Models\VendorPayout;
+use App\Support\Quantity;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Spatie\Sluggable\HasSlug;
 use Spatie\Sluggable\SlugOptions;
 
@@ -22,6 +25,7 @@ class Vendor extends Model
         'dashboard_blocked', 'dashboard_blocked_reason', 'dashboard_blocked_at',
         'restock_window_days', 'restock_lead_time_days', 'restock_target_cover_days', 'restock_safety_buffer_days',
         'allow_negative_stock', 'pos_ask_quantity', 'pos_allow_price_change', 'enable_gadget_fields',
+        'allow_half_quantities',
     ];
 
     protected $casts = [
@@ -30,6 +34,8 @@ class Vendor extends Model
         'enable_gadget_fields'      => 'boolean',
         'pos_ask_quantity'          => 'boolean',
         'pos_allow_price_change'    => 'boolean',
+        'allow_half_quantities'     => 'boolean',
+        'half_quantities_disabled_at' => 'datetime',
         'online_sales_enabled'      => 'boolean',
         'dashboard_blocked'         => 'boolean',
         'dashboard_blocked_at'      => 'datetime',
@@ -39,6 +45,65 @@ class Vendor extends Model
         'restock_target_cover_days' => 'integer',
         'restock_safety_buffer_days' => 'integer',
     ];
+
+    protected static function booted(): void
+    {
+        // A shop cannot stop selling halves while it still holds one. Turning
+        // the switch off with 19½ crates on the shelf would leave stock the
+        // whole-number screens can neither show nor count. Refused here, on
+        // the model, so the settings page, a tinker session and any future
+        // screen are all held to it.
+        static::saving(function (Vendor $vendor) {
+            if (! $vendor->exists || ! $vendor->isDirty('allow_half_quantities') || $vendor->allow_half_quantities) {
+                return;
+            }
+
+            $blockers = $vendor->halfQuantityBlockers();
+
+            if ($blockers->isNotEmpty()) {
+                throw ValidationException::withMessages([
+                    'allow_half_quantities' => 'Half quantities cannot be turned off while these products still hold a half: '
+                        .$blockers->implode(', ')
+                        .'. Sell, count or adjust them to whole numbers first.',
+                ]);
+            }
+
+            // Kept for good once set. Offline sync reads it as "this shop has
+            // sold halves", so a half sale still queued on a till is accepted.
+            $vendor->half_quantities_disabled_at = now();
+        });
+    }
+
+    /**
+     * Names of this shop's products that hold a half somewhere it matters: on
+     * a shelf or a reservation, or on a purchase not yet received.
+     *
+     * @return \Illuminate\Support\Collection<int, string>
+     */
+    public function halfQuantityBlockers(): \Illuminate\Support\Collection
+    {
+        $fractional = fn (string $column) => Quantity::fractionalSql($column);
+
+        $onShelf = DB::table('product_store_stock')
+            ->join('products', 'products.id', '=', 'product_store_stock.product_id')
+            ->where('products.vendor_id', $this->id)
+            ->where(fn ($q) => $q
+                ->whereRaw($fractional('product_store_stock.quantity'))
+                ->orWhereRaw($fractional('product_store_stock.reserved')))
+            ->pluck('products.name');
+
+        $onOpenPurchases = DB::table('procurement_items')
+            ->join('procurements', 'procurements.id', '=', 'procurement_items.procurement_id')
+            ->join('products', 'products.id', '=', 'procurement_items.product_id')
+            ->where('procurements.vendor_id', $this->id)
+            ->whereIn('procurements.status', [Procurement::STATUS_DRAFT, Procurement::STATUS_PENDING, Procurement::STATUS_CHANGES_REQUESTED])
+            ->where(fn ($q) => $q
+                ->whereRaw($fractional('procurement_items.quantity'))
+                ->orWhereRaw($fractional('COALESCE(procurement_items.unit_qty, 0)')))
+            ->pluck('products.name');
+
+        return $onShelf->merge($onOpenPurchases)->unique()->sort()->values();
+    }
 
     /**
      * Whether this shop sells things with specifications and serial numbers

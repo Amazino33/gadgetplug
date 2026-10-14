@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Export;
 
+use App\Support\Quantity;
 use App\Models\Product;
 use App\Models\Vendor;
 use App\Support\Import\ProductField;
@@ -197,7 +198,7 @@ class ProductExporter
             ->when(filled($filters['status'] ?? null), fn ($q) => $q->where('status', $filters['status']))
             ->when(
                 ($filters['low_stock_only'] ?? false) === true,
-                fn ($q) => $q->whereRaw('CAST(stock_quantity AS SIGNED) - CAST(reserved_stock AS SIGNED) < low_stock_threshold'),
+                fn ($q) => $q->whereRaw(Quantity::availableSql().' < low_stock_threshold'),
             )
             ->orderBy('id');
     }

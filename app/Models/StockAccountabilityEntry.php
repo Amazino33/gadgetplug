@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\AsQuantity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use LogicException;
@@ -16,7 +17,7 @@ class StockAccountabilityEntry extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'quantity_variance' => 'integer',
+        'quantity_variance' => AsQuantity::class,
         'unit_cost'         => 'decimal:2',
         'amount'            => 'decimal:2',
         'occurred_at'       => 'date',

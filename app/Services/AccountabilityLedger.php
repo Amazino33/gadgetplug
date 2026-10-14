@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\Quantity;
 use App\Models\AccountabilityLedgerEntry;
 use App\Models\Product;
 use App\Support\Accountability\FrozenLossSnapshot;
@@ -26,14 +27,14 @@ class AccountabilityLedger
     public function postCharge(
         int $vendorId,
         Product $product,
-        int $shortageQty,
+        int|float $shortageQty,
         string $naturalKey,
         ?int $storekeeperId = null,
         ?int $caseId = null,
         ?int $createdBy = null,
         ?string $note = null,
     ): AccountabilityLedgerEntry {
-        if ($shortageQty === 0) {
+        if (Quantity::of($shortageQty) === 0) {
             throw new InvalidArgumentException('A charge needs a non-zero shortage quantity.');
         }
 

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\AsQuantity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -19,6 +20,7 @@ class BlindCountEntry extends Model
 
     protected $casts = [
         'counted_at' => 'datetime',
+        'count' => AsQuantity::class,
     ];
 
     public function session(): BelongsTo

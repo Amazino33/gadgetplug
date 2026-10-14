@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Inventory;
 
+use App\Support\Quantity;
 use App\Models\Product;
 use App\Models\StockCostLayer;
 use Illuminate\Database\Eloquent\Model;
@@ -37,11 +38,13 @@ class StockCostLayers
     public static function receive(
         int $productId,
         int $storeId,
-        int $quantity,
+        int|float $quantity,
         ?float $unitCost,
         ?Model $source = null,
         ?Carbon $receivedAt = null,
     ): ?StockCostLayer {
+        $quantity = Quantity::of($quantity);
+
         if ($quantity <= 0) {
             return null;
         }
@@ -71,10 +74,12 @@ class StockCostLayers
      * exists and reporting it is the honest outcome — refusing here would stop
      * goods leaving over a bookkeeping gap.
      *
-     * @return array{cost: float, consumed: int, shortfall: int, uncosted_units: int}
+     * @return array{cost: float, consumed: int|float, shortfall: int|float, uncosted_units: int|float}
      */
-    public static function consume(int $productId, int $storeId, int $quantity): array
+    public static function consume(int $productId, int $storeId, int|float $quantity): array
     {
+        $quantity = Quantity::of($quantity);
+
         if ($quantity <= 0) {
             return ['cost' => 0.0, 'consumed' => 0, 'shortfall' => 0, 'uncosted_units' => 0];
         }
@@ -97,23 +102,23 @@ class StockCostLayers
                 break;
             }
 
-            $take = min($outstanding, $layer->quantity_remaining);
+            $take = Quantity::of(min($outstanding, $layer->quantity_remaining));
 
             if ($layer->unit_cost === null) {
-                $uncosted += $take;
+                $uncosted = Quantity::add($uncosted, $take);
             } else {
                 $cost += $take * (float) $layer->unit_cost;
             }
 
-            $layer->quantity_remaining -= $take;
+            $layer->quantity_remaining = Quantity::sub($layer->quantity_remaining, $take);
             $layer->save();
 
-            $outstanding -= $take;
+            $outstanding = Quantity::sub($outstanding, $take);
         }
 
         return [
             'cost'           => round($cost, 2),
-            'consumed'       => $quantity - $outstanding,
+            'consumed'       => Quantity::sub($quantity, $outstanding),
             'shortfall'      => $outstanding,
             'uncosted_units' => $uncosted,
         ];
@@ -130,12 +135,12 @@ class StockCostLayers
      * can book it as cost of goods sold. Null for a receipt, which has no cost
      * of sale to report.
      *
-     * @return array{cost: float, consumed: int, shortfall: int, uncosted_units: int}|null
+     * @return array{cost: float, consumed: int|float, shortfall: int|float, uncosted_units: int|float}|null
      */
     public static function applyMovement(
         Product $product,
         int $storeId,
-        int $quantityChanged,
+        int|float $quantityChanged,
         ?float $unitCost = null,
         ?Model $source = null,
     ): ?array {

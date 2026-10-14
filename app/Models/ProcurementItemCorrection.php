@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Support\Quantity;
+use App\Casts\AsQuantity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use LogicException;
@@ -23,9 +25,9 @@ class ProcurementItemCorrection extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'recorded_quantity'  => 'integer',
+        'recorded_quantity'  => AsQuantity::class,
         'recorded_unit_cost' => 'decimal:2',
-        'verified_quantity'  => 'integer',
+        'verified_quantity'  => AsQuantity::class,
         'verified_unit_cost' => 'decimal:2',
         'corrected_at'       => 'datetime',
     ];
@@ -53,9 +55,9 @@ class ProcurementItemCorrection extends Model
     }
 
     /** Units gained or lost against what was recorded. Negative means fewer arrived than written down. */
-    public function quantityVariance(): int
+    public function quantityVariance(): int|float
     {
-        return $this->verified_quantity - $this->recorded_quantity;
+        return Quantity::sub($this->verified_quantity, $this->recorded_quantity);
     }
 
     /** Naira per unit, against what was recorded. */

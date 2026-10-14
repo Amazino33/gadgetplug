@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Quantity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -225,18 +226,18 @@ class Procurement extends Model
         );
     }
 
-    public function verifiedQuantity(): int
+    public function verifiedQuantity(): int|float
     {
         $this->loadMissing('items.corrections');
 
-        return (int) $this->items->sum(fn (ProcurementItem $item) => $item->verifiedQuantity());
+        return Quantity::of($this->items->sum(fn (ProcurementItem $item) => $item->verifiedQuantity()));
     }
 
-    public function recordedQuantity(): int
+    public function recordedQuantity(): int|float
     {
         $this->loadMissing('items');
 
-        return (int) $this->items->sum('quantity');
+        return Quantity::of($this->items->sum('quantity'));
     }
 
     public function hasCorrections(): bool

@@ -2,6 +2,7 @@
 
 namespace App\Support\Accountability;
 
+use App\Support\Quantity;
 use App\Models\Product;
 
 // The loss, priced at the moment it was established, and never recalculated.
@@ -17,7 +18,7 @@ use App\Models\Product;
 final readonly class FrozenLossSnapshot
 {
     private function __construct(
-        public int $shortageQty,
+        public int|float $shortageQty,
         public float $unitCostSnapshot,
         public float $unitPriceSnapshot,
         public float $chargeAmount,
@@ -27,11 +28,12 @@ final readonly class FrozenLossSnapshot
     ) {}
 
     /**
-     * @param  int  $shortageQty  Units missing, as a positive number.
+     * @param  int|float  $shortageQty  Units missing, as a positive number. A
+     *                                   half only for a shop that sells halves.
      */
-    public static function forProduct(Product $product, int $shortageQty): self
+    public static function forProduct(Product $product, int|float $shortageQty): self
     {
-        $quantity = abs($shortageQty);
+        $quantity = Quantity::of(abs($shortageQty));
 
         // A product with no recorded cost is treated as costing nothing rather
         // than blocking the line. The charge still stands; it simply has no cost
@@ -53,7 +55,7 @@ final readonly class FrozenLossSnapshot
      * can reason about a historic charge without touching the product again.
      */
     public static function fromFrozen(
-        int $shortageQty,
+        int|float $shortageQty,
         float $unitCostSnapshot,
         float $unitPriceSnapshot,
         bool $priceFallback,
@@ -61,7 +63,7 @@ final readonly class FrozenLossSnapshot
         return self::fromValues($shortageQty, $unitCostSnapshot, $unitPriceSnapshot, $priceFallback);
     }
 
-    private static function fromValues(int $quantity, float $unitCost, float $unitPrice, bool $priceFallback): self
+    private static function fromValues(int|float $quantity, float $unitCost, float $unitPrice, bool $priceFallback): self
     {
         $chargeAmount = round($quantity * $unitPrice, 2);
         $costComponent = round($quantity * $unitCost, 2);

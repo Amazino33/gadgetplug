@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Vendor\Pages;
 
+use App\Support\Quantity;
 use App\Actions\Inventory\AdjustStockAction;
 use App\Models\Product;
 use App\Models\ProductStoreStock;
@@ -458,12 +459,12 @@ class StockAdjustment extends Page
      * branch's stock combined would compute the wrong delta and apply()
      * would then move that wrong amount, correctly, to the right store.
      */
-    private function currentStock(Product $product): int
+    private function currentStock(Product $product): int|float
     {
         $storeId = ActiveStore::currentId();
 
         if ($storeId === null) {
-            return (int) $product->stock_quantity;
+            return Quantity::of($product->stock_quantity);
         }
 
         return (int) (ProductStoreStock::where('product_id', $product->id)

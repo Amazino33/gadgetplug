@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\AsQuantity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -21,7 +22,7 @@ class PickingLedgerEntry extends Model
     public const UPDATED_AT = null;
 
     protected $casts = [
-        'quantity'   => 'integer',
+        'quantity'   => AsQuantity::class,
         'amount'     => 'decimal:2',
         'unit_price' => 'decimal:2',
         'created_at' => 'datetime',

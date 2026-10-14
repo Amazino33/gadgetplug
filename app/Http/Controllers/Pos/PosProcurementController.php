@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Pos;
 
+use App\Support\Quantity;
 use App\Http\Controllers\Controller;
 use App\Models\Procurement;
 use App\Services\Inventory\TillStore;
@@ -52,7 +53,7 @@ class PosProcurementController extends Controller
                     'items' => $procurement->items->map(fn ($item) => [
                         'id' => $item->id,
                         'product_name' => $item->product?->name ?? 'Unknown Product',
-                        'quantity' => (int) $item->quantity,
+                        'quantity' => Quantity::of($item->quantity),
                         'unit_cost' => (float) $item->unit_cost,
                         // Both figures, so the till can show what was recorded
                         // beside what has been verified rather than quietly

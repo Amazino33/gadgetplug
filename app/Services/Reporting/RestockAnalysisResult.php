@@ -31,7 +31,7 @@ readonly class RestockAnalysisResult
     public function __construct(
         public int $productId,
         public float $dailyVelocity,
-        public int $currentStock,
+        public int|float $currentStock,
         public ?float $daysOfCover,
         public int $reorderQuantity,
         public string $tier,

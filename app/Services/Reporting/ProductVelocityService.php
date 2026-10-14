@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Reporting;
 
+use App\Support\Quantity;
 use App\Models\InventoryLedger;
 use App\Models\Product;
 use Carbon\CarbonImmutable;
@@ -173,7 +174,7 @@ class ProductVelocityService
             // divisible (0 / 30 === 0, not 0.0) — force float so the strict
             // === 0.0 check below (and the DTO's float type) are reliable.
             $dailyVelocity = (float) $unitsDelivered / $windowDays;
-            $currentStock = (int) $product->stock_quantity;
+            $currentStock = Quantity::of($product->stock_quantity);
             $isNew = $product->created_at->greaterThan($windowStart);
 
             $daysOfCover = $dailyVelocity > 0 ? $currentStock / $dailyVelocity : null;
@@ -208,7 +209,7 @@ class ProductVelocityService
     private function classify(
         bool $isNew,
         float $dailyVelocity,
-        int $currentStock,
+        int|float $currentStock,
         ?float $daysOfCover,
         int $leadTimeDays,
         int $safetyBufferDays,
@@ -256,7 +257,7 @@ class ProductVelocityService
             ->groupBy('order_items.product_id')
             ->selectRaw('order_items.product_id, SUM(order_items.quantity) as units')
             ->pluck('units', 'product_id')
-            ->map(fn ($units) => (int) $units)
+            ->map(fn ($units) => Quantity::of($units))
             ->all();
     }
 
@@ -271,7 +272,7 @@ class ProductVelocityService
             ->groupBy('pos_sale_items.product_id')
             ->selectRaw('pos_sale_items.product_id, SUM(pos_sale_items.quantity) as units')
             ->pluck('units', 'product_id')
-            ->map(fn ($units) => (int) $units)
+            ->map(fn ($units) => Quantity::of($units))
             ->all();
     }
 
@@ -293,10 +294,10 @@ class ProductVelocityService
             return 0;
         }
 
-        $startingBalance = (int) InventoryLedger::where('vendor_id', $vendorId)
+        $startingBalance = Quantity::of(InventoryLedger::where('vendor_id', $vendorId)
             ->where('product_id', $productId)
             ->where('created_at', '<', $windowStart)
-            ->sum('quantity_change');
+            ->sum('quantity_change'));
 
         $events = InventoryLedger::where('vendor_id', $vendorId)
             ->where('product_id', $productId)
@@ -314,7 +315,7 @@ class ProductVelocityService
             }
 
             $cursor = CarbonImmutable::parse($event->created_at);
-            $balance += (int) $event->quantity_change;
+            $balance = Quantity::add($balance, $event->quantity_change);
         }
 
         if ($balance <= 0) {

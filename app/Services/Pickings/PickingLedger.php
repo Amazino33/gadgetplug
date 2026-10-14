@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Pickings;
 
+use App\Support\Quantity;
 use App\Models\PickingItem;
 use App\Models\PickingLedgerEntry;
 use Illuminate\Support\Collection;
@@ -23,11 +24,11 @@ use Illuminate\Support\Facades\DB;
 class PickingLedger
 {
     /** Units of this line the picker is still holding. */
-    public static function heldQuantity(PickingItem $item): int
+    public static function heldQuantity(PickingItem $item): int|float
     {
-        $accounted = (int) PickingLedgerEntry::where('picking_item_id', $item->id)->sum('quantity');
+        $accounted = PickingLedgerEntry::where('picking_item_id', $item->id)->sum('quantity');
 
-        return max(0, $item->quantity - $accounted);
+        return max(0, Quantity::sub($item->quantity, $accounted));
     }
 
     /**
@@ -57,22 +58,22 @@ class PickingLedger
      * been accounted for. Easier to read, and each half is independently
      * checkable against the tables.
      */
-    public static function heldQuantityForProduct(int $productId, ?int $storeId = null): int
+    public static function heldQuantityForProduct(int $productId, ?int $storeId = null): int|float
     {
-        $taken = (int) PickingItem::query()
+        $taken = PickingItem::query()
             ->join('pickings', 'pickings.id', '=', 'picking_items.picking_id')
             ->where('picking_items.product_id', $productId)
             ->when($storeId, fn ($q) => $q->where('pickings.store_id', $storeId))
             ->sum('picking_items.quantity');
 
-        $accounted = (int) PickingLedgerEntry::query()
+        $accounted = PickingLedgerEntry::query()
             ->join('picking_items', 'picking_items.id', '=', 'picking_ledger_entries.picking_item_id')
             ->join('pickings', 'pickings.id', '=', 'picking_items.picking_id')
             ->where('picking_items.product_id', $productId)
             ->when($storeId, fn ($q) => $q->where('pickings.store_id', $storeId))
             ->sum('picking_ledger_entries.quantity');
 
-        return max(0, $taken - $accounted);
+        return max(0, Quantity::sub($taken, $accounted));
     }
 
     /**
@@ -136,7 +137,7 @@ class PickingLedger
             ->map(fn ($row) => [
                 'picker_id'   => (int) $row->picker_id,
                 'picker_name' => $row->picker_name,
-                'units'       => (int) $row->units,
+                'units'       => Quantity::of($row->units),
                 'value'       => (float) $row->value,
             ]);
     }
@@ -148,7 +149,7 @@ class PickingLedger
      * so this is what the inventory screens add back on top of what is on the
      * shelf to say what the business owns in all.
      *
-     * @return array{units: int, value: float}
+     * @return array{units: int|float, value: float}
      */
     public static function heldTotals(int $vendorId, ?int $storeId = null): array
     {
@@ -158,7 +159,7 @@ class PickingLedger
             ->first();
 
         return [
-            'units' => max(0, (int) $row->units),
+            'units' => max(0, Quantity::of($row->units)),
             'value' => max(0.0, (float) $row->value),
         ];
     }
@@ -183,7 +184,7 @@ class PickingLedger
             ->map(fn ($row) => [
                 'picker_id'   => (int) $row->picker_id,
                 'picker_name' => $row->picker_name,
-                'units'       => (int) $row->units,
+                'units'       => Quantity::of($row->units),
                 'taken_at'    => $row->taken_at,
                 'reference'   => $row->reference,
             ]);

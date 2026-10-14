@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Inventory;
 
+use App\Support\Quantity;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -58,7 +59,7 @@ class StoreStockMetrics
             ->keyBy('store_id')
             ->map(fn ($row) => (object) [
                 'product_count'      => (int) $row->product_count,
-                'units'              => (int) $row->units,
+                'units'              => Quantity::of($row->units),
                 'cost_value'         => (float) $row->cost_value,
                 'retail_value'       => (float) $row->retail_value,
                 'low_stock_count'    => (int) $row->low_stock_count,

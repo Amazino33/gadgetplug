@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\AsQuantity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -18,7 +19,7 @@ class PickingItem extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'quantity'  => 'integer',
+        'quantity'  => AsQuantity::class,
         'unit_cost' => 'decimal:2',
     ];
 

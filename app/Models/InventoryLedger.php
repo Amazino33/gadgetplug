@@ -2,11 +2,16 @@
 
 namespace App\Models;
 
+use App\Casts\AsQuantity;
 use Illuminate\Database\Eloquent\Model;
 
 class InventoryLedger extends Model
 {
     protected $guarded = [];
+
+    protected $casts = [
+        'quantity_change' => AsQuantity::class,
+    ];
 
     public function product()
     {

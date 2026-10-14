@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         colors="true"
+>
+    <testsuites>
+        <testsuite name="Unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
+        <testsuite name="Feature">
+            <directory>tests/Feature</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory>app</directory>
+        </include>
+    </source>
+    <php>
+        <env name="APP_ENV" value="testing"/>
+        <env name="APP_MAINTENANCE_DRIVER" value="file"/>
+        <env name="BCRYPT_ROUNDS" value="4"/>
+        <env name="BROADCAST_CONNECTION" value="null"/>
+        <env name="CACHE_STORE" value="array"/>
+        <!-- MySQL, because SQLite cannot catch what DECIMAL quantities and
+             CAST(... AS SIGNED) do on the real server. Run with
+             php artisan test with the configuration option pointing at this file,
+             against an empty database named bizac_test (parallel runs add
+             _1, _2 ... themselves). -->
+        <env name="DB_CONNECTION" value="mysql"/>
+        <env name="DB_HOST" value="127.0.0.1"/>
+        <env name="DB_PORT" value="3306"/>
+        <env name="DB_DATABASE" value="bizac_test"/>
+        <env name="DB_USERNAME" value="root"/>
+        <env name="DB_PASSWORD" value=""/>
+        <env name="DB_URL" value=""/>
+        <env name="MAIL_MAILER" value="array"/>
+        <env name="QUEUE_CONNECTION" value="sync"/>
+        <env name="SESSION_DRIVER" value="array"/>
+        <env name="PULSE_ENABLED" value="false"/>
+        <env name="TELESCOPE_ENABLED" value="false"/>
+        <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <!-- Force the inert drivers regardless of real keys in a developer's local .env -->
+        <env name="MESSAGING_WHATSAPP_DRIVER" value="log_null"/>
+        <env name="MESSAGING_SMS_DRIVER" value="log_null"/>
+        <env name="MESSAGING_REDIRECT_ALL_TO" value=""/>
+        <!-- Blank the provider credentials as well. Tests that null the *_DRIVER
+             config at runtime to exercise auto-selection would otherwise fall
+             through to whichever provider has real keys locally and, with no
+             Http::fake() in place, send live messages during a test run. -->
+        <env name="WAWP_INSTANCE_ID" value=""/>
+        <env name="WAWP_ACCESS_TOKEN" value=""/>
+        <env name="WHATSAPP_CLOUD_TOKEN" value=""/>
+        <env name="WHATSAPP_CLOUD_PHONE_NUMBER_ID" value=""/>
+        <env name="TERMII_API_KEY" value=""/>
+        <env name="TERMII_SENDER_ID" value=""/>
+    </php>
+</phpunit>
