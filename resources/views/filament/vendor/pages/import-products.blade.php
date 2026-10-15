@@ -257,23 +257,65 @@
                 </div>
             @endif
 
-            <p class="mt-5 text-sm font-medium text-gray-900 dark:text-white">First {{ count($previewRows) }} rows</p>
+            @php
+                $rowsAll = collect($previewRows);
+                $filters = [
+                    'all'       => ['All', $rowsAll->count()],
+                    'changed'   => ['Changed', $rowsAll->where('changed', true)->count()],
+                    'units'     => ['Unit changes', $rowsAll->where('units_changed', true)->count()],
+                    'prices'    => ['Price changes', $rowsAll->where('price_changed', true)->count()],
+                    'unchanged' => ['No change', $rowsAll->where('action', 'update')->where('changed', false)->count()],
+                    'create'    => ['New', $rowsAll->where('action', 'create')->count()],
+                    'skip'      => ['Skipped', $rowsAll->where('action', 'skip')->count()],
+                ];
+                $visible = $rowsAll->filter(fn ($r) => match ($previewFilter) {
+                    'changed'   => $r['changed'],
+                    'units'     => $r['units_changed'],
+                    'prices'    => $r['price_changed'],
+                    'unchanged' => $r['action'] === 'update' && ! $r['changed'],
+                    'create'    => $r['action'] === 'create',
+                    'skip'      => $r['action'] === 'skip',
+                    default     => true,
+                });
+            @endphp
 
-            <div class="mt-2 overflow-x-auto rounded-lg border border-gray-200 dark:border-white/10">
+            <div class="mt-5 flex flex-wrap gap-2">
+                @foreach ($filters as $key => [$label, $count])
+                    <button type="button" wire:click="$set('previewFilter', '{{ $key }}')" @class([
+                        'rounded-full border px-3 py-1 text-xs font-medium',
+                        'border-primary-600 bg-primary-600 text-white' => $previewFilter === $key,
+                        'border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-white/20 dark:text-gray-300 dark:hover:bg-white/5' => $previewFilter !== $key,
+                    ])>
+                        {{ $label }} ({{ number_format($count) }})
+                    </button>
+                @endforeach
+            </div>
+
+            <p class="mt-3 text-sm font-medium text-gray-900 dark:text-white">
+                Showing {{ number_format($visible->count()) }} of {{ number_format($summary['total'] ?? 0) }} rows
+                @if (($summary['total'] ?? 0) > count($previewRows))
+                    <span class="font-normal text-gray-500">(only the first {{ number_format(count($previewRows)) }} can be previewed; every row is still imported)</span>
+                @endif
+            </p>
+
+            <div class="mt-2 max-h-[34rem] overflow-auto rounded-lg border border-gray-200 dark:border-white/10">
                 <table class="w-full text-sm">
-                    <thead class="bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+                    <thead class="sticky top-0 bg-gray-50 text-xs uppercase tracking-wide text-gray-500 dark:bg-gray-800 dark:text-gray-400">
                         <tr>
                             <th class="px-3 py-2 text-left font-medium">Line</th>
                             <th class="px-3 py-2 text-left font-medium">Name</th>
                             <th class="px-3 py-2 text-left font-medium">SKU</th>
+                            <th class="px-3 py-2 text-left font-medium">Category</th>
+                            <th class="px-3 py-2 text-left font-medium">Unit</th>
                             <th class="px-3 py-2 text-right font-medium">Cost</th>
                             <th class="px-3 py-2 text-right font-medium">Price</th>
+                            <th class="px-3 py-2 text-left font-medium">Extra units</th>
                             <th class="px-3 py-2 text-left font-medium">Will do</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach ($previewRows as $row)
-                            <tr class="border-t border-gray-100 dark:border-gray-800">
+                        @forelse ($visible as $row)
+                            <tr class="border-t border-gray-100 align-top dark:border-gray-800">
                                 <td class="px-3 py-2 text-gray-500">{{ $row['line'] }}</td>
                                 <td class="px-3 py-2">
                                     {{ $row['name'] }}
@@ -293,6 +335,8 @@
                                         <div class="text-xs text-gray-400 dark:text-gray-500">was {{ $row['changes']['sku'] ?: '—' }}</div>
                                     @endif
                                 </td>
+                                <td class="px-3 py-2 text-gray-600 dark:text-gray-400">{{ $row['category'] ?: '—' }}</td>
+                                <td class="px-3 py-2 text-gray-600 dark:text-gray-400">{{ $row['unit'] ?: '—' }}</td>
                                 <td class="px-3 py-2 text-right">
                                     {{ $row['cost'] === null ? '—' : number_format((float) $row['cost'], 2) }}
                                     @if (array_key_exists('cost_price', $row['changes']))
@@ -306,6 +350,27 @@
                                     @endif
                                 </td>
                                 <td class="px-3 py-2">
+                                    @forelse ($row['units'] as $u)
+                                        <div @class([
+                                            'text-xs',
+                                            'text-gray-700 dark:text-gray-300' => $u['state'] !== 'same',
+                                            'text-gray-400 dark:text-gray-500' => $u['state'] === 'same',
+                                        ])>
+                                            {{ $u['name'] }} ×{{ $u['contains'] }}
+                                            @if ($u['price'] !== null)
+                                                @ {{ number_format($u['price'], 2) }}
+                                            @endif
+                                            @if ($u['state'] === 'new')
+                                                <span class="font-semibold text-green-600 dark:text-green-400">new</span>
+                                            @elseif ($u['state'] === 'changed')
+                                                <span class="text-gray-400 dark:text-gray-500">(was {{ $u['was'] }})</span>
+                                            @endif
+                                        </div>
+                                    @empty
+                                        <span class="text-gray-400">—</span>
+                                    @endforelse
+                                </td>
+                                <td class="px-3 py-2">
                                     <span @class([
                                         'rounded-full px-2 py-0.5 text-xs font-semibold',
                                         'bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300' => $row['action'] === 'create',
@@ -314,12 +379,14 @@
                                     ])>
                                         {{ ['create' => 'Create', 'update' => 'Update', 'skip' => 'Skip'][$row['action']] }}
                                     </span>
-                                    @if ($row['action'] === 'update' && $row['changes'] === [])
+                                    @if ($row['action'] === 'update' && ! $row['changed'])
                                         <div class="mt-0.5 text-xs text-gray-400 dark:text-gray-500">no change</div>
                                     @endif
                                 </td>
                             </tr>
-                        @endforeach
+                        @empty
+                            <tr><td colspan="9" class="px-3 py-6 text-center text-sm text-gray-500">No rows match this filter.</td></tr>
+                        @endforelse
                     </tbody>
                 </table>
             </div>

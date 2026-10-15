@@ -7,6 +7,7 @@ namespace App\Filament\Vendor\Pages;
 use App\Models\ImportLog;
 use App\Models\ImportMappingTemplate;
 use App\Models\Product;
+use App\Models\ProductUnit;
 use App\Models\Store;
 use App\Services\ActiveStore;
 use App\Services\Export\ProductExporter;
@@ -93,6 +94,11 @@ class ImportProducts extends Page
 
     /** @var array<int, array<string, mixed>> */
     public array $previewRows = [];
+
+    /** all | changed | units | prices | unchanged | create | skip */
+    public string $previewFilter = 'all';
+
+    private const PREVIEW_ROW_LIMIT = 1000;
 
     /** @var array<int, array<string, mixed>> */
     public array $problems = [];
@@ -343,20 +349,29 @@ class ImportProducts extends Page
 
         $this->summary = app(ImportPreparer::class)->summarise($rows);
 
-        $shown = $rows->take(20);
+        // Every row, not just the first few: the vendor needs to find the ones
+        // that matter (a unit or a price moved) among hundreds that did not.
+        $shown = $rows->take(self::PREVIEW_ROW_LIMIT);
+        $ids   = $shown->pluck('matchedProductId')->filter()->all();
 
         // What the matched products hold today, so an update row can show the
         // old figure under the new one.
         $current = Product::where('vendor_id', filament()->getTenant()->id)
-            ->whereIn('id', $shown->pluck('matchedProductId')->filter()->all())
+            ->whereIn('id', $ids)
             ->get(['id', 'name', 'sku', 'price', 'cost_price'])
             ->keyBy('id');
 
-        $this->previewRows = $shown->map(function (ParsedRow $row) use ($current) {
+        $currentUnits = ProductUnit::whereIn('product_id', $ids)
+            ->where('is_base', false)
+            ->get()
+            ->groupBy('product_id');
+
+        $this->previewRows = $shown->map(function (ParsedRow $row) use ($current, $currentUnits) {
             $product = $row->matchedProductId ? $current->get($row->matchedProductId) : null;
+            $isUpdate = $product && $row->action() === ParsedRow::ACTION_UPDATE;
             $changes = [];
 
-            if ($product && $row->action() === ParsedRow::ACTION_UPDATE) {
+            if ($isUpdate) {
                 foreach (['name', 'sku', 'price', 'cost_price'] as $field) {
                     $new = $row->value($field);
 
@@ -375,18 +390,70 @@ class ImportProducts extends Page
                 }
             }
 
+            // The extra units the file describes, each marked new / changed /
+            // same against what the product has now.
+            $units = [];
+
+            if ($row->action() !== ParsedRow::ACTION_SKIP) {
+                [$fileUnits] = ImportPreparer::unitsFor($row->values);
+                $existing = $isUpdate ? ($currentUnits->get($product->id) ?? collect()) : collect();
+
+                foreach ($fileUnits as $u) {
+                    $unit = $existing->first(fn ($e) => mb_strtolower($e->name) === mb_strtolower($u['name']));
+                    $was  = [];
+
+                    if (! $unit) {
+                        $state = $isUpdate ? 'new' : 'same';
+                    } else {
+                        if ((int) $unit->conversion_factor !== $u['contains']) {
+                            $was[] = 'contains ' . (int) $unit->conversion_factor;
+                        }
+
+                        if ($u['price'] !== null && round((float) $unit->price, 2) !== round($u['price'], 2)) {
+                            $was[] = 'price ' . number_format((float) $unit->price, 2);
+                        }
+
+                        if ($u['wholesale'] !== null && round((float) $unit->wholesale_price, 2) !== round($u['wholesale'], 2)) {
+                            $was[] = 'wholesale ' . number_format((float) $unit->wholesale_price, 2);
+                        }
+
+                        $state = $was === [] ? 'same' : 'changed';
+                    }
+
+                    $units[] = [
+                        'name'      => $u['name'],
+                        'contains'  => $u['contains'],
+                        'price'     => $u['price'],
+                        'wholesale' => $u['wholesale'],
+                        'state'     => $state,
+                        'was'       => implode(', ', $was),
+                    ];
+                }
+            }
+
+            $unitsChanged = collect($units)->contains(fn ($u) => $u['state'] !== 'same');
+            $priceChanged = isset($changes['price']) || isset($changes['cost_price']);
+
             return [
-                'line'     => $row->line,
-                'name'     => $row->name(),
-                'sku'      => (string) ($row->value('sku') ?? ''),
-                'price'    => $row->value('price'),
-                'cost'     => $row->value('cost_price'),
-                'action'   => $row->action(),
-                'changes'  => $changes,
-                'errors'   => $row->errors,
-                'warnings' => $row->warnings,
+                'line'          => $row->line,
+                'name'          => $row->name(),
+                'sku'           => (string) ($row->value('sku') ?? ''),
+                'price'         => $row->value('price'),
+                'cost'          => $row->value('cost_price'),
+                'category'      => (string) ($row->value('category') ?? ''),
+                'unit'          => (string) ($row->value('measurement_unit') ?? ''),
+                'action'        => $row->action(),
+                'changes'       => $changes,
+                'units'         => $units,
+                'price_changed' => $priceChanged,
+                'units_changed' => $unitsChanged,
+                'changed'       => $changes !== [] || $unitsChanged,
+                'errors'        => $row->errors,
+                'warnings'      => $row->warnings,
             ];
         })->values()->all();
+
+        $this->previewFilter = 'all';
 
         // Every problem row, not just the first twenty — a vendor fixing their
         // file needs the whole list, and it is the one thing they cannot get by
