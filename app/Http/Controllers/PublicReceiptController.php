@@ -29,14 +29,25 @@ class PublicReceiptController extends Controller
 {
     public function show(string $token): View
     {
+        // The till prints this address before the sale reaches the server, so
+        // a well-formed token with no sale behind it yet is a receipt that is
+        // still on its way, not a missing one.
+        if ($this->notSyncedYet($token)) {
+            return view('receipt.pending');
+        }
+
         $sale = $this->resolve($token);
 
         return view('receipt.public', $this->payload($sale));
     }
 
     /** The same receipt as a downloadable PDF, for keeping. */
-    public function pdf(string $token): Response
+    public function pdf(string $token): Response|View
     {
+        if ($this->notSyncedYet($token)) {
+            return view('receipt.pending');
+        }
+
         $sale = $this->resolve($token);
 
         $pdf = Pdf::loadView('receipt.public-pdf', $this->payload($sale))
@@ -90,6 +101,13 @@ class PublicReceiptController extends Controller
             'reward'   => $settings->loyalty_reward_text ?: 'a reward from us',
             'earned'   => $toGo === 0,
         ]);
+    }
+
+    /** A token shaped like ours that no sale — voided or not — carries yet. */
+    private function notSyncedYet(string $token): bool
+    {
+        return PosSale::isValidPublicToken($token)
+            && ! PosSale::where('public_token', $token)->exists();
     }
 
     private function resolve(string $token): PosSale

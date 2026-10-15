@@ -32,6 +32,9 @@ export async function recordSale(sale, cashierId) {
         server_id:       sale.id ?? null,
         reference:       sale.reference ?? null,
         offline_id:      sale.offline_id ?? null,
+        // The address the printed QR opens. Kept so a reprint draws the very
+        // same code as the original.
+        public_token:    sale.public_token ?? null,
         completed_at:    sale.completed_at ?? new Date().toISOString(),
         total:           sale.total ?? 0,
         subtotal:        sale.subtotal ?? null,
@@ -79,13 +82,22 @@ export async function recordSale(sale, cashierId) {
  * never be fetched and it would appear twice the moment the server copy
  * arrived alongside it.
  */
-export async function markSaleSynced(offlineId, { id, reference } = {}) {
+export async function markSaleSynced(offlineId, { id, reference, public_token } = {}) {
     if (!offlineId) return 0;
 
     return db.sales
         .where('offline_id')
         .equals(offlineId)
-        .modify({ server_id: id ?? null, reference: reference ?? null, synced: 1 });
+        .modify((row) => {
+            row.server_id = id ?? null;
+            row.reference = reference ?? null;
+            row.synced    = 1;
+
+            // The token the till minted is what is on the customer's paper, so
+            // it is never replaced; the server's is only taken by a row that
+            // somehow has none.
+            row.public_token ??= public_token ?? null;
+        });
 }
 
 /**
@@ -195,6 +207,21 @@ export function mergeSales(local, server) {
             items:           sale.items,
             status:          sale.status,
             offline_id:      sale.offline_id ?? null,
+            // Everything a reprint prints. Without these a reprint of a sale
+            // that has not synced came out with no tender, no change, no
+            // customer and no QR, though the device had kept all of it.
+            public_token:    sale.public_token ?? null,
+            subtotal:        sale.subtotal,
+            discount_amount: sale.discount_amount,
+            vat_amount:      sale.vat_amount,
+            vat_rate:        sale.vat_rate,
+            vat_enabled:     sale.vat_enabled,
+            amount_tendered: sale.amount_tendered,
+            change_given:    sale.change_given,
+            payments:        sale.payments,
+            bank_transfer_reference: sale.bank_transfer_reference,
+            customer:        sale.customer,
+            cashier_name:    sale.cashier_name,
             // Lets the screen say so, rather than presenting an unsynced sale
             // as though the server had confirmed it.
             pending_sync:    sale.synced !== 1,

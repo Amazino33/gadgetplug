@@ -13,14 +13,16 @@
  * one is tuned the other must be tuned with it, or the two paths drift apart
  * and the offline receipt quietly degrades again.
  *
- * The one deliberate difference is the QR. It addresses the customer's online
- * copy, which does not exist until the sale syncs, so offline it is omitted
- * rather than printed dead.
+ * The QR is drawn here too, from the token the till minted for the sale (see
+ * lib/publicToken). It addresses the customer's online copy, which does not
+ * exist until the sale syncs — so an offline receipt prints a code that opens a
+ * "available shortly" page at first and the real receipt afterwards.
  *
  * Targets the Xprinter 80mm class of head: 72mm of printable width at 203dpi,
  * 1-bit, no grey.
  */
 
+import qrcode from 'qrcode-generator';
 import { formatQty, hasHalf } from './halves';
 
 const ALIGNMENTS = { left: 'al-left', center: 'al-center', right: 'al-right' };
@@ -137,6 +139,12 @@ export const THERMAL_CSS = `
 
     .footer { margin-top: 2.5mm; font-size: 12px; white-space: pre-line; line-height: 1.4; }
 
+    /* The code's size is set on the svg element itself, in whole printer dots (see
+       qrSvg), so no rule here can scale it off the dot grid. */
+    .qr-block { margin-top: 3mm; }
+    .qr { margin: 0 auto 2px; }
+    .qr svg { display: block; margin: 0 auto; }
+    .qr-caption { margin: .5mm 0 0; font-size: 11px; }
     .feed { height: 0; }
 
     /* On screen (a preview, or a phone) give it a paper-like frame; when
@@ -250,6 +258,97 @@ function header(config) {
     }
 
     return `<div class="${alignClass(settings.header_alignment)}">\n${lines.join('\n')}\n</div>`;
+}
+
+// 203dpi head: one dot is 1/8 mm, and 72mm of paper is 576 dots.
+const DOT_MM = 0.125;
+// Quiet zone, in modules. The spec asks for 4; scanners lean on it on thermal
+// paper, where the white around the code is only as good as the roll.
+const QUIET = 4;
+// About 24mm across.
+const TARGET_DOTS = 192;
+
+/**
+ * A QR code as inline SVG, sized for a thermal head.
+ *
+ * Vector, so it needs no image to load and nothing from the network — it works
+ * offline because it is drawn from the bundle. Error correction M, pure black
+ * on white, and crisp edges so nothing is anti-aliased into grey that a 1-bit
+ * head would dither.
+ *
+ * Each module is an exact whole number of printer dots. At a fractional size
+ * the head rounds module edges unevenly, so some modules print a dot wider than
+ * others and the finder patterns lose their proportions; that is what stops a
+ * phone reading a small thermal code.
+ */
+export function qrSvg(text) {
+    const qr = qrcode(0, 'M');
+    qr.addData(text, 'Byte');
+    qr.make();
+
+    const count = qr.getModuleCount();
+    const total = count + QUIET * 2;
+    const dots  = Math.max(3, Math.floor(TARGET_DOTS / total));
+    const size  = (total * dots * DOT_MM).toFixed(3).replace(/\.?0+$/, '');
+
+    // One horizontal run per stretch of dark modules, in a single path.
+    let path = '';
+
+    for (let row = 0; row < count; row++) {
+        let col = 0;
+
+        while (col < count) {
+            if (! qr.isDark(row, col)) { col++; continue; }
+
+            const start = col;
+            while (col < count && qr.isDark(row, col)) col++;
+
+            path += `M${start + QUIET} ${row + QUIET}h${col - start}v1h-${col - start}z`;
+        }
+    }
+
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${total} ${total}" width="${size}mm" height="${size}mm" shape-rendering="crispEdges" role="img" aria-label="QR code for your digital receipt">`
+        + `<rect width="${total}" height="${total}" fill="#fff"/>`
+        + `<path d="${path}" fill="#000"/></svg>`;
+}
+
+/** The customer's copy of a sale, or null if the till cannot address one. */
+export function receiptUrl(sale, config = {}) {
+    const template = config.receipt_url_template;
+
+    if (! template || ! /^[A-Za-z0-9]{16}$/.test(String(sale.public_token ?? ''))) {
+        return null;
+    }
+
+    return String(template).replace('{token}', sale.public_token);
+}
+
+/**
+ * The QR block, or nothing.
+ *
+ * Nothing — never an error — when the vendor has switched it off, the sale has
+ * no token (rung before tokens were minted on the till), or this device has not
+ * yet been told the receipt address. A receipt without a QR is still a receipt.
+ */
+function qrBlock(sale, config) {
+    const settings = config.receipt ?? {};
+    const url      = settings.show_qr === false ? null : receiptUrl(sale, config);
+
+    if (! url) return '';
+
+    try {
+        const caption = String(settings.qr_caption ?? '').trim() || 'Scan for your receipt';
+
+        return `<hr>
+<div class="al-center qr-block">
+<div class="qr">${qrSvg(url)}</div>
+<p class="qr-caption">${escapeHtml(caption)}</p>
+</div>`;
+    } catch (error) {
+        console.warn('Receipt QR could not be drawn — printing without it.', error);
+
+        return '';
+    }
 }
 
 /** Blank lines so the cut lands clear of the text. */
@@ -386,8 +485,10 @@ export function receiptHtml(sale, config = {}) {
 
     parts.push('<hr>', `<div class="footer ${alignClass(settings.footer_alignment)}">${escapeHtml(footer)}</div>`);
 
-    // No QR. It addresses the customer's online copy, which does not exist
-    // until this sale syncs — printing a dead code is worse than printing none.
+    // Printed last, so a scanner is not hunting for it among the figures.
+    const qr = qrBlock(sale, config);
+
+    if (qr) parts.push(qr);
 
     parts.push(feed(config));
 

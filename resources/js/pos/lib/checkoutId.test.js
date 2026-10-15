@@ -81,3 +81,34 @@ describe('createCheckoutId', () => {
         expect(two.forAttempt()).toBe('id-1');
     });
 });
+
+describe('createCheckoutId — the receipt token', () => {
+    it('keeps one token per checkout, across retries', () => {
+        let n = 0;
+        const checkout = createCheckoutId(() => 'id', () => `token-${++n}`);
+
+        expect(checkout.tokenForAttempt()).toBe('token-1');
+        expect(checkout.tokenForAttempt()).toBe('token-1');
+    });
+
+    it('mints a new one for the next customer', () => {
+        let n = 0;
+        const checkout = createCheckoutId(() => 'id', () => `token-${++n}`);
+
+        checkout.tokenForAttempt();
+        checkout.settled();
+
+        expect(checkout.tokenForAttempt()).toBe('token-2');
+    });
+
+    it('rings the sale without a token if one cannot be made', () => {
+        const checkout = createCheckoutId(() => 'id', () => { throw new Error('no crypto'); });
+
+        expect(checkout.tokenForAttempt()).toBeNull();
+    });
+
+    it('has no token when no generator was given', () => {
+        expect(createCheckoutId(() => 'id').tokenForAttempt()).toBeNull();
+    });
+});
+

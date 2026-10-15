@@ -1,9 +1,11 @@
+// v3: receipts are built on the till with a QR drawn in the browser (see
+// resources/js/pos/lib/receiptDocument.js); bump forces the new bundle onto tills.
 // Bump this to force every installed till to throw away its cached copies on
 // the next load. v1 held the POS shell cache-first forever (see the /pos rule
 // below), so tills kept serving an old shell pointing at build assets that had
 // long since been replaced — a front-end deploy could never actually reach a
 // device that had already opened the POS once.
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const STATIC_CACHE  = `gp-static-${CACHE_VERSION}`;
 const IMAGE_CACHE   = `gp-images-${CACHE_VERSION}`;
 const PAGE_CACHE    = `gp-pages-${CACHE_VERSION}`;

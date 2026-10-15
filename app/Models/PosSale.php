@@ -116,6 +116,15 @@ class PosSale extends Model
         }
     }
 
+    /**
+     * Whether a token has the shape generatePublicToken() makes: 16 letters and
+     * digits. The till mints its own, so the server checks rather than trusts.
+     */
+    public static function isValidPublicToken(mixed $token): bool
+    {
+        return is_string($token) && preg_match('/\A[A-Za-z0-9]{16}\z/', $token) === 1;
+    }
+
     public static function generatePublicToken(): string
     {
         do {

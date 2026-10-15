@@ -3,6 +3,7 @@ import { useKeyboard } from '../hooks/useKeyboard';
 import { useSync } from '../hooks/useSync';
 import { fmt, generateOfflineId } from '../lib/format';
 import { createCheckoutId } from '../lib/checkoutId';
+import { newPublicToken } from '../lib/publicToken';
 import { cartFloorTotal } from '../lib/cartFloor';
 import { addToCart, roomFor } from '../lib/cartAdd';
 import { findUnit, lineFields, prepareLine } from '../lib/units';
@@ -614,7 +615,7 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
     // repeated attempts at it. See lib/checkoutId for why that matters and what
     // it used to do instead.
     const checkoutRef = useRef(null);
-    checkoutRef.current ??= createCheckoutId(generateOfflineId);
+    checkoutRef.current ??= createCheckoutId(generateOfflineId, newPublicToken);
 
     const completeSale = async ({ paymentMethod, amountTendered, bankRef, payments }) => {
         if (submittingRef.current) return;
@@ -635,6 +636,9 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
 
         const payload = {
             offline_id:              checkoutRef.current.forAttempt(),
+            // The customer's receipt address, minted here so the QR can be
+            // printed before (or without) the server ever seeing the sale.
+            public_token:            checkoutRef.current.tokenForAttempt(),
             vendor_id:               vendorId,
             // Where and by whom, fixed now rather than worked out whenever the
             // queue happens to sync — by then a different login may be on this
@@ -699,12 +703,12 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
         await recordSale({ ...payload, ...localOnly }, user.id);
 
         const receiptSale = {
-            // Carried through so the receipt can be printed from the server's
-            // own document, which is the only one that carries the QR. Null
-            // while offline — the sale has no server id until it syncs, and the
-            // till then builds the same 80mm receipt itself, minus that code.
+            // Null until the sale syncs. The receipt is always built here, so
+            // the id is no longer needed to print — the public_token below is
+            // what puts the QR on the paper.
             id:                      savedSale.id ?? null,
             reference:               savedSale.reference ?? payload.offline_id,
+            public_token:            payload.public_token,
             // The sale's own time, so a receipt reprinted later is stamped when
             // it was rung rather than when it was reprinted.
             completed_at:            payload.completed_at,

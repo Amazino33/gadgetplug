@@ -13,8 +13,9 @@
  * component owns the in-flight flag, which is React's business; this owns the
  * identity of the checkout, which is the part that has to be right.
  */
-export function createCheckoutId(generate) {
+export function createCheckoutId(generate, generateToken = null) {
     let current = null;
+    let token   = null;
 
     return {
         /**
@@ -39,6 +40,26 @@ export function createCheckoutId(generate) {
          */
         settled() {
             current = null;
+            token   = null;
+        },
+
+        /**
+         * The receipt token for this checkout. Held exactly like the id, for
+         * the same reason: a retried or re-queued sale must keep the token its
+         * customer's QR already carries.
+         */
+        tokenForAttempt() {
+            if (! generateToken) return null;
+
+            // A till with no secure random source rings the sale anyway and
+            // prints it without a QR: a receipt is not worth losing a sale over.
+            try {
+                token ??= generateToken();
+            } catch {
+                return null;
+            }
+
+            return token;
         },
 
         /** The id currently in play, or null before the first attempt. */

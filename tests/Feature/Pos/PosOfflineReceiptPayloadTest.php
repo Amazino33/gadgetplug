@@ -68,10 +68,14 @@ it('falls back to the column defaults for a store that never opened the settings
         ->and($receipt['feed_lines'])->toBe(2);
 });
 
-it('never sends a QR setting, because an offline sale has no online copy to link to', function () {
+it('sends the QR setting and the receipt address, because the till draws the code itself', function () {
     $ctx = debtTenderContext();
 
-    expect(loginAsTill($ctx)->json('vendor.receipt'))->not->toHaveKey('show_qr');
+    $vendor = loginAsTill($ctx)->json('vendor');
+
+    expect($vendor['receipt']['show_qr'])->toBeTrue()
+        ->and($vendor['receipt'])->toHaveKey('qr_caption')
+        ->and($vendor['receipt_url_template'])->toEndWith('/receipt/{token}');
 });
 
 it('names the branch only when the vendor has more than one store', function () {

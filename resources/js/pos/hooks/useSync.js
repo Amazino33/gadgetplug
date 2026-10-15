@@ -66,6 +66,7 @@ export function useSync(vendorId, cashierId, onStuckSalesChange) {
                         await markSaleSynced(record.offline_id, {
                             id: result.id ?? null,
                             reference: result.reference ?? null,
+                            public_token: result.public_token ?? null,
                         });
                     } else if (result.status === 'rejected' || result.status === 'error') {
                         await db.offlineSales.update(record.id, {

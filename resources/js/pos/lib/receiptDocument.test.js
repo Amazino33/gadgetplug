@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { receiptHtml, zReportHtml, salesSummaryHtml, money, escapeHtml, THERMAL_CSS } from './receiptDocument';
+import { receiptHtml, zReportHtml, salesSummaryHtml, money, escapeHtml, THERMAL_CSS, qrSvg, receiptUrl } from './receiptDocument';
 
 const config = {
     vat_enabled: true,
@@ -70,11 +70,85 @@ describe('receiptHtml — thermal layout', () => {
         expect(html).not.toContain('text-overflow');
     });
 
-    it('omits the QR, which addresses a copy that does not exist until the sale syncs', () => {
-        const html = receiptHtml(sale, config);
+    it('prints no QR for a sale that has no token, rather than failing', () => {
+        const html = receiptHtml(sale, { ...config, receipt_url_template: 'https://shop.test/receipt/{token}' });
 
         expect(html).not.toContain('<svg');
         expect(html.toLowerCase()).not.toContain('scan for your receipt');
+    });
+
+    it('prints no QR until the till has been told the receipt address', () => {
+        expect(receiptHtml({ ...sale, public_token: TOKEN }, config)).not.toContain('<svg');
+    });
+});
+
+const TOKEN = 'Ab3dEf6hIj9lMn2P';
+const withQr = { ...config, receipt_url_template: 'https://shop.test/receipt/{token}' };
+
+describe('receiptHtml — the QR', () => {
+    it('draws an inline SVG, so it needs no image, CDN or network', () => {
+        const html = receiptHtml({ ...sale, public_token: TOKEN }, withQr);
+
+        expect(html).toMatch(/<svg[^>]*viewBox="0 0 \d+ \d+"/);
+        expect(html).not.toMatch(/<img[^>]*qr/i);
+        expect(html).toContain('Scan for your receipt');
+    });
+
+    it('is thermal-ready: black on white, crisp, with a 4-module quiet zone', () => {
+        const html = receiptHtml({ ...sale, public_token: TOKEN }, withQr);
+        const svg  = html.match(/<svg[\s\S]*?<\/svg>/)[0];
+        const [, modules] = svg.match(/viewBox="0 0 (\d+) /);
+
+        expect(svg).toContain('shape-rendering="crispEdges"');
+        expect(svg).toContain('fill="#000"');
+        expect(svg).toContain('fill="#fff"');
+        // No dark module may sit inside the quiet zone.
+        const xs = [...svg.matchAll(/M(\d+) (\d+)h/g)].map((m) => [Number(m[1]), Number(m[2])]);
+        const n  = Number(modules) - 8;
+
+        expect(Math.min(...xs.map(([x]) => x))).toBeGreaterThanOrEqual(4);
+        expect(Math.max(...xs.map(([, y]) => y))).toBeLessThan(4 + n);
+    });
+
+    it('is about 24mm and a whole number of printer dots per module', () => {
+        const svg = receiptHtml({ ...sale, public_token: TOKEN }, withQr).match(/<svg[\s\S]*?<\/svg>/)[0];
+        const mm  = Number(svg.match(/width="([\d.]+)mm"/)[1]);
+        const [, modules] = svg.match(/viewBox="0 0 (\d+) /);
+
+        expect(mm).toBeGreaterThan(18);
+        expect(mm).toBeLessThanOrEqual(24);
+        expect((mm / 0.125) % Number(modules)).toBe(0);
+    });
+
+    it('encodes exactly the public address of the sale', () => {
+        const url = receiptUrl({ public_token: TOKEN }, withQr);
+
+        expect(url).toBe(`https://shop.test/receipt/${TOKEN}`);
+
+        // The code on the paper is the code for that URL, module for module.
+        const html = receiptHtml({ ...sale, public_token: TOKEN }, withQr);
+        expect(html).toContain(qrSvg(url));
+        expect(qrSvg(url)).not.toBe(qrSvg(receiptUrl({ public_token: 'Zz9yXx8wVv7uTt6S' }, withQr)));
+    });
+
+    it('is the same code every time for the same sale, so a reprint matches the original', () => {
+        const first  = receiptHtml({ ...sale, public_token: TOKEN }, withQr);
+        const second = receiptHtml({ ...sale, public_token: TOKEN }, withQr);
+
+        expect(second).toBe(first);
+    });
+
+    it('uses the vendors caption, and disappears when the vendor switches it off', () => {
+        const captioned = receiptHtml({ ...sale, public_token: TOKEN }, { ...withQr, receipt: { ...withQr.receipt, qr_caption: 'Your e-receipt' } });
+        const off       = receiptHtml({ ...sale, public_token: TOKEN }, { ...withQr, receipt: { ...withQr.receipt, show_qr: false } });
+
+        expect(captioned).toContain('Your e-receipt');
+        expect(off).not.toContain('<svg');
+    });
+
+    it('refuses a token that is not the 16 letters and digits the server makes', () => {
+        expect(receiptUrl({ public_token: 'short' }, withQr)).toBeNull();
+        expect(receiptUrl({ public_token: 'has spaces in it!' }, withQr)).toBeNull();
     });
 });
 
@@ -290,15 +364,16 @@ describe('the port has not drifted from the server template', () => {
         const ported  = new Set(strip(THERMAL_CSS));
         const missing = bladeCss.filter((rule) => !ported.has(rule));
 
-        // The QR is the one deliberate omission: it addresses a copy that does
-        // not exist until the sale syncs.
+        // The QR rules are exempt: the till sizes its code in printer dots.
         expect(missing.filter((rule) => !rule.startsWith('.qr'))).toEqual([]);
     });
 
     it('adds no rule of its own that the blade template lacks', () => {
         const blade = new Set(bladeCss);
 
-        expect(strip(THERMAL_CSS).filter((rule) => !blade.has(rule))).toEqual([]);
+        // The QR block is sized on the till's own dot grid rather than the blade's
+        // fixed 30mm, so its sizing rules are the one place the two differ.
+        expect(strip(THERMAL_CSS).filter((rule) => !blade.has(rule) && !rule.startsWith('.qr'))).toEqual([]);
     });
 });
 

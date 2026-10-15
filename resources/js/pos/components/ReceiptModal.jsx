@@ -1,7 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { fmt } from '../lib/format';
-import api from '../lib/api';
-import { cacheReceipt, cachedReceipt } from '../lib/salesHistory';
 import { printDocument } from '../lib/printDocument';
 import { receiptHtml } from '../lib/receiptDocument';
 import { vendorSettings } from '../lib/vendorSettings';
@@ -15,84 +13,23 @@ export default function ReceiptModal({ sale, onNewSale, isReprint = false }) {
             customer, bank_transfer_reference, payments } = sale;
     const isSplit = payment_method === 'split';
 
-    // Surfaced on screen when the receipt document could not be fetched, so a
-    // failing printer path is visible at the till instead of silently degrading.
-    const [printWarning, setPrintWarning] = useState(null);
-
     // Auto-focus the "New Sale" button so Enter immediately starts next sale
     const newSaleRef = useRef(null);
     useEffect(() => {
         setTimeout(() => newSaleRef.current?.focus(), 100);
     }, []);
 
-    // Prints an 80mm document, never this modal.
+    // Prints an 80mm document, never this modal — and always the same one.
     //
-    // Printing the modal meant hiding the whole app with `visibility: hidden`
-    // and pinning the receipt with `position: fixed`, which cannot paginate —
-    // a long sale was silently cut off at one page and the modal's own padding
-    // leaked onto the paper. Its screen styling made the rest of the damage: a
-    // proportional font that threw the money column out of line, grey text and
-    // dashed rules that a 1-bit thermal head dithers into speckle, and item
-    // names truncated to an ellipsis.
-    //
-    // There are now three sources for that document, in order of how much they
-    // know, and all three are the same 80mm layout. Only the QR distinguishes
-    // them — it addresses a copy the customer can open online, which does not
-    // exist until the sale has synced.
-    const print = async () => {
-        // A sale queued offline has no server id, so there is nothing to fetch.
-        // It is built here instead, from the receipt settings and branch details
-        // cached at login — which is the whole reason the offline receipt used
-        // to come out looking like a different shop's.
-        if (!sale?.id) {
-            // Offline this is expected. Online it means whoever built this sale
-            // object dropped the id, so the customer silently loses the QR —
-            // worth saying, since the paper itself looks right either way.
-            if (navigator.onLine) {
-                console.warn('Receipt has no sale id — printing the locally built document, which carries no QR.');
-                setPrintWarning('Printed without the scan code — this receipt was not linked to a saved sale.');
-            }
-
-            printDocument(receiptHtml(sale, vendorSettings()));
-
-            return;
-        }
-
-        try {
-            // Fetched WITHOUT ?print=1 on purpose. That flag makes the document
-            // print itself from inside the frame, which left two mechanisms
-            // able to fire for one sale — the frame's own print, and the
-            // parent's @media print rules that still render this modal. One
-            // trigger, owned here, is the only way that cannot double.
-            const { data: html } = await api.get(`/sales/${sale.id}/receipt`);
-            printDocument(html);
-
-            // Kept for next time. A customer coming back tomorrow, on a till
-            // with no signal, is exactly when the real receipt is wanted and
-            // exactly when the server cannot supply it.
-            cacheReceipt(sale.id, html).catch(() => {});
-        } catch (err) {
-            const status = err?.response?.status;
-            const detail = status ? `HTTP ${status}` : (err?.message ?? 'network error');
-
-            // The stored copy is the server's own document, QR included — worth
-            // trying before rebuilding one without it.
-            const stored = await cachedReceipt(sale.id).catch(() => null);
-
-            if (stored) {
-                printDocument(stored);
-                setPrintWarning("Printed from this device's saved copy — the server could not be reached.");
-
-                return;
-            }
-
-            // Still a proper 80mm receipt, just without the QR. The warning
-            // stays: falling back silently is how the old modal print stayed
-            // hidden for so long.
-            console.error(`Receipt document failed (${detail}) — printing the locally built copy.`, err);
-            setPrintWarning(`Printed without the scan code — the full receipt could not be loaded (${detail}).`);
-            printDocument(receiptHtml(sale, vendorSettings()));
-        }
+    // Fresh sale, reprint, online, offline: every print is built here by
+    // receiptHtml() from what the till holds, QR included. The QR comes from the
+    // token the till minted for the sale, so it no longer depends on the server
+    // having seen the sale, or on a connection to fetch a document from it. The
+    // server-rendered copy is not fetched for printing any more: two builders
+    // meant two receipts that drifted apart, and a cached copy outlived the
+    // stylesheet it was printed with.
+    const print = () => {
+        printDocument(receiptHtml(sale, vendorSettings()));
     };
 
     // The sale's own time, not the clock. Reading `new Date()` here meant a
@@ -281,10 +218,6 @@ export default function ReceiptModal({ sale, onNewSale, isReprint = false }) {
 
                 </div>
                 {/* ── end scrolling middle ── */}
-
-                {printWarning && (
-                    <p className="shrink-0 px-6 pb-2 text-[11px] text-amber-600">{printWarning}</p>
-                )}
 
                 {/* Actions — always reachable, whatever the sale's length */}
                 <div className="shrink-0 flex gap-3 px-6 pt-4 pb-6 border-t border-gray-100 bg-white">

@@ -43,6 +43,14 @@ class TillProfile
             'allow_half_quantities' => (bool) ($vendor->allow_half_quantities ?? false),
             'vendor_name'  => $vendor?->name,
             'receipt'      => self::receipt($vendor),
+            // The public receipt address with {token} where the sale's token
+            // goes, derived from the real route so it can never drift from it.
+            // The till owns the token, so it can print a working QR offline.
+            'receipt_url_template' => str_replace(
+                '__TOKEN__',
+                '{token}',
+                route('receipt.public', ['token' => '__TOKEN__']),
+            ),
             'store'        => self::store($cashier, $vendor),
             // Which till screens to offer. Only decides what is shown — every
             // endpoint behind them checks the same permission again.
@@ -89,9 +97,11 @@ class TillProfile
             'footer_text'          => $settings->footer_text,
             'footer_alignment'     => $settings->footer_alignment ?? 'center',
             'feed_lines'           => (int) ($settings->feed_lines ?? 2),
-            // No QR key on purpose. The code addresses a copy the customer can
-            // open online, which does not exist until the sale has synced, so
-            // an offline receipt never has one to print.
+            // The till mints each sale's token itself and draws the QR in the
+            // browser, so a receipt printed offline carries a code that starts
+            // working the moment the sale syncs.
+            'show_qr'              => (bool) ($settings->show_qr ?? true),
+            'qr_caption'           => $settings->qr_caption,
         ];
     }
 

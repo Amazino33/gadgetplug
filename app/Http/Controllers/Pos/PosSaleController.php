@@ -110,6 +110,10 @@ class PosSaleController extends Controller
             // idempotent, which is what stops a lost response becoming a second
             // sale of the same goods.
             'offline_id'                 => 'nullable|string|max:64',
+            // Minted by the till so the QR on the paper can be printed before
+            // the server has seen the sale. Uniqueness is checked below the
+            // replay branch, not here: a replay carries its own token.
+            'public_token'               => ['nullable', 'string', 'regex:/\A[A-Za-z0-9]{16}\z/'],
             // Where and by whom the till says this sale was rung — the same
             // two fields the sync path honours.
             'store_id'                   => 'nullable|integer',
@@ -201,6 +205,14 @@ class PosSaleController extends Controller
             }
         }
 
+        // A token that already opens a different sale is refused: the printed
+        // QR would show someone else's receipt.
+        if ($request->filled('public_token') && PosSale::where('public_token', $request->public_token)->exists()) {
+            throw ValidationException::withMessages([
+                'public_token' => 'The receipt token on this sale already belongs to a different sale.',
+            ]);
+        }
+
         // Lines sold in a unit become base quantities here, from the server's
         // own unit records. Lines without a unit come back untouched.
         $resolver = app(SaleLineResolver::class);
@@ -246,6 +258,7 @@ class PosSaleController extends Controller
 
             $sale = PosSale::create([
                 'reference'               => $reference,
+                'public_token'            => $request->public_token,
                 'vendor_id'               => $request->vendor_id,
                 // The branch the till was rung in — see TillStore::forSale().
                 'store_id'                => $storeId,
@@ -647,11 +660,18 @@ class PosSaleController extends Controller
             'vendor_id' => 'required|integer',
         ]);
 
-        $sales = PosSale::with(['items', 'payments'])
+        $sales = PosSale::with(['items', 'payments', 'customer:id,name,phone'])
             ->where('vendor_id', $request->vendor_id)
             ->where('cashier_id', $request->user()->id)
             ->latest('completed_at')
             ->paginate(20);
+
+        // Everything a reprint needs to match the first copy: the till builds
+        // the receipt itself from this row, and these were the two lines it
+        // could not otherwise name. The token (already a column) is what draws
+        // the same QR as the original.
+        $cashierName = $request->user()->name;
+        $sales->getCollection()->each(fn (PosSale $sale) => $sale->setAttribute('cashier_name', $cashierName));
 
         return response()->json($sales);
     }

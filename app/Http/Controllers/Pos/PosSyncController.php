@@ -86,8 +86,44 @@ class PosSyncController extends Controller
             // Skip if already synced (reference derived from offline_id)
             $existingRef = 'POS-' . strtoupper(substr(md5($payload['offline_id']), 0, 8));
 
-            if (PosSale::where('reference', $existingRef)->exists()) {
-                $results[] = ['offline_id' => $payload['offline_id'], 'status' => 'duplicate'];
+            // A replay hands back the identity it was given the first time —
+            // including the token, which is never rewritten — so a till that
+            // missed the first response still learns the server id.
+            if ($already = PosSale::where('reference', $existingRef)->first(['id', 'public_token'])) {
+                $results[] = [
+                    'offline_id'   => $payload['offline_id'],
+                    'status'       => 'duplicate',
+                    'id'           => $already->id,
+                    'public_token' => $already->public_token,
+                ];
+                continue;
+            }
+
+            // The token printed on the customer's QR was minted on the till.
+            // Absent (an older client): the model makes one, as it always has.
+            // Present but malformed or already another sale's: refused for this
+            // sale alone rather than failing the whole batch with it.
+            $clientToken = $payload['public_token'] ?? null;
+
+            if ($clientToken !== null && ! PosSale::isValidPublicToken($clientToken)) {
+                $results[] = [
+                    'offline_id' => $payload['offline_id'],
+                    'status'     => 'rejected',
+                    'message'    => 'This sale carries a malformed receipt token.',
+                ];
+                continue;
+            }
+
+            if ($clientToken !== null && PosSale::where('public_token', $clientToken)->exists()) {
+                // Not this sale (its reference was not found above), so the
+                // printed QR would open somebody else's receipt. Refused loudly
+                // rather than quietly re-keyed: the paper is already in the
+                // customer's hand and cannot be corrected.
+                $results[] = [
+                    'offline_id' => $payload['offline_id'],
+                    'status'     => 'rejected',
+                    'message'    => 'The receipt token on this sale already belongs to a different sale.',
+                ];
                 continue;
             }
 
@@ -151,8 +187,11 @@ class PosSyncController extends Controller
                     (float) $payload['total'] - (float) ($payload['vat_amount'] ?? 0),
                 );
 
-                DB::transaction(function () use ($payload, $request, $adjustStock, $existingRef, $storeId, $lines, $products, $vendor) {
+                $savedSale = null;
+
+                DB::transaction(function () use ($payload, $request, $adjustStock, $existingRef, $storeId, $lines, $products, $vendor, $clientToken, &$savedSale) {
                     $sale = PosSale::create([
+                        'public_token'            => $clientToken,
                         'reference'               => $existingRef,
                         'vendor_id'               => $request->vendor_id,
                         'store_id'                => $storeId,
@@ -172,6 +211,8 @@ class PosSyncController extends Controller
                         'synced_at'               => now(),
                         'completed_at'            => $payload['completed_at'],
                     ]);
+
+                    $savedSale = $sale;
 
                     if ($payload['payment_method'] === 'split') {
                         foreach ($payload['payments'] as $p) {
@@ -266,7 +307,13 @@ class PosSyncController extends Controller
                     }
                 });
 
-                $results[] = ['offline_id' => $payload['offline_id'], 'status' => 'synced', 'reference' => $existingRef];
+                $results[] = [
+                    'offline_id'   => $payload['offline_id'],
+                    'status'       => 'synced',
+                    'reference'    => $existingRef,
+                    'id'           => $savedSale?->id,
+                    'public_token' => $savedSale?->public_token,
+                ];
             } catch (TillBranchUnclear $e) {
                 // Understood and refused, like a validation failure: sending it
                 // again unchanged would only be refused again.

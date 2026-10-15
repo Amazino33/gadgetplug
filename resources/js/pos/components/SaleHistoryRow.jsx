@@ -22,6 +22,10 @@ export const paymentLabel = (method) => {
 export const toReprint = (sale) => ({
     id:                      sale.id,
     reference:               sale.reference,
+    // The same token the original QR carried, so a reprint draws the
+    // identical code. Absent on a sale rung before tokens were minted
+    // on the till and not yet merged with its server copy: no QR.
+    public_token:            sale.public_token ?? null,
     // Without this the receipt fell back to the current clock, so a
     // reprint of an older sale was stamped with today's date and time.
     completed_at:            sale.completed_at,
