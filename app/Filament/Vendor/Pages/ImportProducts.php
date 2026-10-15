@@ -6,6 +6,7 @@ namespace App\Filament\Vendor\Pages;
 
 use App\Models\ImportLog;
 use App\Models\ImportMappingTemplate;
+use App\Models\Product;
 use App\Models\Store;
 use App\Services\ActiveStore;
 use App\Services\Export\ProductExporter;
@@ -342,16 +343,50 @@ class ImportProducts extends Page
 
         $this->summary = app(ImportPreparer::class)->summarise($rows);
 
-        $this->previewRows = $rows->take(20)->map(fn (ParsedRow $row) => [
-            'line'     => $row->line,
-            'name'     => $row->name(),
-            'sku'      => (string) ($row->value('sku') ?? ''),
-            'price'    => $row->value('price'),
-            'cost'     => $row->value('cost_price'),
-            'action'   => $row->action(),
-            'errors'   => $row->errors,
-            'warnings' => $row->warnings,
-        ])->values()->all();
+        $shown = $rows->take(20);
+
+        // What the matched products hold today, so an update row can show the
+        // old figure under the new one.
+        $current = Product::where('vendor_id', filament()->getTenant()->id)
+            ->whereIn('id', $shown->pluck('matchedProductId')->filter()->all())
+            ->get(['id', 'name', 'sku', 'price', 'cost_price'])
+            ->keyBy('id');
+
+        $this->previewRows = $shown->map(function (ParsedRow $row) use ($current) {
+            $product = $row->matchedProductId ? $current->get($row->matchedProductId) : null;
+            $changes = [];
+
+            if ($product && $row->action() === ParsedRow::ACTION_UPDATE) {
+                foreach (['name', 'sku', 'price', 'cost_price'] as $field) {
+                    $new = $row->value($field);
+
+                    if ($new === null) {
+                        continue; // not in the file, so left as it is
+                    }
+
+                    $old = $product->{$field};
+                    $same = in_array($field, ['price', 'cost_price'], true)
+                        ? round((float) $old, 2) === round((float) $new, 2)
+                        : (string) $old === (string) $new;
+
+                    if (! $same) {
+                        $changes[$field] = $old;
+                    }
+                }
+            }
+
+            return [
+                'line'     => $row->line,
+                'name'     => $row->name(),
+                'sku'      => (string) ($row->value('sku') ?? ''),
+                'price'    => $row->value('price'),
+                'cost'     => $row->value('cost_price'),
+                'action'   => $row->action(),
+                'changes'  => $changes,
+                'errors'   => $row->errors,
+                'warnings' => $row->warnings,
+            ];
+        })->values()->all();
 
         // Every problem row, not just the first twenty — a vendor fixing their
         // file needs the whole list, and it is the one thing they cannot get by

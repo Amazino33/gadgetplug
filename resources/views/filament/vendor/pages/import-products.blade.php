@@ -277,6 +277,9 @@
                                 <td class="px-3 py-2 text-gray-500">{{ $row['line'] }}</td>
                                 <td class="px-3 py-2">
                                     {{ $row['name'] }}
+                                    @if (array_key_exists('name', $row['changes']))
+                                        <div class="text-xs text-gray-400 dark:text-gray-500">was {{ $row['changes']['name'] }}</div>
+                                    @endif
                                     @foreach ($row['errors'] as $error)
                                         <div class="text-xs text-red-600 dark:text-red-400">{{ $error }}</div>
                                     @endforeach
@@ -284,9 +287,24 @@
                                         <div class="text-xs text-amber-600 dark:text-amber-400">{{ $warning }}</div>
                                     @endforeach
                                 </td>
-                                <td class="px-3 py-2 text-gray-600 dark:text-gray-400">{{ $row['sku'] ?: '—' }}</td>
-                                <td class="px-3 py-2 text-right">{{ $row['cost'] === null ? '—' : number_format((float) $row['cost'], 2) }}</td>
-                                <td class="px-3 py-2 text-right">{{ $row['price'] === null ? '—' : number_format((float) $row['price'], 2) }}</td>
+                                <td class="px-3 py-2 text-gray-600 dark:text-gray-400">
+                                    {{ $row['sku'] ?: '—' }}
+                                    @if (array_key_exists('sku', $row['changes']))
+                                        <div class="text-xs text-gray-400 dark:text-gray-500">was {{ $row['changes']['sku'] ?: '—' }}</div>
+                                    @endif
+                                </td>
+                                <td class="px-3 py-2 text-right">
+                                    {{ $row['cost'] === null ? '—' : number_format((float) $row['cost'], 2) }}
+                                    @if (array_key_exists('cost_price', $row['changes']))
+                                        <div class="text-xs text-gray-400 dark:text-gray-500">was {{ number_format((float) $row['changes']['cost_price'], 2) }}</div>
+                                    @endif
+                                </td>
+                                <td class="px-3 py-2 text-right">
+                                    {{ $row['price'] === null ? '—' : number_format((float) $row['price'], 2) }}
+                                    @if (array_key_exists('price', $row['changes']))
+                                        <div class="text-xs text-gray-400 dark:text-gray-500">was {{ number_format((float) $row['changes']['price'], 2) }}</div>
+                                    @endif
+                                </td>
                                 <td class="px-3 py-2">
                                     <span @class([
                                         'rounded-full px-2 py-0.5 text-xs font-semibold',
@@ -296,6 +314,9 @@
                                     ])>
                                         {{ ['create' => 'Create', 'update' => 'Update', 'skip' => 'Skip'][$row['action']] }}
                                     </span>
+                                    @if ($row['action'] === 'update' && $row['changes'] === [])
+                                        <div class="mt-0.5 text-xs text-gray-400 dark:text-gray-500">no change</div>
+                                    @endif
                                 </td>
                             </tr>
                         @endforeach
