@@ -38,7 +38,7 @@ export default function ReturnModal({ vendorId, cashierId, onClose }) {
     };
 
     // A shop that sells halves returns in halves too; everyone else in whole units.
-    const step = qtyStep(halvesEnabled());
+    const qtyUnit = qtyStep(halvesEnabled());
 
     const adjust = (productId, delta, max) =>
         setSelected((s) => ({ ...s, [productId]: Math.min(max, Math.max(0, cleanQty((s[productId] || 0) + delta))) }));
@@ -157,10 +157,10 @@ export default function ReturnModal({ vendorId, cashierId, onClose }) {
                                             </p>
                                         </div>
                                         <div className="flex items-center gap-2 shrink-0">
-                                            <button onClick={() => adjust(item.product_id, -step, item.returnable)}
+                                            <button onClick={() => adjust(item.product_id, -qtyUnit, item.returnable)}
                                                 className="w-7 h-7 rounded-full bg-white border border-gray-200 text-gray-600 font-bold text-sm flex items-center justify-center">−</button>
                                             <span className="w-6 text-center text-sm font-semibold">{formatQty(selected[item.product_id] || 0)}</span>
-                                            <button onClick={() => adjust(item.product_id, +step, item.returnable)}
+                                            <button onClick={() => adjust(item.product_id, +qtyUnit, item.returnable)}
                                                 className="w-7 h-7 rounded-full bg-white border border-gray-200 text-gray-600 font-bold text-sm flex items-center justify-center">+</button>
                                         </div>
                                     </div>
