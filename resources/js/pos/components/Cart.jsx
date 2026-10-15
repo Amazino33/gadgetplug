@@ -218,6 +218,42 @@ function QtyStepper({ items, item, idx, onQtyChange, onQtyEditDone }) {
     );
 }
 
+/**
+ * − ½ + for a phone, under the product. Only a shop that sells halves sees it:
+ * the phone row has never had quantity buttons (quantity is changed in the
+ * quantity box), and every other shop's phone screen stays exactly as it was.
+ * − and + move by ½; ½ adds or takes off the half on its own.
+ */
+function MobileHalfControls({ items, item, idx, onQtyChange }) {
+    if (! halvesEnabled() || ! onQtyChange) return null;
+
+    const room   = roomFor(items, item, idx);
+    const half   = hasHalf(item.qty);
+    const btn    = 'min-w-9 h-9 px-2 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 font-bold text-sm flex items-center justify-center disabled:opacity-30';
+    const toggle = half ? cleanQty(item.qty - 0.5) : cleanQty(item.qty + 0.5);
+
+    return (
+        <div className="mt-1.5 flex items-center gap-1.5" onClick={stop} onPointerDown={stop}>
+            <button type="button" aria-label="Half less" className={btn} onClick={() => onQtyChange(idx, cleanQty(item.qty - 0.5))}>−</button>
+            <button
+                type="button"
+                aria-label={half ? 'Take off the half' : 'Add a half'}
+                aria-pressed={half}
+                disabled={toggle <= 0 || toggle > room}
+                className={`${btn} ${half ? '!bg-[#068B03] !text-white' : ''}`}
+                onClick={() => onQtyChange(idx, toggle)}
+            >½</button>
+            <button
+                type="button"
+                aria-label="Half more"
+                disabled={cleanQty(item.qty + 0.5) > room}
+                className={btn}
+                onClick={() => onQtyChange(idx, cleanQty(item.qty + 0.5))}
+            >+</button>
+        </div>
+    );
+}
+
 /** Retail or wholesale for this one line, under its price — only where a wholesale price exists. */
 function PriceType({ item, idx, onPriceTypeChange }) {
     if (! unitsOf(item).some((u) => u.wholesale_price != null)) return null;
@@ -332,7 +368,7 @@ function CartRow({ items, item, idx, isSelected, allowPriceChange, handlers }) {
 
 // ── Phone row: swipe left to delete ───────────────────────────────────────────
 
-function MobileCartRow({ items, item, idx, isSelected, onSelect, onRemove, onUnitChange }) {
+function MobileCartRow({ items, item, idx, isSelected, onSelect, onRemove, onUnitChange, onQtyChange }) {
     const rowRef   = useRef(null);
     const startX   = useRef(0);
     const snapTx   = useRef(0);
@@ -423,6 +459,7 @@ function MobileCartRow({ items, item, idx, isSelected, onSelect, onRemove, onUni
                     {unitsOf(item).length > 1 && (
                         <div className="mt-1.5"><UnitSegments item={item} idx={idx} onUnitChange={onUnitChange} /></div>
                     )}
+                    <MobileHalfControls items={items} item={item} idx={idx} onQtyChange={onQtyChange} />
                 </div>
                 <div className="text-right shrink-0">
                     <p className="text-xs text-gray-400 dark:text-gray-500 font-mono tabular-nums">×{formatQty(item.qty)}</p>
@@ -472,6 +509,7 @@ export default function Cart({
                         onSelect={onSelect}
                         onRemove={onRemove}
                         onUnitChange={onUnitChange}
+                        onQtyChange={onQtyChange}
                     />
                 ))}
             </div>
