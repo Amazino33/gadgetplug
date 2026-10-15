@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Support\Quantity;
 use App\Actions\Inventory\AdjustStockAction;
 use App\Models\AuditSession;
 use App\Models\Product;
@@ -227,11 +228,11 @@ class RestoreOverwrittenProductsCommand extends Command
         }
 
         $target  = $line->countedQuantity();
-        $current = (int) (ProductStoreStock::where('product_id', $product->id)
+        $current = Quantity::of(ProductStoreStock::where('product_id', $product->id)
             ->where('store_id', $storeId)
             ->value('quantity') ?? 0);
 
-        $delta = $target - $current;
+        $delta = Quantity::sub($target, $current);
 
         if ($delta !== 0) {
             app(AdjustStockAction::class)->execute(

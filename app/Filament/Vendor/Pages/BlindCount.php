@@ -354,7 +354,8 @@ class BlindCount extends Page
             return Quantity::of($product->stock_quantity);
         }
 
-        return (int) (ProductStoreStock::where('product_id', $product->id)
+        // Not (int): 7½ crates on the branch's shelf must not read as 7.
+        return Quantity::of(ProductStoreStock::where('product_id', $product->id)
             ->where('store_id', $session->store_id)
             ->value('quantity') ?? 0);
     }
@@ -676,9 +677,11 @@ class BlindCount extends Page
 
         DB::transaction(function () use ($session, $entries, &$discrepancies) {
             foreach ($session->product_order as $productId) {
-                $count      = (int) ($entries[$productId]?->count ?? 0);
+                // Not (int): a shop that sells halves counts 7½ crates, and
+                // truncating here would turn every half into a false shortage.
+                $count      = Quantity::of($entries[$productId]?->count ?? 0);
                 $product    = Product::find($productId);
-                $difference = $count - $this->systemQuantityFor($session, $product);
+                $difference = Quantity::sub($count, $this->systemQuantityFor($session, $product));
                 $matched    = $difference === 0;
 
                 $line = AuditSession::create([
@@ -757,8 +760,10 @@ class BlindCount extends Page
         // Wrap in a transaction so all AuditSessions are created or none are
         DB::transaction(function () use ($session, $aEntries, $bEntries, $adjustStock, &$discrepancies) {
             foreach ($session->product_order as $productId) {
-                $countA  = (int) ($aEntries[$productId]?->count ?? 0);
-                $countB  = (int) ($bEntries[$productId]?->count ?? 0);
+                // Halves kept (see the solo path above). Quantity::of gives an
+                // int for every whole count, so 7 against 7 still matches.
+                $countA  = Quantity::of($aEntries[$productId]?->count ?? 0);
+                $countB  = Quantity::of($bEntries[$productId]?->count ?? 0);
                 $matched = $countA === $countB;
                 $product = Product::find($productId);
 
@@ -779,7 +784,7 @@ class BlindCount extends Page
 
                 if ($matched) {
                     $systemQuantity = $this->systemQuantityFor($session, $product);
-                    $difference = $countB - $systemQuantity;
+                    $difference = Quantity::sub($countB, $systemQuantity);
 
                     if ($difference !== 0) {
                         $adjustStock->execute(
@@ -788,7 +793,7 @@ class BlindCount extends Page
                             transactionType: 'audit_correction',
                             userId:          $session->storekeeper_b_id,
                             reference:       "Inventory Count #{$session->id}",
-                            description:     "Verified count. System had {$systemQuantity}, found {$countB}.",
+                            description:     'Verified count. System had '.Quantity::format($systemQuantity, true).', found '.Quantity::format($countB, true).'.',
                             // The branch this session counted, read from the
                             // session itself rather than from whoever happens
                             // to be looking at the page when it reconciles.

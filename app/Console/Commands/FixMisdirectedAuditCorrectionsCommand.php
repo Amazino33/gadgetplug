@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Support\Quantity;
 use App\Actions\Inventory\AdjustStockAction;
 use App\Models\AuditSession;
 use App\Models\InventoryLedger;
@@ -101,11 +102,11 @@ class FixMisdirectedAuditCorrectionsCommand extends Command
 
             $landedStore = Store::find($entry->store_id);
 
-            $currentAtBranch = (int) (ProductStoreStock::where('product_id', $audit->product_id)
+            $currentAtBranch = Quantity::of(ProductStoreStock::where('product_id', $audit->product_id)
                 ->where('store_id', $branch->id)
                 ->value('quantity') ?? 0);
 
-            $correctDelta = $audit->countedQuantity() - $currentAtBranch;
+            $correctDelta = Quantity::sub($audit->countedQuantity(), $currentAtBranch);
 
             $plan[] = [
                 'entry'         => $entry,

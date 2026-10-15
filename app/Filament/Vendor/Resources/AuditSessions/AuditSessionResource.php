@@ -104,7 +104,7 @@ class AuditSessionResource extends Resource
                 TextColumn::make('count_a')
                     ->label('Count A')
                     ->alignCenter()
-                    ->numeric()
+                    ->formatStateUsing(fn ($state): string => Quantity::display($state, filament()->getTenant()))
                     ->description(
                         fn (AuditSession $r): string => $r->storekeeperA?->name ?? '—'
                     ),
@@ -113,7 +113,7 @@ class AuditSessionResource extends Resource
                 TextColumn::make('count_b')
                     ->label('Count B')
                     ->alignCenter()
-                    ->numeric()
+                    ->formatStateUsing(fn ($state): string => Quantity::display($state, filament()->getTenant()))
                     ->placeholder('—')
                     ->description(
                         fn (AuditSession $r): string =>
@@ -124,11 +124,12 @@ class AuditSessionResource extends Resource
                 TextColumn::make('sold')
                     ->label('Sold')
                     ->alignCenter()
-                    ->getStateUsing(function (AuditSession $r): int {
-                        return (int) \App\Models\InventoryLedger::where('product_id', $r->product_id)
+                    ->getStateUsing(function (AuditSession $r): int|float {
+                        return Quantity::of(\App\Models\InventoryLedger::where('product_id', $r->product_id)
                             ->whereIn('transaction_type', ['pos_sale', 'online_sale'])
-                            ->sum('quantity_change') * -1;
+                            ->sum('quantity_change') * -1);
                     })
+                    ->formatStateUsing(fn ($state): string => Quantity::display($state, filament()->getTenant()))
                     ->url(fn (AuditSession $r): string => \App\Filament\Vendor\Resources\InventoryLedgers\InventoryLedgerResource::getUrl('index', [
                         'tableFilters' => [
                             'product_id' => ['value' => $r->product_id],
@@ -140,11 +141,12 @@ class AuditSessionResource extends Resource
                 TextColumn::make('total_stock_in')
                     ->label('Total Stock In')
                     ->alignCenter()
-                    ->getStateUsing(function (AuditSession $r): int {
-                        return (int) \App\Models\InventoryLedger::where('product_id', $r->product_id)
+                    ->getStateUsing(function (AuditSession $r): int|float {
+                        return Quantity::of(\App\Models\InventoryLedger::where('product_id', $r->product_id)
                             ->where('transaction_type', 'restock')
-                            ->sum('quantity_change');
+                            ->sum('quantity_change'));
                     })
+                    ->formatStateUsing(fn ($state): string => Quantity::display($state, filament()->getTenant()))
                     ->url(fn (AuditSession $r): string => \App\Filament\Vendor\Resources\InventoryLedgers\InventoryLedgerResource::getUrl('index', [
                         'tableFilters' => [
                             'product_id' => ['value' => $r->product_id],

@@ -730,11 +730,11 @@ class StoreAccountCloseBalance
                     // a delivery, a transfer in, a returned unit going back on
                     // the shelf. All of them are stock the branch now has to
                     // account for.
-                    'received' => (int) $rest->where('quantity_change', '>', 0)->sum('quantity_change'),
-                    'sold'     => (int) abs($sales->where('quantity_change', '<', 0)->sum('quantity_change')),
+                    'received' => Quantity::of($rest->where('quantity_change', '>', 0)->sum('quantity_change')),
+                    'sold'     => Quantity::of(abs($sales->where('quantity_change', '<', 0)->sum('quantity_change'))),
                     // Negative. Movements out that were neither a sale nor a
                     // return of stock — transfers away, pickings, adjustments.
-                    'other'    => (int) $rest->where('quantity_change', '<', 0)->sum('quantity_change'),
+                    'other'    => Quantity::of($rest->where('quantity_change', '<', 0)->sum('quantity_change')),
                 ];
             });
     }
@@ -751,12 +751,12 @@ class StoreAccountCloseBalance
      */
     private function procurement(Store $store, CarbonInterface $from, CarbonInterface $to): array
     {
-        $units = (int) InventoryLedger::query()
+        $units = Quantity::of(InventoryLedger::query()
             ->where('store_id', $store->id)
             ->where('transaction_type', 'restock')
             ->whereBetween('created_at', [$from, $to])
             ->where('quantity_change', '>', 0)
-            ->sum('quantity_change');
+            ->sum('quantity_change'));
 
         return [
             'units_received' => $units,

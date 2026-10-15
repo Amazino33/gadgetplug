@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Vendor\Resources\CountSessions\RelationManagers;
 
+use App\Support\Quantity;
 use App\Filament\Vendor\Resources\AuditSessions\AuditSessionResource;
 use App\Filament\Vendor\Resources\Products\Schemas\ProductForm;
 use App\Models\AuditSession;
@@ -48,21 +49,25 @@ class LinesRelationManager extends RelationManager
                 TextColumn::make('system_quantity')
                     ->label('System')
                     ->alignCenter()
+                    ->formatStateUsing(fn ($state): string => Quantity::display($state, filament()->getTenant()))
                     ->placeholder('—'),
 
                 TextColumn::make('counted')
                     ->label('Counted')
                     ->alignCenter()
-                    ->getStateUsing(fn (AuditSession $r): int => $r->countedQuantity()),
+                    // "7½" for a shop that sells halves; whole counts as before.
+                    ->getStateUsing(fn (AuditSession $r): int|float => $r->countedQuantity())
+                    ->formatStateUsing(fn ($state): string => Quantity::display($state, filament()->getTenant())),
 
                 TextColumn::make('sold')
                     ->label('Sold')
                     ->alignCenter()
-                    ->getStateUsing(function (AuditSession $r): int {
-                        return (int) \App\Models\InventoryLedger::where('product_id', $r->product_id)
+                    ->getStateUsing(function (AuditSession $r): int|float {
+                        return Quantity::of(\App\Models\InventoryLedger::where('product_id', $r->product_id)
                             ->whereIn('transaction_type', ['pos_sale', 'online_sale'])
-                            ->sum('quantity_change') * -1;
+                            ->sum('quantity_change') * -1);
                     })
+                    ->formatStateUsing(fn ($state): string => Quantity::display($state, filament()->getTenant()))
                     ->url(fn (AuditSession $r): string => \App\Filament\Vendor\Resources\InventoryLedgers\InventoryLedgerResource::getUrl('index', [
                         'tableFilters' => [
                             'product_id' => ['value' => $r->product_id],
@@ -73,11 +78,12 @@ class LinesRelationManager extends RelationManager
                 TextColumn::make('total_stock_in')
                     ->label('Total Stock In')
                     ->alignCenter()
-                    ->getStateUsing(function (AuditSession $r): int {
-                        return (int) \App\Models\InventoryLedger::where('product_id', $r->product_id)
+                    ->getStateUsing(function (AuditSession $r): int|float {
+                        return Quantity::of(\App\Models\InventoryLedger::where('product_id', $r->product_id)
                             ->where('transaction_type', 'restock')
-                            ->sum('quantity_change');
+                            ->sum('quantity_change'));
                     })
+                    ->formatStateUsing(fn ($state): string => Quantity::display($state, filament()->getTenant()))
                     ->url(fn (AuditSession $r): string => \App\Filament\Vendor\Resources\InventoryLedgers\InventoryLedgerResource::getUrl('index', [
                         'tableFilters' => [
                             'product_id' => ['value' => $r->product_id],
@@ -92,7 +98,7 @@ class LinesRelationManager extends RelationManager
                     ->getStateUsing(function (AuditSession $r): string {
                         $diff = $r->countedVariance();
 
-                        return $diff === null ? '—' : ($diff > 0 ? '+' : '').$diff;
+                        return $diff === null ? '—' : ($diff > 0 ? '+' : '').Quantity::display($diff, filament()->getTenant());
                     })
                     ->color(function (AuditSession $r): string {
                         $diff = $r->countedVariance();

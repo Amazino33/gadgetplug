@@ -477,7 +477,8 @@ class StockAdjustment extends Page
             return Quantity::of($product->stock_quantity);
         }
 
-        return (int) (ProductStoreStock::where('product_id', $product->id)
+        // Not (int): 7½ crates on the branch's shelf must not read as 7.
+        return Quantity::of(ProductStoreStock::where('product_id', $product->id)
             ->where('store_id', $storeId)
             ->value('quantity') ?? 0);
     }

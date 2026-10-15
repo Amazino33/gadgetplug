@@ -380,6 +380,13 @@
             this.persist();
         },
         clampCount() { this.setCount(this.entries[this.currentProductId]?.count); },
+        // "7½" for a shop that sells halves; the plain number for everyone else.
+        fmtQty(v) {
+            const n = Number(v ?? 0);
+            if (! this.halves || Number.isInteger(n)) return String(n);
+            const whole = Math.floor(n);
+            return (whole > 0 ? whole : '') + '½';
+        },
 
         showToast(message) {
             this.toastMessage = message;
@@ -693,7 +700,7 @@
                 <button @click="goTo(products.findIndex(x => x.id === p.id) + 1)"
                     class="w-full text-left flex items-center justify-between gap-2 px-3 py-2.5 bg-[#162016] hover:bg-[#1a2a1a] rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-[#4caf50]">
                     <span class="text-white text-xs truncate" x-text="p.name"></span>
-                    <span class="text-[#4caf50] text-xs font-bold shrink-0" x-text="entries[p.id]?.count ?? 0"></span>
+                    <span class="text-[#4caf50] text-xs font-bold shrink-0" x-text="fmtQty(entries[p.id]?.count)"></span>
                 </button>
             </template>
             <p class="text-[#3a5a3c] text-xs px-1 py-2" x-show="searchQuery.trim() && filteredResults.length === 0">No matching product.</p>

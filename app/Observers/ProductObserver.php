@@ -91,10 +91,10 @@ class ProductObserver
             return;
         }
 
-        $reserved = (int) ProductStoreStock::query()
+        $reserved = Quantity::of(ProductStoreStock::query()
             ->where('product_id', $product->id)
             ->where('store_id', $from)
-            ->value('reserved');
+            ->value('reserved') ?? 0);
 
         if ($reserved > 0) {
             throw new LogicException(
