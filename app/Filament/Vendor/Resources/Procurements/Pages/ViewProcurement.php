@@ -63,6 +63,15 @@ class ViewProcurement extends ViewRecord
                     ->content($record->creator->name ?? '—'),
                 Placeholder::make('created_at')->label('Submitted')
                     ->content($record->created_at->format('d M Y, H:i')),
+                // Who actually received this delivery, not just that somebody
+                // did. The badge already says "Approved" — this is the name
+                // the storekeeper would otherwise have to ask around for.
+                Placeholder::make('approver')->label('Approved By')
+                    ->content($record->approver->name ?? '—')
+                    ->visible((bool) $record->approved_by),
+                Placeholder::make('approved_at')->label('Approved')
+                    ->content(fn () => $record->approved_at?->format('d M Y, H:i') ?? '—')
+                    ->visible((bool) $record->approved_by),
                 Placeholder::make('void_reason')->label('Void Reason')
                     ->content($record->void_reason ?? '—')
                     ->visible($record->isVoided()),

@@ -28,9 +28,20 @@
 
 <div class="mt-2 space-y-2">
 
-    <p class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-        Items purchased
-    </p>
+    <div class="flex items-center justify-between">
+        <p class="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+            Items purchased
+        </p>
+
+        {{-- The name behind the "Approved" badge. The status column already
+             says it was received; this is who the storekeeper would
+             otherwise have to go and ask. --}}
+        @if ($record->approved_by)
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+                Approved by <span class="font-semibold text-gray-700 dark:text-gray-300">{{ $record->approver->name ?? '—' }}</span>
+            </p>
+        @endif
+    </div>
 
     <div class="divide-y divide-gray-100 overflow-hidden rounded-lg border border-gray-200 dark:divide-white/5 dark:border-white/10">
         @forelse ($items as $item)

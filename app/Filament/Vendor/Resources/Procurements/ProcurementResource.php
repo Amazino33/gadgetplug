@@ -293,6 +293,7 @@ class ProcurementResource extends Resource
             ->modifyQueryUsing(fn (Builder $query) => $query->with([
                 'items.product',
                 'items.corrections',
+                'approver',
             ]))
             ->defaultSort('created_at', 'desc')
             ->filters([
