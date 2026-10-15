@@ -45,7 +45,13 @@
             <!-- Edit State -->
             @php 
                 $product = $this->selectedProduct; 
-                $cost = (float) $product->cost_price;
+                $units = $this->extraUnits;
+                $unit = $this->selectedUnit;
+                $unitName = $unit?->name ?? ($product->base_unit ?: 'Piece');
+                // Cost and price of the unit being edited: a crate of 24 costs
+                // 24 of the base cost, so its margin is measured against that.
+                $cost = $this->selectedCost;
+                $currentPrice = $this->selectedCurrentPrice;
                 $currentMargin = $cost > 0 && $newPrice > 0 ? (($newPrice - $cost) / $newPrice) * 100 : 0;
                 $isLoss = $cost > 0 && $newPrice < $cost;
             @endphp
@@ -60,15 +66,37 @@
                         @svg('heroicon-m-x-mark', 'w-6 h-6')
                     </button>
                 </div>
+
+                {{-- Which unit's price to change. Only for a product sold in
+                     more than one unit; everything else looks as it did. --}}
+                @if($units->isNotEmpty())
+                    <div class="px-6 pt-5">
+                        <span class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Unit to change</span>
+                        <div class="flex flex-wrap gap-2" role="group" aria-label="Unit to change">
+                            <button type="button" wire:click="selectUnit(null)" aria-pressed="{{ $unit === null ? 'true' : 'false' }}"
+                                class="px-4 py-2 rounded-xl border text-sm font-semibold {{ $unit === null ? 'bg-primary-600 border-primary-600 text-white' : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200' }}">
+                                {{ $product->base_unit ?: 'Piece' }}
+                                <span class="block text-xs font-normal opacity-80">₦{{ number_format((float) $product->price) }}</span>
+                            </button>
+                            @foreach($units as $u)
+                                <button type="button" wire:click="selectUnit({{ $u->id }})" aria-pressed="{{ $unit?->id === $u->id ? 'true' : 'false' }}"
+                                    class="px-4 py-2 rounded-xl border text-sm font-semibold {{ $unit?->id === $u->id ? 'bg-primary-600 border-primary-600 text-white' : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200' }}">
+                                    {{ $u->name }} <span class="font-normal opacity-80">({{ $u->conversion_factor }})</span>
+                                    <span class="block text-xs font-normal opacity-80">₦{{ number_format((float) $u->price) }}</span>
+                                </button>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
                 
                 <div class="p-6 bg-gray-50 dark:bg-gray-800/50 grid grid-cols-3 gap-4 border-b border-gray-200 dark:border-gray-700">
                     <div class="text-center">
-                        <span class="block text-xs font-semibold text-gray-500 uppercase tracking-wider">Current Cost</span>
+                        <span class="block text-xs font-semibold text-gray-500 uppercase tracking-wider">Current Cost{{ $units->isNotEmpty() ? ' / '.$unitName : '' }}</span>
                         <span class="block mt-1 text-lg font-bold text-gray-900 dark:text-white">{{ $cost > 0 ? '₦'.number_format($cost) : 'Not Set' }}</span>
                     </div>
                     <div class="text-center border-l border-gray-200 dark:border-gray-700">
-                        <span class="block text-xs font-semibold text-gray-500 uppercase tracking-wider">Current Price</span>
-                        <span class="block mt-1 text-lg font-bold text-gray-900 dark:text-white">₦{{ number_format((float) $product->price) }}</span>
+                        <span class="block text-xs font-semibold text-gray-500 uppercase tracking-wider">Current Price{{ $units->isNotEmpty() ? ' / '.$unitName : '' }}</span>
+                        <span class="block mt-1 text-lg font-bold text-gray-900 dark:text-white">₦{{ number_format($currentPrice) }}</span>
                     </div>
                     <div class="text-center border-l border-gray-200 dark:border-gray-700">
                         <span class="block text-xs font-semibold text-gray-500 uppercase tracking-wider">New Margin</span>
@@ -78,9 +106,21 @@
 
                 <div class="p-6 space-y-6">
                     <div>
-                        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">New Selling Price (₦)</label>
+                        <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">New Selling Price{{ $units->isNotEmpty() ? ' per '.$unitName : '' }} (₦)</label>
                         <input type="number" wire:model.live="newPrice" class="block w-full text-center text-4xl font-black py-4 border-gray-300 dark:border-gray-600 rounded-2xl focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white shadow-sm">
                     </div>
+
+                    {{-- Half of this unit, for a shop that sells halves. Blank
+                         charges exactly half of the price above. --}}
+                    @if($this->sellsHalves)
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Half price — ½ {{ $unitName }} (₦)</label>
+                            <input type="number" min="0" step="0.01" wire:model.live="newHalfPrice"
+                                placeholder="Auto: ₦{{ number_format(round((float) $newPrice / 2, 2), 2) }}"
+                                class="block w-full text-center text-2xl font-bold py-3 border-gray-300 dark:border-gray-600 rounded-2xl focus:ring-primary-500 focus:border-primary-500 dark:bg-gray-700 dark:text-white shadow-sm">
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Price for half of this unit. Leave blank to charge exactly half.</p>
+                        </div>
+                    @endif
                     
                     <div class="grid grid-cols-4 gap-3">
                         <button wire:click="adjustPrice(-1000)" class="py-3 bg-red-50 text-red-700 font-bold rounded-xl border border-red-200 active:bg-red-100">-1k</button>
