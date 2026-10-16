@@ -3,6 +3,7 @@
 use App\Models\Affiliate;
 use App\Models\Category;
 use App\Models\Product;
+use Database\Factories\ProductFactory;
 use App\Models\User;
 use App\Models\Vendor;
 use Livewire\Volt\Volt;
@@ -13,7 +14,7 @@ function makeAffiliatePageProduct(): Product
     $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Affiliate Page Store ' . uniqid(), 'online_sales_enabled' => true]);
     $category = Category::create(['name' => 'Affiliate Page Category ' . uniqid()]);
 
-    return Product::create([
+    return ProductFactory::new()->withPhoto()->create([
         'vendor_id'      => $vendor->id,
         'category_id'    => $category->id,
         'name'           => 'Affiliate Page Widget',
