@@ -35,6 +35,10 @@ class LoginResponse implements LoginResponseContract
             return Filament::getPanel('admin')->getUrl();
         }
 
+        if ($user->isCatalogueEditor()) {
+            return \App\Filament\Resources\Products\ProductResource::getUrl('index', panel: 'admin');
+        }
+
         if ($user->vendors()->isNotEmpty()) {
             return Filament::getPanel('vendor')->getUrl();
         }

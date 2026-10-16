@@ -31,6 +31,13 @@ class ClientRequestResource extends Resource
         return 'warning'; // Makes the badge yellow/orange
     }
 
+    // Admin panel is super-admin territory; the catalogue editor, also admitted
+    // to the panel, must not see this. Explicit rather than left to the policy.
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->isSuperAdmin() ?? false;
+    }
+
     public static function form(Schema $schema): Schema
     {
         return ClientRequestForm::configure($schema);

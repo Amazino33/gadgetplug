@@ -44,6 +44,13 @@ class RoleResource extends Resource
     protected static ?string $recordTitleAttribute = 'name';
 
     #[Override]
+    // Admin panel is super-admin territory; the catalogue editor, also admitted
+    // to the panel, must not see this. Explicit rather than left to the policy.
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->isSuperAdmin() ?? false;
+    }
+
     public static function form(Schema $schema): Schema
     {
         return $schema

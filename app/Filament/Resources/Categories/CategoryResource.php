@@ -24,6 +24,13 @@ class CategoryResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
+    // Admin panel is super-admin territory; the catalogue editor, also admitted
+    // to the panel, must not see this. Explicit rather than left to the policy.
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->isSuperAdmin() ?? false;
+    }
+
     public static function form(Schema $schema): Schema
     {
         return CategoryForm::configure($schema);

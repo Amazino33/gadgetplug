@@ -81,6 +81,39 @@ class User extends Authenticatable implements HasTenants, FilamentUser
             ->exists();
     }
 
+    // The global back-office catalogue editor (team_id null). Raw check for the
+    // same reason as isSuperAdmin(): hasRole() would filter by whatever team
+    // the resolver currently returns.
+    public function isCatalogueEditor(): bool
+    {
+        return \Illuminate\Support\Facades\DB::table('model_has_roles')
+            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+            ->where('model_has_roles.model_id', $this->id)
+            ->where('model_has_roles.model_type', get_class($this))
+            ->whereNull('model_has_roles.team_id')
+            ->where('roles.name', 'catalogue_editor')
+            ->where('roles.guard_name', 'web')
+            ->exists();
+    }
+
+    // A permission held through a GLOBAL role (team_id null), checked the same
+    // way whatever panel or tenant the request is in. Spatie filters roles by
+    // the current team, so inside the vendor panel a plain can() would never
+    // see a global role — and outside it, a vendor role would never count.
+    public function hasGlobalPermission(string $permission): bool
+    {
+        $previousTeam = getPermissionsTeamId();
+        setPermissionsTeamId(null);
+        $this->unsetRelation('roles')->unsetRelation('permissions');
+
+        try {
+            return $this->checkPermissionTo($permission);
+        } finally {
+            setPermissionsTeamId($previousTeam);
+            $this->unsetRelation('roles')->unsetRelation('permissions');
+        }
+    }
+
     public function initials(): string
     {
         return Str::of($this->name)
@@ -194,7 +227,10 @@ class User extends Authenticatable implements HasTenants, FilamentUser
     public function canAccessPanel(Panel $panel): bool
     {
         if ($panel->getId() === 'admin') {
-            return $this->isSuperAdmin();
+            // The catalogue editor is admitted to the panel, but every admin
+            // resource and page except All Products keeps its own super_admin
+            // gate — see AdminPanelAccessTest, which checks all of them.
+            return $this->isSuperAdmin() || $this->isCatalogueEditor();
         }
 
         if ($panel->getId() === 'vendor') {

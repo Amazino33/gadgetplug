@@ -72,4 +72,33 @@ class ProductPolicy
         return $authUser->can('Reorder:Product');
     }
 
+    // ── Back-office catalogue editing ────────────────────────────────────────
+    //
+    // Hand-written, not Shield-generated: Shield's names are Verb:Model, these
+    // are platform permissions held through the GLOBAL catalogue_editor role.
+    // super_admin passes via Gate::before. Checked by the actions themselves,
+    // not only by hiding their buttons — see ManageProductImages.
+
+    /** Open the admin All Products page — anyone who may edit some part of the catalogue. */
+    public function viewCatalogue(AuthUser $authUser): bool
+    {
+        return method_exists($authUser, 'hasGlobalPermission')
+            && ($authUser->hasGlobalPermission('update_product_media')
+                || $authUser->hasGlobalPermission('update_product_online_name'));
+    }
+
+    /** Replace a product's photos — and nothing else about it. */
+    public function updateMedia(AuthUser $authUser, Product $product): bool
+    {
+        return method_exists($authUser, 'hasGlobalPermission')
+            && $authUser->hasGlobalPermission('update_product_media');
+    }
+
+    /** Set the customer-facing online name and meta description. */
+    public function updateOnlineName(AuthUser $authUser, Product $product): bool
+    {
+        return method_exists($authUser, 'hasGlobalPermission')
+            && $authUser->hasGlobalPermission('update_product_online_name');
+    }
+
 }

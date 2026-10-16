@@ -35,6 +35,13 @@ class SupplierLinkResource extends Resource
 
     protected static ?string $modelLabel = 'supplier link';
 
+    // Admin panel is super-admin territory; the catalogue editor, also admitted
+    // to the panel, must not see this. Explicit rather than left to the policy.
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->isSuperAdmin() ?? false;
+    }
+
     public static function form(Schema $schema): Schema
     {
         return $schema->components([
