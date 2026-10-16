@@ -21,6 +21,13 @@ class OrderItem extends Model
         return $this->belongsTo(Product::class);
     }
 
+    // Whether this line's stock is ours to reserve, dispatch or release.
+    // False for a resold (VendorLink) listing. See Product::tracksStock().
+    public function tracksStock(): bool
+    {
+        return $this->product?->tracksStock() ?? true;
+    }
+
     // Which store(s) supplied this line. Written at reservation, read by
     // dispatch, release and per-store sales.
     public function storeAllocations()

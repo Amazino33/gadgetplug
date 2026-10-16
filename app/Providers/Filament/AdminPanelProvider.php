@@ -63,6 +63,14 @@ class AdminPanelProvider extends PanelProvider
                 Authenticate::class,
             ])
             ->renderHook(
+                PanelsRenderHook::CONTENT_BEFORE,
+                function (): string {
+                    \App\Services\Messaging\MessagingService::warnRedirectActiveOncePerDay();
+
+                    return Blade::render("@include('partials.messaging-redirect-banner')");
+                },
+            )
+            ->renderHook(
                 PanelsRenderHook::HEAD_END,
                 fn () => Blade::render("@include('partials.meta-pixel')"),
             );

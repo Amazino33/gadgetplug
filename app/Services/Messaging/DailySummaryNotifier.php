@@ -66,7 +66,7 @@ class DailySummaryNotifier
             'status'         => 'queued',
         ]);
 
-        return $this->messaging->send($message);
+        return $this->messaging->dispatch($message);
     }
 
     /**

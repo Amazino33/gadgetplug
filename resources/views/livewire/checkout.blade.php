@@ -489,7 +489,7 @@ new class extends Component {
                     // where he sells the last unit first is accepted, and a
                     // pay-on-delivery order that cannot be filled simply cancels
                     // with nothing paid.
-                    if ($item['product']->isLinked()) {
+                    if (! $item['product']->tracksStock()) {
                         continue;
                     }
 

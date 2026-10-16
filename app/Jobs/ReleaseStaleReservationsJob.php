@@ -54,9 +54,15 @@ class ReleaseStaleReservationsJob
                     return;
                 }
 
-                $locked->load('items');
+                $locked->load('items.product');
 
                 foreach ($locked->items as $item) {
+                    // A resold line never held a reservation; releasing it
+                    // would only write a phantom ledger row on the reseller.
+                    if (! $item->tracksStock()) {
+                        continue;
+                    }
+
                     app(ReleaseReservationAction::class)->execute(
                         productId: $item->product_id,
                         quantity: $item->quantity,

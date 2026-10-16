@@ -9,6 +9,8 @@ use App\Services\Messaging\Drivers\TermiiSmsDriver;
 use App\Services\Messaging\Drivers\WaLinkDriver;
 use App\Services\Messaging\Drivers\WawpDriver;
 use App\Services\Messaging\Drivers\WhatsAppCloudApiDriver;
+use App\Jobs\SendDeliveryMessageJob;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
 use Throwable;
@@ -66,6 +68,51 @@ class MessagingService
         return $message->fresh();
     }
 
+    /**
+     * Hand an automated message to the queue instead of sending it inline.
+     *
+     * For anything triggered by a status change, reminder or summary — never
+     * for a button the user is watching (those call send() and show the result).
+     * The row stays 'queued' until SendDeliveryMessageJob settles it.
+     *
+     * Never throws: with the sync queue (tests, local) a failing job rethrows
+     * into the caller, and a messaging problem must not break an order flow.
+     */
+    public function dispatch(DeliveryMessage $message): DeliveryMessage
+    {
+        try {
+            SendDeliveryMessageJob::dispatch($message->id);
+        } catch (Throwable $e) {
+            Log::warning('Could not run queued delivery message.', [
+                'delivery_message_id' => $message->id,
+                'exception' => $e->getMessage(),
+            ]);
+        }
+
+        return $message->fresh() ?? $message;
+    }
+
+    /** The number every message is currently diverted to, or null when the valve is off. */
+    public static function redirectTarget(): ?string
+    {
+        $target = PhoneNumber::toNigerianInternational(config('services.messaging.redirect_all_to'));
+
+        return blank($target) ? null : $target;
+    }
+
+    public static function warnRedirectActiveOncePerDay(): void
+    {
+        if (self::redirectTarget() === null) {
+            return;
+        }
+
+        if (Cache::add('messaging.redirect-warned.'.now()->toDateString(), true, now()->endOfDay())) {
+            Log::warning('MESSAGING_REDIRECT_ALL_TO is set — every WhatsApp/SMS is being diverted to one number and no customer is receiving anything. Unset it to go live.', [
+                'redirected_to' => self::redirectTarget(),
+            ]);
+        }
+    }
+
     // Test-mode safety valve: when MESSAGING_REDIRECT_ALL_TO is set, every message
     // goes to that number instead of the real recipient. Lets a provider be
     // exercised end to end through the real app — real orders, real status
@@ -79,11 +126,10 @@ class MessagingService
             return null;
         }
 
-        Log::warning('Delivery message redirected — MESSAGING_REDIRECT_ALL_TO is set. Unset it to reach real customers.', [
-            'delivery_message_id' => $message->id,
-            'intended_for' => $message->to_number,
-            'redirected_to' => $target,
-        ]);
+        // Once a day rather than per message: the banner in the admin panel is
+        // the standing reminder, and every redirected row records redirected_to
+        // in provider_response.
+        self::warnRedirectActiveOncePerDay();
 
         $message->body      = "[TEST — intended for {$message->to_number}]\n\n".$message->body;
         $message->to_number = $target;

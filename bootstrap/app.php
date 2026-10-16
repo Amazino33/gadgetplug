@@ -41,6 +41,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // feed post. Appended for the same reason as above — it needs the
         // session started and the final response to set its cookie on.
         $middleware->web(append: [EnsureDeviceToken::class]);
+
+        // Paystack's webhook carries no session or token; it is authenticated by
+        // its HMAC signature header (PaystackWebhookController).
+        $middleware->validateCsrfTokens(except: ['paystack/webhook']);
     })
     ->withSchedule(function (Schedule $schedule): void {
         // This host doesn't allow a persistent `queue:work` daemon, so nothing
@@ -53,7 +57,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // --stop-when-empty exits as soon as both queues are clear rather
         // than idling; --max-time=50 is a safety net so a run can't still be
         // going when the next minute's cron tick starts.
-        $schedule->command('queue:work --queue=meta,default --stop-when-empty --max-time=50')
+        $schedule->command('queue:work --queue=meta,messaging,default --stop-when-empty --max-time=50')
             ->everyMinute()
             ->withoutOverlapping();
 

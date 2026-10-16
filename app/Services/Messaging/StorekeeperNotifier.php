@@ -224,7 +224,7 @@ class StorekeeperNotifier
             'status'         => 'queued',
         ]);
 
-        return $this->messaging->send($message);
+        return $this->messaging->dispatch($message);
     }
 
     // The vendor's own storekeeper when they have set one, otherwise GadgetPlug's

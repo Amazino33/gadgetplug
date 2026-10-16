@@ -276,7 +276,7 @@ class OrderObserver
                 // is nothing here to deduct. Skipped rather than left to fail
                 // and be logged, which would bury a real dispatch failure in
                 // noise.
-                if ($item->product?->isLinked()) {
+                if (! $item->tracksStock()) {
                     continue;
                 }
 
@@ -320,7 +320,7 @@ class OrderObserver
             foreach ($order->items as $item) {
                 // Nothing was reserved for a resold line, so there is nothing
                 // to give back.
-                if ($item->product?->isLinked()) {
+                if (! $item->tracksStock()) {
                     continue;
                 }
 
@@ -416,6 +416,7 @@ class OrderObserver
             'status'         => 'queued',
         ]);
 
-        app(MessagingService::class)->send($message);
+        // Queued: this runs inside checkout, which must not wait on a gateway.
+        app(MessagingService::class)->dispatch($message);
     }
 }

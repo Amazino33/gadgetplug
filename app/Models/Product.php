@@ -140,6 +140,19 @@ class Product extends Model implements HasMedia
         return $this->source_product_id !== null;
     }
 
+    /**
+     * Whether this product's units are ours to reserve, dispatch and release.
+     *
+     * The single answer every stock path asks — checkout, the Paystack
+     * confirmation, the observer, the stale-reservation sweep, reseller
+     * purchases. A resold listing's goods sit in the supplier's shop and are
+     * read, never written, so nothing here may touch a stock row for it.
+     */
+    public function tracksStock(): bool
+    {
+        return ! $this->isLinked();
+    }
+
     public function scopeLinked(Builder $query): Builder
     {
         return $query->whereNotNull('source_product_id');

@@ -103,6 +103,11 @@ class ResellerCheckoutService
                     'unit_cost'  => $line['product']->cost_price,
                 ]);
 
+                // A resold listing holds no stock of ours to reserve.
+                if (! $line['product']->tracksStock()) {
+                    continue;
+                }
+
                 $this->reserveStock->execute(
                     productId: $line['product']->id,
                     quantity: $line['quantity'],

@@ -1,76 +1,47 @@
-<?php 
+<?php
+
 namespace App\Http\Controllers\Payment;
 
+use App\Actions\Payment\ConfirmPaystackPaymentAction;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use App\Models\Order;
-use App\Actions\Inventory\ReserveStockAction;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Session;
-use Exception;
 
 class PaystackCallbackController extends Controller
 {
     /**
-     * Handle the incoming Paystack webhook/callback.
+     * The customer's browser returning from Paystack. The webhook may already
+     * have confirmed the order; the action is idempotent, so either order of
+     * arrival ends the same.
      */
-    public function __invoke(Request $request, ReserveStockAction $reserveStock)
+    public function __invoke(Request $request, ConfirmPaystackPaymentAction $confirm)
     {
         $reference = $request->query('reference');
 
-        if (!$reference) {
+        if (! $reference) {
             abort(400, 'No reference supplied');
         }
 
-        // Verify the transaction with Paystack
-        $response = Http::withToken(config('services.paystack.secret_key'))
-            ->get("https://api.paystack.co/transaction/verify/{$reference}");
+        $result = $confirm->execute((string) $reference);
 
-        // If verification fails, redirect immediately
-        if (!$response->successful() || $response->json('data.status') !== 'success') {
-            return redirect()->route('cart')->with('error', 'Payment failed or was cancelled.');
-        }
+        switch ($result) {
+            case ConfirmPaystackPaymentAction::PAID:
+            case ConfirmPaystackPaymentAction::ALREADY:
+                Session::forget('cart');
+                session()->put('payment_success', (string) $reference);
 
-        // Find the order with its items to prevent N+1 queries
-        $order = Order::with('items')->where('reference', $reference)->firstOrFail();
+                return redirect()->route('checkout');
 
-        // if it is already paid (e.g., webhook and redirect hit at the same time), just return success
-        if ($order->status !== 'pending') {
-            Session::forget('cart');
-            session()->put('payment_success', $order->reference);
-            return redirect()->route('checkout');
-        }
+            case ConfirmPaystackPaymentAction::FAILED_STOCK:
+                Session::forget('cart');
 
-        try {
-            // 1. Reserve stock — physical item stays on shelf until dispatched
-            foreach ($order->items as $item) {
-                $reserveStock->execute(
-                    productId:   $item->product_id,
-                    quantity:    $item->quantity,
-                    reference:   $order->reference,
-                    description: 'Reserved on Paystack payment confirmation.',
-                    orderItemId: $item->id,
-                );
-            }
+                return redirect()->route('home')->with('warning', 'Payment successful, but an item sold out during checkout. Our team will contact you to resolve this.');
 
-            // 2. Only update status to 'paid' If the stock deduction succeeds
-            $order->update(['status' => 'paid']);
+            case ConfirmPaystackPaymentAction::NOT_FOUND:
+                abort(404);
 
-            // 3. Clear the cart
-            Session::forget('cart');
-
-            session()->put('payment_success', $order->reference);
-            return redirect()->route('checkout');
-        } catch (Exception $e) {
-            // 4. Race condition caught
-            // Someone bought the last item while this user was typing their card details
-            Log::error("Stock deduction failed after payment for order {$order->id}: " . $e->getMessage());
-
-            $order->update(['status' => 'paid_but_failed_stock']);
-            Session::forget('cart');
-
-            return redirect()->route('home')->with('warning', 'Payment successful, but an item sold out during checkout. Our team will contact you to resolve this.');
+            default: // UNVERIFIED, MISMATCH
+                return redirect()->route('cart')->with('error', 'Payment failed or was cancelled.');
         }
     }
 }

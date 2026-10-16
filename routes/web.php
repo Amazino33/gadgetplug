@@ -48,6 +48,11 @@ Volt::route('/checkout', 'checkout')->name('checkout');
 
 Route::get('/payment/callback', PaystackCallbackController::class)->name('payment.callback');
 
+// Server-to-server confirmation from Paystack, for the customer who pays and
+// closes the tab before the redirect above. Excluded from CSRF in
+// bootstrap/app.php; authenticated by the x-paystack-signature header instead.
+Route::post('/paystack/webhook', \App\Http\Controllers\Payment\PaystackWebhookController::class)->name('paystack.webhook');
+
 Route::get('/r/{code}', [AffiliateClickController::class, 'redirect'])->name('affiliate.click');
 
 
