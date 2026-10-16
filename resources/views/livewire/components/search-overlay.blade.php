@@ -48,7 +48,7 @@ new class extends Component
         return Product::query()
             ->visibleOnline()
             ->inStockForSale()
-            ->with(['vendor', 'category', 'media'])
+            ->with(['vendor', 'category'])->withCatalogue()
             ->where(function ($q) use ($escaped) {
                 $q->where('name', 'like', "%{$escaped}%")
                   ->orWhere('brand', 'like', "%{$escaped}%");
@@ -329,7 +329,7 @@ new class extends Component
 
                         <div class="space-y-2">
                             @foreach ($this->results as $result)
-                            @php $thumb = $result->getFirstMediaUrl('product-images', 'thumb'); @endphp
+                            @php $thumb = $result->catalogueImageUrl('thumb'); @endphp
                             <a href="{{ route('product.show', $result) }}"
                                wire:key="search-{{ $result->id }}"
                                class="flex items-center gap-3 rounded-xl bg-white p-2.5 transition-colors hover:bg-[#f0f8f0] dark:bg-[#162016] dark:hover:bg-[#1f2f1f]">

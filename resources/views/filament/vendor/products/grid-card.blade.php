@@ -1,7 +1,7 @@
 @php
     // $record is passed in directly — no longer rendered via a Filament
     // ViewColumn, so there's no $getRecord() closure to call.
-    $imgUrl = $record->getFirstMediaUrl('product-images', 'thumb');
+    $imgUrl = $record->catalogueImageUrl('thumb'); // a resold listing shows its supplier's photo
     $available = $record->storeAvailable();
 
     $badge = match (true) {

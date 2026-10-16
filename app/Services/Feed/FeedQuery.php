@@ -139,7 +139,9 @@ class FeedQuery
         return Product::query()
             ->visibleOnline()
             ->inStockForSale()
-            ->with(['vendor:id,name,slug,logo,city,state', 'media'])
+            ->with(['vendor:id,name,slug,logo,city,state'])
+            // Photos and caption of a resold listing are its supplier's.
+            ->withCatalogue()
             ->when($categoryId, fn (Builder $q) => $q->where('products.category_id', $categoryId))
             ->tap(fn (Builder $q) => self::applySearch($q, $search))
             ->select([
@@ -233,7 +235,7 @@ class FeedQuery
             'id'          => $p->id,
             'name'        => $p->name,
             'slug'        => $p->slug,
-            'caption'     => $p->description,
+            'caption'     => $p->catalogueDescription(),
             'price'       => (float) $p->price,
             'url'         => route('product.show', $p->slug),
             // Falls back through feed -> preview -> placeholder, so a queue

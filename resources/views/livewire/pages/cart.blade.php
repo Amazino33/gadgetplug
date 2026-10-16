@@ -9,6 +9,9 @@ new class extends Component {
     public array $cartItems = [];
     public float $total = 0;
 
+    // Why something just left the cart, said once on the page that removed it.
+    public ?string $notice = null;
+
     public function mount(): void
     {
         $this->loadCart();
@@ -20,11 +23,12 @@ new class extends Component {
         $cart = Session::get('cart', []);
         $this->cartItems = [];
         $this->total = 0;
+        $this->notice = null;
 
         if (empty($cart)) return;
 
         $productIds = array_keys($cart);
-        $products   = Product::with('media')->whereIn('id', $productIds)->get()->keyBy('id');
+        $products   = Product::withCatalogue()->whereIn('id', $productIds)->get()->keyBy('id');
         $changed    = false;
 
         foreach ($cart as $productId => $item) {
@@ -39,6 +43,16 @@ new class extends Component {
                 continue;
             }
 
+            // A resold listing whose supplier side no longer resolves (link
+            // off, his product unpublished or gone) cannot be sold. Take it out
+            // here, with a reason, rather than let it fail at payment.
+            if (! $product->tracksStock() && $product->catalogueSource() === null) {
+                unset($cart[$productId]);
+                $changed = true;
+                $this->notice = '"'.$product->name.'" is no longer available and has been removed from your cart.';
+                continue;
+            }
+
             $qty              = $item['quantity'];
             $this->total     += $product->price * $qty;
             $this->cartItems[] = [
@@ -50,7 +64,7 @@ new class extends Component {
                 'quantity' => $qty,
                 'subtotal' => (float) ($product->price * $qty),
                 'max'      => $item['max'] ?? $product->stock_quantity,
-                'thumb'    => $product->getFirstMediaUrl('product-images', 'thumb'),
+                'thumb'    => $product->catalogueImageUrl('thumb'),
                 'slug'     => $product->slug,
             ];
         }
@@ -129,6 +143,13 @@ new class extends Component {
             Continue Shopping
         </a>
     </div>
+
+    {{-- Items removed on this load, or by checkout before it sent the customer back here. --}}
+    @if ($notice || session()->has('error'))
+    <div role="alert" class="bg-[#fce4ec] border border-[#f8bbd0] text-red-700 px-4 py-3 rounded-xl mb-5 text-[13px]">
+        {{ $notice ?? session('error') }}
+    </div>
+    @endif
 
     @if (count($cartItems) > 0)
 

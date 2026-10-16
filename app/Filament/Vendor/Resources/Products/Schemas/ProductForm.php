@@ -301,7 +301,18 @@ class ProductForm
                                 Grid::make(['default' => 1, 'lg' => 3])
                                     ->schema([
                                         Group::make([
+                                            // A resold listing shows its supplier's photos, live;
+                                            // anything uploaded here would never be seen.
                                             Section::make('Photos')
+                                                ->visible(fn ($record) => (bool) $record?->isLinked())
+                                                ->schema([
+                                                    Placeholder::make('linked_photos_note')
+                                                        ->hiddenLabel()
+                                                        ->content('Photos come from your supplier\'s product and update automatically when they change theirs.'),
+                                                ]),
+
+                                            Section::make('Photos')
+                                                ->visible(fn ($record) => ! $record?->isLinked())
                                                 ->schema([
                                                     SpatieMediaLibraryFileUpload::make('images')
                                                         ->label('')

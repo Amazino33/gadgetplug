@@ -1,5 +1,5 @@
 @php
-    $imgUrl = $product->getFirstMediaUrl('product-images', 'thumb');
+    $imgUrl = $product->catalogueImageUrl('thumb'); // a resold listing shows its supplier's photo
     $available = $product->storeAvailable();
 
     $stockDot = match (true) {

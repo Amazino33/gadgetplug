@@ -22,9 +22,9 @@ function published(float $price = 10000, int $stock = 5, float $markup = 40): ar
 
     $listing = Product::linked()->firstOrFail();
 
-    // A photo, so the listing is one a customer could see (887f13f). Attached
-    // after publishing: the publish copies media files, and this one has none.
-    ProductFactory::attachPhoto($listing);
+    // A photo on HIS product, so the listing is one a customer could see: a
+    // resold listing shows its supplier's photo (Product::catalogueSource()).
+    ProductFactory::attachPhoto($source);
 
     return [$listing, $source, $link, $reseller, $supplier];
 }
@@ -132,10 +132,8 @@ describe('the storefront', function () {
     test('keeps the supplier himself invisible while his goods sell', function () {
         [$listing, $source, , , $supplier] = published(stock: 4);
 
-        // His product has a photo too, so it is his switched-off shop — not a
-        // missing picture — that keeps it off the shelf.
-        ProductFactory::attachPhoto($source);
-
+        // His product has a photo (published() gives it one), so it is his
+        // switched-off shop — not a missing picture — that keeps it off the shelf.
         $visible = Product::visibleOnline()->inStockForSale()->pluck('id');
 
         // His shop is switched off for the marketplace, so his own product is
@@ -181,13 +179,15 @@ describe('the supplier is never written to', function () {
             ->and((float) $source->fresh()->price)->toBe(10000.0);
     });
 
-    test('his edits never reach the copied pictures and words', function () {
+    // Reversed in Oct 2026: what a customer sees is read live from him, and the
+    // listing row itself is still never written by his edits.
+    test('his edits show on the listing live without writing to it', function () {
         [$listing, $source] = published();
         $source->update(['description' => 'His new copy', 'name' => 'His new name']);
 
-        // Presentation was copied once and belongs to the reseller. Only money
-        // stayed live.
-        expect($listing->fresh()->description)->not->toBe('His new copy')
-            ->and($listing->fresh()->name)->not->toBe('His new name');
+        expect($listing->fresh()->catalogueDescription())->toBe('His new copy')
+            // The listing's own internal name is the reseller's and stays put.
+            ->and($listing->fresh()->name)->not->toBe('His new name')
+            ->and($listing->fresh()->description)->toBeNull();
     });
 });

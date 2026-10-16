@@ -109,9 +109,12 @@ class Product extends Model implements HasMedia
     /**
      * The supplier's product this listing resells, if it is a linked listing.
      *
-     * Price and stock resolve from here live; images and description do not —
-     * those are copied once at publish and belong to the reseller thereafter,
-     * so the supplier editing his product never mutates a published listing.
+     * Everything a customer sees about a resold listing resolves from here
+     * live — price, stock, photos and description — so a supplier fixing his
+     * pictures fixes every listing of them at once. Read it through
+     * catalogueSource(), never this relation directly: the relation knows
+     * nothing about whether the link is still on, and inside the vendor panel
+     * tenancy hides the supplier's row from it.
      */
     public function sourceProduct(): BelongsTo
     {
@@ -137,7 +140,12 @@ class Product extends Model implements HasMedia
      */
     public function isLinked(): bool
     {
-        return $this->source_product_id !== null;
+        // supplier_link_id counts too. products.source_product_id is
+        // ON DELETE SET NULL, so when a supplier deletes his product every
+        // listing of it loses its source — but it is still a resold listing
+        // (no stock of its own, nothing of its own to show) and must stay
+        // hidden, not quietly turn into an ordinary product.
+        return $this->source_product_id !== null || $this->supplier_link_id !== null;
     }
 
     /**
@@ -153,21 +161,149 @@ class Product extends Model implements HasMedia
         return ! $this->isLinked();
     }
 
+    // Same definition as isLinked(), in SQL.
     public function scopeLinked(Builder $query): Builder
     {
-        return $query->whereNotNull('source_product_id');
+        return $query->where(fn (Builder $q) => $q->whereNotNull('products.source_product_id')
+            ->orWhereNotNull('products.supplier_link_id'));
     }
 
     public function scopeOwnStock(Builder $query): Builder
     {
-        return $query->whereNull('source_product_id');
+        return $query->whereNull('products.source_product_id')->whereNull('products.supplier_link_id');
     }
 
+    // ── What a customer sees: the catalogue source ──────────────────────────
+
+    /** Memo for catalogueSource() — resolving it can cost a query or two. */
+    private bool $catalogueSourceResolved = false;
+
+    private ?self $resolvedCatalogueSource = null;
+
+    /**
+     * The product whose photos and description a customer is shown.
+     *
+     * Itself for an ordinary product. For a resold (linked) listing, the
+     * supplier's product — live, the same way price and stock already are —
+     * or NULL when that cannot be resolved: link switched off, source
+     * unpublished, deleted, or no longer the supplier's. Null means the listing
+     * is not shown at all; it never falls back to the listing's own row or to
+     * pictures copied onto it in the past.
+     *
+     * Uses eager-loaded supplierLink / sourceProduct when present (see
+     * scopeWithCatalogue) and otherwise reads through SupplierCatalogue, the
+     * one gateway allowed across the tenant line.
+     */
+    public function catalogueSource(): ?self
+    {
+        if (! $this->isLinked()) {
+            return $this;
+        }
+
+        if (! $this->catalogueSourceResolved) {
+            $this->resolvedCatalogueSource = $this->resolveCatalogueSource();
+            $this->catalogueSourceResolved = true;
+        }
+
+        return $this->resolvedCatalogueSource;
+    }
+
+    private function resolveCatalogueSource(): ?self
+    {
+        $link = $this->relationLoaded('supplierLink')
+            ? $this->supplierLink
+            : SupplierLink::find($this->supplier_link_id);
+
+        if (! $link || ! $link->isUsable()) {
+            return null;
+        }
+
+        // A loaded relation can still read null inside the vendor panel, where
+        // tenancy hides the supplier's row — so null falls through to the gateway.
+        $source = $this->relationLoaded('sourceProduct') ? $this->sourceProduct : null;
+        $source ??= \App\Services\VendorLink\SupplierCatalogue::find($link, (int) $this->source_product_id);
+
+        // The same conditions SupplierCatalogue applies and scopeVisibleOnline
+        // repeats in SQL: his, and published.
+        if (! $source
+            || (int) $source->vendor_id !== (int) $link->supplier_vendor_id
+            || $source->status !== 'published') {
+            return null;
+        }
+
+        return $source;
+    }
+
+    /**
+     * Eager-load what catalogueSource() needs, so a page of products resolves
+     * its supplier photos in three queries rather than several per card.
+     */
+    public function scopeWithCatalogue(Builder $query): Builder
+    {
+        return $query->with(['media', 'supplierLink', 'sourceProduct.media']);
+    }
+
+    /** The photos a customer is shown, primary first. Empty when there is no source. */
+    public function catalogueMedia(): \Illuminate\Support\Collection
+    {
+        return $this->catalogueSource()?->getMedia('product-images') ?? collect();
+    }
+
+    /** URL of the primary photo a customer is shown ('' when there is none). */
+    public function catalogueImageUrl(string $conversion = ''): string
+    {
+        return $this->catalogueSource()?->getFirstMediaUrl('product-images', $conversion) ?? '';
+    }
+
+    /** The description a customer is shown. */
+    public function catalogueDescription(): ?string
+    {
+        return $this->catalogueSource()?->description;
+    }
+
+    /**
+     * What a customer may see.
+     *
+     * A product needs a photo to be shown (887f13f). An ordinary product's own;
+     * a resold listing's SUPPLIER's — and only while the link is on and his
+     * product is still published and still his, mirroring catalogueSource() in
+     * SQL so the catalogue, feed and search agree with the product page.
+     */
     public function scopeVisibleOnline(Builder $query): void
     {
         $query->published()->where('show_online', true)
               ->whereHas('vendor', fn (Builder $q) => $q->where('online_sales_enabled', true))
-              ->whereHas('media', fn (Builder $q) => $q->where('collection_name', 'product-images'));
+              ->where(function (Builder $q) {
+                  $q->where(function (Builder $own) {
+                      // Both null: an orphaned listing (source deleted) has
+                      // only its link id left and must not pass as ordinary.
+                      $own->whereNull('products.source_product_id')
+                          ->whereNull('products.supplier_link_id')
+                          ->whereHas('media', fn (Builder $m) => $m->where('collection_name', 'product-images'));
+                  })->orWhere(function (Builder $linked) {
+                      $linked->whereNotNull('products.source_product_id')
+                          ->whereExists(function ($src) {
+                              $src->selectRaw('1')
+                                  ->from('products as catalogue_src')
+                                  ->whereColumn('catalogue_src.id', 'products.source_product_id')
+                                  ->where('catalogue_src.status', 'published')
+                                  ->whereExists(function ($link) {
+                                      $link->selectRaw('1')
+                                          ->from('supplier_links')
+                                          ->whereColumn('supplier_links.id', 'products.supplier_link_id')
+                                          ->whereColumn('supplier_links.supplier_vendor_id', 'catalogue_src.vendor_id')
+                                          ->where('supplier_links.is_active', true);
+                                  })
+                                  ->whereExists(function ($media) {
+                                      $media->selectRaw('1')
+                                          ->from('media')
+                                          ->where('media.model_type', (new self)->getMorphClass())
+                                          ->whereColumn('media.model_id', 'catalogue_src.id')
+                                          ->where('media.collection_name', 'product-images');
+                                  });
+                          });
+                  });
+              });
     }
 
     public function scopeVisibleInPos(Builder $query): void
@@ -408,11 +544,13 @@ class Product extends Model implements HasMedia
      * placeholder, because a feed of broken image icons is worse than a feed of
      * heavy ones — and a product whose upload failed should still be sellable.
      *
+     * A resold listing shows its supplier's photo (catalogueSource()).
+     *
      * @return array{src: string, srcset: ?string, ready: bool}
      */
     public function feedImage(): array
     {
-        $media = $this->getFirstMedia('product-images');
+        $media = $this->catalogueSource()?->getFirstMedia('product-images');
 
         if (! $media) {
             return ['src' => asset('images/product-placeholder.svg'), 'srcset' => null, 'ready' => false];

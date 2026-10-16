@@ -7,6 +7,7 @@ use App\Models\ProductStoreStock;
 use App\Models\SupplierLink;
 use App\Models\User;
 use App\Models\Vendor;
+use Database\Factories\ProductFactory;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -74,22 +75,27 @@ describe('publishing a supplier product', function () {
             ->and((bool) $listing->show_online)->toBeTrue();
     });
 
-    test('copies the description, which then belongs to the reseller', function () {
+    // Reversed in Oct 2026: presentation is no longer copied. A listing shows its
+    // supplier's photos and description live, so his fixes reach every listing.
+    test('copies neither photos nor description; the listing shows his, live', function () {
         $link = makeLink(linkVendor('Reseller'), linkVendor('Wholesaler'));
         $source = linkProduct($link->supplier);
         $source->update(['description' => 'Original supplier copy']);
+        ProductFactory::attachPhoto($source);
 
         app(PublishLinkedListingAction::class)->execute($link, [$source->id]);
 
         $listing = Product::linked()->firstOrFail();
 
-        expect($listing->description)->toBe('Original supplier copy');
+        expect($listing->getMedia('product-images'))->toHaveCount(0)
+            ->and($listing->description)->toBeNull()
+            ->and($listing->catalogueDescription())->toBe('Original supplier copy')
+            ->and($listing->catalogueMedia())->toHaveCount(1);
 
-        // The supplier rewriting his own words must not rewrite a listing
-        // somebody is already selling.
+        // His rewrite reaches the listing with nothing to run.
         $source->update(['description' => 'He changed his mind']);
 
-        expect($listing->fresh()->description)->toBe('Original supplier copy');
+        expect($listing->fresh()->catalogueDescription())->toBe('He changed his mind');
     });
 
     test('publishes many at once', function () {
@@ -116,7 +122,7 @@ describe('publishing again', function () {
             ->and(Product::linked()->count())->toBe(1);
     });
 
-    test('does not undo the reseller edits to name, words or pictures', function () {
+    test('re-publishing copies nothing and leaves the listing\'s own columns alone', function () {
         $link = makeLink(linkVendor('Reseller'), linkVendor('Wholesaler'));
         $source = linkProduct($link->supplier);
         $source->update(['description' => 'Supplier copy']);
@@ -125,13 +131,15 @@ describe('publishing again', function () {
 
         $listing = Product::linked()->firstOrFail();
         $listing->update(['name' => 'My Own Title', 'description' => 'My own words']);
+        ProductFactory::attachPhoto($source);
 
         app(PublishLinkedListingAction::class)->execute($link, [$source->id]);
 
-        // Re-publishing refreshes the money, never the shop window somebody
-        // has already dressed.
+        // Re-publishing refreshes the money only: the reseller's internal name
+        // is untouched, and no photo or description is copied across.
         expect($listing->fresh()->name)->toBe('My Own Title')
-            ->and($listing->fresh()->description)->toBe('My own words');
+            ->and($listing->fresh()->description)->toBe('My own words')
+            ->and($listing->fresh()->getMedia('product-images'))->toHaveCount(0);
     });
 
     test('picks up a supplier price change on the mirrored price', function () {

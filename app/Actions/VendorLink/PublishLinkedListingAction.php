@@ -18,10 +18,13 @@ use RuntimeException;
  * and the pixel all treat it like any other product. What makes it a linked
  * listing is only that it points at a source.
  *
- * Presentation is copied once; commerce stays live. Images and description are
- * copied here and belong to the reseller from then on — the supplier editing his
- * product must never rewrite a listing somebody is already selling. Price and
- * stock are the opposite: they answer to the supplier, always.
+ * Everything a customer sees stays live on the supplier's product: price,
+ * stock, photos and description are all read from the source at display time
+ * (Product::catalogueSource()). Nothing presentational is copied, so a supplier
+ * fixing a photo fixes it on every reseller's listing at once. The listing keeps
+ * only its own internal name, brand and category for the reseller's own panel.
+ * (This reversed the earlier "copied once, reseller owns it" rule in Oct 2026;
+ * vendorlink:purge-copied-media clears what that rule left behind.)
  *
  * The listing deliberately holds NO stock of its own. products.stock_quantity is
  * authoritatively recomputed from the per-store rows, so a mirrored quantity
@@ -83,7 +86,8 @@ class PublishLinkedListingAction
                 'category_id'       => $source->category_id,
                 'name'              => $source->name,
                 'brand'             => $source->brand,
-                'description'       => $source->description,
+                // No description and no photos: both resolve live from the
+                // source. See the class docblock.
 
                 // A mirror of the marked-up price, kept so the catalogue can
                 // sort and filter on it in SQL. Price has no invariant behind
@@ -102,8 +106,6 @@ class PublishLinkedListingAction
                 'show_in_pos' => false,
             ]);
 
-            $this->copyImages($source, $listing);
-
             return $listing;
         });
     }
@@ -111,10 +113,10 @@ class PublishLinkedListingAction
     /**
      * Re-publishing an already-linked product.
      *
-     * Updates the mirrored price and re-points the link, and deliberately does
-     * NOT touch name, description or images: those belong to the reseller once
-     * published, and somebody has very likely edited them. Overwriting on a
-     * re-publish would silently undo that work.
+     * Updates the mirrored price and re-points the link. Never touches name,
+     * description or photos: the internal name is the reseller's, and photos
+     * and description are read live from the source, so there is nothing to
+     * refresh.
      */
     private function refresh(Product $listing, Product $source, SupplierLink $link): void
     {
@@ -136,19 +138,5 @@ class PublishLinkedListingAction
         $marked = (float) $source->price * (1 + ((float) $link->markup_percent / 100));
 
         return RoundingRules::make($link->rounding_rule)->apply($marked);
-    }
-
-    /**
-     * Copy the supplier's pictures into the listing.
-     *
-     * Copied, not referenced: the reseller owns them afterwards and may replace
-     * them, and the supplier deleting his product must not strip the images off
-     * a listing that is still selling.
-     */
-    private function copyImages(Product $source, Product $listing): void
-    {
-        foreach ($source->getMedia('product-images') as $media) {
-            $media->copy($listing, 'product-images');
-        }
     }
 }

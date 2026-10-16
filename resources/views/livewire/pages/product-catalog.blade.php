@@ -70,7 +70,7 @@ new class extends Component {
     public function with(): array
     {
         $query = Product::visibleOnline()
-            ->with(['vendor', 'category', 'media'])
+            ->with(['vendor', 'category'])->withCatalogue()
             ->inStockForSale()
             ->when($this->selectedCategory, fn($q) => $q->where('category_id', $this->selectedCategory))
             ->when($this->search, fn($q) => $q->where(function ($sq) {
@@ -96,8 +96,8 @@ new class extends Component {
         $categories->take(5)->each(function (Category $category) {
             $category->trendingImageUrl = $category->getFirstMediaUrl('category-image', 'thumb')
                 ?: optional(
-                    Product::visibleOnline()->where('category_id', $category->id)->with('media')->first()
-                )?->getFirstMediaUrl('product-images', 'thumb');
+                    Product::visibleOnline()->where('category_id', $category->id)->withCatalogue()->first()
+                )?->catalogueImageUrl('thumb');
         });
 
         return [
@@ -416,7 +416,7 @@ $cardBgs = [
             @php
                 $bg = $cardBgs[$product->id % count($cardBgs)];
                 $isNew = $product->created_at->diffInDays(now()) <= 14;
-                $thumbUrl = $product->getFirstMediaUrl('product-images', 'preview');
+                $thumbUrl = $product->catalogueImageUrl('preview');
                 $categoryIcon = \App\Support\CategoryIcon::for($product->category?->name);
                 // The first row is what a visitor sees without scrolling, so it
                 // loads eagerly; everything after it defers.

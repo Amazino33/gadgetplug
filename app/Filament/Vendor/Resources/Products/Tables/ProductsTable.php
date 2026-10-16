@@ -49,7 +49,7 @@ class ProductsTable
                     ImageColumn::make('thumb')
                         ->label('')
                         ->getStateUsing(fn (Product $record): ?string =>
-                            $record->getFirstMediaUrl('product-images', 'thumb') ?: null
+                            $record->catalogueImageUrl('thumb') ?: null
                         )
                         ->defaultImageUrl(self::PLACEHOLDER_IMAGE)
                         ->size(44)

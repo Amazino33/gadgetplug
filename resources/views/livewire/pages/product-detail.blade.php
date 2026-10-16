@@ -49,7 +49,7 @@ new class extends Component {
             abort(404);
         }
 
-        $this->product = $product->load(['vendor', 'category', 'media']);
+        $this->product = $product->load(['vendor', 'category', 'media', 'supplierLink', 'sourceProduct.media']);
         if (auth()->check()) {
             $this->wishlisted = Wishlist::where('user_id', auth()->id())
                 ->where('product_id', $product->id)
@@ -148,7 +148,7 @@ new class extends Component {
         return Product::query()
             ->visibleOnline()
             ->inStockForSale()
-            ->with(['vendor', 'category', 'media'])
+            ->with(['vendor', 'category'])->withCatalogue()
             ->where('category_id', $this->product->category_id)
             ->whereKeyNot($this->product->id)
             ->orderByRaw('CASE WHEN price > ? THEN 0 ELSE 1 END', [$price])
@@ -320,7 +320,7 @@ new class extends Component {
 }; ?>
 
 @php
-$allImages  = $product->getMedia('product-images');
+$allImages  = $product->catalogueMedia();
 $firstImage = $allImages->first();
 // The 'preview' conversion (800x800, already generated on upload) — not the
 // raw original — since this is the largest-contentful-paint image on the page.
@@ -332,10 +332,10 @@ $categoryIcon = \App\Support\CategoryIcon::for($product->category?->name);
 <div>
 @php
     $ogTitle       = trim(($product->brand ? $product->brand . ' ' : '') . $product->name) . ' — GadgetPlug';
-    $ogDescription = $product->description
-        ? Str::limit(strip_tags($product->description), 155)
+    $ogDescription = $product->catalogueDescription()
+        ? Str::limit(strip_tags($product->catalogueDescription()), 155)
         : 'Buy ' . $product->name . ' at the best price on GadgetPlug Nigeria. Verified vendor, fast delivery.';
-    $ogImage       = $product->getFirstMediaUrl('product-images', 'preview') ?: asset('images/logo.svg');
+    $ogImage       = $product->catalogueImageUrl('preview') ?: asset('images/logo.svg');
     $ogUrl         = route('product.show', $product->slug);
 @endphp
 <x-layouts.storefront
@@ -575,10 +575,10 @@ fbq('track', 'ViewContent', {
             </div>
 
             {{-- Description --}}
-            @if ($product->description)
+            @if ($product->catalogueDescription())
             <div class="mt-6 pt-6 border-t border-brand-border dark:border-[#2a3a2a]">
                 <h3 class="font-montserrat font-bold text-[15px] text-brand-dark dark:text-[#e8f5e9] mb-3">About this product</h3>
-                <div class="text-[13px] text-[#444] dark:text-[#b0c8b0] leading-relaxed whitespace-pre-wrap">{{ $product->description }}</div>
+                <div class="text-[13px] text-[#444] dark:text-[#b0c8b0] leading-relaxed whitespace-pre-wrap">{{ $product->catalogueDescription() }}</div>
             </div>
             @endif
         </div>

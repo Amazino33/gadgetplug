@@ -160,7 +160,7 @@ new class extends Component {
             @foreach($order->items as $item)
             <div class="px-5 md:px-6 py-3.5 flex items-center gap-3">
                 <div class="w-11 h-11 bg-brand-bg dark:bg-[#0d1a0d] rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden">
-                    @php $img = $item->product?->getFirstMediaUrl('product-images', 'preview'); @endphp
+                    @php $img = $item->product?->catalogueImageUrl('preview'); @endphp
                     @if($img)
                         <img src="{{ $img }}" alt="{{ $item->product->name }}" class="w-full h-full object-contain p-1">
                     @else

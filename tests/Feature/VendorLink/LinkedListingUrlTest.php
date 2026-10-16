@@ -41,7 +41,7 @@ test('a resold listing is reachable at its product URL', function () {
     app(PublishLinkedListingAction::class)->execute($link, [$source->id]);
 
     $listing = Product::linked()->firstOrFail();
-    ProductFactory::attachPhoto($listing); // after publish: the publish copies files, this has none
+    ProductFactory::attachPhoto($source); // a resold listing shows its supplier's photo
 
     // Before the binding override this 404'd: the slug resolved to the
     // supplier's row, whose shop is hidden, and the detail page refused it —
@@ -58,7 +58,7 @@ test('the colliding slug is the accepted state, and routing is what resolves it'
     app(PublishLinkedListingAction::class)->execute($link, [$source->id]);
 
     $listing = Product::linked()->firstOrFail();
-    ProductFactory::attachPhoto($listing); // after publish: the publish copies files, this has none
+    ProductFactory::attachPhoto($source); // a resold listing shows its supplier's photo
 
     // Slugs are unique per vendor by design, so these two genuinely share one.
     // The fix does not separate them — it decides which one a URL means.

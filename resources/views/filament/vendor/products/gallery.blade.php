@@ -1,5 +1,5 @@
 @php
-    $media = $record->getMedia('product-images');
+    $media = $record->catalogueMedia(); // a resold listing shows its supplier's photos
     $images = $media->map(fn ($m) => [
         'preview' => $m->getUrl('preview'),
         'thumb'   => $m->getUrl('thumb'),

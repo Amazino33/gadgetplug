@@ -117,7 +117,7 @@ new class extends Component {
 
     public function with(): array
     {
-        $query = $this->storeProducts()->with(['category', 'media']);
+        $query = $this->storeProducts()->with(['category'])->withCatalogue();
 
         match ($this->sort) {
             'price_asc'  => $query->orderBy('price'),
@@ -226,7 +226,7 @@ new class extends Component {
                 @foreach ($products as $product)
                     @php
                         $bg = $cardBgs[$product->id % count($cardBgs)];
-                        $thumbUrl = $product->getFirstMediaUrl('product-images', 'preview');
+                        $thumbUrl = $product->catalogueImageUrl('preview');
                         $categoryIcon = \App\Support\CategoryIcon::for($product->category?->name);
                         $aboveFold = $loop->index < 4;
                         $wishlisted = in_array($product->id, $wishlistIds);

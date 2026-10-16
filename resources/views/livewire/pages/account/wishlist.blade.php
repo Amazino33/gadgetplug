@@ -16,7 +16,7 @@ new class extends Component {
         return [
             'items' => auth()->user()
                 ->wishlistedProducts()
-                ->with('media', 'category')
+                ->with('category')->withCatalogue()
                 ->latest('wishlists.created_at')
                 ->get(),
         ];
@@ -53,8 +53,8 @@ new class extends Component {
                 {{-- Thumbnail --}}
                 <a href="{{ route('product.show', $product->slug) }}"
                    class="w-16 h-16 rounded-xl bg-brand-bg dark:bg-[#0d1a0d] border border-brand-border dark:border-[#2a3a2a] flex items-center justify-center flex-shrink-0 overflow-hidden">
-                    @if ($product->getFirstMediaUrl('product-images', 'thumb'))
-                        <img src="{{ $product->getFirstMediaUrl('product-images', 'thumb') }}" alt="{{ $product->name }}" class="w-full h-full object-cover">
+                    @if ($product->catalogueImageUrl('thumb'))
+                        <img src="{{ $product->catalogueImageUrl('thumb') }}" alt="{{ $product->name }}" class="w-full h-full object-cover">
                     @else
                         <span class="text-2xl">📱</span>
                     @endif

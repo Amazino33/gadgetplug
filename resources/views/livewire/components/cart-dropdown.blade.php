@@ -26,7 +26,7 @@ new class extends Component {
         if (empty($cart)) return;
 
         $productIds = array_keys($cart);
-        $products   = Product::with('media')->whereIn('id', $productIds)->get()->keyBy('id');
+        $products   = Product::withCatalogue()->whereIn('id', $productIds)->get()->keyBy('id');
 
         foreach ($cart as $productId => $item) {
             $product = $products->get($productId);
@@ -41,7 +41,7 @@ new class extends Component {
                 'price'    => (float) $product->price,
                 'quantity' => $qty,
                 'subtotal' => (float) ($product->price * $qty),
-                'thumb'    => $product->getFirstMediaUrl('product-images', 'thumb'),
+                'thumb'    => $product->catalogueImageUrl('thumb'),
             ];
         }
     }

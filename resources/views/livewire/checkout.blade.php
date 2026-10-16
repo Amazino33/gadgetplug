@@ -83,7 +83,7 @@ new class extends Component {
                         'name'     => $item->product->name ?? 'Unknown',
                         'quantity' => $item->quantity,
                         'subtotal' => $item->unit_price * $item->quantity,
-                        'thumb'    => $item->product?->getFirstMediaUrl('product-images', 'thumb') ?? '',
+                        'thumb'    => $item->product?->catalogueImageUrl('thumb') ?? '',
                     ];
                     if ($item->product) {
                         $this->paidProductIds[] = $item->product->id;
@@ -106,7 +106,7 @@ new class extends Component {
         }
 
         $productIds = array_keys($cart);
-        $products   = Product::with(['media', 'vendor'])->whereIn('id', $productIds)->get()->keyBy('id');
+        $products   = Product::with(['vendor'])->withCatalogue()->whereIn('id', $productIds)->get()->keyBy('id');
         $droppedZeroQty = false;
         $droppedUnavailableVendor = false;
 
@@ -132,12 +132,20 @@ new class extends Component {
                 continue;
             }
 
+            // A resold listing whose supplier side no longer resolves — same
+            // treatment as a switched-off vendor: drop that line, keep the rest.
+            if (! $product->tracksStock() && $product->catalogueSource() === null) {
+                unset($cart[$productId]);
+                $droppedUnavailableVendor = true;
+                continue;
+            }
+
             $this->total += $product->price * $item['quantity'];
             $this->cartItems[] = [
                 'product'  => $product,
                 'quantity' => $item['quantity'],
                 'subtotal' => $product->price * $item['quantity'],
-                'thumb'    => $product->getFirstMediaUrl('product-images', 'thumb'),
+                'thumb'    => $product->catalogueImageUrl('thumb'),
             ];
         }
 
@@ -384,7 +392,8 @@ new class extends Component {
         // submission — mount() already filtered this on load, so this should
         // essentially never trigger. If it does, don't silently complete a
         // partial order; send the customer back to review their cart.
-        if (collect($this->cartItems)->contains(fn (array $item) => ! $item['product']->vendor?->canSellOnline())) {
+        if (collect($this->cartItems)->contains(fn (array $item) => ! $item['product']->vendor?->canSellOnline()
+            || (! $item['product']->tracksStock() && $item['product']->catalogueSource() === null))) {
             session()->flash('error', 'Some items in your cart became unavailable. Please review your cart and try again.');
             $this->redirectRoute('cart');
             return;

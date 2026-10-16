@@ -22,7 +22,7 @@
 ])
 
 @php
-    $thumbUrl     = $product->getFirstMediaUrl('product-images', 'preview');
+    $thumbUrl     = $product->catalogueImageUrl('preview');
     $categoryIcon = \App\Support\CategoryIcon::for($product->category?->name);
     // Same rotating tint the storefront grids use, so a card pulled out of one
     // and dropped into a rail does not suddenly look like a different card.

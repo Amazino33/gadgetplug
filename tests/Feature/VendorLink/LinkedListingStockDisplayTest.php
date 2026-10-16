@@ -19,7 +19,7 @@ test('a resold listing whose supplier has stock is buyable on its product page',
     app(PublishLinkedListingAction::class)->execute($link, [$source->id]);
 
     $listing = Product::linked()->firstOrFail();
-    ProductFactory::attachPhoto($listing); // after publish: the publish copies files, this has none
+    ProductFactory::attachPhoto($source); // a resold listing shows its supplier's photo
 
     // The listing holds none of its own — that is the design, not a fault.
     expect((int) $listing->stock_quantity)->toBe(0)
@@ -41,7 +41,7 @@ test('a resold listing goes out of stock when the supplier actually runs out', f
     $source->update(['stock_quantity' => 0]);
 
     $listing = Product::linked()->firstOrFail();
-    ProductFactory::attachPhoto($listing); // after publish: the publish copies files, this has none
+    ProductFactory::attachPhoto($source); // a resold listing shows its supplier's photo
     $html = $this->get(route('product.show', $listing->slug))->assertOk()->getContent();
 
     expect($html)->toContain('Out of Stock');

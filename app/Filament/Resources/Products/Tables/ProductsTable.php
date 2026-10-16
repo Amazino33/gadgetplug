@@ -126,9 +126,9 @@ class ProductsTable
                         'own'      => 'Own stock, not resold',
                     ])
                     ->query(fn (Builder $query, array $data) => match ($data['value'] ?? null) {
-                        'linked'   => $query->whereNotNull('products.source_product_id'),
+                        'linked'   => $query->linked(),
                         'supplier' => $query->has('resoldListings'),
-                        'own'      => $query->whereNull('products.source_product_id')->doesntHave('resoldListings'),
+                        'own'      => $query->ownStock()->doesntHave('resoldListings'),
                         default    => $query,
                     }),
 
