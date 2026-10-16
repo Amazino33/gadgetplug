@@ -16,7 +16,15 @@ class BackfillProductSkusCommand extends Command
     {
         $dry = (bool) $this->option('dry-run');
 
+        // A shop that types its own SKUs has chosen not to have them made.
+        $manualShops = \App\Models\Vendor::where('sku_style', SkuGenerator::STYLE_MANUAL)->pluck('id');
+
+        if ($manualShops->isNotEmpty()) {
+            $this->warn('Skipping '.$manualShops->count().' shop(s) set to type their own SKUs.');
+        }
+
         $query = Product::query()
+            ->whereNotIn('vendor_id', $manualShops)
             ->where(fn ($q) => $q->whereNull('sku')->orWhere('sku', ''))
             ->when($this->option('vendor'), fn ($q, $id) => $q->where('vendor_id', (int) $id));
 

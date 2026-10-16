@@ -25,7 +25,7 @@ class Vendor extends Model
         'dashboard_blocked', 'dashboard_blocked_reason', 'dashboard_blocked_at',
         'restock_window_days', 'restock_lead_time_days', 'restock_target_cover_days', 'restock_safety_buffer_days',
         'allow_negative_stock', 'pos_ask_quantity', 'pos_allow_price_change', 'enable_gadget_fields',
-        'allow_half_quantities',
+        'allow_half_quantities', 'sku_style', 'sku_prefix',
     ];
 
     protected $casts = [

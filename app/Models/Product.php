@@ -181,7 +181,17 @@ class Product extends Model implements HasMedia
         // because imports, seeders and linked listings create products too.
         static::saving(function (Product $product) {
             if (blank($product->sku)) {
-                $product->sku = app(SkuGenerator::class)->generate($product);
+                $generator = app(SkuGenerator::class);
+
+                // A shop that types its own SKUs has chosen not to have one
+                // made for it, so a blank is a mistake to report, not fill.
+                if ($generator->isManual($product->vendor_id)) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'sku' => 'Enter a SKU for this product - this shop is set to type its own.',
+                    ]);
+                }
+
+                $product->sku = $generator->generate($product);
                 $product->skuWasGenerated = true;
             } elseif (is_string($product->sku)) {
                 $product->sku = trim($product->sku);

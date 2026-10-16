@@ -5,37 +5,139 @@ namespace App\Services\Products;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductUnit;
+use App\Models\Vendor;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
- * Product and unit SKUs: ALC-CASTLI-0042 and ALC-CASTLI-0042-CR12.
+ * Product and unit SKUs, in whichever style the shop chose in Store Profile.
  *
- * The product SKU is category (3) + name (up to 6) + a per-shop sequence. The
- * sequence is "one more than the shop's product count", walked forward until
- * the result is free, so deleted products never cause a clash. Two creates at
- * the same moment can still pick the same number; the unique index decides,
- * and Product::performInsert() asks for another.
+ *   category_name  ALC-CASTLI-0042  category (3) + name (up to 6) + shop sequence
+ *   serial         8226             one more than the highest purely numeric SKU
+ *   prefix_serial  VWD-8226         the same, behind the shop's prefix
+ *   manual         nothing is generated; the shop types every SKU
+ *
+ * A candidate is walked forward until it is free, so deleted products never
+ * cause a clash. Two creates at the same moment can still pick the same one;
+ * the unique index decides, and Product::performInsert() asks for another.
  */
 class SkuGenerator
 {
+    public const STYLE_CATEGORY_NAME = 'category_name';
+    public const STYLE_SERIAL        = 'serial';
+    public const STYLE_PREFIX_SERIAL = 'prefix_serial';
+    public const STYLE_MANUAL        = 'manual';
+
+    public const STYLES = [
+        self::STYLE_CATEGORY_NAME,
+        self::STYLE_SERIAL,
+        self::STYLE_PREFIX_SERIAL,
+        self::STYLE_MANUAL,
+    ];
+
     public function generate(Product $product): string
     {
         return $this->for($product->vendor_id, $product->category_id, $product->name, $product->exists ? $product->id : null);
     }
 
+    /** The shop's style, defaulting to the one every shop started on. */
+    public function styleFor(?int $vendorId): string
+    {
+        $style = $vendorId ? Vendor::whereKey($vendorId)->value('sku_style') : null;
+
+        return in_array($style, self::STYLES, true) ? $style : self::STYLE_CATEGORY_NAME;
+    }
+
+    public function isManual(?int $vendorId): bool
+    {
+        return $this->styleFor($vendorId) === self::STYLE_MANUAL;
+    }
+
     /** What a product with these details would be called, without saving anything. */
     public function for(?int $vendorId, ?int $categoryId, ?string $name, ?int $exceptProductId = null, int $skip = 0): string
     {
-        $prefix = $this->categoryCode($categoryId).'-'.$this->nameCode($name).'-';
+        $vendor = $vendorId ? Vendor::find($vendorId, ['id', 'sku_style', 'sku_prefix']) : null;
 
-        $seq = Product::where('vendor_id', $vendorId)->count() + 1 + $skip;
+        return $this->build(
+            $vendorId,
+            $this->styleFor($vendorId),
+            $vendor?->sku_prefix,
+            $categoryId,
+            $name,
+            $exceptProductId,
+            $skip,
+        );
+    }
+
+    /**
+     * What the next product would be called under a style that may not be saved
+     * yet - the example shown beside the setting in Store Profile.
+     */
+    public function example(int $vendorId, string $style, ?string $prefix): string
+    {
+        return match ($style) {
+            self::STYLE_CATEGORY_NAME => $this->build($vendorId, $style, null, null, 'Sample item'),
+            self::STYLE_SERIAL, self::STYLE_PREFIX_SERIAL => $this->build($vendorId, $style, $prefix, null, null),
+            default => '',
+        };
+    }
+
+    private function build(?int $vendorId, string $style, ?string $prefix, ?int $categoryId, ?string $name, ?int $exceptProductId = null, int $skip = 0): string
+    {
+        if ($style === self::STYLE_MANUAL) {
+            return '';
+        }
+
+        if ($style === self::STYLE_SERIAL || $style === self::STYLE_PREFIX_SERIAL) {
+            $lead = $style === self::STYLE_PREFIX_SERIAL ? $this->cleanPrefix($prefix).'-' : '';
+            $n    = $this->highestSerial($vendorId, $lead) + 1 + $skip;
+
+            do {
+                $sku = $lead.$n;
+                $n++;
+            } while ($this->productSkuTaken($vendorId, $sku, $exceptProductId));
+
+            return $sku;
+        }
+
+        $head = $this->categoryCode($categoryId).'-'.$this->nameCode($name).'-';
+        $seq  = Product::where('vendor_id', $vendorId)->count() + 1 + $skip;
 
         do {
-            $sku = $prefix.str_pad((string) $seq, 4, '0', STR_PAD_LEFT);
+            $sku = $head.str_pad((string) $seq, 4, '0', STR_PAD_LEFT);
             $seq++;
         } while ($this->productSkuTaken($vendorId, $sku, $exceptProductId));
 
         return $sku;
+    }
+
+    /** Letters and digits only, upper case, at most six. */
+    public function cleanPrefix(?string $prefix): string
+    {
+        return strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', (string) $prefix), 0, 6));
+    }
+
+    /**
+     * The largest number among this shop's SKUs that are exactly {lead}{digits}.
+     * A shop that has used 1, 2, 3 ... 8225 gets 8225 back; one that has used
+     * none gets 0, so the sequence starts at 1.
+     */
+    private function highestSerial(?int $vendorId, string $lead): int
+    {
+        $query = Product::where('vendor_id', $vendorId)->where('sku', 'like', $lead.'%');
+
+        if (DB::getDriverName() === 'mysql') {
+            // At most 15 digits, so the cast cannot overflow.
+            return (int) $query
+                ->whereRaw('sku REGEXP ?', ['^'.$lead.'[0-9]{1,15}$'])
+                ->selectRaw('MAX(CAST(SUBSTRING(sku, '.(strlen($lead) + 1).') AS UNSIGNED)) as top')
+                ->value('top');
+        }
+
+        return (int) $query->pluck('sku')
+            ->filter(fn ($sku) => preg_match('/^'.preg_quote($lead, '/').'[0-9]{1,15}$/', (string) $sku))
+            ->map(fn ($sku) => (int) substr($sku, strlen($lead)))
+            ->max();
     }
 
     /** {product SKU}-{first two letters of the unit}{how many it holds}. */

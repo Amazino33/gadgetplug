@@ -2,7 +2,9 @@
 
 namespace App\Filament\Vendor\Pages;
 
+use App\Services\Products\SkuGenerator;
 use Illuminate\Validation\ValidationException;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -61,6 +63,8 @@ class StoreProfile extends Page
             'allow_half_quantities'        => (bool) $vendor->allow_half_quantities,
             'pos_blind_count_frequency'    => $vendor->pos_blind_count_frequency ?? 'daily',
             'pos_blind_count_custom_days'  => $vendor->pos_blind_count_custom_days ?? 3,
+            'sku_style'                    => $vendor->sku_style ?: SkuGenerator::STYLE_CATEGORY_NAME,
+            'sku_prefix'                   => $vendor->sku_prefix,
         ]);
     }
 
@@ -203,6 +207,59 @@ class StoreProfile extends Page
                             ->default(false),
                     ]),
 
+                // How this shop's product codes are made. Only the owner can
+                // change it: it decides what every code in the shop looks like,
+                // and what is already printed on shelves and labels is not
+                // rewritten when it changes - only products added afterwards.
+                Section::make('Product codes (SKU)')
+                    ->description('How a new product\'s SKU is made. Existing products keep the SKU they have.')
+                    ->schema([
+                        Select::make('sku_style')
+                            ->label('SKU style')
+                            ->options([
+                                SkuGenerator::STYLE_CATEGORY_NAME => 'Category + name + number — e.g. ALC-CASTLI-0042',
+                                SkuGenerator::STYLE_SERIAL        => 'Serial number — 1, 2, 3 … continuing from your highest',
+                                SkuGenerator::STYLE_PREFIX_SERIAL => 'Prefix + serial number — e.g. VWD-8226',
+                                SkuGenerator::STYLE_MANUAL        => 'I type every SKU myself',
+                            ])
+                            ->default(SkuGenerator::STYLE_CATEGORY_NAME)
+                            ->required()
+                            ->native(true)
+                            ->live()
+                            ->disabled(fn () => ! self::isOwner())
+                            ->helperText(fn () => self::isOwner()
+                                ? 'Only affects products you add from now on.'
+                                : 'Only the store owner can change this.'),
+
+                        TextInput::make('sku_prefix')
+                            ->label('Prefix')
+                            ->placeholder('e.g. VWD')
+                            ->maxLength(6)
+                            ->regex('/^[A-Za-z0-9]{1,6}$/')
+                            ->validationMessages(['regex' => 'Letters and numbers only, up to 6.'])
+                            ->required(fn ($get) => $get('sku_style') === SkuGenerator::STYLE_PREFIX_SERIAL)
+                            ->visible(fn ($get) => $get('sku_style') === SkuGenerator::STYLE_PREFIX_SERIAL)
+                            ->disabled(fn () => ! self::isOwner())
+                            ->live(onBlur: true),
+
+                        Placeholder::make('sku_example')
+                            ->label('The next product would get')
+                            ->content(function ($get): string {
+                                $style  = $get('sku_style');
+                                $prefix = $get('sku_prefix');
+
+                                if ($style === SkuGenerator::STYLE_MANUAL) {
+                                    return 'Whatever you type — a SKU is then required on every product.';
+                                }
+
+                                if ($style === SkuGenerator::STYLE_PREFIX_SERIAL && blank($prefix)) {
+                                    return 'Enter a prefix to see an example.';
+                                }
+
+                                return app(SkuGenerator::class)->example(filament()->getTenant()->id, (string) $style, $prefix);
+                            }),
+                    ]),
+
                 Section::make('Bank Details for Payouts')
                     ->description('Your earnings will be transferred to this account.')
                     ->schema([
@@ -280,10 +337,33 @@ class StoreProfile extends Page
             throw ValidationException::withMessages(['data.allow_half_quantities' => $message]);
         }
 
+        // Owner only. The fields are disabled for anyone else, but a disabled
+        // field is only a hint to the browser, so this is checked here too.
+        if (self::isOwner()) {
+            $style = in_array($data['sku_style'] ?? null, SkuGenerator::STYLES, true)
+                ? $data['sku_style']
+                : SkuGenerator::STYLE_CATEGORY_NAME;
+
+            $vendor->forceFill([
+                'sku_style'  => $style,
+                'sku_prefix' => $style === SkuGenerator::STYLE_PREFIX_SERIAL
+                    ? app(SkuGenerator::class)->cleanPrefix($data['sku_prefix'] ?? null)
+                    : null,
+            ])->save();
+        }
+
         Notification::make()
             ->title('Store profile saved')
             ->success()
             ->send();
+    }
+
+    private static function isOwner(): bool
+    {
+        $user   = auth()->user();
+        $vendor = filament()->getTenant();
+
+        return $user && $vendor && $vendor->isOwner($user);
     }
 
     public static function canAccess(): bool

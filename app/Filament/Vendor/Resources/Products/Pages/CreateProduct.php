@@ -15,7 +15,7 @@ class CreateProduct extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        $manual = (bool) ($data['sku_manual'] ?? false);
+        $manual = (bool) ($data['sku_manual'] ?? false) || ProductForm::skuIsManual();
 
         $data = ProductForm::stripTransientFields($data);
         $data['vendor_id'] = filament()->getTenant()->id;

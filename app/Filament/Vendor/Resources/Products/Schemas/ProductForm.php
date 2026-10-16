@@ -161,6 +161,12 @@ class ProductForm
         return round($basePrice * $factor * 0.92 / 50) * 50;
     }
 
+    /** Whether this shop types its own SKUs (Store Profile → Product codes). */
+    public static function skuIsManual(): bool
+    {
+        return app(SkuGenerator::class)->isManual(filament()->getTenant()?->id);
+    }
+
     /** The SKU a product with the form's current name and category would get. */
     private static function previewSku(Get $get, ?int $recordId = null): ?string
     {
@@ -304,7 +310,7 @@ class ProductForm
                             // on edit the code is already the product's.
                             ->live(onBlur: true)
                             ->afterStateUpdated(function (Get $get, Set $set, $record) {
-                                if ($record === null && ! $get('sku_manual')) {
+                                if ($record === null && ! $get('sku_manual') && ! self::skuIsManual()) {
                                     $set('sku', self::previewSku($get));
                                 }
                             })
@@ -346,7 +352,7 @@ class ProductForm
                             ->native(true)
                             ->live()
                             ->afterStateUpdated(function (Get $get, Set $set, $record) {
-                                if ($record === null && ! $get('sku_manual')) {
+                                if ($record === null && ! $get('sku_manual') && ! self::skuIsManual()) {
                                     $set('sku', self::previewSku($get));
                                 }
                             }),
@@ -466,9 +472,17 @@ class ProductForm
         return TextInput::make('sku')
             ->label('SKU')
             ->maxLength(100)
-            ->placeholder('Generated when you save')
-            ->hint('Generated from category + name')
-            ->readOnly(fn (Get $get) => ! $get('sku_manual'))
+            // A shop that types its own SKUs must give one; every other shop
+            // always has one made for it.
+            ->required(fn () => self::skuIsManual())
+            ->placeholder(fn () => self::skuIsManual() ? 'Enter a SKU' : 'Generated when you save')
+            ->hint(fn () => match (app(SkuGenerator::class)->styleFor(filament()->getTenant()?->id)) {
+                SkuGenerator::STYLE_SERIAL        => 'Next number in your sequence',
+                SkuGenerator::STYLE_PREFIX_SERIAL => 'Your prefix + next number',
+                SkuGenerator::STYLE_MANUAL        => 'You type this one',
+                default                           => 'Generated from category + name',
+            })
+            ->readOnly(fn (Get $get) => ! self::skuIsManual() && ! $get('sku_manual'))
             ->extraInputAttributes(['class' => 'font-mono'])
             // A friendly refusal instead of the database's. Skipped for a
             // generated preview on create (it is replaced on save anyway) and
@@ -478,13 +492,15 @@ class ProductForm
                 fn ($record) => Rule::unique('products', 'sku')
                     ->where('vendor_id', filament()->getTenant()->id)
                     ->ignore($record?->getKey()),
-                fn ($record, Get $get): bool => $record !== null || (bool) $get('sku_manual'),
+                fn ($record, Get $get): bool => $record !== null || (bool) $get('sku_manual') || self::skuIsManual(),
             )
             ->validationMessages(['unique' => 'This SKU is already used by another product in this shop.'])
+            // Nothing to regenerate or unlock when the shop types them all.
             ->suffixActions([
                 Action::make('regenerateSku')
                     ->icon('heroicon-m-arrow-path')
                     ->tooltip('Regenerate')
+                    ->visible(fn () => ! self::skuIsManual())
                     ->action(function (Get $get, Set $set, $record) {
                         $set('sku', self::previewSku($get, $record?->getKey()));
                     }),
@@ -492,6 +508,7 @@ class ProductForm
                 Action::make('editSkuManually')
                     ->icon('heroicon-m-pencil-square')
                     ->tooltip('Edit manually')
+                    ->visible(fn () => ! self::skuIsManual())
                     ->action(fn (Get $get, Set $set) => $set('sku_manual', ! $get('sku_manual'))),
             ]);
     }
