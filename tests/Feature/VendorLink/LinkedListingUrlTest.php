@@ -3,6 +3,7 @@
 use App\Actions\VendorLink\PublishLinkedListingAction;
 use App\Models\Category;
 use App\Models\Product;
+use Database\Factories\ProductFactory;
 use App\Models\Vendor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -40,6 +41,7 @@ test('a resold listing is reachable at its product URL', function () {
     app(PublishLinkedListingAction::class)->execute($link, [$source->id]);
 
     $listing = Product::linked()->firstOrFail();
+    ProductFactory::attachPhoto($listing); // after publish: the publish copies files, this has none
 
     // Before the binding override this 404'd: the slug resolved to the
     // supplier's row, whose shop is hidden, and the detail page refused it —
@@ -56,6 +58,7 @@ test('the colliding slug is the accepted state, and routing is what resolves it'
     app(PublishLinkedListingAction::class)->execute($link, [$source->id]);
 
     $listing = Product::linked()->firstOrFail();
+    ProductFactory::attachPhoto($listing); // after publish: the publish copies files, this has none
 
     // Slugs are unique per vendor by design, so these two genuinely share one.
     // The fix does not separate them — it decides which one a URL means.
@@ -76,6 +79,8 @@ test('two ordinary vendors sharing a product name no longer hide each other', fu
 
     $hiddensProduct = namedProduct($hidden, 'iPhone 15 Pro');
     $opensProduct = namedProduct($open, 'iPhone 15 Pro');
+    ProductFactory::attachPhoto($hiddensProduct);
+    ProductFactory::attachPhoto($opensProduct);
 
     expect($opensProduct->slug)->toBe($hiddensProduct->slug);
 

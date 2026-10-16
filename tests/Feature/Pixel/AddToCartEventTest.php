@@ -3,6 +3,7 @@
 use App\Jobs\SendMetaConversionEventJob;
 use App\Models\Category;
 use App\Models\Product;
+use Database\Factories\ProductFactory;
 use App\Models\User;
 use App\Models\Vendor;
 use Illuminate\Support\Facades\Queue;
@@ -14,7 +15,7 @@ function makeAddToCartPixelProduct(array $attrs = []): Product
     $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Add To Cart Store ' . uniqid(), 'online_sales_enabled' => true]);
     $category = Category::create(['name' => 'Add To Cart Category ' . uniqid()]);
 
-    return Product::create(array_merge([
+    return ProductFactory::new()->withPhoto()->create(array_merge([
         'vendor_id'      => $vendor->id,
         'category_id'    => $category->id,
         'name'           => 'Add To Cart Pixel Product',

@@ -2,6 +2,7 @@
 
 use App\Models\Category;
 use App\Models\Product;
+use Database\Factories\ProductFactory;
 use App\Models\User;
 use App\Models\Vendor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -24,7 +25,7 @@ function searchableProduct(string $name, array $attrs = [], ?Category $category 
         'online_sales_enabled' => true,
     ]);
 
-    return Product::create(array_merge([
+    return ProductFactory::new()->withPhoto()->create(array_merge([
         'vendor_id'      => $vendor->id,
         'category_id'    => ($category ?? Category::create(['name' => 'Search Category ' . uniqid()]))->id,
         'name'           => $name,

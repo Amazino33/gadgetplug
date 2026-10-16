@@ -4,6 +4,7 @@ use App\Http\Middleware\EnsureDeviceToken;
 use App\Listeners\ClaimGuestFeedActivity;
 use App\Models\Category;
 use App\Models\Product;
+use Database\Factories\ProductFactory;
 use App\Models\ProductInteraction;
 use App\Models\User;
 use App\Models\Vendor;
@@ -27,7 +28,7 @@ function actionProduct(?Vendor $vendor = null, array $over = []): Product
 {
     $vendor ??= actionVendor();
 
-    return Product::create(array_merge([
+    return ProductFactory::new()->withPhoto()->create(array_merge([
         'vendor_id'      => $vendor->id,
         'store_id'       => $vendor->defaultStore->id,
         'category_id'    => Category::firstOrCreate(['name' => 'Action Cat'])->id,

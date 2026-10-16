@@ -2,6 +2,7 @@
 
 use App\Models\Category;
 use App\Models\Product;
+use Database\Factories\ProductFactory;
 use App\Models\User;
 use App\Models\Vendor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -16,7 +17,7 @@ function addToCartTestProduct(int $stock): Product
     $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Add To Cart Store', 'online_sales_enabled' => true]);
     $category = Category::create(['name' => 'Add To Cart Category']);
 
-    return Product::create([
+    return ProductFactory::new()->withPhoto()->create([
         'vendor_id'      => $vendor->id,
         'category_id'    => $category->id,
         'name'           => 'Add To Cart Product',

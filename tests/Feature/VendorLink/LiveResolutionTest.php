@@ -2,6 +2,7 @@
 
 use App\Actions\VendorLink\PublishLinkedListingAction;
 use App\Models\Product;
+use Database\Factories\ProductFactory;
 use App\Models\SupplierLink;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -19,7 +20,13 @@ function published(float $price = 10000, int $stock = 5, float $markup = 40): ar
 
     app(PublishLinkedListingAction::class)->execute($link, [$source->id]);
 
-    return [Product::linked()->firstOrFail(), $source, $link, $reseller, $supplier];
+    $listing = Product::linked()->firstOrFail();
+
+    // A photo, so the listing is one a customer could see (887f13f). Attached
+    // after publishing: the publish copies media files, and this one has none.
+    ProductFactory::attachPhoto($listing);
+
+    return [$listing, $source, $link, $reseller, $supplier];
 }
 
 describe('price follows the supplier', function () {
@@ -125,6 +132,10 @@ describe('the storefront', function () {
     test('keeps the supplier himself invisible while his goods sell', function () {
         [$listing, $source, , , $supplier] = published(stock: 4);
 
+        // His product has a photo too, so it is his switched-off shop — not a
+        // missing picture — that keeps it off the shelf.
+        ProductFactory::attachPhoto($source);
+
         $visible = Product::visibleOnline()->inStockForSale()->pluck('id');
 
         // His shop is switched off for the marketplace, so his own product is
@@ -146,6 +157,8 @@ describe('the storefront', function () {
         $vendor = linkVendor('Ordinary');
         $out = linkProduct($vendor, stock: 0);
         $in = linkProduct($vendor, stock: 3);
+        ProductFactory::attachPhoto($out);
+        ProductFactory::attachPhoto($in);
 
         $visible = Product::visibleOnline()->inStockForSale()->pluck('id');
 

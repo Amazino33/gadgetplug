@@ -2,6 +2,7 @@
 
 use App\Models\Category;
 use App\Models\Product;
+use Database\Factories\ProductFactory;
 use App\Models\User;
 use App\Models\Vendor;
 use App\Support\CategoryIcon;
@@ -22,7 +23,7 @@ function storefrontProduct(array $attributes = []): Product
 
     $category = Category::firstOrCreate(['name' => 'Smartphones']);
 
-    return Product::create(array_merge([
+    return ProductFactory::new()->withPhoto()->create(array_merge([
         'vendor_id'      => $vendor->id,
         'category_id'    => $category->id,
         'name'           => 'Pixel 9 Pro',

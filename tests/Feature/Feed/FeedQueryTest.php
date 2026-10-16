@@ -2,6 +2,7 @@
 
 use App\Models\Category;
 use App\Models\Product;
+use Database\Factories\ProductFactory;
 use App\Models\ProductInteraction;
 use App\Models\User;
 use App\Models\Vendor;
@@ -24,7 +25,7 @@ function feedVendor(string $name = 'Shop', bool $online = true): Vendor
 
 function feedProduct(Vendor $vendor, array $over = []): Product
 {
-    return Product::create(array_merge([
+    return ProductFactory::new()->withPhoto()->create(array_merge([
         'vendor_id'      => $vendor->id,
         'store_id'       => $vendor->defaultStore->id,
         'category_id'    => Category::firstOrCreate(['name' => 'Feed Cat'])->id,

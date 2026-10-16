@@ -2,6 +2,7 @@
 
 use App\Actions\VendorLink\PublishLinkedListingAction;
 use App\Models\Product;
+use Database\Factories\ProductFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 require_once __DIR__ . '/Helpers.php';
@@ -18,6 +19,7 @@ test('a resold listing whose supplier has stock is buyable on its product page',
     app(PublishLinkedListingAction::class)->execute($link, [$source->id]);
 
     $listing = Product::linked()->firstOrFail();
+    ProductFactory::attachPhoto($listing); // after publish: the publish copies files, this has none
 
     // The listing holds none of its own — that is the design, not a fault.
     expect((int) $listing->stock_quantity)->toBe(0)
@@ -39,6 +41,7 @@ test('a resold listing goes out of stock when the supplier actually runs out', f
     $source->update(['stock_quantity' => 0]);
 
     $listing = Product::linked()->firstOrFail();
+    ProductFactory::attachPhoto($listing); // after publish: the publish copies files, this has none
     $html = $this->get(route('product.show', $listing->slug))->assertOk()->getContent();
 
     expect($html)->toContain('Out of Stock');
@@ -47,6 +50,7 @@ test('a resold listing goes out of stock when the supplier actually runs out', f
 test('an ordinary product still reads out of stock when it is', function () {
     $vendor = linkVendor('Ordinary');
     $sold = linkProduct($vendor, stock: 0);
+    ProductFactory::attachPhoto($sold);
 
     $html = $this->get(route('product.show', $sold->slug))->assertOk()->getContent();
 

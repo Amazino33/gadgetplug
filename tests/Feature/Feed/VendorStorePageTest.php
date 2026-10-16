@@ -2,6 +2,7 @@
 
 use App\Models\Category;
 use App\Models\Product;
+use Database\Factories\ProductFactory;
 use App\Models\User;
 use App\Models\Vendor;
 use App\Models\Wishlist;
@@ -22,7 +23,7 @@ function storePageVendor(bool $online = true): Vendor
 
 function storePageProduct(Vendor $vendor, array $over = []): Product
 {
-    return Product::create(array_merge([
+    return ProductFactory::new()->withPhoto()->create(array_merge([
         'vendor_id'      => $vendor->id,
         'store_id'       => $vendor->defaultStore->id,
         'category_id'    => Category::firstOrCreate(['name' => 'Store Page Cat'])->id,

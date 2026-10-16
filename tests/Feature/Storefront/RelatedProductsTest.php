@@ -2,6 +2,7 @@
 
 use App\Models\Category;
 use App\Models\Product;
+use Database\Factories\ProductFactory;
 use App\Models\User;
 use App\Models\Vendor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -20,7 +21,7 @@ function relatedVendor(string $name): Vendor
 
 function relatedProduct(Vendor $vendor, Category $category, string $name, int $price, array $attrs = []): Product
 {
-    return Product::create(array_merge([
+    return ProductFactory::new()->withPhoto()->create(array_merge([
         'vendor_id'      => $vendor->id,
         'category_id'    => $category->id,
         'name'           => $name,

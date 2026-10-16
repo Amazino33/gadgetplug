@@ -316,11 +316,13 @@ test('is_low_stock is false when out of stock — that is its own distinct state
 test('visibleOnline excludes products hidden from the storefront', function () {
     $data = setUpProductVendor();
 
-    $onlineProduct = Product::create([
+    // Photo on both, so the only difference under test is show_online
+    // (the photo rule has its own tests in Storefront/PhotoRequirementTest).
+    $onlineProduct = \Database\Factories\ProductFactory::new()->withPhoto()->create([
         'vendor_id' => $data['vendor']->id, 'category_id' => $data['category']->id,
         'name' => 'Online Widget', 'price' => 100, 'status' => 'published', 'show_online' => true,
     ]);
-    $hiddenProduct = Product::create([
+    $hiddenProduct = \Database\Factories\ProductFactory::new()->withPhoto()->create([
         'vendor_id' => $data['vendor']->id, 'category_id' => $data['category']->id,
         'name' => 'Hidden Widget', 'price' => 100, 'status' => 'published', 'show_online' => false,
     ]);

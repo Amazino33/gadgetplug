@@ -4,6 +4,7 @@ use App\Filament\Resources\Vendors\VendorResource;
 use App\Models\Category;
 use App\Models\Order;
 use App\Models\Product;
+use Database\Factories\ProductFactory;
 use App\Models\User;
 use App\Models\Vendor;
 use App\Services\CartService;
@@ -28,7 +29,7 @@ function gatingVendorProduct(bool $onlineSalesEnabled): array
         'online_sales_enabled'  => $onlineSalesEnabled,
     ]);
     $category = Category::create(['name' => 'Gating Test Category ' . uniqid()]);
-    $product = Product::create([
+    $product = ProductFactory::new()->withPhoto()->create([
         'vendor_id'      => $vendor->id,
         'category_id'    => $category->id,
         'name'           => 'Gated Widget ' . uniqid(),
