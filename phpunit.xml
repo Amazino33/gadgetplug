@@ -46,5 +46,22 @@
         <env name="WHATSAPP_CLOUD_PHONE_NUMBER_ID" value=""/>
         <env name="TERMII_API_KEY" value=""/>
         <env name="TERMII_SENDER_ID" value=""/>
+        <!-- Every other credential gets a dummy, so a developer's real key in
+             .env can never be used — or printed in a failure — by a test. The
+             messaging providers above stay blank on purpose (blank = no live
+             driver is auto-selected). No request leaves the machine anyway:
+             tests/TestCase.php refuses stray HTTP and fakes the known hosts. -->
+        <env name="META_PIXEL_ID" value="000000000000000"/>
+        <env name="META_CAPI_ACCESS_TOKEN" value="test-meta-capi-token"/>
+        <env name="META_TEST_EVENT_CODE" value=""/>
+        <env name="PAYSTACK_PUBLIC_KEY" value="pk_test_dummy"/>
+        <env name="PAYSTACK_SECRET_KEY" value="sk_test_dummy"/>
+        <env name="TELEGRAM_BOT_TOKEN" value="test-telegram-token"/>
+        <env name="TELEGRAM_CHAT_ID" value="0"/>
+        <env name="ANTHROPIC_API_KEY" value="test-anthropic-key"/>
+        <env name="REPLICATE_API_TOKEN" value="test-replicate-token"/>
+        <env name="AWS_ACCESS_KEY_ID" value="test-aws-key"/>
+        <env name="AWS_SECRET_ACCESS_KEY" value="test-aws-secret"/>
+        <env name="MAIL_PASSWORD" value="test-mail-password"/>
     </php>
 </phpunit>

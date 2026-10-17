@@ -369,7 +369,12 @@ test('reminders are not due when both recurring toggles are off', function () {
 
 // --- Scheduled command -------------------------------------------------
 
-test('the reminder command sends and stamps the cadence clock', function () {
+// Frozen clocks, both sides of the default quiet hours (waking window
+// 08:00–20:00 Lagos). Reading the real clock made this pass by day and fail by
+// night. Frozen before setup: forVendor() stamps remind_orders_from with now().
+test('the reminder command sends and stamps the cadence clock in the daytime', function () {
+    $this->travelTo(Carbon::parse('2026-08-06 10:00', 'Africa/Lagos'));
+
     $data = setUpStorekeeperVendor(['undispatched_after_hours' => 6]);
     $order = makeStorekeeperOrder($data, 'paid');
     Order::whereKey($order->id)->update(['updated_at' => now()->subDays(1)]);
@@ -383,8 +388,27 @@ test('the reminder command sends and stamps the cadence clock', function () {
         ->not->toBeNull();
 });
 
+test('the same reminder is held back during default quiet hours, clock untouched', function () {
+    $this->travelTo(Carbon::parse('2026-08-06 23:00', 'Africa/Lagos'));
+
+    $data = setUpStorekeeperVendor(['undispatched_after_hours' => 6]);
+    $order = makeStorekeeperOrder($data, 'paid');
+    Order::whereKey($order->id)->update(['updated_at' => now()->subDays(1)]);
+
+    DeliveryMessage::truncate();
+
+    $this->artisan('storekeeper:remind')->assertSuccessful();
+
+    expect(storekeeperMessages())->toBeEmpty()
+        ->and(VendorNotificationSetting::forVendor($data['vendor'])->fresh()->last_reminder_sent_at)
+        ->toBeNull();
+});
+
 // Otherwise a stall right after a quiet cycle would wait a full extra period.
 test('a run with nothing to report leaves the cadence clock untouched', function () {
+    // Daytime, so "untouched" is because nothing was due — not quiet hours.
+    $this->travelTo(Carbon::parse('2026-08-06 10:00', 'Africa/Lagos'));
+
     $data = setUpStorekeeperVendor();
     makeStorekeeperOrder($data, 'paid');
 
