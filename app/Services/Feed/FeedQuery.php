@@ -145,7 +145,7 @@ class FeedQuery
             ->when($categoryId, fn (Builder $q) => $q->where('products.category_id', $categoryId))
             ->tap(fn (Builder $q) => self::applySearch($q, $search))
             ->select([
-                'products.id', 'products.vendor_id', 'products.category_id', 'products.name',
+                'products.id', 'products.vendor_id', 'products.category_id', 'products.name', 'products.online_name',
                 'products.slug', 'products.description', 'products.price', 'products.stock_quantity',
                 'products.reserved_stock', 'products.source_product_id', 'products.supplier_link_id',
                 'products.like_count', 'products.share_count', 'products.feed_bucket',
@@ -171,8 +171,11 @@ class FeedQuery
 
         $like = '%'.str_replace(['%', '_'], ['\%', '\_'], $search).'%';
 
-        return $query->where(function (Builder $inner) use ($like) {
-            $inner->where('products.name', 'like', $like)
+        // The storefront's rule (internal name, online name, brand — see
+        // Product::scopeSearchCatalogue), plus the description the feed has
+        // always matched, since a post's caption is on screen.
+        return $query->where(function (Builder $inner) use ($search, $like) {
+            $inner->where(fn (Builder $q) => $q->searchCatalogue($search))
                 ->orWhere('products.description', 'like', $like);
         });
     }
@@ -233,7 +236,7 @@ class FeedQuery
 
         return $posts->map(fn (Product $p) => [
             'id'          => $p->id,
-            'name'        => $p->name,
+            'name'        => $p->displayName(),
             'slug'        => $p->slug,
             'caption'     => $p->catalogueDescription(),
             'price'       => (float) $p->price,

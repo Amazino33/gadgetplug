@@ -162,13 +162,13 @@ new class extends Component {
                 <div class="w-11 h-11 bg-brand-bg dark:bg-[#0d1a0d] rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden">
                     @php $img = $item->product?->catalogueImageUrl('preview'); @endphp
                     @if($img)
-                        <img src="{{ $img }}" alt="{{ $item->product->name }}" class="w-full h-full object-contain p-1">
+                        <img src="{{ $img }}" alt="{{ $item->customerName() }}" class="w-full h-full object-contain p-1">
                     @else
                         <svg class="w-5 h-5 text-brand-muted fill-none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
                     @endif
                 </div>
                 <div class="flex-1 min-w-0">
-                    <p class="text-[13px] font-medium text-brand-dark dark:text-[#e8f5e9] truncate">{{ $item->product?->name ?? 'Product' }}</p>
+                    <p class="text-[13px] font-medium text-brand-dark dark:text-[#e8f5e9] truncate">{{ $item->customerName() }}</p>
                     <p class="text-[11px] text-brand-muted">Qty: {{ $item->quantity }}</p>
                 </div>
                 <p class="font-montserrat font-bold text-[13px] text-brand-dark dark:text-[#e8f5e9] flex-shrink-0">

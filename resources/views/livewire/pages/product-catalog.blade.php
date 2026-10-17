@@ -73,10 +73,9 @@ new class extends Component {
             ->with(['vendor', 'category'])->withCatalogue()
             ->inStockForSale()
             ->when($this->selectedCategory, fn($q) => $q->where('category_id', $this->selectedCategory))
-            ->when($this->search, fn($q) => $q->where(function ($sq) {
-                $sq->where('name', 'like', "%{$this->search}%")
-                   ->orWhere('brand', 'like', "%{$this->search}%");
-            }));
+            // Internal name, online name, brand — shared with the search
+            // overlay and the feed (Product::scopeSearchCatalogue).
+            ->when($this->search, fn($q) => $q->searchCatalogue($this->search));
 
         match ($this->sort) {
             'price_asc'  => $query->orderBy('price'),
@@ -148,7 +147,7 @@ new class extends Component {
         if (!$product) return;
 
         if (! app(CartService::class)->add($product)) {
-            $this->cartError = "Sorry, \"{$product->name}\" is out of stock.";
+            $this->cartError = "Sorry, \"{$product->displayName()}\" is out of stock.";
             return;
         }
 
@@ -162,7 +161,7 @@ new class extends Component {
         if (!$product) return;
 
         if (! app(CartService::class)->add($product)) {
-            $this->cartError = "Sorry, \"{$product->name}\" is out of stock.";
+            $this->cartError = "Sorry, \"{$product->displayName()}\" is out of stock.";
             return;
         }
 
@@ -436,7 +435,7 @@ $cardBgs = [
                             {{-- Explicit dimensions reserve the box before the
                                  file arrives, so the grid stops jumping as
                                  images load. --}}
-                            <img src="{{ $thumbUrl }}" alt="{{ $product->name }}"
+                            <img src="{{ $thumbUrl }}" alt="{{ $product->displayName() }}"
                                 width="400" height="280"
                                 loading="{{ $aboveFold ? 'eager' : 'lazy' }}"
                                 decoding="async"
@@ -452,7 +451,7 @@ $cardBgs = [
                          and always focusable — it previously relied on hover to
                          appear, which never happens on touch or via keyboard. --}}
                     <button wire:click="toggleWishlist({{ $product->id }})"
-                        aria-label="{{ in_array($product->id, $wishlistIds) ? 'Remove ' . $product->name . ' from wishlist' : 'Add ' . $product->name . ' to wishlist' }}"
+                        aria-label="{{ in_array($product->id, $wishlistIds) ? 'Remove ' . $product->displayName() . ' from wishlist' : 'Add ' . $product->displayName() . ' to wishlist' }}"
                         aria-pressed="{{ in_array($product->id, $wishlistIds) ? 'true' : 'false' }}"
                         class="absolute top-0.5 right-0.5 w-11 h-11 rounded-full flex items-center justify-center transition-all duration-200 z-10
                             {{ in_array($product->id, $wishlistIds)
@@ -479,7 +478,7 @@ $cardBgs = [
 
                     <a href="{{ route('product.show', $product) }}"
                        class="block text-[12px] font-semibold text-[#111] dark:text-[#e8f5e9] leading-[1.35] mb-2 hover:text-brand transition-colors line-clamp-2">
-                        {{ $product->name }}
+                        {{ $product->displayName() }}
                     </a>
 
                     @if ($product->brand)
@@ -492,14 +491,14 @@ $cardBgs = [
 
                     <div class="flex gap-1.5">
                         <button wire:click="addToCart({{ $product->id }})"
-                            aria-label="Add {{ $product->name }} to cart"
+                            aria-label="Add {{ $product->displayName() }} to cart"
                             class="flex-1 flex items-center justify-center gap-1 min-h-[44px] px-2 bg-[#f0f8f0] dark:bg-[#1a2a1a] hover:bg-[#e8f5e9] dark:hover:bg-[#2a3a2a] text-brand border border-[#c8e6c9] dark:border-[#2a3a2a] rounded-lg text-[10px] font-semibold font-montserrat cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             @disabled($product->available_stock < 1)>
                             <x-gp-icon name="cart" class="w-3 h-3 flex-shrink-0" />
                             Cart
                         </button>
                         <button wire:click="buyNow({{ $product->id }})"
-                            aria-label="Buy {{ $product->name }} now"
+                            aria-label="Buy {{ $product->displayName() }} now"
                             class="flex-1 flex items-center justify-center gap-1 min-h-[44px] px-2 bg-brand-orange hover:bg-[#e06610] text-white border-0 rounded-lg text-[10px] font-semibold font-montserrat cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             @disabled($product->available_stock < 1)>
                             <x-gp-icon name="arrow-right" class="w-3 h-3 flex-shrink-0" />

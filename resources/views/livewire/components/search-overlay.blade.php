@@ -49,15 +49,14 @@ new class extends Component
             ->visibleOnline()
             ->inStockForSale()
             ->with(['vendor', 'category'])->withCatalogue()
-            ->where(function ($q) use ($escaped) {
-                $q->where('name', 'like', "%{$escaped}%")
-                  ->orWhere('brand', 'like', "%{$escaped}%");
-            })
+            // Internal name, online name, brand — one rule shared with the
+            // catalogue and the feed (Product::scopeSearchCatalogue).
+            ->searchCatalogue($term)
             // Something that starts with what they typed is much more likely to
             // be what they meant than something that merely contains it
             // somewhere — "charger" should not open on "Car charger adapter
             // for wireless charger stand".
-            ->orderByRaw('CASE WHEN name LIKE ? THEN 0 ELSE 1 END', ["{$escaped}%"])
+            ->orderByRaw('CASE WHEN products.online_name LIKE ? OR products.name LIKE ? THEN 0 ELSE 1 END', ["{$escaped}%", "{$escaped}%"])
             ->orderBy('name')
             ->limit(self::RESULT_LIMIT)
             ->get();
@@ -105,7 +104,8 @@ new class extends Component
     public function suggestions(): array
     {
         return Cache::remember(
-            'storefront.search-suggestions',
+            // v2: online names joined the haystack (Oct 2026).
+            'storefront.search-suggestions.v2',
             now()->addMinutes(10),
             function (): array {
                 // Category names count as well as product names. Stock is
@@ -117,8 +117,8 @@ new class extends Component
                     ->visibleOnline()
                     ->inStockForSale()
                     ->limit(2000)
-                    ->get(['name', 'brand'])
-                    ->map(fn ($p) => $p->name . ' ' . $p->brand)
+                    ->get(['name', 'online_name', 'brand'])
+                    ->map(fn ($p) => $p->name . ' ' . $p->online_name . ' ' . $p->brand)
                     ->concat(
                         Category::query()
                             ->whereHas('products', fn ($q) => $q->visibleOnline()->inStockForSale())
@@ -335,13 +335,13 @@ new class extends Component
                                class="flex items-center gap-3 rounded-xl bg-white p-2.5 transition-colors hover:bg-[#f0f8f0] dark:bg-[#162016] dark:hover:bg-[#1f2f1f]">
                                 <div class="flex h-12 w-12 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg border border-brand-border bg-brand-bg dark:border-[#2a3a2a] dark:bg-[#0d1a0d]">
                                     @if ($thumb)
-                                        <img src="{{ $thumb }}" alt="{{ $result->name }}" loading="lazy" decoding="async" class="h-full w-full object-cover">
+                                        <img src="{{ $thumb }}" alt="{{ $result->displayName() }}" loading="lazy" decoding="async" class="h-full w-full object-cover">
                                     @else
                                         <x-gp-icon :name="\App\Support\CategoryIcon::for($result->category?->name)" class="h-6 w-6 text-brand opacity-40" />
                                     @endif
                                 </div>
                                 <div class="min-w-0 flex-1">
-                                    <p class="line-clamp-1 text-[13px] font-semibold text-[#111] dark:text-[#e8f5e9]">{{ $result->name }}</p>
+                                    <p class="line-clamp-1 text-[13px] font-semibold text-[#111] dark:text-[#e8f5e9]">{{ $result->displayName() }}</p>
                                     <p class="line-clamp-1 text-[11px] text-brand-muted">{{ $result->vendor->name ?? '' }}</p>
                                 </div>
                                 <span class="flex-shrink-0 font-montserrat text-[14px] font-black text-brand">

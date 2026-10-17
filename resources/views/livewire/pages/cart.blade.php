@@ -49,7 +49,7 @@ new class extends Component {
             if (! $product->tracksStock() && $product->catalogueSource() === null) {
                 unset($cart[$productId]);
                 $changed = true;
-                $this->notice = '"'.$product->name.'" is no longer available and has been removed from your cart.';
+                $this->notice = '"'.$product->displayName().'" is no longer available and has been removed from your cart.';
                 continue;
             }
 
@@ -57,7 +57,7 @@ new class extends Component {
             $this->total     += $product->price * $qty;
             $this->cartItems[] = [
                 'id'       => $productId,
-                'name'     => $product->name,
+                'name'     => $product->displayName(),
                 'vendor'   => $product->vendor?->name ?? 'Unknown Vendor',
                 'brand'    => $product->brand,
                 'price'    => (float) $product->price,

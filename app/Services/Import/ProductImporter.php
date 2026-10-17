@@ -180,6 +180,20 @@ class ProductImporter
         });
     }
 
+    /**
+     * Whoever is running this import may set online names: super_admin or a
+     * holder of update_product_online_name (the same check the admin action
+     * uses, through the policy). No signed-in user — e.g. an artisan import —
+     * may not.
+     */
+    private function mayWriteOnlineNames(): bool
+    {
+        $user = auth()->user();
+
+        return $user !== null
+            && ($user->isSuperAdmin() || $user->hasGlobalPermission('update_product_online_name'));
+    }
+
     /** The pre-import safety copy, for callers driving the run themselves. */
     public function snapshotFor(Vendor $vendor): ?string
     {
@@ -218,6 +232,13 @@ class ProductImporter
                 ProductField::Supplier->value => $suppliers->resolve((string) $value),
                 default                       => $value,
             };
+        }
+
+        // Online name and meta description are GadgetPlug's, not the vendor's.
+        // A vendor round-tripping an export carries them back unchanged; only
+        // someone allowed to edit online names may actually write them.
+        if (! $this->mayWriteOnlineNames()) {
+            unset($attributes[ProductField::OnlineName->value], $attributes[ProductField::MetaDescription->value]);
         }
 
         // A category is not optional on this table, so a row that named none

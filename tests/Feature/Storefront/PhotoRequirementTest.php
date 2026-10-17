@@ -55,7 +55,7 @@ test('feed: a product without a photo never becomes a post', function () {
 });
 
 test('search: a product without a photo is never a search result', function () {
-    Cache::forget('storefront.search-suggestions');
+    Cache::forget('storefront.search-suggestions.v2');
     $vendor = photoRuleVendor();
     ProductFactory::new()->withPhoto()->create(['vendor_id' => $vendor->id, 'name' => 'Oraimo Charger With Photo']);
     ProductFactory::new()->create(['vendor_id' => $vendor->id, 'name' => 'Oraimo Charger No Photo']);

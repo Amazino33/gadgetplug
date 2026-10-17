@@ -12,6 +12,43 @@ class OrderItem extends Model
 
     protected $guarded = [];
 
+    protected static function booted(): void
+    {
+        // Snapshot both names the moment a line is created — on every path
+        // that creates one (checkout, reseller wallet purchase, anything later)
+        // — so renaming a product never rewrites what an existing order says.
+        static::creating(function (self $item) {
+            if ($item->product_name !== null && $item->product_display_name !== null) {
+                return;
+            }
+
+            $product = Product::find($item->product_id);
+
+            if (! $product) {
+                return;
+            }
+
+            $item->product_name ??= $product->name;
+            $item->product_display_name ??= $product->displayName();
+        });
+    }
+
+    /** What the customer was shown for this line — online name, frozen at order time. */
+    public function customerName(): string
+    {
+        return $this->product_display_name
+            ?? $this->product?->displayName()
+            ?? 'Item';
+    }
+
+    /** The store's own shelf name for this line, frozen at order time. */
+    public function internalName(): string
+    {
+        return $this->product_name
+            ?? $this->product?->name
+            ?? 'Item';
+    }
+
     public function order() {
         return $this->belongsTo(Order::class);
     }

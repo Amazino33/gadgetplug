@@ -180,6 +180,8 @@ class OrderObserver
                     'currency'     => 'NGN',
                     'value'        => (float) $order->total_amount,
                     'content_ids'  => $order->items->pluck('product_id')->all(),
+                    // The online names the buyer saw, from the line snapshots.
+                    'content_name' => $order->items->map(fn ($item) => $item->customerName())->unique()->implode(', '),
                     'content_type' => 'product',
                 ],
             );
@@ -412,7 +414,7 @@ class OrderObserver
             'recipient_type' => 'customer',
             'channel'        => $template->channel,
             'to_number'      => $order->customer_phone,
-            'body'           => app(TemplateRenderer::class)->render($template->body, TemplateRenderer::contextForOrder($order)),
+            'body'           => app(TemplateRenderer::class)->render($template->body, TemplateRenderer::contextForOrder($order, TemplateRenderer::AUDIENCE_CUSTOMER)),
             'status'         => 'queued',
         ]);
 

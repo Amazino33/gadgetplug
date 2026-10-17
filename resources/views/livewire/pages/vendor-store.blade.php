@@ -92,7 +92,7 @@ new class extends Component {
         }
 
         if (! app(CartService::class)->add($product)) {
-            $this->cartError = "Sorry, \"{$product->name}\" is out of stock.";
+            $this->cartError = "Sorry, \"{$product->displayName()}\" is out of stock.";
 
             return;
         }
@@ -237,7 +237,7 @@ new class extends Component {
                             <a href="{{ route('product.show', $product) }}" class="block">
                                 <div class="gp-card-img h-[140px] flex items-center justify-center relative" style="{{ $bg }}">
                                     @if ($thumbUrl)
-                                        <img src="{{ $thumbUrl }}" alt="{{ $product->name }}"
+                                        <img src="{{ $thumbUrl }}" alt="{{ $product->displayName() }}"
                                              width="400" height="280"
                                              loading="{{ $aboveFold ? 'eager' : 'lazy' }}"
                                              decoding="async"
@@ -249,7 +249,7 @@ new class extends Component {
                             </a>
 
                             <button wire:click="toggleWishlist({{ $product->id }})"
-                                    aria-label="{{ $wishlisted ? 'Remove '.$product->name.' from wishlist' : 'Add '.$product->name.' to wishlist' }}"
+                                    aria-label="{{ $wishlisted ? 'Remove '.$product->displayName().' from wishlist' : 'Add '.$product->displayName().' to wishlist' }}"
                                     aria-pressed="{{ $wishlisted ? 'true' : 'false' }}"
                                     class="absolute top-0.5 right-0.5 w-11 h-11 rounded-full flex items-center justify-center transition-all duration-200 {{ $wishlisted ? 'text-red-500' : 'text-[#aaa] hover:text-red-400 opacity-70 group-hover:opacity-100 focus-visible:opacity-100' }}">
                                 <span class="w-7 h-7 rounded-full bg-white dark:bg-[#1a2a1a] shadow-md flex items-center justify-center">
@@ -263,7 +263,7 @@ new class extends Component {
                         <div class="p-3">
                             <a href="{{ route('product.show', $product) }}"
                                class="block text-[12px] font-semibold text-[#111] dark:text-[#e8f5e9] leading-[1.35] mb-2 hover:text-brand transition-colors line-clamp-2">
-                                {{ $product->name }}
+                                {{ $product->displayName() }}
                             </a>
 
                             @if ($product->brand)
@@ -275,7 +275,7 @@ new class extends Component {
                             </div>
 
                             <button wire:click="addToCart({{ $product->id }})"
-                                    aria-label="Add {{ $product->name }} to cart"
+                                    aria-label="Add {{ $product->displayName() }} to cart"
                                     class="w-full flex items-center justify-center gap-1 min-h-[44px] px-2 bg-brand hover:bg-[#055002] text-white border-0 rounded-lg text-[11px] font-semibold font-montserrat transition-colors">
                                 <x-gp-icon name="cart" class="w-3 h-3 flex-shrink-0" />
                                 Add to Cart

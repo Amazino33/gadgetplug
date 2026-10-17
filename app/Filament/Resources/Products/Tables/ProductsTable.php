@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Products\Tables;
 
+use App\Filament\Resources\Products\Actions\EditOnlineNameAction;
 use App\Filament\Resources\Products\Actions\ManageProductImagesAction;
 use App\Filament\Resources\Products\Pages\ListProducts;
 use App\Filament\Resources\Products\ProductResource;
@@ -32,7 +33,8 @@ class ProductsTable
             ->columns([
                 ImageColumn::make('thumb')
                     ->label('')
-                    ->getStateUsing(fn (Product $record): ?string => $record->getFirstMediaUrl('product-images', 'thumb') ?: null)
+                    // A resold listing shows its supplier's photo, as customers see it.
+                    ->getStateUsing(fn (Product $record): ?string => $record->catalogueImageUrl('thumb') ?: null)
                     ->defaultImageUrl(self::PLACEHOLDER_IMAGE)
                     ->size(44),
 
@@ -45,6 +47,14 @@ class ProductsTable
                     ->description(fn (Product $record): ?string => $record->isLinked()
                         ? 'Images managed on supplier product'
                         : null),
+
+                TextColumn::make('online_name')
+                    ->label('Online name')
+                    // A resold listing shows its supplier's online name.
+                    ->state(fn (Product $record): ?string => $record->isLinked() ? $record->catalogueSource()?->online_name : $record->online_name)
+                    ->placeholder('—')
+                    ->searchable()
+                    ->wrap(),
 
                 TextColumn::make('vendor.name')->label('Vendor')->searchable()->sortable(),
 
@@ -110,6 +120,14 @@ class ProductsTable
                     ->searchable()
                     ->preload(),
 
+                // Own products only: a resold listing takes its supplier's.
+                Filter::make('no_online_name')
+                    ->label('No online name')
+                    ->toggle()
+                    ->query(fn (Builder $query) => $query->ownStock()->where(
+                        fn (Builder $q) => $q->whereNull('products.online_name')->orWhere('products.online_name', ''),
+                    )),
+
                 Filter::make('no_photo')
                     ->label('No photo')
                     ->toggle()
@@ -150,6 +168,7 @@ class ProductsTable
             ])
             ->recordActions([
                 ManageProductImagesAction::make(),
+                EditOnlineNameAction::make(),
                 EditAction::make()->label('Commission')->visible($canSeeCost),
             ]);
     }

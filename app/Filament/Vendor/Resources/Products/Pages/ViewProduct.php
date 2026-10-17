@@ -58,6 +58,17 @@ class ViewProduct extends ViewRecord
                                     '<h2 class="text-xl font-bold text-gray-950 dark:text-white">' . e($record->name) . '</h2>'
                                 )),
 
+                            // Read-only here: GadgetPlug sets these for online search.
+                            Placeholder::make('online_name_view')
+                                ->label('Online name')
+                                ->helperText('Set by GadgetPlug for online search')
+                                ->content($record->displayName() !== $record->name ? $record->displayName() : '— (customers see the name above)'),
+
+                            Placeholder::make('meta_description_view')
+                                ->label('Meta description')
+                                ->helperText('Set by GadgetPlug for online search')
+                                ->content($record->catalogueSource()?->meta_description ?: '—'),
+
                             Placeholder::make('sku')
                                 ->label('SKU')
                                 ->content($record->sku ?? '—'),

@@ -40,7 +40,7 @@
     <a href="{{ route('product.show', $product) }}" class="block">
         <div class="gp-card-img h-[140px] flex items-center justify-center relative" style="{{ $bg }}">
             @if ($thumbUrl)
-                <img src="{{ $thumbUrl }}" alt="{{ $product->name }}"
+                <img src="{{ $thumbUrl }}" alt="{{ $product->displayName() }}"
                      width="400" height="280"
                      loading="{{ $eager ? 'eager' : 'lazy' }}"
                      decoding="async"
@@ -54,7 +54,7 @@
     <div class="p-3">
         <a href="{{ route('product.show', $product) }}"
            class="block text-[12px] font-semibold text-[#111] dark:text-[#e8f5e9] leading-[1.35] mb-2 hover:text-brand transition-colors line-clamp-2">
-            {{ $product->name }}
+            {{ $product->displayName() }}
         </a>
 
         @if ($showVendor && $product->vendor)

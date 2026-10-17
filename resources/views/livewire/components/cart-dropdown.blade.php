@@ -37,7 +37,7 @@ new class extends Component {
             $this->total    += $product->price * $qty;
             $this->cartItems[] = [
                 'id'       => $productId,
-                'name'     => $product->name,
+                'name'     => $product->displayName(),
                 'price'    => (float) $product->price,
                 'quantity' => $qty,
                 'subtotal' => (float) ($product->price * $qty),

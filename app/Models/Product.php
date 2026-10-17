@@ -25,7 +25,7 @@ class Product extends Model implements HasMedia
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['name', 'sku', 'price', 'cost_price', 'stock_quantity', 'status', 'category_id'])
+            ->logOnly(['name', 'online_name', 'meta_description', 'sku', 'price', 'cost_price', 'stock_quantity', 'status', 'category_id'])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs();
     }
@@ -253,6 +253,52 @@ class Product extends Model implements HasMedia
     public function catalogueImageUrl(string $conversion = ''): string
     {
         return $this->catalogueSource()?->getFirstMediaUrl('product-images', $conversion) ?? '';
+    }
+
+    /**
+     * The name a customer is shown.
+     *
+     * The online name when GadgetPlug has set one, otherwise the store's own
+     * name — read from the catalogue source, so a resold listing shows its
+     * supplier's online name. Staff-facing places (POS, receipts, storekeeper
+     * messages, the vendor panel, stock errors) keep using `name`.
+     */
+    public function displayName(): string
+    {
+        $source = $this->catalogueSource();
+
+        return (string) (filled($source?->online_name) ? $source->online_name : ($source?->name ?? $this->name));
+    }
+
+    /**
+     * Storefront search: internal name, online name and brand — and, for a
+     * resold listing, its supplier's online name, which is what the customer
+     * actually sees on it.
+     *
+     * One definition for the catalogue, the search overlay and the feed, so a
+     * product findable in one is findable in all three. The term is escaped:
+     * a customer typing "50%" means those characters, not a wildcard.
+     */
+    public function scopeSearchCatalogue(Builder $query, ?string $term): Builder
+    {
+        if ($term === null || trim($term) === '') {
+            return $query;
+        }
+
+        // Same escaping the search overlay has always used.
+        $like = '%'.addcslashes(trim($term), '%_\\').'%';
+
+        return $query->where(function (Builder $q) use ($like) {
+            $q->where('products.name', 'like', $like)
+                ->orWhere('products.online_name', 'like', $like)
+                ->orWhere('products.brand', 'like', $like)
+                ->orWhereExists(function ($src) use ($like) {
+                    $src->selectRaw('1')
+                        ->from('products as search_src')
+                        ->whereColumn('search_src.id', 'products.source_product_id')
+                        ->where('search_src.online_name', 'like', $like);
+                });
+        });
     }
 
     /** The description a customer is shown. */

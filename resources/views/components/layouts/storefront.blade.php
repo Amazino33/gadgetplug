@@ -603,6 +603,7 @@ $navCategories = \Illuminate\Support\Facades\Cache::remember(
     <div x-data x-on:pixel-add-to-cart.window="fbq('track', 'AddToCart', {
             value: $event.detail.value,
             currency: 'NGN',
+            ...($event.detail.contentName ? { content_name: $event.detail.contentName } : {}),
         }, {eventID: $event.detail.eventId})"></div>
 
     {{-- The two steps of the buying flow that happen without a page load, so
@@ -613,11 +614,13 @@ $navCategories = \Illuminate\Support\Facades\Cache::remember(
     <div x-data x-on:pixel-initiate-checkout.window="fbq('track', 'InitiateCheckout', {
             value: $event.detail.value,
             currency: 'NGN',
+            ...($event.detail.contentName ? { content_name: $event.detail.contentName } : {}),
         }, {eventID: $event.detail.eventId})"></div>
 
     <div x-data x-on:pixel-add-payment-info.window="fbq('track', 'AddPaymentInfo', {
             value: $event.detail.value,
             currency: 'NGN',
+            ...($event.detail.contentName ? { content_name: $event.detail.contentName } : {}),
         }, {eventID: $event.detail.eventId})"></div>
     @endif
 

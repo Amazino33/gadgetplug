@@ -90,6 +90,7 @@ new class extends Component {
                 'currency'     => 'NGN',
                 'value'        => (float) $this->product->price,
                 'content_ids'  => [$this->product->id],
+                'content_name' => $this->product->displayName(),
                 'content_type' => 'product',
             ],
         );
@@ -225,11 +226,12 @@ new class extends Component {
                 'currency'     => 'NGN',
                 'value'        => $value,
                 'content_ids'  => [$this->product->id],
+                'content_name' => $this->product->displayName(),
                 'content_type' => 'product',
             ],
         );
 
-        $this->dispatch('pixel-initiate-checkout', eventId: $eventId, value: $value);
+        $this->dispatch('pixel-initiate-checkout', eventId: $eventId, value: $value, contentName: $this->product->displayName());
     }
 
     /**
@@ -285,12 +287,13 @@ new class extends Component {
                 'currency'       => 'NGN',
                 'value'          => $value,
                 'content_ids'    => [$this->product->id],
+                'content_name'   => $this->product->displayName(),
                 'content_type'   => 'product',
                 'payment_method' => $method,
             ],
         );
 
-        $this->dispatch('pixel-add-payment-info', eventId: $eventId, value: $value);
+        $this->dispatch('pixel-add-payment-info', eventId: $eventId, value: $value, contentName: $this->product->displayName());
     }
 
     // Server CAPI copy dispatched right here (this method runs inside a real
@@ -311,11 +314,12 @@ new class extends Component {
                 'currency'     => 'NGN',
                 'value'        => (float) $this->product->price * $this->quantity,
                 'content_ids'  => [$this->product->id],
+                'content_name' => $this->product->displayName(),
                 'content_type' => 'product',
             ],
         );
 
-        $this->dispatch('pixel-add-to-cart', eventId: $eventId, value: (float) $this->product->price * $this->quantity);
+        $this->dispatch('pixel-add-to-cart', eventId: $eventId, value: (float) $this->product->price * $this->quantity, contentName: $this->product->displayName());
     }
 }; ?>
 
@@ -331,10 +335,16 @@ $categoryIcon = \App\Support\CategoryIcon::for($product->category?->name);
 
 <div>
 @php
-    $ogTitle       = trim(($product->brand ? $product->brand . ' ' : '') . $product->name) . ' — GadgetPlug';
+    // The brand leads the title unless the name already starts with it — an
+    // online name usually does ("itel 2160 …"), and "itel itel 2160" reads badly.
+    $displayName   = $product->displayName();
+    $brandPrefix   = ($product->brand && ! Str::startsWith(Str::lower($displayName), Str::lower($product->brand)))
+        ? $product->brand . ' '
+        : '';
+    $ogTitle       = trim($brandPrefix . $displayName) . ' — GadgetPlug';
     $ogDescription = $product->catalogueDescription()
         ? Str::limit(strip_tags($product->catalogueDescription()), 155)
-        : 'Buy ' . $product->name . ' at the best price on GadgetPlug Nigeria. Verified vendor, fast delivery.';
+        : 'Buy ' . $product->displayName() . ' at the best price on GadgetPlug Nigeria. Verified vendor, fast delivery.';
     $ogImage       = $product->catalogueImageUrl('preview') ?: asset('images/logo.svg');
     $ogUrl         = route('product.show', $product->slug);
 @endphp
@@ -353,6 +363,7 @@ fbq('track', 'ViewContent', {
     value: {{ (float) $product->price }},
     currency: 'NGN',
     content_ids: @json([$product->id]),
+    content_name: @json($product->displayName()),
     content_type: 'product'
 }, {eventID: '{{ $viewContentEventId }}'});
 </script>
@@ -397,7 +408,7 @@ fbq('track', 'ViewContent', {
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
         </svg>
         @endif
-        <span class="text-[#111] dark:text-[#e8f5e9] font-medium line-clamp-1">{{ $product->name }}</span>
+        <span class="text-[#111] dark:text-[#e8f5e9] font-medium line-clamp-1">{{ $product->displayName() }}</span>
     </nav>
 
     {{-- ─── MAIN PRODUCT AREA ───────────────────────────────────────────────── --}}
@@ -409,7 +420,7 @@ fbq('track', 'ViewContent', {
             {{-- Main image — 4:3 on mobile to keep title above fold; square on desktop --}}
             <div class="aspect-[4/3] lg:aspect-square w-full bg-brand-bg dark:bg-[#1a2a1a] rounded-2xl border border-brand-border dark:border-[#2a3a2a] overflow-hidden relative">
                 @if ($firstImage)
-                    <img :src="current" alt="{{ $product->name }}" fetchpriority="high"
+                    <img :src="current" alt="{{ $product->displayName() }}" fetchpriority="high"
                         class="w-full h-full object-cover transition-all duration-300">
                 @else
                     <div class="w-full h-full flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-[#f0f8f0] to-[#e8f5e9] dark:from-[#1a2a1a] dark:to-[#162016]">
@@ -441,7 +452,7 @@ fbq('track', 'ViewContent', {
                 <button @click="current = '{{ $previewUrl }}'"
                     class="aspect-square rounded-xl overflow-hidden border-2 transition-all duration-200 focus:outline-none"
                     :class="current === '{{ $previewUrl }}' ? 'border-brand opacity-100' : 'border-transparent opacity-60 hover:opacity-100 hover:border-brand-border'">
-                    <img src="{{ $image->getUrl('thumb') }}" alt="{{ $product->name }}" class="w-full h-full object-cover">
+                    <img src="{{ $image->getUrl('thumb') }}" alt="{{ $product->displayName() }}" class="w-full h-full object-cover">
                 </button>
                 @endforeach
             </div>
@@ -470,7 +481,7 @@ fbq('track', 'ViewContent', {
 
             {{-- Product name --}}
             <h1 class="font-montserrat font-black text-[24px] md:text-[28px] text-brand-dark dark:text-[#e8f5e9] leading-tight tracking-tight mb-4">
-                {{ $product->name }}
+                {{ $product->displayName() }}
             </h1>
 
             {{-- Price + stock --}}

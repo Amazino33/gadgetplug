@@ -78,6 +78,9 @@ class ProductExporter
         $this->write($path, $format, function (callable $writeRow) {
             $writeRow(collect(ProductField::exportColumns())->map(fn (ProductField $f) => match ($f) {
                 ProductField::Name              => 'Anker 20W USB-C Charger',
+                // Blank: set by GadgetPlug, and ignored on a vendor's import.
+                ProductField::OnlineName        => '',
+                ProductField::MetaDescription   => '',
                 ProductField::Sku               => 'ANK-20W-01',
                 ProductField::Barcode           => '6009880123456',
                 ProductField::Category          => 'Chargers',

@@ -306,7 +306,7 @@ class ViewOrder extends ViewRecord
                                 $set('channel', $template->channel);
                                 $set('body', app(TemplateRenderer::class)->render(
                                     $template->body,
-                                    TemplateRenderer::contextForOrder($this->record),
+                                    TemplateRenderer::contextForOrder($this->record, $template->recipient_type === 'customer' ? TemplateRenderer::AUDIENCE_CUSTOMER : TemplateRenderer::AUDIENCE_RIDER),
                                 ));
                             }
                         }),
@@ -387,7 +387,7 @@ class ViewOrder extends ViewRecord
             'recipient_type' => 'rider',
             'channel' => $template->channel,
             'to_number' => $to,
-            'body' => app(TemplateRenderer::class)->render($template->body, TemplateRenderer::contextForOrder($order)),
+            'body' => app(TemplateRenderer::class)->render($template->body, TemplateRenderer::contextForOrder($order, TemplateRenderer::AUDIENCE_RIDER)),
             'status' => 'queued',
             'sent_by' => auth()->id(),
         ]);

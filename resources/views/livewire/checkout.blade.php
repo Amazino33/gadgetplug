@@ -80,7 +80,7 @@ new class extends Component {
                 $this->paidName   = $order->customer_name;
                 foreach ($order->items as $item) {
                     $this->paidItems[] = [
-                        'name'     => $item->product->name ?? 'Unknown',
+                        'name'     => $item->customerName(),
                         'quantity' => $item->quantity,
                         'subtotal' => $item->unit_price * $item->quantity,
                         'thumb'    => $item->product?->catalogueImageUrl('thumb') ?? '',
@@ -208,6 +208,7 @@ new class extends Component {
                 'currency'     => 'NGN',
                 'value'        => $this->total,
                 'content_ids'  => array_map(fn (array $item) => $item['product']->id, $this->cartItems),
+                'content_name' => $this->pixelContentName(),
                 'content_type' => 'product',
             ],
         );
@@ -228,6 +229,18 @@ new class extends Component {
         $this->fireAddPaymentInfo($method);
 
         $this->step = self::STEP_DELIVERY;
+    }
+
+    /**
+     * content_name for the pixel/CAPI: the online names in the basket, as the
+     * customer sees them. Additive only — content_ids and event ids unchanged.
+     */
+    public function pixelContentName(): string
+    {
+        return Str::limit(
+            collect($this->cartItems)->map(fn (array $item) => $item['product']->displayName())->unique()->implode(', '),
+            500,
+        );
     }
 
     /**
@@ -255,12 +268,13 @@ new class extends Component {
                 'currency'       => 'NGN',
                 'value'          => $this->total,
                 'content_ids'    => array_map(fn (array $item) => $item['product']->id, $this->cartItems),
+                'content_name'   => $this->pixelContentName(),
                 'content_type'   => 'product',
                 'payment_method' => $method,
             ],
         );
 
-        $this->dispatch('pixel-add-payment-info', eventId: $eventId, value: $this->total);
+        $this->dispatch('pixel-add-payment-info', eventId: $eventId, value: $this->total, contentName: $this->pixelContentName());
     }
 
     /**
@@ -735,6 +749,7 @@ that screen is where they carry on shopping, not somewhere to be held. --}}
         value: {{ $paidTotal }},
         currency: 'NGN',
         content_ids: @json($paidProductIds),
+        content_name: @json(collect($paidItems)->pluck('name')->unique()->implode(', ')),
         content_type: 'product'
     }, {eventID: '{{ $pixelEventId }}'});
     </script>
@@ -907,6 +922,7 @@ that screen is where they carry on shopping, not somewhere to be held. --}}
         value: {{ $total }},
         currency: 'NGN',
         content_ids: @json(collect($cartItems)->pluck('product.id')->values()->all()),
+        content_name: @json($this->pixelContentName()),
         content_type: 'product'
     }, {eventID: '{{ $pixelEventId }}'});
     </script>
@@ -1083,13 +1099,13 @@ that screen is where they carry on shopping, not somewhere to be held. --}}
                     <div class="flex gap-2.5 items-center">
                         <div class="w-11 h-11 rounded-lg bg-brand-bg dark:bg-[#0d1a0d] border border-brand-border dark:border-[#2a3a2a] flex items-center justify-center flex-shrink-0 overflow-hidden">
                             @if ($item['thumb'])
-                                <img src="{{ $item['thumb'] }}" alt="{{ $item['product']->name }}" loading="lazy" decoding="async" class="w-full h-full object-cover">
+                                <img src="{{ $item['thumb'] }}" alt="{{ $item['product']->displayName() }}" loading="lazy" decoding="async" class="w-full h-full object-cover">
                             @else
                                 <x-gp-icon name="package" class="w-5 h-5 text-[#8a9e8c]" />
                             @endif
                         </div>
                         <div class="flex-1 min-w-0">
-                            <div class="text-[12px] font-medium text-[#111] dark:text-[#e8f5e9] line-clamp-1">{{ $item['product']->name }}</div>
+                            <div class="text-[12px] font-medium text-[#111] dark:text-[#e8f5e9] line-clamp-1">{{ $item['product']->displayName() }}</div>
                             <div class="text-[10px] text-brand-muted">Qty: {{ $item['quantity'] }}</div>
                         </div>
                         <div class="font-montserrat font-bold text-[12px] text-brand flex-shrink-0">

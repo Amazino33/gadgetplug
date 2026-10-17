@@ -20,10 +20,17 @@ class TemplateRenderer
         return strtr($body, $replacements);
     }
 
+    /** Who a message is for — decides which name each line carries. */
+    public const AUDIENCE_CUSTOMER    = 'customer';
+    public const AUDIENCE_STOREKEEPER = 'storekeeper';
+    public const AUDIENCE_RIDER       = 'rider';
+
     /**
+     * @param  string  $audience  customer: the online name the buyer saw;
+     *                            storekeeper/rider: the shelf name staff pick by.
      * @return array<string, string>
      */
-    public static function contextForOrder(Order $order): array
+    public static function contextForOrder(Order $order, string $audience = self::AUDIENCE_CUSTOMER): array
     {
         return [
             'customer_name'    => $order->customer_name,
@@ -36,7 +43,7 @@ class TemplateRenderer
             'status'           => $order->status,
             'total'            => self::naira($order->total_amount),
             'delivery_address' => $order->shipping_address,
-            'order_items'      => self::itemLines($order),
+            'order_items'      => self::itemLines($order, $audience),
             'item_count'       => (string) self::itemCount($order),
             'payment_method'   => self::paymentMethod($order),
         ];
@@ -46,16 +53,20 @@ class TemplateRenderer
     //   • 2 x iPhone 13 Pro — ₦900,000.00
     // Uses the unit_price stored on the order line rather than the product's
     // current price, so a later price change never rewrites what the customer
-    // was quoted.
-    private static function itemLines(Order $order): string
+    // was quoted — and the line's name snapshot for the same reason: the
+    // customer gets the online name they bought under, staff get the shelf
+    // name they pick by. (Riders get the shelf name for now; showing both is
+    // planned with the order-operations work.)
+    private static function itemLines(Order $order, string $audience = self::AUDIENCE_CUSTOMER): string
     {
         $order->loadMissing('items.product');
 
         return $order->items
-            ->map(function ($item) {
-                // Products can be deleted after an order is placed; the message
-                // still has to name something the customer recognises.
-                $name = $item->product?->name ?? 'Item';
+            ->map(function ($item) use ($audience) {
+                // Snapshots first; a deleted product still names something.
+                $name = $audience === self::AUDIENCE_CUSTOMER
+                    ? $item->customerName()
+                    : $item->internalName();
                 $line = (float) $item->quantity * (float) $item->unit_price;
 
                 return '• ' . $item->quantity . ' x ' . $name . ' — ' . self::naira($line);

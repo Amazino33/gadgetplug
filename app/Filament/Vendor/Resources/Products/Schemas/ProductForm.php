@@ -114,6 +114,25 @@ class ProductForm
                                     // Tour hook ("Add a product").
                                     ->extraFieldWrapperAttributes(['data-tour' => 'product-name']),
 
+                                // Read-only for vendors: GadgetPlug sets the online
+                                // name and meta description. Never a form field, so
+                                // a vendor save can't write them.
+                                Grid::make(['default' => 1, 'md' => 2])
+                                    ->visible(fn ($record) => $record !== null)
+                                    ->schema([
+                                        Placeholder::make('online_name_display')
+                                            ->label('Online name')
+                                            ->helperText('Set by GadgetPlug for online search')
+                                            ->content(fn ($record) => $record && $record->displayName() !== $record->name
+                                                ? $record->displayName()
+                                                : '— (customers see the product name)'),
+
+                                        Placeholder::make('meta_description_display')
+                                            ->label('Meta description')
+                                            ->helperText('Set by GadgetPlug for online search')
+                                            ->content(fn ($record) => $record?->catalogueSource()?->meta_description ?: '—'),
+                                    ]),
+
                                 // What it is, and which branch holds it.
                                 Grid::make(['default' => 1, 'md' => 2])
                                     ->schema([

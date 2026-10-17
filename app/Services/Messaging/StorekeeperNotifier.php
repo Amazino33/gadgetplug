@@ -56,7 +56,7 @@ class StorekeeperNotifier
             vendor: $vendor,
             templateKey: $templateKey,
             toggle: $toggle,
-            context: TemplateRenderer::contextForOrder($order) + ['store_name' => $vendor->name],
+            context: TemplateRenderer::contextForOrder($order, TemplateRenderer::AUDIENCE_STOREKEEPER) + ['store_name' => $vendor->name],
             order: $order,
         );
     }

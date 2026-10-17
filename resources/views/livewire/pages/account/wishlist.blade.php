@@ -54,7 +54,7 @@ new class extends Component {
                 <a href="{{ route('product.show', $product->slug) }}"
                    class="w-16 h-16 rounded-xl bg-brand-bg dark:bg-[#0d1a0d] border border-brand-border dark:border-[#2a3a2a] flex items-center justify-center flex-shrink-0 overflow-hidden">
                     @if ($product->catalogueImageUrl('thumb'))
-                        <img src="{{ $product->catalogueImageUrl('thumb') }}" alt="{{ $product->name }}" class="w-full h-full object-cover">
+                        <img src="{{ $product->catalogueImageUrl('thumb') }}" alt="{{ $product->displayName() }}" class="w-full h-full object-cover">
                     @else
                         <span class="text-2xl">📱</span>
                     @endif
@@ -64,7 +64,7 @@ new class extends Component {
                 <div class="flex-1 min-w-0">
                     <a href="{{ route('product.show', $product->slug) }}"
                        class="font-semibold text-[13px] text-brand-dark dark:text-[#e8f5e9] hover:text-brand line-clamp-1 block">
-                        {{ $product->name }}
+                        {{ $product->displayName() }}
                     </a>
                     <p class="text-[11px] text-brand-muted mt-0.5">{{ $product->category?->name }}</p>
                     <p class="font-montserrat font-black text-[14px] text-brand mt-1">₦{{ number_format($product->price) }}</p>

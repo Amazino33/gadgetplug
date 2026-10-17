@@ -915,14 +915,14 @@ new class extends Component {
                             @foreach ($this->productResults as $product)
                                 <button type="button" wire:click="selectProduct({{ $product->id }})"
                                     class="w-full text-left px-3.5 py-2.5 text-[12px] text-[#111] dark:text-[#e8f5e9] hover:bg-brand-bg dark:hover:bg-[#1a2a1a] transition-colors">
-                                    {{ $product->name }}
+                                    {{ $product->displayName() }}
                                 </button>
                             @endforeach
                         </div>
                     @endif
                 @else
                     <div class="flex items-center justify-between mb-4">
-                        <span class="text-[13px] font-semibold text-brand-dark dark:text-[#e8f5e9]">{{ $this->selectedProduct->name }}</span>
+                        <span class="text-[13px] font-semibold text-brand-dark dark:text-[#e8f5e9]">{{ $this->selectedProduct->displayName() }}</span>
                         <button type="button" wire:click="clearSelectedProduct" class="text-[11px] text-brand-muted hover:text-brand">
                             Change product
                         </button>

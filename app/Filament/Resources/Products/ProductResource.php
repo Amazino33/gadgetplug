@@ -40,7 +40,7 @@ class ProductResource extends Resource
     public const SAFE_COLUMNS = [
         'id', 'vendor_id', 'store_id', 'category_id',
         'source_product_id', 'supplier_link_id',
-        'name', 'slug', 'brand', 'description', 'specifications',
+        'name', 'online_name', 'slug', 'brand', 'description', 'meta_description', 'specifications',
         'status', 'show_online', 'published_at', 'unpublish_at',
         // Selling price only. has_custom_price is needed by the price accessor
         // to decide whether a linked listing quotes its own price.
@@ -84,7 +84,7 @@ class ProductResource extends Resource
         }
 
         return $query
-            ->with(['vendor:id,name', 'category:id,name', 'supplierLink.supplier:id,name', 'media'])
+            ->with(['vendor:id,name', 'category:id,name', 'supplierLink.supplier:id,name', 'media', 'sourceProduct.media'])
             ->withCount([
                 'media as image_count' => fn (Builder $q) => $q->where('collection_name', 'product-images'),
                 'resoldListings',

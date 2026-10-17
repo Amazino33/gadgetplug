@@ -100,7 +100,7 @@ class ListOrders extends ListRecords
     public function messageTemplatesFor(Order $order): array
     {
         $renderer = app(TemplateRenderer::class);
-        $context  = TemplateRenderer::contextForOrder($order);
+        $context  = TemplateRenderer::contextForOrder($order, TemplateRenderer::AUDIENCE_CUSTOMER);
 
         return MessageTemplate::query()
             ->where('vendor_id', filament()->getTenant()->id)

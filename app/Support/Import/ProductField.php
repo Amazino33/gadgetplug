@@ -20,11 +20,15 @@ namespace App\Support\Import;
 enum ProductField: string
 {
     case Name              = 'name';
+    // Set by GadgetPlug for online search. Exported for everyone; written by an
+    // import only for users holding update_product_online_name (ProductImporter).
+    case OnlineName        = 'online_name';
     case Sku               = 'sku';
     case Barcode           = 'barcode';
     case Category          = 'category';
     case Brand             = 'brand';
     case Description       = 'description';
+    case MetaDescription   = 'meta_description';
     case MeasurementUnit   = 'measurement_unit';
     case CostPrice         = 'cost_price';
     case Price             = 'price';
@@ -54,11 +58,13 @@ enum ProductField: string
     {
         return match ($this) {
             self::Name              => 'Name',
+            self::OnlineName        => 'Online Name',
             self::Sku               => 'SKU',
             self::Barcode           => 'Barcode',
             self::Category          => 'Category',
             self::Brand             => 'Brand',
             self::Description       => 'Description',
+            self::MetaDescription   => 'Meta Description',
             self::MeasurementUnit   => 'Unit',
             self::CostPrice         => 'Cost',
             self::Price             => 'Price',
@@ -79,6 +85,8 @@ enum ProductField: string
     {
         return match ($this) {
             self::Name              => 'Required. The product name.',
+            self::OnlineName        => 'The name customers see online. Set by GadgetPlug; ignored unless you may edit online names.',
+            self::MetaDescription   => 'The search-result description. Set by GadgetPlug; ignored unless you may edit online names.',
             self::Sku               => 'Used to match existing products first. Required unless a barcode is given.',
             self::Barcode           => 'Used to match existing products when there is no SKU.',
             self::Category          => 'Matched by name; a category that does not exist yet is created.',
@@ -127,6 +135,8 @@ enum ProductField: string
             self::Category => ['category', 'productgroup', 'product group', 'group', 'department', 'class'],
             self::Brand    => ['brand', 'make', 'manufacturer'],
             self::Description     => ['description', 'details', 'notes', 'long description'],
+            self::OnlineName      => ['online name', 'onlinename', 'online title', 'web name', 'display name', 'seo name', 'seo title'],
+            self::MetaDescription => ['meta description', 'metadescription', 'seo description', 'search description'],
             self::MeasurementUnit => ['unit', 'measurementunit', 'measurement unit', 'uom', 'unit of measure', 'measure'],
             self::CostPrice       => ['cost', 'cost price', 'costprice', 'buy price', 'buying price', 'purchase price', 'unit cost', 'wholesale'],
             self::Price           => ['price', 'selling price', 'sellprice', 'sell price', 'retail', 'retail price', 'unit price', 'sale price'],

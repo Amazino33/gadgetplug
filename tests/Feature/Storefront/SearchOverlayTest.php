@@ -14,7 +14,7 @@ uses(RefreshDatabase::class);
 beforeEach(function () {
     // The suggestion list is cached for every storefront page; each test builds
     // its own catalogue and must be judged on that one.
-    Cache::forget('storefront.search-suggestions');
+    Cache::forget('storefront.search-suggestions.v2');
 });
 
 function searchableProduct(string $name, array $attrs = [], ?Category $category = null): Product
