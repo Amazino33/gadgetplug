@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 use App\Services\VendorLink\LinkedPricing;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -40,7 +41,10 @@ class Product extends Model implements HasMedia
     public function getSlugOptions(): SlugOptions
     {
         return SlugOptions::create()
-            ->generateSlugsFrom('name')
+            // The online name when there is one: it is what customers search
+            // for. Later changes to it re-slug in ProductObserver (old URLs
+            // 301); changes to the internal name never touch the slug.
+            ->generateSlugsFrom(fn (self $product) => filled($product->online_name) ? $product->online_name : $product->name)
             ->saveSlugsTo('slug')
             ->slugsShouldBeNoLongerThan(80)
             ->doNotGenerateSlugsOnUpdate()
@@ -78,8 +82,61 @@ class Product extends Model implements HasMedia
     {
         $field ??= $this->getRouteKeyName();
 
-        return static::query()->where($field, $value)->visibleOnline()->first()
+        $product = static::query()->where($field, $value)->visibleOnline()->first()
             ?? static::query()->where($field, $value)->first();
+
+        // A slug a product used to have: answer with a permanent redirect to
+        // where it lives now, keeping any query string. Only for slug URLs —
+        // the feed's id-bound routes never redirect.
+        if ($product === null && $field === 'slug' && ($moved = self::movedFromSlug((string) $value)) !== null) {
+            $query = request()->getQueryString();
+
+            throw new \Illuminate\Http\Exceptions\HttpResponseException(
+                redirect()->to(route('product.show', $moved->slug).($query ? '?'.$query : ''), 301)
+            );
+        }
+
+        return $product;
+    }
+
+    /** The product that used to live at this slug, preferring one customers can see. */
+    private static function movedFromSlug(string $slug): ?self
+    {
+        $ids = ProductSlugRedirect::where('old_slug', $slug)->latest('id')->pluck('product_id');
+
+        if ($ids->isEmpty()) {
+            return null;
+        }
+
+        return static::query()->whereKey($ids)->visibleOnline()->first()
+            ?? static::query()->whereKey($ids->first())->first();
+    }
+
+    public function slugRedirects(): HasMany
+    {
+        return $this->hasMany(ProductSlugRedirect::class);
+    }
+
+    /**
+     * The slug this product's online name produces: the same shape the slug
+     * package makes (max 80, kebab-case), unique within the vendor — slugs are
+     * unique per vendor, not globally — with -1, -2 … on a collision.
+     */
+    public function slugFromOnlineName(): string
+    {
+        $base = Str::limit(Str::slug((string) $this->online_name), 80, '');
+        $slug = $base;
+        $suffix = 1;
+
+        while (static::query()
+            ->where('vendor_id', $this->vendor_id)
+            ->where('slug', $slug)
+            ->whereKeyNot($this->getKey())
+            ->exists()) {
+            $slug = $base.'-'.$suffix++;
+        }
+
+        return $slug;
     }
 
     protected $casts = [

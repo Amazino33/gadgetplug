@@ -342,18 +342,52 @@ $categoryIcon = \App\Support\CategoryIcon::for($product->category?->name);
         ? $product->brand . ' '
         : '';
     $ogTitle       = trim($brandPrefix . $displayName) . ' — GadgetPlug';
-    $ogDescription = $product->catalogueDescription()
-        ? Str::limit(strip_tags($product->catalogueDescription()), 155)
-        : 'Buy ' . $product->displayName() . ' at the best price on GadgetPlug Nigeria. Verified vendor, fast delivery.';
+    // GadgetPlug's meta description when set (the supplier's, for a resold
+    // listing), otherwise the description, otherwise a generated line.
+    $metaDescription = $product->catalogueSource()?->meta_description;
+    $ogDescription = filled($metaDescription)
+        ? $metaDescription
+        : ($product->catalogueDescription()
+            ? Str::limit(strip_tags($product->catalogueDescription()), 155)
+            : 'Buy ' . $displayName . ' at the best price on GadgetPlug Nigeria. Verified vendor, fast delivery.');
     $ogImage       = $product->catalogueImageUrl('preview') ?: asset('images/logo.svg');
-    $ogUrl         = route('product.show', $product->slug);
+    // On the storefront host, at THIS listing's own slug — a reseller's page is
+    // canonical to itself, never to the supplier's.
+    $ogUrl         = config('app.storefront_url') . '/product/' . $product->slug;
+
+    // schema.org Product for search engines: what it is, what it costs, and
+    // whether it can be bought right now (live stock, so a resold listing
+    // answers with its supplier's).
+    $jsonLd = array_filter([
+        '@context'    => 'https://schema.org',
+        '@type'       => 'Product',
+        'name'        => $displayName,
+        'image'       => $product->catalogueMedia()->map(fn ($m) => $m->getUrl('preview'))->values()->all() ?: null,
+        'description' => $ogDescription,
+        'sku'         => $product->sku ?: null,
+        'brand'       => $product->brand ? ['@type' => 'Brand', 'name' => $product->brand] : null,
+        'url'         => $ogUrl,
+        'offers'      => [
+            '@type'         => 'Offer',
+            'url'           => $ogUrl,
+            'price'         => number_format((float) $product->price, 2, '.', ''),
+            'priceCurrency' => 'NGN',
+            'availability'  => $product->available_stock > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+            'seller'        => ['@type' => 'Organization', 'name' => $product->vendor?->name],
+        ],
+    ], fn ($value) => $value !== null);
 @endphp
 <x-layouts.storefront
     :title="$ogTitle"
     :description="$ogDescription"
     :image="$ogImage"
     :url="$ogUrl"
+    :canonical="$ogUrl"
 >
+<x-slot:head>
+    {{-- JSON_HEX_TAG: a "</script>" inside a product name can't end the tag. --}}
+    <script type="application/ld+json">{!! json_encode($jsonLd, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) !!}</script>
+</x-slot:head>
 
 {{-- Browser half of ViewContent, quoting the event_id its Conversions API
 copy was sent with in mount() so Meta folds the two into one event. --}}

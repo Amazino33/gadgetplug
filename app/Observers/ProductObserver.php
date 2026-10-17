@@ -78,6 +78,8 @@ class ProductObserver
      */
     public function updating(Product $product): void
     {
+        $this->followOnlineName($product);
+
         if (! $product->isDirty('store_id')) {
             return;
         }
@@ -113,8 +115,46 @@ class ProductObserver
      * through the model so ProductStoreStockObserver recomputes the mirror;
      * the total is unchanged by a move, so the mirror simply stays correct.
      */
+    /**
+     * The URL follows the online name.
+     *
+     * Setting or changing a product's online name gives it a slug made from
+     * that name; the old slug is kept as a redirect (recorded in updated()).
+     * Clearing the online name, or changing the internal name, never moves the
+     * URL. A resold listing has no online name of its own — its supplier's
+     * changing never re-slugs the reseller's URL.
+     */
+    private function followOnlineName(Product $product): void
+    {
+        if (! $product->isDirty('online_name') || blank($product->online_name) || $product->isLinked()) {
+            return;
+        }
+
+        $slug = $product->slugFromOnlineName();
+
+        if ($slug !== '' && $slug !== $product->slug) {
+            $product->slug = $slug;
+        }
+    }
+
+    /**
+     * Keep every slug a product leaves behind, so its old URL 301s to the new
+     * one — and drop a redirect that now points a product at its own URL.
+     */
+    private function rememberOldSlug(Product $product): void
+    {
+        if (! $product->wasChanged('slug') || blank($old = $product->getOriginal('slug'))) {
+            return;
+        }
+
+        $product->slugRedirects()->firstOrCreate(['old_slug' => $old]);
+        $product->slugRedirects()->where('old_slug', $product->slug)->delete();
+    }
+
     public function updated(Product $product): void
     {
+        $this->rememberOldSlug($product);
+
         if (! $product->wasChanged('store_id')) {
             return;
         }

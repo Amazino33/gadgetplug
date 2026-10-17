@@ -8,8 +8,26 @@
     'title'       => "GadgetPlug — Nigeria's #1 Tech Marketplace",
     'description' => 'Buy phones, laptops and gadgets from CAC-verified Nigerian vendors. Test your item before you pay, with 2-hour dispatch across Uyo, Lagos, Abuja and 20 more cities.',
     'image'       => asset('images/logo.svg'),
-    'url'         => request()->url(),
+    // Defaults to the canonical address below; og:url and canonical agree.
+    'url'         => null,
+    // The page's address on the STOREFRONT host (config app.storefront_url),
+    // never the panels' domain the app may also be served from. Pages with a
+    // better answer pass their own (the product page does).
+    'canonical'   => null,
 ])
+@php
+    if ($canonical === null) {
+        $canonicalPath = trim(request()->path(), '/');
+        $canonical = config('app.storefront_url').($canonicalPath === '' ? '/' : '/'.$canonicalPath);
+
+        // A category shelf is a real page; search and paging are not.
+        if (filled(request('category'))) {
+            $canonical .= '?category='.urlencode((string) request('category'));
+        }
+    }
+
+    $url ??= $canonical;
+@endphp
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
@@ -20,6 +38,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $title }}</title>
     <meta name="description" content="{{ $description }}">
+    <link rel="canonical" href="{{ $canonical }}">
 
     {{-- Open Graph --}}
     <meta property="og:type"        content="website">
@@ -60,6 +79,8 @@
     @livewireStyles
     @include('partials.meta-pixel')
     @include('partials.ms-clarity')
+    {{-- Per-page extras, e.g. the product page's JSON-LD. --}}
+    {{ $head ?? '' }}
 </head>
 <body
     x-data="{

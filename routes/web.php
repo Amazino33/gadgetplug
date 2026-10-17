@@ -22,6 +22,9 @@ Volt::route('/stores', 'pages.stores')->name('stores.index');
 Volt::route('/store/{vendor:slug}', 'pages.vendor-store')->name('store.show');
 Volt::route('/cart', 'pages.cart')->name('cart');
 
+// Every customer-visible page, on the storefront host. robots.txt points here.
+Route::get('/sitemap.xml', \App\Http\Controllers\Storefront\SitemapController::class)->name('sitemap');
+
 // The social feed's data, called on every scroll. Kept as plain JSON routes
 // rather than Livewire methods so the payload is exactly what a post needs and
 // nothing more — this runs on mobile data.

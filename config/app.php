@@ -54,6 +54,11 @@ return [
 
     'url' => env('APP_URL', 'http://localhost'),
 
+    // The customer storefront's own host. APP_URL is the panels' domain
+    // (gadgetplug.com.ng); canonical links, Open Graph URLs, JSON-LD and the
+    // sitemap must point search engines at the storefront instead.
+    'storefront_url' => rtrim((string) env('STOREFRONT_URL', 'https://gadgetplug.ng'), '/'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Timezone
