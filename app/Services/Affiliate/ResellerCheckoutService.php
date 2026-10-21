@@ -8,6 +8,7 @@ use App\Models\Affiliate;
 use App\Models\Checkout;
 use App\Models\Product;
 use App\Models\WalletTransaction;
+use App\Services\Orders\OrderStatusService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -31,6 +32,7 @@ class ResellerCheckoutService
         private ReserveStockAction $reserveStock,
         private WalletService $walletService,
         private PlaceCheckoutAction $placeCheckout,
+        private OrderStatusService $orderStatus,
     ) {}
 
     /**
@@ -128,6 +130,11 @@ class ResellerCheckoutService
                     'amount'       => -(float) $order->total_amount,
                     'description'  => "Reseller purchase — order #{$order->reference}.",
                 ]);
+
+                // The debit is the payment: revenue into the selling vendor's
+                // Due from GadgetPlug account, and the supplier payable, now —
+                // the same moment a Paystack order books at paid.
+                $this->orderStatus->recordWalletPayment($order);
             }
 
             return $checkout->fresh('orders.items');

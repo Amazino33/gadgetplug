@@ -40,13 +40,20 @@ class RecognizeOrderRevenueAction
         }
 
         // How the customer paid — recorded on the order. Paystack is always a
-        // transfer; there is no cash variant of a card payment, so the caller's
-        // channel is ignored rather than trusted.
-        $channel = $order->payment_method === 'paystack'
-            ? 'bank_transfer'
-            : ($channel ?? $order->payment_channel);
+        // transfer and a reseller purchase always the wallet: neither has a
+        // cash variant, so the caller's channel is ignored rather than trusted.
+        $channel = match ($order->payment_method) {
+            'paystack' => 'bank_transfer',
+            'wallet'   => 'wallet',
+            default    => $channel ?? $order->payment_channel,
+        };
 
-        if (! in_array($channel, ['cash', 'bank_transfer'], true)) {
+        if (! in_array($channel, ['cash', 'bank_transfer', 'wallet'], true)) {
+            return 'no_channel';
+        }
+
+        // Wallet money is only ever the wallet's; cash or transfer is never.
+        if (($channel === 'wallet') !== ($order->payment_method === 'wallet')) {
             return 'no_channel';
         }
 

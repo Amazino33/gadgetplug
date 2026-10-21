@@ -30,6 +30,7 @@ use Throwable;
  *  confirmed              confirm()               system (POD checkout)  —
  *  paid                   markPaid()              system (Paystack)      revenue → Due from GadgetPlug; supplier payable
  *  paid_but_failed_stock  markPaidButFailedStock()system (Paystack)      —
+ *  (created confirmed)    recordWalletPayment()   system (wallet debit)  revenue → Due from GadgetPlug; supplier payable
  *  packed                 pack()                  store (fulfil)         —
  *  shipped (handed over)  handOver()              store (fulfil)         stock leaves the allocated store(s), COGS
  *  delivered              markDelivered()         GadgetPlug (dispatch)  logistics only; affiliate return window starts
@@ -109,6 +110,22 @@ class OrderStatusService
         return $this->move($order, 'paid', null, [], function (Order $order) {
             $this->recogniseRevenue($order);
         });
+    }
+
+    /**
+     * A reseller paid from their GadgetPlug wallet: the money is GadgetPlug's
+     * to pass on, exactly like a Paystack payment. Revenue (items only) goes to
+     * the selling vendor's Due from GadgetPlug account and the supplier payable
+     * books with it. The order is created already confirmed, so this changes
+     * no status; it is called at the moment of the wallet debit.
+     */
+    public function recordWalletPayment(Order $order): ?string
+    {
+        if ($order->payment_method !== 'wallet') {
+            throw new InvalidOrderTransition('Only a wallet purchase is paid from the wallet.');
+        }
+
+        return $this->recogniseRevenue($order);
     }
 
     /** Paid, but a unit could not be held: flagged for a human, nothing booked. */
