@@ -231,4 +231,10 @@ class Order extends Model
     {
         return $this->hasOne(WalletTransaction::class)->where('type', 'debit');
     }
+
+    /** The credit that gave a cancelled wallet order's money back, if any. */
+    public function walletRefund(): HasOne
+    {
+        return $this->hasOne(WalletTransaction::class)->where('type', 'credit');
+    }
 }

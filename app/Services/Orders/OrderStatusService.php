@@ -9,6 +9,7 @@ use App\Actions\VendorLink\BookSupplierPayableAction;
 use App\Models\FinancialLedgerEntry;
 use App\Models\Order;
 use App\Models\User;
+use App\Models\WalletTransaction;
 use App\Services\Affiliate\CommissionService;
 use App\Services\FinancialLedger;
 use App\Services\VendorLink\SupplierPayable;
@@ -35,7 +36,7 @@ use Throwable;
  *  packed                 pack()                  store (fulfil)         —
  *  shipped (handed over)  handOver()              store (fulfil)         stock leaves the allocated store(s), COGS
  *  delivered              markDelivered()         GadgetPlug (dispatch)  logistics only; affiliate return window starts
- *  cancelled              cancel()                GadgetPlug (dispatch)  release holds; reverse revenue and supplier payable; reject commission
+ *  cancelled              cancel()                GadgetPlug (dispatch)  release holds; reverse revenue and supplier payable; refund a wallet; reject commission
  *  (no status change)     recordPaymentReceived() GadgetPlug (dispatch)  POD revenue → Due from GadgetPlug; supplier payable
  *
  * "Delivered" moves no stock and no money: stock leaves at the handover (the
@@ -324,6 +325,7 @@ class OrderStatusService
 
                 $this->reverseRevenue($order, $actor);
                 $this->reverseSupplierPayable($order, $actor);
+                $this->refundWallet($order);
 
                 try {
                     app(CommissionService::class)->reject($order, 'order_cancelled');
@@ -390,6 +392,38 @@ class OrderStatusService
         }
 
         return $reason;
+    }
+
+    /**
+     * Give a reseller's wallet back what this order took from it. One child
+     * order of a checkout has one debit of its own, so a mixed checkout gets
+     * back only the part that was cancelled.
+     *
+     * Append-only: a credit row referencing the order, for exactly the debit's
+     * amount. Booked once — cancel() holds this order's row lock and a status
+     * can only be cancelled once, and an existing refund is checked for too.
+     * Unlike the bookkeeping reversals this is the customer's money, so a
+     * failure here fails the cancellation rather than being logged and passed.
+     */
+    private function refundWallet(Order $order): void
+    {
+        if ($order->payment_method !== 'wallet') {
+            return;
+        }
+
+        $debit = WalletTransaction::where('order_id', $order->id)->where('type', 'debit')->first();
+
+        if (! $debit || WalletTransaction::where('order_id', $order->id)->where('type', 'credit')->exists()) {
+            return;
+        }
+
+        WalletTransaction::create([
+            'affiliate_id' => $debit->affiliate_id,
+            'order_id'     => $order->id,
+            'type'         => 'credit',
+            'amount'       => abs((float) $debit->amount),
+            'description'  => "Refund — order #{$order->reference} cancelled.",
+        ]);
     }
 
     /**
