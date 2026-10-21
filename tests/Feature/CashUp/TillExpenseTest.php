@@ -44,26 +44,6 @@ function payOut(array $ctx, array $over = [])
     ], $over));
 }
 
-function tillSale(array $ctx, array $over = []): PosSale
-{
-    $total = $over['total'] ?? 80000;
-
-    return PosSale::create(array_merge([
-        'reference'       => 'POS-'.Str::random(10),
-        'vendor_id'       => $ctx['vendor']->id,
-        'store_id'        => $ctx['store']->id,
-        'cashier_id'      => $ctx['cashier']->id,
-        'subtotal'        => $total,
-        'discount_amount' => 0,
-        'vat_amount'      => 0,
-        'total'           => $total,
-        'payment_method'  => 'cash',
-        'amount_tendered' => $total,
-        'change_given'    => 0,
-        'status'          => 'completed',
-        'completed_at'    => now(),
-    ], $over));
-}
 
 // ── Recording it at the counter ──────────────────────────────────────────────
 

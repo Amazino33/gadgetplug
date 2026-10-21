@@ -7,10 +7,12 @@
 // in a sibling test only exists when that sibling happens to load too, and
 // running a file on its own then fails.
 
+use App\Models\PosSale;
 use App\Models\PosSession;
 use App\Models\Store;
 use App\Models\User;
 use App\Models\Vendor;
+use Illuminate\Support\Str;
 
 /** A vendor, its default branch, and a cashier assigned to that branch. */
 function cashUpContext(): array
@@ -64,4 +66,26 @@ function closeCashUp(PosSession $session, array $over = []): PosSession
     ], $over));
 
     return $session->refresh();
+}
+
+/** A completed cash sale at the till, for the drawer tests (TillExpenseTest, TillDebtRepaymentTest). */
+function tillSale(array $ctx, array $over = []): PosSale
+{
+    $total = $over['total'] ?? 80000;
+
+    return PosSale::create(array_merge([
+        'reference'       => 'POS-'.Str::random(10),
+        'vendor_id'       => $ctx['vendor']->id,
+        'store_id'        => $ctx['store']->id,
+        'cashier_id'      => $ctx['cashier']->id,
+        'subtotal'        => $total,
+        'discount_amount' => 0,
+        'vat_amount'      => 0,
+        'total'           => $total,
+        'payment_method'  => 'cash',
+        'amount_tendered' => $total,
+        'change_given'    => 0,
+        'status'          => 'completed',
+        'completed_at'    => now(),
+    ], $over));
 }

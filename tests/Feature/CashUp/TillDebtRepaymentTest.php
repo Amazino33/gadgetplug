@@ -52,9 +52,8 @@ function collectRepayment(array $ctx, array $over = [])
     ], $over));
 }
 
-// tillSale() is declared in TillExpenseTest.php — Pest loads every test file
-// into one global function namespace, and a second identical declaration
-// here would collide with it the moment both files load in the same run.
+// tillSale() lives in Helpers.php, shared with TillExpenseTest, so this file
+// runs on its own as well as alongside it.
 
 // ── Recording it at the counter ──────────────────────────────────────────────
 
