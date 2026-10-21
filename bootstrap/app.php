@@ -149,6 +149,17 @@ return Application::configure(basePath: dirname(__DIR__))
             return $toLogin($request, 'Your session timed out before that went through — please sign in again.');
         });
 
+        // A rider's dispatch link that has expired, been altered, or been
+        // replaced: riders have no account, so the login bounce below would be
+        // a dead end. Tell them plainly instead, still as a 403.
+        $exceptions->render(function (\Illuminate\Routing\Exceptions\InvalidSignatureException $e, Request $request) {
+            if (! $request->is('dispatch/*')) {
+                return null;
+            }
+
+            return response()->view('dispatch.expired', [], 403);
+        });
+
         // 403: never a dead end. Where the user goes depends on what they can
         // actually reach from here.
         $exceptions->render(function (Throwable $e, Request $request) use ($toLogin): ?RedirectResponse {

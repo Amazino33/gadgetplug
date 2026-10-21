@@ -34,8 +34,10 @@ use Throwable;
  *  paid_but_failed_stock  markPaidButFailedStock()system (Paystack)      —
  *  (created confirmed)    recordWalletPayment()   system (wallet debit)  revenue → Due from GadgetPlug; supplier payable
  *  packed                 pack()                  store (fulfil)         —
- *  shipped (handed over)  handOver()              store (fulfil)         stock leaves the allocated store(s), COGS
- *  delivered              markDelivered()         GadgetPlug (dispatch)  logistics only; affiliate return window starts
+ *  shipped (handed over)  handOver()              store (fulfil)         stock leaves the allocated store(s), COGS; customer gets a delivery code
+ *  delivered              confirmDeliveryWithCode() rider (signed link + code)  logistics only; affiliate return window starts
+ *  delivered              markDelivered()         GadgetPlug (dispatch, override with reason)  the same
+ *  returned               returnToStore()         GadgetPlug (dispatch)  failed delivery: stock back to the branch it left, at its cost; no revenue
  *  cancelled              cancel()                GadgetPlug (dispatch)  release holds; reverse revenue and supplier payable; refund a wallet; reject commission
  *  (no status change)     recordPaymentReceived() GadgetPlug (dispatch)  POD revenue → Due from GadgetPlug; supplier payable
  *
@@ -52,10 +54,13 @@ class OrderStatusService
         'packed'                => ['confirmed', 'paid'],
         'shipped'               => ['confirmed', 'paid', 'packed'],
         'delivered'             => ['shipped'],
-        'cancelled'             => ['pending', 'confirmed', 'paid', 'packed', 'paid_but_failed_stock'],
+        'returned'              => ['shipped'],
+        // A returned order's goods are already back on the shelf: cancelling it
+        // settles the money (revenue reversal, wallet refund) and moves no stock.
+        'cancelled'             => ['pending', 'confirmed', 'paid', 'packed', 'paid_but_failed_stock', 'returned'],
     ];
 
-    public const STATUSES = ['pending', 'confirmed', 'paid', 'paid_but_failed_stock', 'packed', 'shipped', 'delivered', 'cancelled'];
+    public const STATUSES = ['pending', 'confirmed', 'paid', 'paid_but_failed_stock', 'packed', 'shipped', 'delivered', 'returned', 'cancelled'];
 
     /** Staff-facing names. Customers see their own wording on /track. */
     public const LABELS = [
@@ -66,6 +71,7 @@ class OrderStatusService
         'packed'                => 'Packed',
         'shipped'               => 'Handed to rider',
         'delivered'             => 'Delivered',
+        'returned'              => 'Returned to store',
         'cancelled'             => 'Cancelled',
     ];
 
@@ -154,12 +160,19 @@ class OrderStatusService
     {
         Gate::forUser($actor)->authorize('fulfil', $order);
 
+        // The customer's delivery code: four digits, stored only as a hash.
+        // The rider must enter it to mark the order delivered, so it reaches
+        // the customer, never the rider page or /track.
+        $code = DispatchService::newDeliveryCode();
+
         return $this->move(
             $order,
             'shipped',
             $actor,
-            ['handed_over_at' => now(), 'handed_over_by' => $actor->id],
-            function (Order $order) use ($actor) {
+            ['handed_over_at' => now(), 'handed_over_by' => $actor->id] + DispatchService::codeColumns($code),
+            function (Order $order) use ($actor, $code) {
+                app(DispatchMessages::class)->sendDeliveryCode($order, $code);
+
                 $order->load('items.product');
 
                 foreach ($order->items as $item) {
@@ -191,9 +204,9 @@ class OrderStatusService
     // ── GadgetPlug's part ───────────────────────────────────────────────────
 
     /**
-     * The customer has the goods. A logistics record only — no stock, revenue,
-     * cost, supplier payable or ledger moves. Until the rider's delivery-code
-     * page exists, only an admin can record it, and must say why.
+     * The customer has the goods, recorded by GadgetPlug without the delivery
+     * code — an override, so a reason is required and logged. A logistics
+     * record only — no stock, revenue, cost, supplier payable or ledger moves.
      */
     public function markDelivered(Order $order, User $actor, string $reason, bool $notifyCustomer = true): Order
     {
@@ -209,18 +222,167 @@ class OrderStatusService
             $order,
             'delivered',
             $actor,
-            ['delivered_at' => now(), 'delivered_by' => $actor->id, 'delivered_override_reason' => $reason],
-            function (Order $order) {
-                // A commission hold, not a book entry: the return window starts
-                // when the customer has the item.
-                try {
-                    app(CommissionService::class)->startReturnWindow($order);
-                } catch (Throwable $e) {
-                    Log::error("Affiliate return window failed for order {$order->id}: ".$e->getMessage());
-                }
-            },
+            ['delivered_at' => now(), 'delivered_by' => $actor->id, 'delivered_override_reason' => $reason, 'delivered_via' => 'override'],
+            fn (Order $order) => $this->startReturnWindow($order),
             notifyCustomer: $notifyCustomer,
         );
+    }
+
+    /**
+     * The rider marks the order delivered on the signed dispatch page, with
+     * the customer's code. The link is the authority (whoever holds it was
+     * sent it); the code proves the customer has the goods.
+     *
+     * A wrong code counts against the order; at the fifth the link locks and
+     * GadgetPlug is alerted, and only a new code (admin) unlocks it.
+     *
+     * @return array{result: string, remaining?: int}
+     *   result: delivered | wrong_code | locked | already_delivered | not_with_rider
+     */
+    public function confirmDeliveryWithCode(Order $order, string $code): array
+    {
+        return DB::transaction(function () use ($order, $code) {
+            $locked = Order::whereKey($order->id)->lockForUpdate()->firstOrFail();
+
+            if ($locked->status === 'delivered') {
+                return ['result' => 'already_delivered'];
+            }
+
+            if ($locked->status !== 'shipped' || $locked->delivery_code_hash === null) {
+                return ['result' => 'not_with_rider'];
+            }
+
+            if ($locked->isDeliveryCodeLocked()) {
+                return ['result' => 'locked'];
+            }
+
+            if (! DispatchService::codeMatches($locked, $code)) {
+                $attempts = (int) $locked->delivery_code_attempts + 1;
+                $lockNow = $attempts >= Order::DELIVERY_CODE_MAX_ATTEMPTS;
+
+                $locked->updateQuietly([
+                    'delivery_code_attempts'  => $attempts,
+                    'delivery_code_locked_at' => $lockNow ? now() : null,
+                ]);
+
+                activity()->performedOn($locked)->event('delivery_code_wrong')
+                    ->withProperties(['attempts' => $attempts, 'locked' => $lockNow])
+                    ->log($lockNow ? 'Delivery code locked after too many wrong attempts' : 'Wrong delivery code entered');
+
+                if ($lockNow) {
+                    app(DispatchMessages::class)->alertCodeLocked($locked);
+
+                    return ['result' => 'locked'];
+                }
+
+                return ['result' => 'wrong_code', 'remaining' => Order::DELIVERY_CODE_MAX_ATTEMPTS - $attempts];
+            }
+
+            $this->move(
+                $locked,
+                'delivered',
+                null,
+                ['delivered_at' => now(), 'delivered_by' => null, 'delivered_via' => 'code'],
+                fn (Order $order) => $this->startReturnWindow($order),
+            );
+
+            $order->refresh();
+
+            return ['result' => 'delivered'];
+        });
+    }
+
+    /**
+     * Failed delivery: the goods come back to the store. Each unit returns to
+     * the branch it was handed over from, as an append-only stock movement,
+     * at the cost it left with (so the cost layer is restored, not revalued).
+     * No revenue moves; the order stays as it was paid for until GadgetPlug
+     * cancels it (which then settles the money) — and the rider's link and
+     * code stop working.
+     */
+    public function returnToStore(Order $order, User $actor, string $reason): Order
+    {
+        Gate::forUser($actor)->authorize('dispatch', $order);
+
+        $reason = trim($reason);
+
+        if ($reason === '') {
+            throw new InvalidOrderTransition('Say why the delivery failed.');
+        }
+
+        return $this->move(
+            $order,
+            'returned',
+            $actor,
+            [
+                'returned_at'           => now(),
+                'returned_by'           => $actor->id,
+                'return_reason'         => $reason,
+                'delivery_code_hash'    => null,
+                'dispatch_link_version' => (int) $order->dispatch_link_version + 1,
+            ],
+            function (Order $order) use ($actor) {
+                $order->load('items.product');
+
+                foreach ($order->items as $item) {
+                    if (! $item->tracksStock()) {
+                        continue;
+                    }
+
+                    try {
+                        $this->returnLineToStore($order, $item, $actor);
+                    } catch (Throwable $e) {
+                        Log::error("Return to store failed for order item {$item->id}: ".$e->getMessage());
+                    }
+                }
+            },
+        );
+    }
+
+    /**
+     * One line's units back to the branches they left, read from its own
+     * 'dispatched' movements — never re-derived — at the cost each carried.
+     */
+    private function returnLineToStore(Order $order, \App\Models\OrderItem $item, User $actor): void
+    {
+        $dispatched = \App\Models\InventoryLedger::query()
+            ->where('product_id', $item->product_id)
+            ->where('reference', $order->reference)
+            ->where('transaction_type', 'dispatched')
+            ->get(['store_id', 'quantity_change', 'cost_total']);
+
+        foreach ($dispatched->groupBy('store_id') as $storeId => $rows) {
+            $units = (int) abs($rows->sum('quantity_change'));
+
+            if ($units < 1) {
+                continue;
+            }
+
+            $cost = $rows->whereNotNull('cost_total')->isNotEmpty()
+                ? round((float) $rows->sum('cost_total') / $units, 2)
+                : null;
+
+            app(\App\Actions\Inventory\AdjustStockAction::class)->execute(
+                productId: $item->product_id,
+                quantityChanged: $units,
+                transactionType: 'online_return',
+                userId: $actor->id,
+                reference: $order->reference,
+                description: 'Returned to store — failed delivery: '.$order->return_reason,
+                store: (int) $storeId,
+                unitCost: $cost,
+            );
+        }
+    }
+
+    /** A commission hold, not a book entry: the return window starts when the customer has the item. */
+    private function startReturnWindow(Order $order): void
+    {
+        try {
+            app(CommissionService::class)->startReturnWindow($order);
+        } catch (Throwable $e) {
+            Log::error("Affiliate return window failed for order {$order->id}: ".$e->getMessage());
+        }
     }
 
     /**
@@ -305,7 +467,9 @@ class OrderStatusService
                 $order->load('items.product');
 
                 foreach ($order->items as $item) {
-                    if (! $item->tracksStock()) {
+                    // Nothing held for a resold line; nothing held any more for
+                    // a returned order — its goods are already back on the shelf.
+                    if (! $item->tracksStock() || $order->returned_at !== null) {
                         continue;
                     }
 

@@ -16,6 +16,11 @@ use Exception;
 class AdjustStockAction
 {
     /**
+     * $unitCost: what units coming IN cost, when the caller knows (goods back
+     * from a failed delivery re-enter at the cost they left with). Left null,
+     * an inbound movement is costed at the product's current cost price, as
+     * every caller before it has been.
+     *
      * @throws Exception
      */
     public function execute(
@@ -28,8 +33,9 @@ class AdjustStockAction
         ?int $auditSessionId = null,
         ?string $reasonCode = null,
         Store|int|null $store = null,
+        ?float $unitCost = null,
     ) {
-        return DB::transaction(function () use ($productId, $quantityChanged, $transactionType, $userId, $reference, $description, $auditSessionId, $reasonCode, $store) {
+        return DB::transaction(function () use ($productId, $quantityChanged, $transactionType, $userId, $reference, $description, $auditSessionId, $reasonCode, $store, $unitCost) {
             // 1. PESSIMISTIC LOCK: Lock the product row until the transaction is done.
             // If POS tries to sell this at the exact same millisecond, it will be forced to wait.
             // Still the product row and not merely the store row: it is what
@@ -55,7 +61,7 @@ class AdjustStockAction
             // 4b. Keep the cost batches in step with the units. Inside this
             // same transaction and under the same product lock taken above, so
             // the layers can never disagree with the row they describe.
-            $movement = StockCostLayers::applyMovement($product, $row->store_id, $quantityChanged);
+            $movement = StockCostLayers::applyMovement($product, $row->store_id, $quantityChanged, $unitCost);
 
             // 5. Record the immutable movement in the ledger, carrying what the
             // units actually cost when they left. That figure is what the caller

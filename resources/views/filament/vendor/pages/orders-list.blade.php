@@ -79,6 +79,7 @@
                 <option value="packed">Packed</option>
                 <option value="shipped">Handed to rider</option>
                 <option value="delivered">Delivered</option>
+                <option value="returned">Returned to store</option>
                 <option value="cancelled">Cancelled</option>
                 <option value="paid_but_failed_stock">Stock Issue</option>
             </select>

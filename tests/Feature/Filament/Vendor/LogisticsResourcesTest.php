@@ -200,9 +200,11 @@ test('message template seeder creates the expected default templates for a vendo
     expect($keys)->toBe([
         'customer_confirmed',
         'customer_delivered',
+        'customer_delivery_code',
         'customer_dispatched',
         'customer_out_for_delivery',
         'customer_received',
+        'logistics_dispatch',
         'rider_assignment',
         'storekeeper_cancelled',
         'storekeeper_low_stock',

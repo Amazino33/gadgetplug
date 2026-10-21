@@ -64,6 +64,7 @@ new class extends Component {
                             'confirmed'             => 'Confirmed',
                             'paid'                  => 'Paid',
                             'packed'                => 'Packed',
+                            'returned'              => 'Delivery failed',
                             'shipped'               => 'On the Way',
                             'delivered'             => 'Delivered',
                             'cancelled'             => 'Cancelled',

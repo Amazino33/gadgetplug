@@ -232,8 +232,11 @@ class User extends Authenticatable implements HasTenants, FilamentUser
             // gate — see AdminPanelAccessTest, which checks all of them.
             // Delivery-settings staff come in for that one page; every other
             // admin page keeps its own gate (see AdminPanelAccessTest).
+            // Dispatch staff come in for Orders (the dispatch board) and
+            // Logistics companies only.
             return $this->isSuperAdmin() || $this->isCatalogueEditor()
-                || $this->hasGlobalPermission('manage_delivery_settings');
+                || $this->hasGlobalPermission('manage_delivery_settings')
+                || $this->hasGlobalPermission('manage_dispatch');
         }
 
         if ($panel->getId() === 'vendor') {

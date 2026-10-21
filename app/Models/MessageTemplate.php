@@ -29,6 +29,11 @@ class MessageTemplate extends Model
     public const PLATFORM_LOCKED_KEYS = [
         'storekeeper_new_order',
         'customer_received',
+        // The customer's delivery code: without it the order cannot be marked
+        // delivered on the rider's page.
+        'customer_delivery_code',
+        // GadgetPlug's dispatch link to the logistics company.
+        'logistics_dispatch',
     ];
 
     public function vendor(): BelongsTo

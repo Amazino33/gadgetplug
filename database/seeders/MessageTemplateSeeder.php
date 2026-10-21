@@ -94,6 +94,18 @@ class MessageTemplateSeeder extends Seeder
                 'body'           => "📊 *Daily Summary — {{summary_date}}*\n{{store_name}}\n\n*Sales by store*\n{{store_lines}}\n\n*Money taken (incl. VAT)*\n• Cash: {{cash_taken}}\n• Card: {{card_taken}}\n• Transfer: {{transfer_taken}}\n• Shop total: {{pos_taken}}\n\n*Profit*\n• Revenue (excl. VAT): {{revenue}}\n• Cost of goods: {{product_cost}}\n• Net profit: {{net_profit}}{{profit_note}}\n\n*Expenses recorded*\n{{expense_lines}}\n• Total: {{expenses_total}}\n\n*Procurement recorded*\n• {{procurement_count}} purchase(s), {{procurement_total}}\n• Paid: {{procurement_paid}} · Outstanding: {{procurement_owing}}\n\n— GadgetPlug",
             ],
             [
+                'key'            => 'customer_delivery_code',
+                'recipient_type' => 'customer',
+                'channel'        => 'whatsapp',
+                'body'           => "Hello {{customer_name}} 👋\n\nYour order *{{order_number}}* is on its way.\n\nYour delivery code is *{{delivery_code}}*\nGive it to the rider only when your items are in your hands — they need it to complete the delivery.\n\n{{collect_line}}\n\nThank you for shopping with GadgetPlug 💚",
+            ],
+            [
+                'key'            => 'logistics_dispatch',
+                'recipient_type' => 'rider',
+                'channel'        => 'whatsapp',
+                'body'           => "New delivery from GadgetPlug 🚚\n\n*Order:* {{order_number}}\n*Pick up from:* {{pickup}}\n\n*Deliver to:* {{customer_name}} ({{customer_phone}})\n{{delivery_address}}\n\n*Items ({{item_count}})*\n{{order_items}}\n\n{{collect_line}}\n\nOpen this link for the details and to mark it delivered. The customer gives you a 4-digit code when they receive the items:\n{{dispatch_link}}\n\nThe link works for 48 hours.",
+            ],
+            [
                 'key'            => 'rider_assignment',
                 'recipient_type' => 'rider',
                 'channel'        => 'whatsapp',

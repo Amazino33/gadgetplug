@@ -112,15 +112,23 @@ class OrderInfolist
                         ->placeholder('Not assigned yet')
                         ->weight('bold'),
 
-                    TextEntry::make('deliveryPerson.name')
+                    // GadgetPlug's dispatch names the rider on the order; a
+                    // vendor's own rider record only on orders from before that.
+                    TextEntry::make('rider')
                         ->label('Rider')
+                        ->getStateUsing(fn (Order $record) => $record->rider_name
+                            ? trim($record->rider_name.' '.($record->rider_phone ? '('.$record->rider_phone.')' : ''))
+                            : $record->deliveryPerson?->name)
                         ->placeholder('Not assigned yet')
                         ->weight('bold'),
 
+                    // The vendor's own delivery cost: only on orders from before
+                    // GadgetPlug paid the logistics company itself.
                     TextEntry::make('delivery_cost')
                         ->label('What You Pay to Deliver')
                         ->placeholder('Not recorded yet')
-                        ->money('NGN'),
+                        ->money('NGN')
+                        ->visible(fn (Order $record) => filled($record->delivery_cost)),
 
                     TextEntry::make('posted_at')
                         ->label('Have You Paid It?')
@@ -161,11 +169,63 @@ class OrderInfolist
                         ->placeholder('Not yet')
                         ->visible(fn (Order $record) => $record->payment_method === 'pay_on_delivery'),
 
+                    TextEntry::make('return_reason')
+                        ->label('Delivery failed — returned to store')
+                        ->columnSpanFull()
+                        ->visible(fn (Order $record) => filled($record->return_reason))
+                        ->helperText(fn (Order $record) => trim(($record->returned_at?->format('d M Y, g:ia') ?? '').' '.($record->returnedBy?->name ? '· '.$record->returnedBy->name : ''))),
+
                     TextEntry::make('cancel_reason')
                         ->label('Cancelled')
                         ->columnSpanFull()
                         ->visible(fn (Order $record) => filled($record->cancel_reason))
                         ->helperText(fn (Order $record) => $record->cancelled_at?->format('d M Y, g:ia')),
+                ]),
+
+            // GadgetPlug's side of the delivery: admin panel only.
+            Section::make('Dispatch')
+                ->columns(2)
+                ->visible(fn () => filament()->getCurrentPanel()?->getId() === 'admin')
+                ->schema([
+                    TextEntry::make('fee_share')
+                        ->label('Delivery fee carried by this order')
+                        ->getStateUsing(fn (Order $record) => $record->deliveryFeeShare())
+                        ->money('NGN')
+                        ->helperText('The checkout\'s fee is carried by its first part.'),
+
+                    TextEntry::make('company_cost')
+                        ->label('What we pay the company')
+                        ->money('NGN')
+                        ->placeholder('Not set'),
+
+                    TextEntry::make('company_paid_at')
+                        ->label('Paid to company')
+                        ->dateTime('d M Y, g:ia')
+                        ->placeholder('Not yet')
+                        ->helperText(fn (Order $record) => $record->companyPaidBy?->name),
+
+                    TextEntry::make('dispatch_assigned_at')
+                        ->label('Assigned')
+                        ->dateTime('d M Y, g:ia')
+                        ->placeholder('Not yet')
+                        ->helperText(fn (Order $record) => $record->dispatchAssignedBy?->name),
+
+                    // Never the code itself — only whether one is out there.
+                    TextEntry::make('delivery_code_state')
+                        ->label('Delivery code')
+                        ->getStateUsing(fn (Order $record) => match (true) {
+                            $record->delivered_via === 'code'      => 'Used — delivered with the code',
+                            $record->isDeliveryCodeLocked()        => 'Locked after '.$record->delivery_code_attempts.' wrong tries',
+                            $record->delivery_code_hash !== null   => 'Sent to the customer'.($record->delivery_code_attempts ? ' · '.$record->delivery_code_attempts.' wrong '.\Illuminate\Support\Str::plural('try', $record->delivery_code_attempts) : ''),
+                            default                                => 'None yet (sent at handover)',
+                        })
+                        ->badge()
+                        ->color(fn (Order $record) => $record->isDeliveryCodeLocked() ? 'danger' : 'gray'),
+
+                    TextEntry::make('delivered_via')
+                        ->label('Delivered by')
+                        ->formatStateUsing(fn ($state) => $state === 'code' ? 'Rider, with the customer\'s code' : 'Override')
+                        ->placeholder('—'),
                 ]),
 
             Section::make('Items Ordered')

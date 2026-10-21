@@ -56,6 +56,17 @@ Route::get('/payment/callback', PaystackCallbackController::class)->name('paymen
 // bootstrap/app.php; authenticated by the x-paystack-signature header instead.
 Route::post('/paystack/webhook', \App\Http\Controllers\Payment\PaystackWebhookController::class)->name('paystack.webhook');
 
+// The rider's page for one platform-dispatched order. No login: reached only
+// by the signed, 48-hour link GadgetPlug sends the logistics company, and
+// tied to the current assignment (v). Marking delivered needs the customer's
+// code; the POST goes back to the same signed address and is rate limited.
+Route::middleware('signed')->whereNumber(['order', 'v'])->group(function () {
+    Route::get('/dispatch/{order}/{v}', [\App\Http\Controllers\DispatchPageController::class, 'show'])->name('dispatch.show');
+    Route::post('/dispatch/{order}/{v}', [\App\Http\Controllers\DispatchPageController::class, 'deliver'])
+        ->middleware('throttle:10,1')
+        ->name('dispatch.deliver');
+});
+
 Route::get('/r/{code}', [AffiliateClickController::class, 'redirect'])->name('affiliate.click');
 
 

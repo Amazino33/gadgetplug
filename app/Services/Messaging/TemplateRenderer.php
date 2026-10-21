@@ -106,9 +106,10 @@ Delivery fee is on {$first->reference}.";
     // Uses the unit_price stored on the order line rather than the product's
     // current price, so a later price change never rewrites what the customer
     // was quoted — and the line's name snapshot for the same reason: the
-    // customer gets the online name they bought under, staff get the shelf
-    // name they pick by. (Riders get the shelf name for now; showing both is
-    // planned with the order-operations work.)
+    // customer gets the online name they bought under, the storekeeper the
+    // shelf name they pick by. The rider gets both — the shelf name to collect
+    // by, then the online name in brackets when it differs, because they hand
+    // over to a customer who knows the item by that name.
     private static function itemLines(Order $order, string $audience = self::AUDIENCE_CUSTOMER): string
     {
         $order->loadMissing('items.product');
@@ -116,14 +117,27 @@ Delivery fee is on {$first->reference}.";
         return $order->items
             ->map(function ($item) use ($audience) {
                 // Snapshots first; a deleted product still names something.
-                $name = $audience === self::AUDIENCE_CUSTOMER
-                    ? $item->customerName()
-                    : $item->internalName();
+                $name = match ($audience) {
+                    self::AUDIENCE_CUSTOMER => $item->customerName(),
+                    self::AUDIENCE_RIDER    => self::riderName($item),
+                    default                 => $item->internalName(),
+                };
                 $line = (float) $item->quantity * (float) $item->unit_price;
 
                 return '• ' . $item->quantity . ' x ' . $name . ' — ' . self::naira($line);
             })
             ->implode("\n");
+    }
+
+    /** "ITEL 2160 OLD ONE (itel 2160 Dual SIM Keypad Phone)" — or just the one name when they match. */
+    public static function riderName(\App\Models\OrderItem $item): string
+    {
+        $internal = $item->internalName();
+        $online = $item->customerName();
+
+        return mb_strtolower(trim($internal)) === mb_strtolower(trim($online))
+            ? $internal
+            : "{$internal} ({$online})";
     }
 
     private static function itemCount(Order $order): int
@@ -139,8 +153,10 @@ Delivery fee is on {$first->reference}.";
     // reaches the customer before a rider is assigned — which is most of them.
     private static function riderLine(Order $order): string
     {
-        $name  = $order->deliveryPerson?->name;
-        $phone = $order->deliveryPerson?->phone;
+        // GadgetPlug's dispatch names the rider on the order itself; a
+        // vendor's own rider record is only for orders from before that.
+        $name  = $order->rider_name ?: $order->deliveryPerson?->name;
+        $phone = $order->rider_name ? $order->rider_phone : $order->deliveryPerson?->phone;
 
         if (blank($name)) {
             return 'Our dispatch rider will call you soon to arrange delivery.';

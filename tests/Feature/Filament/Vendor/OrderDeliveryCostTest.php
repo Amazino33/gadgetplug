@@ -17,6 +17,11 @@ use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
 
+// GadgetPlug pays the logistics company for an online order (admin dispatch:
+// company_cost and "paid to company"), so the vendor panel no longer records
+// a delivery cost or posts it from the vendor's accounts. What a vendor
+// recorded before that still shows on the order, and stays locked once posted.
+
 function setUpDeliveryCostVendor(): array
 {
     (new VendorPermissionsSeeder())->run();
@@ -53,86 +58,27 @@ function actAsDeliveryCostOwner(array $data): void
     Filament::setTenant($data['vendor']);
 }
 
-test('delivery cost can be recorded through the Assign & Notify Rider action', function () {
+test('the vendor order page no longer assigns riders or pays a delivery cost', function () {
     $data = setUpDeliveryCostVendor();
     actAsDeliveryCostOwner($data);
 
     Livewire::test(ViewOrder::class, ['record' => $data['order']->getRouteKey()])
-        ->mountAction('assignLogistics')
-        ->setActionData(['logistics_company_id' => null, 'delivery_person_id' => null, 'delivery_cost' => 1200])
-        ->callMountedAction()
-        ->assertHasNoActionErrors();
-
-    expect((float) $data['order']->fresh()->delivery_cost)->toBe(1200.0);
+        ->assertActionDoesNotExist('assignLogistics')
+        ->assertActionDoesNotExist('recordDeliveryPayment');
 });
 
-test('the logistics card shows "Not recorded yet" until a delivery cost is set', function () {
+test('a delivery cost the vendor recorded before still shows on the order', function () {
     $data = setUpDeliveryCostVendor();
     actAsDeliveryCostOwner($data);
 
     Livewire::test(ViewOrder::class, ['record' => $data['order']->getRouteKey()])
-        ->assertSeeText('Not recorded yet');
+        ->assertDontSeeText('What You Pay to Deliver');
 
     $data['order']->update(['delivery_cost' => 1500]);
 
     Livewire::test(ViewOrder::class, ['record' => $data['order']->getRouteKey()])
+        ->assertSeeText('What You Pay to Deliver')
         ->assertSeeText('1,500.00');
-});
-
-test('recording a delivery payment posts an out ledger entry from the chosen account', function () {
-    $data = setUpDeliveryCostVendor();
-    $account = FinancialAccount::where('vendor_id', $data['vendor']->id)->where('type', 'cash')->first();
-    $data['order']->update(['delivery_cost' => 2000]);
-    actAsDeliveryCostOwner($data);
-
-    Livewire::test(ViewOrder::class, ['record' => $data['order']->getRouteKey()])
-        ->callAction('recordDeliveryPayment', data: ['financial_account_id' => $account->id])
-        ->assertHasNoActionErrors();
-
-    $order = $data['order']->fresh();
-
-    expect($order->isDeliveryCostPosted())->toBeTrue()
-        ->and($order->financial_account_id)->toBe($account->id)
-        ->and($account->fresh()->balance())->toBe(-2000.0)
-        ->and(FinancialLedgerEntry::where('source_type', $order->getMorphClass())->where('source_id', $order->id)->count())->toBe(1);
-});
-
-test('the Record Delivery Payment action is hidden until a delivery cost is set', function () {
-    $data = setUpDeliveryCostVendor();
-    actAsDeliveryCostOwner($data);
-
-    Livewire::test(ViewOrder::class, ['record' => $data['order']->getRouteKey()])
-        ->assertActionHidden('recordDeliveryPayment');
-});
-
-test('the Record Delivery Payment action is hidden once already posted', function () {
-    $data = setUpDeliveryCostVendor();
-    $account = FinancialAccount::where('vendor_id', $data['vendor']->id)->where('type', 'cash')->first();
-    $data['order']->update(['delivery_cost' => 2000]);
-    actAsDeliveryCostOwner($data);
-
-    Livewire::test(ViewOrder::class, ['record' => $data['order']->getRouteKey()])
-        ->assertActionVisible('recordDeliveryPayment')
-        ->callAction('recordDeliveryPayment', data: ['financial_account_id' => $account->id])
-        ->assertActionHidden('recordDeliveryPayment');
-});
-
-test('a storekeeper cannot see the Record Delivery Payment action', function () {
-    $data = setUpDeliveryCostVendor();
-    $data['order']->update(['delivery_cost' => 2000]);
-
-    $storekeeper = User::factory()->create();
-    $data['vendor']->users()->syncWithoutDetaching([$storekeeper->id]);
-    setPermissionsTeamId($data['vendor']->id);
-    $storekeeper->assignRole('storekeeper');
-
-    test()->actingAs($storekeeper);
-    Filament::setCurrentPanel(Filament::getPanel('vendor'));
-    Filament::bootCurrentPanel();
-    Filament::setTenant($data['vendor']);
-
-    Livewire::test(ViewOrder::class, ['record' => $data['order']->getRouteKey()])
-        ->assertActionHidden('recordDeliveryPayment');
 });
 
 test('a posted delivery cost cannot be changed directly on the model', function () {
@@ -141,23 +87,4 @@ test('a posted delivery cost cannot be changed directly on the model', function 
 
     expect(fn () => $data['order']->update(['delivery_cost' => 9999]))
         ->toThrow(\LogicException::class);
-});
-
-test('the delivery cost field is disabled in the assignment form once posted', function () {
-    $data = setUpDeliveryCostVendor();
-    $account = FinancialAccount::where('vendor_id', $data['vendor']->id)->first();
-    $data['order']->update(['delivery_cost' => 2000, 'financial_account_id' => $account->id, 'posted_at' => now()]);
-    actAsDeliveryCostOwner($data);
-
-    // Attempting to change it via the action must not silently succeed —
-    // the field is disabled client-side, and the action itself skips
-    // delivery_cost from $data entirely once posted, as a second line of
-    // defense alongside the model's own guard.
-    Livewire::test(ViewOrder::class, ['record' => $data['order']->getRouteKey()])
-        ->mountAction('assignLogistics')
-        ->setActionData(['logistics_company_id' => null, 'delivery_person_id' => null, 'delivery_cost' => 9999])
-        ->callMountedAction()
-        ->assertHasNoActionErrors();
-
-    expect((float) $data['order']->fresh()->delivery_cost)->toBe(2000.0);
 });

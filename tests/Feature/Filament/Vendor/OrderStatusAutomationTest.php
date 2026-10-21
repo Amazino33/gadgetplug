@@ -53,6 +53,16 @@ function setUpAutomationOrderVendor(string $initialStatus = 'paid'): array
     return compact('owner', 'vendor', 'order');
 }
 
+// Handing over also sends the customer their delivery code (a platform message
+// that cannot be switched off); these tests are about the vendor's own
+// "dispatched" message, so that one is left out.
+function dispatchedMessageExists(Order $order): bool
+{
+    return DeliveryMessage::where('order_id', $order->id)
+        ->where('body', 'not like', '%delivery code%')
+        ->exists();
+}
+
 function actAsAutomationVendor(array $data): void
 {
     test()->actingAs($data['owner']);
@@ -143,7 +153,7 @@ test('the notify toggle set to false suppresses the customer message but still u
         ->callMountedAction()
         ->assertHasNoActionErrors();
 
-    expect(DeliveryMessage::where('order_id', $data['order']->id)->exists())->toBeFalse()
+    expect(dispatchedMessageExists($data['order']))->toBeFalse()
         ->and($data['order']->fresh()->status)->toBe('shipped');
 });
 
@@ -157,7 +167,7 @@ test('no message is sent when there is no active matching template for the vendo
         ->callMountedAction()
         ->assertHasNoActionErrors();
 
-    expect(DeliveryMessage::where('order_id', $data['order']->id)->exists())->toBeFalse()
+    expect(dispatchedMessageExists($data['order']))->toBeFalse()
         ->and($data['order']->fresh()->status)->toBe('shipped');
 });
 
@@ -180,7 +190,7 @@ test('an inactive template is never used for automatic customer notification', f
         ->callMountedAction()
         ->assertHasNoActionErrors();
 
-    expect(DeliveryMessage::where('order_id', $data['order']->id)->exists())->toBeFalse();
+    expect(dispatchedMessageExists($data['order']))->toBeFalse();
 });
 
 test('cancelling an order never sends a customer message regardless of the notify toggle', function () {

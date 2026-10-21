@@ -148,90 +148,9 @@ test('sending a message to a rider with no phone number on file fails gracefully
     expect(DeliveryMessage::where('order_id', $data['order']->id)->exists())->toBeFalse();
 });
 
-test('assigning a rider with notify enabled sends the rider_assignment template automatically', function () {
-    config(['services.messaging.whatsapp_driver' => 'log_null']);
-
-    $data = setUpMessagingOrderVendor();
-    $company = LogisticsCompany::create(['vendor_id' => $data['vendor']->id, 'name' => 'Speedy Dispatch', 'phone' => '08010000000']);
-    $rider = DeliveryPerson::create(['vendor_id' => $data['vendor']->id, 'logistics_company_id' => $company->id, 'name' => 'John Rider', 'phone' => '08020000000']);
-
-    MessageTemplate::create([
-        'vendor_id' => $data['vendor']->id,
-        'key' => 'rider_assignment',
-        'recipient_type' => 'rider',
-        'channel' => 'whatsapp',
-        'body' => 'Hi {{rider_name}}, deliver order {{order_number}} to {{delivery_address}}.',
-    ]);
-
-    actAsMessagingVendor($data);
-
-    Livewire::test(ViewOrder::class, ['record' => $data['order']->getRouteKey()])
-        ->mountAction('assignLogistics')
-        ->setActionData([
-            'logistics_company_id' => $company->id,
-            'delivery_person_id' => $rider->id,
-            'notify_rider' => true,
-        ])
-        ->callMountedAction()
-        ->assertHasNoActionErrors();
-
-    $message = DeliveryMessage::where('order_id', $data['order']->id)->where('recipient_type', 'rider')->first();
-
-    expect($message)->not->toBeNull()
-        ->and($message->to_number)->toBe('2348020000000')
-        ->and($message->body)->toBe('Hi John Rider, deliver order '.$data['order']->reference.' to 1 Test Street, Lagos.')
-        ->and($message->status)->toBe('sent');
-});
-
-test('assigning a rider with notify disabled does not send any message', function () {
-    $data = setUpMessagingOrderVendor();
-    $company = LogisticsCompany::create(['vendor_id' => $data['vendor']->id, 'name' => 'Speedy Dispatch', 'phone' => '08010000000']);
-    $rider = DeliveryPerson::create(['vendor_id' => $data['vendor']->id, 'logistics_company_id' => $company->id, 'name' => 'John Rider', 'phone' => '08020000000']);
-
-    MessageTemplate::create([
-        'vendor_id' => $data['vendor']->id,
-        'key' => 'rider_assignment',
-        'recipient_type' => 'rider',
-        'channel' => 'whatsapp',
-        'body' => 'Hi {{rider_name}}, delivery assigned.',
-    ]);
-
-    actAsMessagingVendor($data);
-
-    Livewire::test(ViewOrder::class, ['record' => $data['order']->getRouteKey()])
-        ->mountAction('assignLogistics')
-        ->setActionData([
-            'logistics_company_id' => $company->id,
-            'delivery_person_id' => $rider->id,
-            'notify_rider' => false,
-        ])
-        ->callMountedAction()
-        ->assertHasNoActionErrors();
-
-    expect(DeliveryMessage::where('order_id', $data['order']->id)->exists())->toBeFalse()
-        ->and($data['order']->fresh()->delivery_person_id)->toBe($rider->id);
-});
-
-test('assigning a rider with notify enabled but no active rider_assignment template skips gracefully', function () {
-    $data = setUpMessagingOrderVendor();
-    $company = LogisticsCompany::create(['vendor_id' => $data['vendor']->id, 'name' => 'Speedy Dispatch', 'phone' => '08010000000']);
-    $rider = DeliveryPerson::create(['vendor_id' => $data['vendor']->id, 'logistics_company_id' => $company->id, 'name' => 'John Rider', 'phone' => '08020000000']);
-
-    actAsMessagingVendor($data);
-
-    Livewire::test(ViewOrder::class, ['record' => $data['order']->getRouteKey()])
-        ->mountAction('assignLogistics')
-        ->setActionData([
-            'logistics_company_id' => $company->id,
-            'delivery_person_id' => $rider->id,
-            'notify_rider' => true,
-        ])
-        ->callMountedAction()
-        ->assertHasNoActionErrors();
-
-    expect(DeliveryMessage::where('order_id', $data['order']->id)->exists())->toBeFalse()
-        ->and($data['order']->fresh()->delivery_person_id)->toBe($rider->id);
-});
+// The vendor no longer assigns riders to online orders (GadgetPlug dispatch
+// does, and sends the logistics company its link): the assignment-message
+// tests moved to tests/Feature/Orders/DispatchTest.php.
 
 test('the delivery messages log shows entries for the order and supports resend', function () {
     config(['services.messaging.whatsapp_driver' => 'log_null']);

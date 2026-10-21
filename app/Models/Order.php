@@ -23,6 +23,16 @@ class Order extends Model
     // silently / skip" toggle) without affecting any other caller of ->update().
     public bool $skipCustomerNotification = false;
 
+    /**
+     * The customer's delivery code in plain text, only for the moment it is
+     * created — so the message that carries it can be rendered. Never stored:
+     * the table holds the hash alone.
+     */
+    public ?string $plainDeliveryCode = null;
+
+    /** Wrong codes allowed before the rider link locks. */
+    public const DELIVERY_CODE_MAX_ATTEMPTS = 5;
+
     protected static function booted(): void
     {
         // Only delivery_cost is guarded here — unlike a procurement, an order
@@ -74,6 +84,12 @@ class Order extends Model
             'payment_collected_at'       => 'datetime',
             'cancelled_at'               => 'datetime',
             'stale_alerted_at'           => 'datetime',
+            'dispatch_assigned_at'       => 'datetime',
+            'company_cost'               => 'decimal:2',
+            'company_paid_at'            => 'datetime',
+            'delivery_code_set_at'       => 'datetime',
+            'delivery_code_locked_at'    => 'datetime',
+            'returned_at'                => 'datetime',
         ];
     }
 
@@ -140,9 +156,12 @@ class Order extends Model
         return $this->belongsTo(User::class);
     }
 
+    // Past any panel tenant scope: GadgetPlug's own logistics companies belong
+    // to no vendor, and the vendor panel would otherwise hide the company
+    // actually delivering the order.
     public function logisticsCompany(): BelongsTo
     {
-        return $this->belongsTo(LogisticsCompany::class);
+        return $this->belongsTo(LogisticsCompany::class)->withoutGlobalScopes();
     }
 
     public function deliveryPerson(): BelongsTo
@@ -200,6 +219,60 @@ class Order extends Model
     public function cancelledBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'cancelled_by');
+    }
+
+    public function dispatchAssignedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'dispatch_assigned_by');
+    }
+
+    public function companyPaidBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'company_paid_by');
+    }
+
+    public function returnedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'returned_by');
+    }
+
+    /**
+     * This order's share of the checkout's delivery fee. The fee belongs to
+     * the checkout and is carried by its first part (REF-1) — the same rule
+     * the customer's messages use ("Delivery fee is on REF-1") — so the other
+     * parts carry none and the fee is never counted twice.
+     */
+    public function deliveryFeeShare(): float
+    {
+        $checkout = $this->checkout;
+
+        if (! $checkout) {
+            return 0.0;
+        }
+
+        $firstPartId = $this->getAttribute('checkout_first_order_id')
+            ?? $checkout->orders()->min('id');
+
+        return (int) $firstPartId === (int) $this->id ? (float) $checkout->delivery_fee : 0.0;
+    }
+
+    /**
+     * What the rider collects at the door for this part, pay on delivery: its
+     * items, plus the delivery fee when this is the part that carries it.
+     * Nothing for an order already paid.
+     */
+    public function amountToCollect(): float
+    {
+        if ($this->payment_method !== 'pay_on_delivery') {
+            return 0.0;
+        }
+
+        return round((float) $this->total_amount + $this->deliveryFeeShare(), 2);
+    }
+
+    public function isDeliveryCodeLocked(): bool
+    {
+        return $this->delivery_code_locked_at !== null;
     }
 
     public function deliveryMessages(): HasMany

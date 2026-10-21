@@ -50,6 +50,12 @@ class Checkout extends Model
             ?? Order::where('reference', $reference)->first()?->checkout;
     }
 
+    /** The LGA delivered to. */
+    public function lga(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(Lga::class);
+    }
+
     /**
      * One status to show the customer for the whole checkout: its orders'
      * status when they agree, otherwise 'in_progress' (some parts further along

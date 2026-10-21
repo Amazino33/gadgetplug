@@ -209,6 +209,7 @@ class InventoryTableWidget extends BaseWidget
         'reserved'             => 'Reserved',
         'dispatched'           => 'Dispatched',
         'reservation_released' => 'Reservation Released',
+        'online_return'        => 'Returned (failed delivery)',
     ];
 
     /**
@@ -251,7 +252,7 @@ class InventoryTableWidget extends BaseWidget
             $typeColor = match ($entry->transaction_type) {
                 'restock', 'reservation_released'       => '#068B03',
                 'pos_sale', 'online_sale', 'dispatched' => '#F97316',
-                'pos_void', 'pos_return', 'refund'      => '#0284C7',
+                'pos_void', 'pos_return', 'refund', 'online_return' => '#0284C7',
                 default                                 => '#6b7280',
             };
 

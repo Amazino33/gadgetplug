@@ -43,6 +43,7 @@ class InventoryLedgerResource extends Resource
         'reserved'               => 'Reserved',
         'dispatched'             => 'Dispatched',
         'reservation_released'   => 'Reservation Released',
+        'online_return'          => 'Returned (failed delivery)',
     ];
 
     public static function table(Table $table): Table
@@ -67,7 +68,7 @@ class InventoryLedgerResource extends Resource
                     ->color(fn ($state) => match ($state) {
                         'restock', 'reservation_released' => 'success',
                         'pos_sale', 'online_sale', 'dispatched' => 'warning',
-                        'pos_void', 'pos_return', 'refund'      => 'info',
+                        'pos_void', 'pos_return', 'refund', 'online_return' => 'info',
                         'audit_correction'                       => 'gray',
                         default                                  => 'gray',
                     }),

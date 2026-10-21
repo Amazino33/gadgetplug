@@ -2,13 +2,14 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Resources\Orders\OrderResource;
 use App\Filament\Resources\Products\ProductResource;
 use Filament\Pages\Dashboard as BaseDashboard;
 
 // The admin panel's home, kept for super-admins only.
 //
 // Staff admitted to the panel for one job (the catalogue editor, delivery
-// settings) have nothing to do here, and /admin is where the panel's login
+// settings, dispatch) have nothing to do here, and /admin is where the panel's login
 // lands everyone — so instead of a 403 on arrival they are sent straight to the
 // page they may use.
 class Dashboard extends BaseDashboard
@@ -31,6 +32,10 @@ class Dashboard extends BaseDashboard
     {
         if ($user->isCatalogueEditor()) {
             return ProductResource::getUrl('index', panel: 'admin');
+        }
+
+        if ($user->hasGlobalPermission('manage_dispatch')) {
+            return OrderResource::getUrl('index', panel: 'admin');
         }
 
         if ($user->hasGlobalPermission('manage_delivery_settings')) {
