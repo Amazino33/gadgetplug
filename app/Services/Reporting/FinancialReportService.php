@@ -6,6 +6,7 @@ namespace App\Services\Reporting;
 
 use App\Models\Expense;
 use App\Models\FinancialAccount;
+use App\Models\FinancialLedgerEntry;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\PosCustomerLedgerEntry;
@@ -18,6 +19,7 @@ use App\Models\Vendor;
 use App\Services\Inventory\StockValuation;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 // Cash-basis P&L: every cost line counts in the period it was actually PAID
@@ -29,10 +31,15 @@ use Illuminate\Support\Facades\DB;
 // is nothing to double-count.
 //
 // Revenue is never queried by order-creation date — only by
-// orders.revenue_recognized_at, the marker Prompt 4's OrderObserver sets
-// exactly once per order, on the transition that actually means money is in
-// hand (delivered for POD, paid for prepaid). cancelled/paid_but_failed_stock
-// never get that marker at all, so excluding them needs no separate check.
+// orders.revenue_recognized_at, set exactly once per order when the money is
+// in hand (OrderStatusService: Paystack and wallet at payment, pay-on-delivery
+// when GadgetPlug records the payment). paid_but_failed_stock never gets it.
+//
+// The P&L follows the ledger. An order's revenue stays in the period it was
+// recorded, even if the order is cancelled later — a closed period never
+// changes. The cancellation is netted off, revenue and cost, in the period it
+// happened (onlineCancellations()), dated by its ledger reversal: the same
+// rule POS returns follow. Over a range covering both, they cancel exactly.
 //
 // Revenue also includes POS sales — a till sale is money in hand the moment
 // it completes, no delivery step to wait for, so recognizedPosSaleItemsQuery()
@@ -71,6 +78,8 @@ class FinancialReportService
 
         return [
             'revenue'           => $sales['revenue'],
+            // Already netted off revenue above; reported so the page can say so.
+            'cancelled_online_revenue' => $sales['cancelled_online_revenue'],
             'product_cost'      => $sales['product_cost'],
             'inbound_logistics' => $inboundLogistics,
             'outbound_delivery' => $outboundDelivery,
@@ -90,6 +99,11 @@ class FinancialReportService
     // reuses this exact join/filter for restock velocity, so revenue and
     // velocity can never disagree about what sold. Public and static so it can
     // be called without instantiating the whole report service.
+    //
+    // Includes orders cancelled after their revenue was recorded: the P&L
+    // keeps them in their own period and reverses them in the cancellation's
+    // (onlineCancellations()). Anything asking "what sold" uses
+    // soldOrderItemsQuery() instead.
     public static function recognizedOrderItemsQuery(int $vendorId, CarbonInterface $from, CarbonInterface $to)
     {
         return OrderItem::query()
@@ -97,6 +111,15 @@ class FinancialReportService
             ->where('order_items.vendor_id', $vendorId)
             ->whereNotNull('orders.revenue_recognized_at')
             ->whereBetween('orders.revenue_recognized_at', [$from, $to]);
+    }
+
+    // What actually sold, for the operational figures (restock velocity, top
+    // sellers): recorded revenue, less orders cancelled since — those goods
+    // never went. Same as the Sales Report's definition.
+    public static function soldOrderItemsQuery(int $vendorId, CarbonInterface $from, CarbonInterface $to)
+    {
+        return self::recognizedOrderItemsQuery($vendorId, $from, $to)
+            ->where('orders.status', '!=', 'cancelled');
     }
 
     // The single source of truth for "which pos_sale_items count as sold" —
@@ -149,13 +172,92 @@ class FinancialReportService
             ->value('revenue');
 
         $returns = $this->posReturns($vendorId, $from, $to);
+        $cancelled = $this->onlineCancellations($vendorId, $from, $to);
 
         return [
-            'revenue'      => (float) $online->revenue + $posRevenue - $returns['revenue'],
-            'product_cost' => (float) $online->product_cost + (float) $pos->product_cost - $returns['product_cost'],
+            'revenue'      => (float) $online->revenue + $posRevenue - $returns['revenue'] - $cancelled['revenue'],
+            'product_cost' => (float) $online->product_cost + (float) $pos->product_cost - $returns['product_cost'] - $cancelled['product_cost'],
+            'cancelled_online_revenue' => $cancelled['revenue'],
             'estimated'    => ((int) $online->estimated_lines) > 0
                 || ((int) $pos->estimated_lines) > 0
                 || $returns['estimated'],
+        ];
+    }
+
+    // Online orders cancelled after their revenue was recorded, reversed in
+    // the period of the cancellation — never by editing the period the sale
+    // was in. The mirror of posReturns().
+    //
+    // The date is the ledger's: the reversing entry OrderStatusService posts
+    // against the original revenue entry. An order with no reversal entry (a
+    // reversal that failed, or revenue never posted) falls back to its
+    // cancelled_at, then its last update.
+    //
+    // Revenue and cost are reversed with exactly the expressions
+    // recognizedSales() booked them with, over the same lines, so the pair
+    // nets to zero across a range covering both. A cancelled order never left
+    // the store (only an un-handed-over order can be cancelled), so its cost
+    // comes back with it.
+    private function onlineCancellations(int $vendorId, CarbonInterface $from, CarbonInterface $to): array
+    {
+        $orders = Order::query()
+            ->where('status', 'cancelled')
+            ->whereNotNull('revenue_recognized_at')
+            ->whereHas('items', fn ($q) => $q->where('vendor_id', $vendorId))
+            ->get(['id', 'cancelled_at', 'updated_at']);
+
+        if ($orders->isEmpty()) {
+            return ['revenue' => 0.0, 'product_cost' => 0.0];
+        }
+
+        $morph = (new Order)->getMorphClass();
+
+        // Original revenue entry id per order, then the reversal's date per original.
+        $originals = FinancialLedgerEntry::query()
+            ->where('source_type', $morph)
+            ->whereIn('source_id', $orders->pluck('id'))
+            ->where('direction', 'in')
+            ->pluck('id', 'source_id');
+
+        $reversedOn = FinancialLedgerEntry::query()
+            ->where('source_type', (new FinancialLedgerEntry)->getMorphClass())
+            ->whereIn('source_id', $originals->values())
+            ->where('direction', 'out')
+            ->pluck('occurred_at', 'source_id');
+
+        $fromDate = $from->toDateString();
+        $toDate = $to->toDateString();
+
+        $inRange = $orders->filter(function (Order $order) use ($originals, $reversedOn, $from, $to, $fromDate, $toDate) {
+            $reversal = $reversedOn->get($originals->get($order->id));
+
+            if ($reversal !== null) {
+                // occurred_at is a date: compared as a date.
+                $day = Carbon::parse($reversal)->toDateString();
+
+                return $day >= $fromDate && $day <= $toDate;
+            }
+
+            $at = $order->cancelled_at ?? $order->updated_at;
+
+            return $at !== null && Carbon::parse($at)->between($from, $to);
+        });
+
+        if ($inRange->isEmpty()) {
+            return ['revenue' => 0.0, 'product_cost' => 0.0];
+        }
+
+        $row = OrderItem::query()
+            ->join('products', 'products.id', '=', 'order_items.product_id')
+            ->where('order_items.vendor_id', $vendorId)
+            ->whereIn('order_items.order_id', $inRange->pluck('id'))
+            ->selectRaw('COALESCE(SUM(order_items.quantity * order_items.unit_price), 0) as revenue')
+            ->selectRaw('COALESCE(SUM(COALESCE(order_items.cost_total, order_items.quantity * COALESCE(order_items.unit_cost, products.cost_price))), 0) as product_cost')
+            ->first();
+
+        return [
+            'revenue'      => round((float) $row->revenue, 2),
+            'product_cost' => round((float) $row->product_cost, 2),
         ];
     }
 

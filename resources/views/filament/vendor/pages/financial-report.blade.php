@@ -56,6 +56,14 @@
                 </div>
             @endforeach
 
+            @if (($report['cancelled_online_revenue'] ?? 0) > 0)
+                {{-- Orders paid in an earlier period and cancelled in this one:
+                     reversed here, so the earlier period stays as it was read. --}}
+                <p class="px-6 py-2 text-xs text-gray-500 dark:text-gray-400">
+                    Money In already has ₦{{ number_format($report['cancelled_online_revenue'], 2) }} taken off for online orders cancelled in this period.
+                </p>
+            @endif
+
             <div class="flex items-center justify-between bg-gray-50 px-6 py-4 dark:bg-white/5">
                 <span class="text-sm font-bold text-gray-950 dark:text-white">Net Profit</span>
                 <span @class([

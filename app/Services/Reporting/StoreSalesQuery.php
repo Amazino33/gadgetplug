@@ -18,10 +18,10 @@ use Illuminate\Support\Facades\DB;
 // per-store figure at all: for a vendor whose counter trade is the bulk of
 // the business, online-only per-store sales would show a busy branch as idle.
 //
-// Revenue recognition matches FinancialReportService's definition exactly —
-// orders.revenue_recognized_at, not order date — so a per-store figure and the
-// vendor-wide Financial Report can never disagree about what counts as earned.
-// Passing a null store gives the vendor-wide total by the same arithmetic.
+// What counts as sold matches FinancialReportService::soldOrderItemsQuery() —
+// recorded by orders.revenue_recognized_at, not order date, and not an order
+// cancelled since (those goods never went). Passing a null store gives the
+// vendor-wide total by the same arithmetic.
 class StoreSalesQuery
 {
     /**
@@ -57,6 +57,7 @@ class StoreSalesQuery
                 ->where('order_items.vendor_id', $vendorId)
                 ->whereNotNull('orders.revenue_recognized_at')
                 ->whereBetween('orders.revenue_recognized_at', [$from, $to])
+                ->where('orders.status', '!=', 'cancelled')
                 ->selectRaw('COALESCE(SUM(order_items.quantity), 0) as units')
                 ->selectRaw('COALESCE(SUM(order_items.quantity * order_items.unit_price), 0) as revenue')
                 ->selectRaw('COUNT(DISTINCT order_items.order_id) as orders')
@@ -80,6 +81,7 @@ class StoreSalesQuery
             ->where('order_items.vendor_id', $vendorId)
             ->whereNotNull('orders.revenue_recognized_at')
             ->whereBetween('orders.revenue_recognized_at', [$from, $to])
+            ->where('orders.status', '!=', 'cancelled')
             ->where('order_item_store_allocations.store_id', $storeId)
             // Priced on allocated units, not the whole line: a line split
             // across two branches must not credit each with the full amount.

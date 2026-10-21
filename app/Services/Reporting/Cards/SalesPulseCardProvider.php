@@ -10,12 +10,11 @@ use App\Models\Vendor;
 use App\Services\Reporting\StoreSalesQuery;
 use Carbon\CarbonImmutable;
 
-// "Delivered today" and its revenue read FinancialReportService's shared
-// recognizedOrderItemsQuery() — the exact join the financial report and the
-// restock velocity service both already use — so this card can't disagree
-// with either about what counts as delivered. "Placed" and "cancelled" are
-// plain Order counts with no revenue concept, so there's no parallel
-// definition being invented for those.
+// "Delivered today" and its revenue read StoreSalesQuery — the same "what
+// sold" definition as the Sales Report and restock velocity (recorded revenue,
+// not cancelled since) — so this card can't disagree with them. "Placed" and
+// "cancelled" are plain Order counts with no revenue concept, so there's no
+// parallel definition being invented for those.
 //
 // Cancel rate, not the placed-vs-delivered gap, drives urgency: most orders
 // placed today won't be delivered today regardless of how healthy the store

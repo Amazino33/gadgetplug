@@ -16,7 +16,7 @@ use Illuminate\Support\Collection;
 // their own.
 //
 // "Units delivered" combines both sales channels this app has: online orders
-// (via FinancialReportService::recognizedOrderItemsQuery() — the exact join
+// (via FinancialReportService::soldOrderItemsQuery() — the exact join
 // the P&L uses for revenue, so velocity and revenue can never disagree about
 // an online order) and completed POS sales (PosSale has no relationship to
 // Order and never touches revenue_recognized_at, so it needs its own query;
@@ -62,7 +62,7 @@ class ProductVelocityService
     // Ranks products by units actually sold in an arbitrary [from, to] range
     // — "who sold the most this week/month" — as opposed to forVendor()'s
     // trailing-window restock tiering. Reuses the exact same two sources
-    // (recognizedOrderItemsQuery for online, the same POS filter for POS) so
+    // (soldOrderItemsQuery for online, the same POS filter for POS) so
     // "top sellers" and "restock velocity" can never disagree about a sale.
     /**
      * @return Collection<int, TopSellerRow>
@@ -74,7 +74,7 @@ class ProductVelocityService
         ?int $categoryId = null,
         int $limit = 20,
     ): Collection {
-        $onlineRows = FinancialReportService::recognizedOrderItemsQuery($vendorId, $from, $to)
+        $onlineRows = FinancialReportService::soldOrderItemsQuery($vendorId, $from, $to)
             ->groupBy('order_items.product_id')
             ->selectRaw('order_items.product_id, SUM(order_items.quantity) as units, SUM(order_items.quantity * order_items.unit_price) as revenue')
             ->get()
@@ -247,7 +247,7 @@ class ProductVelocityService
      */
     private function onlineUnitsDelivered(int $vendorId, array $productIds, CarbonImmutable $from, CarbonImmutable $to): array
     {
-        return FinancialReportService::recognizedOrderItemsQuery($vendorId, $from, $to)
+        return FinancialReportService::soldOrderItemsQuery($vendorId, $from, $to)
             ->whereIn('order_items.product_id', $productIds)
             ->groupBy('order_items.product_id')
             ->selectRaw('order_items.product_id, SUM(order_items.quantity) as units')
