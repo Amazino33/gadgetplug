@@ -9,6 +9,8 @@ use App\Models\OrderItem;
 use App\Models\SupplierLink;
 use App\Services\VendorLink\SupplierCatalogue;
 use App\Services\VendorLink\SupplierPayable;
+use App\Services\VendorLink\SupplierPriceAtSale;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -38,9 +40,13 @@ class BookSupplierPayableAction
     }
 
     /**
+     * $soldAt is for booking after the fact (the one-off backfill): the line
+     * is priced at what the supplier charged on that date
+     * (SupplierPriceAtSale), not at his price today.
+     *
      * @return int how many lines were booked
      */
-    public function execute(Order $order): int
+    public function execute(Order $order, ?CarbonInterface $soldAt = null): int
     {
         $order->loadMissing('items.product');
         $booked = 0;
@@ -51,7 +57,7 @@ class BookSupplierPayableAction
             }
 
             try {
-                if ($this->bookLine($item)) {
+                if ($this->bookLine($item, $soldAt)) {
                     $booked++;
                 }
             } catch (Throwable $e) {
@@ -66,12 +72,18 @@ class BookSupplierPayableAction
         return $booked;
     }
 
-    private function bookLine(OrderItem $item): bool
+    private function bookLine(OrderItem $item, ?CarbonInterface $soldAt = null): bool
     {
         $link = SupplierLink::find($item->product->supplier_link_id);
 
         if (! $link) {
             return false;
+        }
+
+        if ($soldAt !== null) {
+            $unitCost = (float) (app(SupplierPriceAtSale::class)->resolve($item, $soldAt)['cost'] ?? 0);
+
+            return $unitCost > 0 && $this->charge($link, $item, $unitCost);
         }
 
         // Read past tenancy: the source belongs to the supplier, and this may
@@ -89,6 +101,11 @@ class BookSupplierPayableAction
             return false;
         }
 
+        return $this->charge($link, $item, $unitCost);
+    }
+
+    private function charge(SupplierLink $link, OrderItem $item, float $unitCost): bool
+    {
         $this->payable->charge($link, $item, (int) $item->quantity, $unitCost);
 
         // Cost of goods sold, on the line, in the column the rest of the

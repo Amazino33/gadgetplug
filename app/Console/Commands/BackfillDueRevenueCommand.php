@@ -6,6 +6,7 @@ use App\Actions\Finance\RecognizeOrderRevenueAction;
 use App\Actions\VendorLink\BookSupplierPayableAction;
 use App\Models\Order;
 use App\Models\WalletTransaction;
+use App\Services\VendorLink\SupplierPriceAtSale;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
@@ -32,8 +33,12 @@ use Throwable;
  *              stock), else the order's created_at;
  *   wallet   — the wallet debit, else created_at.
  *
- * Any supplier payable for resold lines books at the same time, at today's
- * date and the supplier's price today (the payable ledger has no back-dating).
+ * Any supplier payable for resold lines books at the same time, priced at
+ * what the supplier charged when the order was paid (SupplierPriceAtSale: the
+ * line's own snapshot, else his price history), and at his price today only
+ * when neither exists. Every line on that fallback is listed in the dry run
+ * with both prices, so it can be checked first. The payable ledger has no
+ * back-dating, so the entry itself is dated today.
  */
 class BackfillDueRevenueCommand extends Command
 {
@@ -94,6 +99,7 @@ class BackfillDueRevenueCommand extends Command
             ])->all(),
         );
 
+        $this->reportSupplierPricing($rows);
         $this->reportUntouched();
 
         if (! $force) {
@@ -129,9 +135,60 @@ class BackfillDueRevenueCommand extends Command
                     $query->orWhere(fn ($q) => $q->where('payment_method', $method)->whereIn('status', $statuses));
                 }
             })
-            ->with('items.vendor')
+            ->with('items.vendor', 'items.product')
             ->orderBy('id')
             ->get();
+    }
+
+    /**
+     * How each resold line's supplier debt would be priced, and every line
+     * that falls back to today's price with the figures to check it against.
+     */
+    private function reportSupplierPricing(Collection $rows): void
+    {
+        $lines = collect();
+
+        foreach ($rows as $row) {
+            foreach ($row['order']->items as $item) {
+                if (! $item->product?->isLinked()) {
+                    continue;
+                }
+
+                $lines->push(['order' => $row['order'], 'item' => $item] + app(SupplierPriceAtSale::class)->resolve($item, $row['at']));
+            }
+        }
+
+        if ($lines->isEmpty()) {
+            return;
+        }
+
+        $this->newLine();
+        $this->line('<options=bold>Supplier debt for resold lines — how each is priced</>');
+        $this->table(['Priced from', 'Lines'], $lines->countBy('source')->map(fn ($n, $source) => [$source, $n])->values()->all());
+
+        $fallback = $lines->where('source', SupplierPriceAtSale::FROM_TODAY);
+
+        if ($fallback->isEmpty()) {
+            return;
+        }
+
+        $this->warn('These lines have no price from the time of sale and would be booked at the supplier\'s price today:');
+        $this->table(
+            ['Order', 'Product', 'Qty', "Today's price", 'Listing last cost', 'Difference / unit', 'Difference / line'],
+            $fallback->map(function (array $line) {
+                $diff = ($line['today'] !== null && $line['listing'] !== null) ? $line['today'] - $line['listing'] : null;
+
+                return [
+                    $line['order']->reference,
+                    $line['item']->product_name ?? $line['item']->product?->name,
+                    $line['item']->quantity,
+                    $line['today'] !== null ? number_format($line['today'], 2) : '—',
+                    $line['listing'] !== null ? number_format($line['listing'], 2) : '—',
+                    $diff !== null ? number_format($diff, 2) : '—',
+                    $diff !== null ? number_format($diff * (int) $line['item']->quantity, 2) : '—',
+                ];
+            })->values()->all(),
+        );
     }
 
     /** Paid orders deliberately left alone, so nothing is silently skipped. */
@@ -187,7 +244,7 @@ class BackfillDueRevenueCommand extends Command
                 $reason = app(RecognizeOrderRevenueAction::class)->execute($locked, occurredAt: $paidAt);
 
                 if ($reason === null) {
-                    app(BookSupplierPayableAction::class)->execute($locked);
+                    app(BookSupplierPayableAction::class)->execute($locked, $paidAt);
 
                     activity()->performedOn($locked)->event('revenue_backfilled')
                         ->withProperties(['paid_at' => $paidAt->toDateTimeString(), 'amount' => (float) $locked->total_amount])

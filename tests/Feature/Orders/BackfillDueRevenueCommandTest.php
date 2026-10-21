@@ -128,3 +128,79 @@ it('falls back to when stock was reserved on payment, then to the order date', f
 
     expect(Carbon::parse($order->fresh()->revenue_recognized_at)->toDateTimeString())->toBe($reservedAt->toDateTimeString());
 });
+
+// ── Supplier debt priced at the time of sale ────────────────────────────────
+
+require_once __DIR__.'/../VendorLink/Helpers.php';
+
+/** A paid storefront order for a resold listing, with no revenue or debt booked yet. */
+function unbookedResale(float $supplierPrice, ?float $lineSnapshot = null): array
+{
+    $reseller = linkVendor('Backfill Reseller');
+    $supplier = linkVendor('Backfill Wholesaler', online: false);
+    $link = makeLink($reseller, $supplier, markup: 40);
+    $source = linkProduct($supplier, price: $supplierPrice, stock: 20);
+    app(App\Actions\VendorLink\PublishLinkedListingAction::class)->execute($link, [$source->id]);
+    $listing = App\Models\Product::linked()->firstOrFail();
+
+    $order = Order::create([
+        'reference' => 'BF-RS-'.uniqid(), 'customer_name' => 'Ada', 'customer_email' => 'ada@example.com',
+        'customer_phone' => '08040000000', 'shipping_address' => '1 Test Street',
+        'total_amount' => (float) $listing->price * 2, 'status' => 'pending', 'payment_method' => 'paystack',
+    ]);
+    $item = OrderItem::create([
+        'order_id' => $order->id, 'product_id' => $listing->id, 'vendor_id' => $reseller->id,
+        'quantity' => 2, 'unit_price' => $listing->price, 'unit_cost' => $lineSnapshot,
+    ]);
+    $order->update(['status' => 'paid']);
+
+    return compact('order', 'item', 'source', 'link', 'listing');
+}
+
+it('books the supplier debt at the line\'s own snapshot when there is one', function () {
+    $r = unbookedResale(supplierPrice: 10000, lineSnapshot: 9000);
+    $r['source']->update(['price' => 12000]);
+
+    $this->artisan('orders:backfill-due-revenue', ['--force' => true])->assertSuccessful();
+
+    expect((float) App\Models\SupplierPayableEntry::charges()->sole()->unit_cost)->toBe(9000.0);
+});
+
+it('books the supplier debt at his price on the sale date, from his price history', function () {
+    $this->travelTo(now()->subDays(10));
+    $r = unbookedResale(supplierPrice: 10000);
+    $this->travelBack();
+
+    // He has put his price up since.
+    $r['source']->update(['price' => 15000]);
+
+    $this->artisan('orders:backfill-due-revenue')
+        ->expectsOutputToContain(App\Services\VendorLink\SupplierPriceAtSale::FROM_HISTORY)
+        ->doesntExpectOutputToContain("would be booked at the supplier's price today")
+        ->assertSuccessful();
+
+    $this->artisan('orders:backfill-due-revenue', ['--force' => true])->assertSuccessful();
+
+    expect((float) App\Models\SupplierPayableEntry::charges()->sole()->unit_cost)->toBe(10000.0)
+        ->and((float) $r['item']->fresh()->unit_cost)->toBe(10000.0);
+});
+
+it('falls back to today\'s price only with no record, and lists the line with both prices and the difference', function () {
+    $r = unbookedResale(supplierPrice: 10000);
+
+    // No history at all for his product, and his price has moved.
+    Spatie\Activitylog\Models\Activity::query()->where('subject_id', $r['source']->id)->delete();
+    $r['source']->updateQuietly(['price' => 11500]);
+
+    Illuminate\Support\Facades\Artisan::call('orders:backfill-due-revenue');
+    $output = Illuminate\Support\Facades\Artisan::output();
+
+    // One row: the order, today's price, the listing's last recorded cost,
+    // and the difference per unit and per line (2 units).
+    expect($output)->toContain("would be booked at the supplier's price today")
+        ->and($output)->toMatch('/'.preg_quote($r['order']->reference, '/').'[^\n]*11,500\.00[^\n]*10,000\.00[^\n]*1,500\.00[^\n]*3,000\.00/');
+
+    $this->artisan('orders:backfill-due-revenue', ['--force' => true])->assertSuccessful();
+
+    expect((float) App\Models\SupplierPayableEntry::charges()->sole()->unit_cost)->toBe(11500.0);
+});
