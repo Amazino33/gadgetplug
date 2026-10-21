@@ -2,7 +2,7 @@
 
 use Livewire\Volt\Component;
 use Livewire\WithPagination;
-use App\Models\Order;
+use App\Models\Checkout;
 
 new class extends Component {
     use WithPagination;
@@ -10,7 +10,10 @@ new class extends Component {
     public function with(): array
     {
         return [
-            'orders' => Order::where('user_id', auth()->id())
+            // One row per checkout — what the customer actually placed — even
+            // when its goods come from several vendors' orders.
+            'orders' => Checkout::where('user_id', auth()->id())
+                ->with('orders')
                 ->latest()
                 ->paginate(10),
         ];
@@ -43,11 +46,12 @@ new class extends Component {
         @else
         <div class="divide-y divide-brand-border dark:divide-[#2a3a2a]">
             @foreach ($orders as $order)
+            @php $status = $order->summaryStatus(); @endphp
             <div class="px-5 md:px-6 py-4">
                 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
                     <div>
                         <span class="font-montserrat font-bold text-[13px] text-brand-dark dark:text-[#e8f5e9]">
-                            {{ $order->reference }}
+                            <a href="{{ route('track-order', ['ref' => $order->reference]) }}" class="hover:underline">{{ $order->reference }}</a>
                         </span>
                         <span class="text-[11px] text-brand-muted ml-2">
                             {{ $order->created_at->format('d M Y, g:ia') }}
@@ -55,7 +59,7 @@ new class extends Component {
                     </div>
                     <div class="flex items-center gap-2">
                         @php
-                        $statusLabel = match($order->status) {
+                        $statusLabel = match($status) {
                             'pending'               => 'Pending Payment',
                             'confirmed'             => 'Confirmed',
                             'paid'                  => 'Paid',
@@ -63,9 +67,10 @@ new class extends Component {
                             'delivered'             => 'Delivered',
                             'cancelled'             => 'Cancelled',
                             'paid_but_failed_stock' => 'Action Needed',
-                            default                 => ucfirst($order->status),
+                            'in_progress'           => 'In Progress',
+                            default                 => ucfirst($status),
                         };
-                        $statusClass = match($order->status) {
+                        $statusClass = match($status) {
                             'paid', 'delivered'     => 'bg-[#e8f5e8] text-brand dark:bg-[#1a2a1a] dark:text-brand-lime',
                             'confirmed'             => 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400',
                             'shipped'               => 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400',
@@ -85,7 +90,7 @@ new class extends Component {
                         {{ $order->shipping_address }}
                     </p>
                     <span class="font-montserrat font-black text-[16px] text-brand shrink-0">
-                        ₦{{ number_format($order->total_amount) }}
+                        ₦{{ number_format($order->grand_total) }}
                     </span>
                 </div>
             </div>

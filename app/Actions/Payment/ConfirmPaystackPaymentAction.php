@@ -3,19 +3,22 @@
 namespace App\Actions\Payment;
 
 use App\Actions\Inventory\ReserveStockAction;
+use App\Models\Checkout;
 use App\Models\Order;
 use App\Services\Payment\PaystackClient;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
-// The single path by which a Paystack payment turns a pending order into a paid
-// one. Used by the browser callback AND the webhook, which race each other on
-// every successful payment — so it is idempotent: whichever arrives first does
-// the work, the other finds the order already past 'pending' and changes nothing.
+// The single path by which a Paystack payment turns a pending checkout's child
+// orders into paid ones. Used by the browser callback AND the webhook, which
+// race each other on every successful payment — so it is idempotent: whichever
+// arrives first does the work, the other finds no child order still 'pending'
+// and changes nothing.
 //
 // Verification happens against Paystack's API, never from the request alone:
-// the amount (kobo) and currency must match the order before it is marked paid.
+// the amount (kobo) must match the checkout's grand total and the currency
+// must be NGN before anything is marked paid.
 class ConfirmPaystackPaymentAction
 {
     public const PAID         = 'paid';
@@ -32,14 +35,21 @@ class ConfirmPaystackPaymentAction
 
     public function execute(string $reference): string
     {
-        $order = Order::where('reference', $reference)->first();
+        // Paystack is paid against the checkout. A reference with no checkout
+        // (an order created outside the checkout flow) is treated as a
+        // checkout of one, so it confirms exactly as it always did.
+        $checkout = Checkout::where('reference', $reference)->first();
 
-        if (! $order) {
+        $orders = $checkout
+            ? $checkout->orders()->get()
+            : Order::where('reference', $reference)->get();
+
+        if ($orders->isEmpty()) {
             return self::NOT_FOUND;
         }
 
         // Cheap early exit before spending an API call. Re-checked under lock below.
-        if ($order->status !== 'pending') {
+        if ($orders->where('status', 'pending')->isEmpty()) {
             return self::ALREADY;
         }
 
@@ -50,12 +60,13 @@ class ConfirmPaystackPaymentAction
             return self::UNVERIFIED;
         }
 
-        $expectedKobo = (int) round((float) $order->total_amount * 100);
+        $expectedKobo = (int) round((float) ($checkout ? $checkout->grand_total : $orders->first()->total_amount) * 100);
 
         if ((int) ($transaction['amount'] ?? -1) !== $expectedKobo
             || strtoupper((string) ($transaction['currency'] ?? '')) !== 'NGN') {
             Log::error('Paystack payment does not match the order — not marking paid.', [
-                'order_id'      => $order->id,
+                'checkout_id'   => $checkout?->id,
+                'order_ids'     => $orders->pluck('id')->all(),
                 'reference'     => $reference,
                 'expected_kobo' => $expectedKobo,
                 'paid_kobo'     => $transaction['amount'] ?? null,
@@ -65,45 +76,60 @@ class ConfirmPaystackPaymentAction
             return self::MISMATCH;
         }
 
-        return DB::transaction(function () use ($order): string {
-            $locked = Order::whereKey($order->id)->lockForUpdate()->first();
+        return DB::transaction(function () use ($orders): string {
+            // Every child locked, in id order so two racing confirmations
+            // queue behind each other rather than deadlock. Whichever gets the
+            // locks first does the work; the other finds nothing pending.
+            $locked = Order::whereKey($orders->pluck('id'))
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get()
+                ->where('status', 'pending');
 
-            if (! $locked || $locked->status !== 'pending') {
+            if ($locked->isEmpty()) {
                 return self::ALREADY;
             }
 
-            $locked->load('items.product');
+            $anyFailed = false;
 
-            try {
-                // Savepoint: if a later line fails, earlier reservations roll
-                // back with it rather than staying held against an order that
-                // is about to be flagged for a human.
-                DB::transaction(function () use ($locked): void {
-                    foreach ($locked->items as $item) {
-                        if (! $item->tracksStock()) {
-                            continue;
+            // Each child order on its own: one vendor's stock problem flags
+            // that vendor's order for a human and does not hold up the others,
+            // which are paid for and ready to fulfil.
+            foreach ($locked as $order) {
+                $order->load('items.product');
+
+                try {
+                    // Savepoint: if a later line fails, earlier reservations roll
+                    // back with it rather than staying held against an order that
+                    // is about to be flagged for a human.
+                    DB::transaction(function () use ($order): void {
+                        foreach ($order->items as $item) {
+                            if (! $item->tracksStock()) {
+                                continue;
+                            }
+
+                            $this->reserveStock->execute(
+                                productId:   $item->product_id,
+                                quantity:    $item->quantity,
+                                reference:   $order->reference,
+                                description: 'Reserved on Paystack payment confirmation.',
+                                orderItemId: $item->id,
+                            );
                         }
+                    });
+                } catch (Throwable $e) {
+                    Log::error("Stock reservation failed after payment for order {$order->id}: ".$e->getMessage());
 
-                        $this->reserveStock->execute(
-                            productId:   $item->product_id,
-                            quantity:    $item->quantity,
-                            reference:   $locked->reference,
-                            description: 'Reserved on Paystack payment confirmation.',
-                            orderItemId: $item->id,
-                        );
-                    }
-                });
-            } catch (Throwable $e) {
-                Log::error("Stock reservation failed after payment for order {$locked->id}: ".$e->getMessage());
+                    $order->update(['status' => 'paid_but_failed_stock']);
+                    $anyFailed = true;
 
-                $locked->update(['status' => 'paid_but_failed_stock']);
+                    continue;
+                }
 
-                return self::FAILED_STOCK;
+                $order->update(['status' => 'paid']);
             }
 
-            $locked->update(['status' => 'paid']);
-
-            return self::PAID;
+            return $anyFailed ? self::FAILED_STOCK : self::PAID;
         });
     }
 }

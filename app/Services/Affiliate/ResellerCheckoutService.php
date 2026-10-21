@@ -2,10 +2,10 @@
 
 namespace App\Services\Affiliate;
 
+use App\Actions\Checkout\PlaceCheckoutAction;
 use App\Actions\Inventory\ReserveStockAction;
 use App\Models\Affiliate;
-use App\Models\Order;
-use App\Models\OrderItem;
+use App\Models\Checkout;
 use App\Models\Product;
 use App\Models\WalletTransaction;
 use Illuminate\Support\Facades\DB;
@@ -21,18 +21,22 @@ use RuntimeException;
 // CommissionService::createForOrder() — that absence alone is the entire
 // no-self-commission guard, confirmed as the only commission-creation path
 // in the whole app during Phase 0 recon.
+//
+// Goes through the same PlaceCheckoutAction as the storefront: one checkout,
+// one child order per vendor in the purchase.
 class ResellerCheckoutService
 {
     public function __construct(
         private ResellerDiscountResolver $discountResolver,
         private ReserveStockAction $reserveStock,
         private WalletService $walletService,
+        private PlaceCheckoutAction $placeCheckout,
     ) {}
 
     /**
      * @param array<int, array{product: Product, quantity: int}> $lines
      */
-    public function purchase(Affiliate $affiliate, array $lines, string $shippingAddress, ?string $localGovernment = null): Order
+    public function purchase(Affiliate $affiliate, array $lines, string $shippingAddress, ?string $localGovernment = null): Checkout
     {
         if (empty($lines)) {
             throw new RuntimeException('Cannot place a reseller order with no items.');
@@ -80,7 +84,9 @@ class ResellerCheckoutService
                 throw new RuntimeException('Insufficient wallet balance for this purchase.');
             }
 
-            $order = Order::create([
+            // Created already 'confirmed' as before (the wallet pays up front),
+            // so no status transition — and none of its side effects — fires.
+            $checkout = $this->placeCheckout->execute([
                 'user_id'          => $lockedAffiliate->user_id,
                 'reference'        => 'GP-RS-' . strtoupper(Str::random(10)),
                 'customer_name'    => $lockedAffiliate->user->name,
@@ -88,44 +94,43 @@ class ResellerCheckoutService
                 'customer_phone'   => $lockedAffiliate->user->phone,
                 'shipping_address' => $shippingAddress,
                 'local_government' => $localGovernment,
-                'total_amount'     => $total,
-                'status'           => 'confirmed',
+                'delivery_fee'     => 0,
                 'payment_method'   => 'wallet',
-            ]);
+            ], array_map(fn (array $line) => [
+                'product'    => $line['product'],
+                'quantity'   => $line['quantity'],
+                'unit_price' => $line['discounted_unit_price'],
+                'unit_cost'  => $line['product']->cost_price,
+            ], $preparedLines), orderStatus: 'confirmed');
 
-            foreach ($preparedLines as $line) {
-                $orderItem = OrderItem::create([
-                    'order_id'   => $order->id,
-                    'product_id' => $line['product']->id,
-                    'vendor_id'  => $line['product']->vendor_id,
-                    'quantity'   => $line['quantity'],
-                    'unit_price' => $line['discounted_unit_price'],
-                    'unit_cost'  => $line['product']->cost_price,
-                ]);
+            foreach ($checkout->orders as $order) {
+                foreach ($order->items as $orderItem) {
+                    // A resold listing holds no stock of ours to reserve.
+                    if (! $orderItem->tracksStock()) {
+                        continue;
+                    }
 
-                // A resold listing holds no stock of ours to reserve.
-                if (! $line['product']->tracksStock()) {
-                    continue;
+                    $this->reserveStock->execute(
+                        productId: $orderItem->product_id,
+                        quantity: $orderItem->quantity,
+                        reference: $order->reference,
+                        description: "Reserved for reseller order #{$order->reference} (affiliate #{$lockedAffiliate->id}).",
+                        orderItemId: $orderItem->id,
+                    );
                 }
 
-                $this->reserveStock->execute(
-                    productId: $line['product']->id,
-                    quantity: $line['quantity'],
-                    reference: $order->reference,
-                    description: "Reserved for reseller order #{$order->reference} (affiliate #{$lockedAffiliate->id}).",
-                    orderItemId: $orderItem->id,
-                );
+                // One debit per child order, for that order's own total, so
+                // every order keeps exactly one wallet debit behind it.
+                WalletTransaction::create([
+                    'affiliate_id' => $lockedAffiliate->id,
+                    'order_id'     => $order->id,
+                    'type'         => 'debit',
+                    'amount'       => -(float) $order->total_amount,
+                    'description'  => "Reseller purchase — order #{$order->reference}.",
+                ]);
             }
 
-            WalletTransaction::create([
-                'affiliate_id' => $lockedAffiliate->id,
-                'order_id'     => $order->id,
-                'type'         => 'debit',
-                'amount'       => -$total,
-                'description'  => "Reseller purchase — order #{$order->reference}.",
-            ]);
-
-            return $order->fresh('items');
+            return $checkout->fresh('orders.items');
         });
     }
 }

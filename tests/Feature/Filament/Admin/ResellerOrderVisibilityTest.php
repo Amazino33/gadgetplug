@@ -52,7 +52,7 @@ function makeResellerOrderForVisibilityTest(): \App\Models\Order
         $affiliate,
         [['product' => $product, 'quantity' => 1]],
         'Uyo, Akwa Ibom State — Visibility Test Address',
-    );
+    )->orders->sole();
 }
 
 test('the admin orders list labels a reseller order as Reseller (Wallet), not Paystack', function () {

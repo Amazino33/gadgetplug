@@ -1,8 +1,10 @@
 <?php
 
 use Livewire\Volt\Component;
+use App\Actions\Checkout\PlaceCheckoutAction;
+use Illuminate\Support\Facades\DB;
+use App\Models\Checkout;
 use App\Models\Order;
-use App\Models\OrderItem;
 use App\Models\Product;
 use App\Services\Affiliate\AttributionService;
 use App\Services\CartService;
@@ -70,15 +72,25 @@ new class extends Component {
             $this->paid          = true;
             $this->paidReference = $ref;
 
-            $order = Order::with('items.product.media')
-                ->where('reference', $this->paidReference)
-                ->first();
+            // The checkout, with every child order's lines — one confirmation
+            // for the whole basket. A reference with no checkout (an order
+            // created outside the flow) still shows as a basket of one.
+            $checkout = Checkout::findByReference($this->paidReference);
+            $checkout?->load('orders.items.product.media');
 
-            if ($order) {
-                $this->paidMethod = $order->payment_method;
-                $this->paidTotal  = (float) $order->total_amount;
-                $this->paidName   = $order->customer_name;
-                foreach ($order->items as $item) {
+            $orders = $checkout
+                ? $checkout->orders
+                : Order::with('items.product.media')->where('reference', $this->paidReference)->get();
+
+            if ($orders->isNotEmpty()) {
+                $head = $checkout ?? $orders->first();
+
+                $this->paidReference = $head->reference;
+                $this->paidMethod    = $head->payment_method;
+                $this->paidTotal     = (float) ($checkout ? $checkout->grand_total : $head->total_amount);
+                $this->paidName      = $head->customer_name;
+
+                foreach ($orders->flatMap->items as $item) {
                     $this->paidItems[] = [
                         'name'     => $item->customerName(),
                         'quantity' => $item->quantity,
@@ -91,9 +103,9 @@ new class extends Component {
                 }
 
                 // Same event_id the server-side copy uses (dispatched from
-                // OrderObserver off this same order, keyed on its reference) —
-                // Meta dedupes browser + server into one Purchase.
-                $this->pixelEventId = $order->reference;
+                // OrderObserver once per checkout, keyed on the checkout's
+                // reference) — Meta dedupes browser + server into one Purchase.
+                $this->pixelEventId = $head->reference;
 
             }
             return;
@@ -413,7 +425,7 @@ new class extends Component {
             return;
         }
 
-        // ── One checkout, one order ──────────────────────────────────────────
+        // ── One submission, one checkout ─────────────────────────────────────
         //
         // Two layers, because either alone leaves a hole. The disabled button
         // stops the ordinary double-tap but not a retried request or a second
@@ -421,15 +433,18 @@ new class extends Component {
         // concurrent pair, which is what the unique index is for.
         $fingerprint = $this->checkoutFingerprint();
 
-        if ($existing = $this->recentOrderFor($fingerprint)) {
-            $this->resumeExistingOrder($existing);
+        if ($existing = $this->recentCheckoutFor($fingerprint)) {
+            $this->resumeExistingCheckout($existing);
             return;
         }
 
         $reference = 'GP-' . strtoupper(Str::random(10));
 
+        // One child order per vendor in the basket, each with only its own
+        // lines and subtotal. The checkout carries the customer, the payment
+        // and the grand total.
         try {
-            $order = Order::create([
+            $checkout = app(PlaceCheckoutAction::class)->execute([
                 'user_id'          => auth()->id(),
                 'reference'        => $reference,
                 'idempotency_key'  => $this->idempotencyKey($fingerprint),
@@ -443,37 +458,17 @@ new class extends Component {
                 'customer_phone'   => $this->phone,
                 'shipping_address' => $this->lga . ', Akwa Ibom State — ' . $this->address,
                 'local_government' => $this->lga,
-                'total_amount'     => $this->total,
-                'status'           => 'pending',
+                // Delivery fee stays 0 until the delivery-location rules land.
+                'delivery_fee'     => 0,
                 'payment_method'   => $this->paymentMethod,
                 // Captured here (shared by both payment paths) so the server-side
                 // Purchase CAPI event — fired later from OrderObserver, possibly
                 // disconnected from this request — can still include them.
                 'fbp'              => request()->cookie('_fbp'),
                 'fbc'              => request()->cookie('_fbc'),
-            ]);
-        } catch (QueryException $e) {
-            // The other request won the race and took the key. Nothing is wrong
-            // — the customer's order exists, it just isn't this one.
-            if ($existing = $this->recentOrderFor($fingerprint)) {
-                $this->resumeExistingOrder($existing);
-                return;
-            }
-
-            throw $e;
-        }
-
-        // Keyed by product so the reservation loop below can tell each
-        // reservation which line it belongs to — the allocation rows hang off
-        // the line, not the product.
-        $orderItemsByProduct = [];
-
-        foreach ($this->cartItems as $item) {
-            $orderItemsByProduct[$item['product']->id] = OrderItem::create([
-                'order_id'   => $order->id,
-                'product_id' => $item['product']->id,
-                'vendor_id'  => $item['product']->vendor_id,
-                'quantity'   => $item['quantity'],
+            ], array_map(fn (array $item) => [
+                'product'    => $item['product'],
+                'quantity'   => (int) $item['quantity'],
                 'unit_price' => $item['product']->price,
                 // Cost as of this moment — a later restock must not rewrite
                 // what this sale earned.
@@ -483,67 +478,96 @@ new class extends Component {
                 // is frozen onto the line then. Writing today's figure here
                 // would freeze a cost for units that may never be delivered.
                 'unit_cost'  => $item['product']->isLinked() ? null : $item['product']->cost_price,
-            ]);
+            ], $this->cartItems));
+        } catch (QueryException $e) {
+            // The other request won the race and took the key. Nothing is wrong
+            // — the customer's checkout exists, it just isn't this one.
+            if ($existing = $this->recentCheckoutFor($fingerprint)) {
+                $this->resumeExistingCheckout($existing);
+                return;
+            }
+
+            throw $e;
         }
 
-        // Affiliate attribution — a code entered here beats the cookie from an
+        // Affiliate attribution — one commission per child order, each on that
+        // vendor's own lines. A code entered here beats the cookie from an
         // earlier click. Self-referral and idempotency are both handled inside
         // the service; a failure here must never block the order itself.
-        try {
-            app(AttributionService::class)->attributeOrder(
-                $order,
-                trim($this->referralCode) ?: null,
-                request()->cookie(AttributionService::COOKIE_NAME),
-            );
-        } catch (\Exception $e) {
-            \Log::error('Affiliate attribution failed for order ' . $order->id . ': ' . $e->getMessage());
+        foreach ($checkout->orders as $order) {
+            try {
+                app(AttributionService::class)->attributeOrder(
+                    $order,
+                    trim($this->referralCode) ?: null,
+                    request()->cookie(AttributionService::COOKIE_NAME),
+                );
+            } catch (\Exception $e) {
+                \Log::error('Affiliate attribution failed for order ' . $order->id . ': ' . $e->getMessage());
+            }
         }
 
         if ($this->paymentMethod === 'pay_on_delivery') {
             $reserveStock = app(ReserveStockAction::class);
 
             try {
-                foreach ($this->cartItems as $item) {
-                    // A resold listing holds no stock of its own — the goods sit
-                    // in the supplier's shop and are read, never written. Trying
-                    // to reserve against zero throws "insufficient stock" and the
-                    // catch below deletes the whole order, so every order
-                    // containing one would fail. Skipped deliberately: the race
-                    // where he sells the last unit first is accepted, and a
-                    // pay-on-delivery order that cannot be filled simply cancels
-                    // with nothing paid.
-                    if (! $item['product']->tracksStock()) {
-                        continue;
-                    }
+                // All of the checkout's holds succeed or none do. Before the
+                // split, a later line running out deleted the order but left
+                // the earlier lines' reservations standing on the shelf, held
+                // for an order that no longer existed.
+                DB::transaction(function () use ($checkout, $reserveStock) {
+                foreach ($checkout->orders as $order) {
+                    foreach ($order->items as $item) {
+                        // A resold listing holds no stock of its own — the goods sit
+                        // in the supplier's shop and are read, never written. Trying
+                        // to reserve against zero throws "insufficient stock" and the
+                        // catch below deletes the whole checkout, so every order
+                        // containing one would fail. Skipped deliberately: the race
+                        // where he sells the last unit first is accepted, and a
+                        // pay-on-delivery order that cannot be filled simply cancels
+                        // with nothing paid.
+                        if (! $item->tracksStock()) {
+                            continue;
+                        }
 
-                    $reserveStock->execute(
-                        productId:   $item['product']->id,
-                        quantity:    $item['quantity'],
-                        reference:   $reference,
-                        description: 'Reserved on pay-on-delivery order placed.',
-                        orderItemId: $orderItemsByProduct[$item['product']->id]->id,
-                    );
+                        // Per child order: the hold is filed under that order's
+                        // own reference and against its own line.
+                        $reserveStock->execute(
+                            productId:   $item->product_id,
+                            quantity:    $item->quantity,
+                            reference:   $order->reference,
+                            description: 'Reserved on pay-on-delivery order placed.',
+                            orderItemId: $item->id,
+                        );
+                    }
                 }
+                });
             } catch (\Exception $e) {
-                $order->delete();
+                foreach ($checkout->orders as $order) {
+                    $order->delete();
+                }
+                $checkout->delete();
                 session()->flash('error', 'One or more items went out of stock. Please review your cart.');
                 return;
             }
 
-            $order->update(['status' => 'confirmed']);
+            foreach ($checkout->orders as $order) {
+                $order->update(['status' => 'confirmed']);
+            }
+
             Session::forget('cart');
             $this->dispatch('cart-updated');
-            session()->put('payment_success', $reference);
+            session()->put('payment_success', $checkout->reference);
             $this->redirectRoute('checkout');
             return;
         }
 
-        $this->startPaystack($reference);
+        $this->startPaystack($checkout);
     }
 
     // Extracted so a duplicate submission can be sent back to the same Paystack
-    // transaction rather than opening a second one.
-    private function startPaystack(string $reference): void
+    // transaction rather than opening a second one. Paystack is paid against
+    // the checkout — one transaction for the whole basket.
+    private function startPaystack(Checkout $checkout): void
     {
         try {
             $paystackKey = config('services.paystack.secret_key');
@@ -558,9 +582,9 @@ new class extends Component {
                 ->withOptions([CURLOPT_IPRESOLVE => CURL_IPRESOLVE_V4])
                 ->withToken($paystackKey)
                 ->post('https://api.paystack.co/transaction/initialize', [
-                    'amount'       => (int) ($this->total * 100),
-                    'email'        => $this->email,
-                    'reference'    => $reference,
+                    'amount'       => (int) round((float) $checkout->grand_total * 100),
+                    'email'        => $checkout->customer_email,
+                    'reference'    => $checkout->reference,
                     'callback_url' => route('payment.callback'),
                 ]);
 
@@ -621,15 +645,15 @@ new class extends Component {
     }
 
     /**
-     * The order an identical submission already created, if there is one.
+     * The checkout an identical submission already created, if there is one.
      *
      * Checks the previous window as well as the current one: two taps a second
      * apart can still land either side of a window boundary, and that pair is
      * exactly what this exists to catch.
      */
-    private function recentOrderFor(string $fingerprint): ?Order
+    private function recentCheckoutFor(string $fingerprint): ?Checkout
     {
-        return Order::query()
+        return Checkout::query()
             ->whereIn('idempotency_key', [
                 $this->idempotencyKey($fingerprint),
                 $this->idempotencyKey($fingerprint, 1),
@@ -640,16 +664,16 @@ new class extends Component {
     }
 
     /**
-     * Send a duplicate submission to the order that already exists instead of
-     * creating a second one. No new items, no second stock reservation, no
-     * second affiliate attribution.
+     * Send a duplicate submission to the checkout that already exists instead
+     * of creating a second one. No new orders or items, no second stock
+     * reservation, no second affiliate attribution.
      */
-    private function resumeExistingOrder(Order $order): void
+    private function resumeExistingCheckout(Checkout $checkout): void
     {
-        if ($order->payment_method === 'pay_on_delivery') {
+        if ($checkout->payment_method === 'pay_on_delivery') {
             Session::forget('cart');
             $this->dispatch('cart-updated');
-            session()->put('payment_success', $order->reference);
+            session()->put('payment_success', $checkout->reference);
             $this->redirectRoute('checkout');
 
             return;
@@ -657,7 +681,7 @@ new class extends Component {
 
         // Paystack treats a repeated reference as the same transaction, so this
         // returns the customer to the payment page they already had.
-        $this->startPaystack($order->reference);
+        $this->startPaystack($checkout);
     }
 }; ?>
 

@@ -137,7 +137,7 @@ class OrderObserver
 
     // Server-side CAPI copy of Purchase — fires on the same "money is settled"
     // transition CUSTOMER_STATUS_TEMPLATES above already uses (confirmed for
-    // POD, paid for Paystack), keyed on the order's own reference so Meta
+    // POD, paid for Paystack), keyed on the checkout's reference so Meta
     // dedupes it against the browser-side copy checkout's success screen
     // fires separately. Deliberately NOT tied to the customer's browser
     // completing that redirect back — if a Paystack payment clears but the
@@ -159,29 +159,53 @@ class OrderObserver
         }
 
         try {
-            $order->loadMissing('items.product');
+            // Once per checkout, not per child order: whichever child order
+            // settles first claims the checkout's Purchase, atomically, and
+            // reports the whole basket under the checkout's reference — the
+            // same event_id the success screen's browser pixel uses. The rest
+            // of the checkout's orders send nothing. An order with no checkout
+            // (created outside the flow) is a basket of one, as before.
+            $checkout = $order->checkout;
+
+            if ($checkout) {
+                if (! $checkout->claimPurchaseTracking()) {
+                    return;
+                }
+
+                $checkout->load('orders.items.product');
+                $items     = $checkout->orders->flatMap->items;
+                $eventId   = $checkout->reference;
+                $value     = (float) $checkout->grand_total;
+                $subject   = $checkout;
+            } else {
+                $order->loadMissing('items.product');
+                $items     = $order->items;
+                $eventId   = $order->reference;
+                $value     = (float) $order->total_amount;
+                $subject   = $order;
+            }
 
             $service = app(MetaConversionsService::class);
             $userData = [
-                'email'      => $order->customer_email,
-                'phone'      => $order->customer_phone,
-                'name'       => $order->customer_name,
-                'city'       => $order->local_government,
-                'fbp'        => $order->fbp,
-                'fbc'        => $order->fbc,
+                'email'      => $subject->customer_email,
+                'phone'      => $subject->customer_phone,
+                'name'       => $subject->customer_name,
+                'city'       => $subject->local_government,
+                'fbp'        => $subject->fbp,
+                'fbc'        => $subject->fbc,
             ];
 
             $service->dispatchEvent(
                 eventName: 'Purchase',
-                eventId: $order->reference,
+                eventId: $eventId,
                 eventSourceUrl: route('checkout'),
                 userData: $userData,
                 customData: [
                     'currency'     => 'NGN',
-                    'value'        => (float) $order->total_amount,
-                    'content_ids'  => $order->items->pluck('product_id')->all(),
+                    'value'        => $value,
+                    'content_ids'  => $items->pluck('product_id')->all(),
                     // The online names the buyer saw, from the line snapshots.
-                    'content_name' => $order->items->map(fn ($item) => $item->customerName())->unique()->implode(', '),
+                    'content_name' => $items->map(fn ($item) => $item->customerName())->unique()->implode(', '),
                     'content_type' => 'product',
                 ],
             );
@@ -189,12 +213,12 @@ class OrderObserver
             if ($order->status === 'confirmed' && $order->payment_method === 'pay_on_delivery') {
                 $service->dispatchEvent(
                     eventName: 'PaymentConfirmed',
-                    eventId: $order->reference . '-payment-confirmed',
+                    eventId: $eventId . '-payment-confirmed',
                     eventSourceUrl: route('checkout'),
                     userData: $userData,
                     customData: [
                         'currency' => 'NGN',
-                        'value'    => (float) $order->total_amount,
+                        'value'    => $value,
                     ],
                 );
             }

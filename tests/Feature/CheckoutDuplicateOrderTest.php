@@ -101,25 +101,26 @@ test('the duplicate still lands the customer on their confirmation', function ()
     expect(session('payment_success'))->toBe(Order::firstOrFail()->reference);
 });
 
-test('every order carries a key, so the database itself can refuse a second one', function () {
+// The key lives on the checkout since the checkout split: one submission is
+// one checkout, however many vendor orders it produces.
+test('every checkout carries a key, so the database itself can refuse a second one', function () {
     $product = duplicateGuardProduct();
 
     readyCheckout($product)->call('processCheckout');
 
-    $order = Order::firstOrFail();
+    $checkout = App\Models\Checkout::firstOrFail();
 
-    expect($order->idempotency_key)->not->toBeNull()
+    expect($checkout->idempotency_key)->not->toBeNull()
         // The unique index is the backstop for two genuinely concurrent
         // requests, which the pre-check alone would race.
-        ->and(fn () => Order::create([
-            'reference'       => 'GP-SECONDONE',
-            'idempotency_key' => $order->idempotency_key,
-            'customer_name'   => 'Someone Else',
-            'customer_email'  => 'other@example.com',
-            'customer_phone'  => '08000000000',
-            'total_amount'    => 6500,
-            'status'          => 'pending',
-            'payment_method'  => 'pay_on_delivery',
+        ->and(fn () => App\Models\Checkout::create([
+            'reference'        => 'GP-SECONDONE',
+            'idempotency_key'  => $checkout->idempotency_key,
+            'customer_name'    => 'Someone Else',
+            'customer_email'   => 'other@example.com',
+            'customer_phone'   => '08000000000',
+            'shipping_address' => 'Uyo',
+            'payment_method'   => 'pay_on_delivery',
         ]))->toThrow(Illuminate\Database\QueryException::class);
 });
 

@@ -1,11 +1,19 @@
 <?php
 
+use App\Models\Checkout;
 use App\Models\Order;
+use Illuminate\Support\Collection;
 use Livewire\Volt\Component;
 
 new class extends Component {
     public string $reference = '';
-    public ?Order $order     = null;
+    // The customer's checkout — what they paid for once. Its child orders (one
+    // per vendor in the basket) are tracked separately, since they can travel
+    // separately.
+    public ?Checkout $checkout = null;
+    // Only for an order created outside the checkout flow; every real order
+    // has a checkout (historical ones were backfilled 1:1).
+    public ?Order $orphan = null;
     public ?string $error    = null;
 
     public function mount(): void
@@ -19,8 +27,9 @@ new class extends Component {
 
     public function lookup(): void
     {
-        $this->error = null;
-        $this->order = null;
+        $this->error    = null;
+        $this->checkout = null;
+        $this->orphan   = null;
 
         $ref = trim($this->reference);
 
@@ -29,14 +38,33 @@ new class extends Component {
             return;
         }
 
-        $order = Order::with('items.product')->where('reference', $ref)->first();
+        // The checkout's reference, or any one of its orders' — a customer may
+        // have either, and both lead to the whole checkout.
+        $checkout = Checkout::findByReference($ref);
+
+        if ($checkout) {
+            $this->checkout = $checkout;
+            return;
+        }
+
+        $order = Order::where('reference', $ref)->first();
 
         if (! $order) {
             $this->error = 'No order found with that reference. Double-check and try again.';
             return;
         }
 
-        $this->order = $order;
+        $this->orphan = $order;
+    }
+
+    /** @return Collection<int, Order> */
+    public function trackedOrders(): Collection
+    {
+        if ($this->checkout) {
+            return $this->checkout->orders()->with('items.product')->get();
+        }
+
+        return $this->orphan ? collect([$this->orphan->load('items.product')]) : collect();
     }
 }; ?>
 
@@ -88,7 +116,39 @@ new class extends Component {
     </div>
 
     {{-- Results --}}
-    @if($order)
+    @php $orders = $this->trackedOrders(); $head = $checkout ?? $orphan; @endphp
+    @if($head)
+    <div class="bg-white dark:bg-[#162016] border border-brand-border dark:border-[#2a3a2a] rounded-2xl overflow-hidden mb-4">
+        <div class="px-5 md:px-6 py-4 border-b border-brand-border dark:border-[#2a3a2a]">
+            <p class="font-montserrat font-bold text-[15px] text-brand-dark dark:text-[#e8f5e9]">{{ $head->reference }}</p>
+            <p class="text-[11px] text-brand-muted mt-0.5">Placed {{ $head->created_at->format('d M Y, g:ia') }}</p>
+            @if($orders->count() > 1)
+            <p class="text-[12px] text-brand-dark dark:text-[#e8f5e9] mt-2">Your order is coming from {{ $orders->count() }} stores, so its parts may arrive separately.</p>
+            @endif
+        </div>
+        <div class="px-5 md:px-6 py-4 grid grid-cols-2 gap-4">
+            <div>
+                <p class="text-[10px] font-semibold uppercase tracking-[0.6px] text-brand-muted mb-0.5">Payment</p>
+                <p class="text-[13px] font-semibold text-brand-dark dark:text-[#e8f5e9]">
+                    {{ match($head->payment_method) { 'pay_on_delivery' => 'Pay on Delivery', 'wallet' => 'Reseller wallet', default => 'Paystack' } }}
+                </p>
+            </div>
+            <div>
+                <p class="text-[10px] font-semibold uppercase tracking-[0.6px] text-brand-muted mb-0.5">Total</p>
+                <p class="font-montserrat font-black text-[16px] text-brand">₦{{ number_format($checkout ? $checkout->grand_total : $head->total_amount) }}</p>
+                @if($checkout && (float) $checkout->delivery_fee > 0)
+                <p class="text-[11px] text-brand-muted">incl. delivery ₦{{ number_format($checkout->delivery_fee) }}</p>
+                @endif
+            </div>
+            <div class="col-span-2">
+                <p class="text-[10px] font-semibold uppercase tracking-[0.6px] text-brand-muted mb-0.5">Delivery Address</p>
+                <p class="text-[13px] text-brand-dark dark:text-[#e8f5e9] leading-relaxed">{{ $head->shipping_address }}</p>
+            </div>
+        </div>
+    </div>
+    @endif
+
+    @foreach($orders as $order)
     @php
         $statusLabel = match($order->status) {
             'pending'               => 'Pending Payment',
@@ -130,29 +190,12 @@ new class extends Component {
     <div class="bg-white dark:bg-[#162016] border border-brand-border dark:border-[#2a3a2a] rounded-2xl overflow-hidden mb-4">
         <div class="px-5 md:px-6 py-4 border-b border-brand-border dark:border-[#2a3a2a] flex items-center justify-between gap-3">
             <div>
-                <p class="font-montserrat font-bold text-[15px] text-brand-dark dark:text-[#e8f5e9]">{{ $order->reference }}</p>
-                <p class="text-[11px] text-brand-muted mt-0.5">Placed {{ $order->created_at->format('d M Y, g:ia') }}</p>
+                <p class="font-montserrat font-bold text-[15px] text-brand-dark dark:text-[#e8f5e9]">{{ $orders->count() > 1 ? 'Part '.$loop->iteration.' of '.$orders->count().' · ' : '' }}{{ $order->reference }}</p>
+                <p class="text-[11px] text-brand-muted mt-0.5">From {{ $order->items->first()?->vendor?->name ?? 'GadgetPlug' }}</p>
             </div>
             <span class="inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-[0.5px] {{ $statusClass }}">
                 {{ $statusLabel }}
             </span>
-        </div>
-
-        <div class="px-5 md:px-6 py-4 grid grid-cols-2 gap-4 border-b border-brand-border dark:border-[#2a3a2a]">
-            <div>
-                <p class="text-[10px] font-semibold uppercase tracking-[0.6px] text-brand-muted mb-0.5">Payment</p>
-                <p class="text-[13px] font-semibold text-brand-dark dark:text-[#e8f5e9]">
-                    {{ $order->payment_method === 'pay_on_delivery' ? 'Pay on Delivery' : 'Paystack' }}
-                </p>
-            </div>
-            <div>
-                <p class="text-[10px] font-semibold uppercase tracking-[0.6px] text-brand-muted mb-0.5">Total</p>
-                <p class="font-montserrat font-black text-[16px] text-brand">₦{{ number_format($order->total_amount) }}</p>
-            </div>
-            <div class="col-span-2">
-                <p class="text-[10px] font-semibold uppercase tracking-[0.6px] text-brand-muted mb-0.5">Delivery Address</p>
-                <p class="text-[13px] text-brand-dark dark:text-[#e8f5e9] leading-relaxed">{{ $order->shipping_address }}</p>
-            </div>
         </div>
 
         {{-- Items --}}
@@ -242,8 +285,8 @@ new class extends Component {
         </div>
     </div>
     @endif
-
-    @endif
+    <div class="mb-6"></div>
+    @endforeach
 
     {{-- Footer help --}}
     <p class="text-center text-[11px] text-brand-muted mt-6">

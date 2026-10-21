@@ -52,7 +52,7 @@ test('the discount is applied to the subtotal and the order total reflects it', 
         $affiliate,
         [['product' => $product, 'quantity' => 1]],
         'Uyo, Akwa Ibom State — Test Address',
-    );
+    )->orders->sole();
 
     // 20% off 1000 = 800
     expect((float) $order->total_amount)->toBe(800.0)
@@ -114,7 +114,7 @@ test('a reseller purchase creates no affiliate commission', function () {
         $affiliate,
         [['product' => $product, 'quantity' => 1]],
         'Uyo, Akwa Ibom State — Test Address',
-    );
+    )->orders->sole();
 
     expect(AffiliateCommission::where('order_id', $order->id)->exists())->toBeFalse();
 });

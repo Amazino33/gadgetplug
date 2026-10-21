@@ -121,6 +121,13 @@ class Order extends Model
         return $this->hasMany(OrderItem::class);
     }
 
+    // The customer's checkout this vendor order belongs to. Null only for
+    // orders created outside the checkout flow.
+    public function checkout(): BelongsTo
+    {
+        return $this->belongsTo(Checkout::class);
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
