@@ -11,6 +11,7 @@ use App\Models\Order;
 use App\Models\User;
 use App\Services\Affiliate\CommissionService;
 use App\Services\FinancialLedger;
+use App\Services\VendorLink\SupplierPayable;
 use Closure;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -34,7 +35,7 @@ use Throwable;
  *  packed                 pack()                  store (fulfil)         —
  *  shipped (handed over)  handOver()              store (fulfil)         stock leaves the allocated store(s), COGS
  *  delivered              markDelivered()         GadgetPlug (dispatch)  logistics only; affiliate return window starts
- *  cancelled              cancel()                GadgetPlug (dispatch)  release holds; reverse revenue; reject commission
+ *  cancelled              cancel()                GadgetPlug (dispatch)  release holds; reverse revenue and supplier payable; reject commission
  *  (no status change)     recordPaymentReceived() GadgetPlug (dispatch)  POD revenue → Due from GadgetPlug; supplier payable
  *
  * "Delivered" moves no stock and no money: stock leaves at the handover (the
@@ -322,6 +323,7 @@ class OrderStatusService
                 }
 
                 $this->reverseRevenue($order, $actor);
+                $this->reverseSupplierPayable($order, $actor);
 
                 try {
                     app(CommissionService::class)->reject($order, 'order_cancelled');
@@ -388,6 +390,23 @@ class OrderStatusService
         }
 
         return $reason;
+    }
+
+    /**
+     * Undo what the supplier was owed for this order's resold lines: the goods
+     * never went, so nothing is owed. Append-only reversal per charged line;
+     * a line never charged (a pay-on-delivery order cancelled before its
+     * payment) has nothing to reverse.
+     */
+    private function reverseSupplierPayable(Order $order, User $actor): void
+    {
+        foreach ($order->items as $item) {
+            try {
+                app(SupplierPayable::class)->reverseCharge($item, $actor, "Order {$order->reference} cancelled");
+            } catch (Throwable $e) {
+                Log::error("Supplier payable reversal failed for order item {$item->id}: ".$e->getMessage());
+            }
+        }
     }
 
     /**

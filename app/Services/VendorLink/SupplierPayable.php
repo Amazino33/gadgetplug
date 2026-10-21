@@ -79,6 +79,48 @@ class SupplierPayable
         }
     }
 
+    /**
+     * Undo a line's charge because its order was cancelled — the units never
+     * reached a customer, so nothing is owed for them.
+     *
+     * Append-only: a 'reversal' row for the charge's full amount, the charge
+     * itself untouched. Idempotent on the line, like the charge: cancelling
+     * twice reverses once. Null when the line was never charged.
+     */
+    public function reverseCharge(OrderItem $orderItem, ?User $user = null, ?string $note = null): ?SupplierPayableEntry
+    {
+        $charge = SupplierPayableEntry::where('idempotency_key', self::chargeKey($orderItem))->first();
+
+        if (! $charge) {
+            return null;
+        }
+
+        $key = self::reversalKey($orderItem);
+
+        $existing = SupplierPayableEntry::where('idempotency_key', $key)->first();
+
+        if ($existing) {
+            return $existing;
+        }
+
+        try {
+            return SupplierPayableEntry::create([
+                'vendor_id'        => $charge->vendor_id,
+                'supplier_link_id' => $charge->supplier_link_id,
+                'entry_type'       => SupplierPayableEntry::TYPE_REVERSAL,
+                'order_item_id'    => $orderItem->id,
+                'quantity'         => $charge->quantity,
+                'unit_cost'        => $charge->unit_cost,
+                'amount'           => $charge->amount,
+                'user_id'          => $user?->id,
+                'note'             => $note,
+                'idempotency_key'  => $key,
+            ]);
+        } catch (UniqueConstraintViolationException) {
+            return SupplierPayableEntry::where('idempotency_key', $key)->firstOrFail();
+        }
+    }
+
     /** Money handed to the supplier against what is owed. */
     public function pay(
         SupplierLink $link,
@@ -104,31 +146,31 @@ class SupplierPayable
         ]);
     }
 
-    /** Still owed on this link: everything charged, less everything paid. */
+    /** Still owed on this link: everything charged, less reversals and payments. */
     public function balance(SupplierLink $link): float
     {
-        $row = SupplierPayableEntry::where('supplier_link_id', $link->id)
-            ->selectRaw("COALESCE(SUM(CASE WHEN entry_type = ? THEN amount ELSE 0 END), 0) as charged", [SupplierPayableEntry::TYPE_CHARGE])
-            ->selectRaw("COALESCE(SUM(CASE WHEN entry_type = ? THEN amount ELSE 0 END), 0) as paid", [SupplierPayableEntry::TYPE_PAYMENT])
-            ->first();
-
-        return round((float) $row->charged - (float) $row->paid, 2);
+        return $this->summary($link)['balance'];
     }
 
     /**
-     * @return array{charged: float, paid: float, balance: float}
+     * 'charged' is net of reversals — what is owed for goods that actually
+     * went — so charged less paid is the balance. 'reversed' is shown apart.
+     *
+     * @return array{charged: float, reversed: float, paid: float, balance: float}
      */
     public function summary(SupplierLink $link): array
     {
         $row = SupplierPayableEntry::where('supplier_link_id', $link->id)
             ->selectRaw("COALESCE(SUM(CASE WHEN entry_type = ? THEN amount ELSE 0 END), 0) as charged", [SupplierPayableEntry::TYPE_CHARGE])
+            ->selectRaw("COALESCE(SUM(CASE WHEN entry_type = ? THEN amount ELSE 0 END), 0) as reversed", [SupplierPayableEntry::TYPE_REVERSAL])
             ->selectRaw("COALESCE(SUM(CASE WHEN entry_type = ? THEN amount ELSE 0 END), 0) as paid", [SupplierPayableEntry::TYPE_PAYMENT])
             ->first();
 
-        $charged = round((float) $row->charged, 2);
-        $paid    = round((float) $row->paid, 2);
+        $reversed = round((float) $row->reversed, 2);
+        $charged  = round((float) $row->charged - $reversed, 2);
+        $paid     = round((float) $row->paid, 2);
 
-        return ['charged' => $charged, 'paid' => $paid, 'balance' => round($charged - $paid, 2)];
+        return ['charged' => $charged, 'reversed' => $reversed, 'paid' => $paid, 'balance' => round($charged - $paid, 2)];
     }
 
     /** Every supplier this vendor owes, biggest balance first. */
@@ -151,5 +193,11 @@ class SupplierPayable
     public static function chargeKey(OrderItem $orderItem): string
     {
         return 'vendorlink:charge:order_item:'.$orderItem->id;
+    }
+
+    /** The key a cancelled line's reversal is booked under. */
+    public static function reversalKey(OrderItem $orderItem): string
+    {
+        return 'vendorlink:reversal:order_item:'.$orderItem->id;
     }
 }

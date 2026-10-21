@@ -38,7 +38,14 @@ class SupplierPayableEntry extends Model
     /** Money handed to the supplier against what is owed. */
     public const TYPE_PAYMENT = 'payment';
 
-    public const TYPES = [self::TYPE_CHARGE, self::TYPE_PAYMENT];
+    /**
+     * A charge undone because its order was cancelled — the units never went,
+     * so nothing is owed for them. Positive amount, subtracted from the
+     * balance; the charge row itself is never edited.
+     */
+    public const TYPE_REVERSAL = 'reversal';
+
+    public const TYPES = [self::TYPE_CHARGE, self::TYPE_PAYMENT, self::TYPE_REVERSAL];
 
     public function vendor(): BelongsTo
     {
@@ -69,5 +76,10 @@ class SupplierPayableEntry extends Model
     public function scopePayments(Builder $query): Builder
     {
         return $query->where('entry_type', self::TYPE_PAYMENT);
+    }
+
+    public function scopeReversals(Builder $query): Builder
+    {
+        return $query->where('entry_type', self::TYPE_REVERSAL);
     }
 }

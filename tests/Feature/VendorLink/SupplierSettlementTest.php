@@ -299,3 +299,61 @@ function settlementPanel(App\Models\Vendor $vendor, User $user): void
     Filament\Facades\Filament::bootCurrentPanel();
     Filament\Facades\Filament::setTenant($vendor);
 }
+
+describe('cancelling after the debt was booked', function () {
+    test('cancelling a paid order reverses its supplier charge with an append-only entry', function () {
+        ['order' => $order, 'link' => $link, 'item' => $item] = orderForListing(quantity: 2, supplierPrice: 10000);
+        $order->update(['payment_method' => 'paystack']);
+        $service = app(App\Services\Orders\OrderStatusService::class);
+        $service->markPaid($order->fresh());
+
+        expect(app(SupplierPayable::class)->balance($link))->toBe(20000.0);
+
+        $admin = User::factory()->create();
+        Spatie\Permission\Models\Role::firstOrCreate(['name' => 'super_admin', 'guard_name' => 'web', 'team_id' => null]);
+        setPermissionsTeamId(null);
+        $admin->assignRole('super_admin');
+
+        $service->cancel($order->fresh(), $admin, 'Customer refunded');
+
+        $charge   = SupplierPayableEntry::charges()->sole();
+        $reversal = SupplierPayableEntry::reversals()->sole();
+
+        expect(app(SupplierPayable::class)->balance($link))->toBe(0.0)
+            // The charge is history: still there, unchanged.
+            ->and((float) $charge->amount)->toBe(20000.0)
+            ->and((float) $reversal->amount)->toBe(20000.0)
+            ->and($reversal->order_item_id)->toBe($item->id)
+            ->and($reversal->user_id)->toBe($admin->id)
+            ->and(app(SupplierPayable::class)->summary($link))->toBe(['charged' => 0.0, 'reversed' => 20000.0, 'paid' => 0.0, 'balance' => 0.0]);
+    });
+
+    test('a line is reversed once, however often the reversal is asked for', function () {
+        ['order' => $order, 'link' => $link, 'item' => $item] = orderForListing(quantity: 1, supplierPrice: 10000);
+        receiveSupplierOrderPayment($order);
+
+        app(SupplierPayable::class)->reverseCharge($item->fresh());
+        app(SupplierPayable::class)->reverseCharge($item->fresh());
+
+        expect(SupplierPayableEntry::reversals()->count())->toBe(1)
+            ->and(app(SupplierPayable::class)->balance($link))->toBe(0.0);
+    });
+
+    test('a line that was never charged has nothing to reverse', function () {
+        ['item' => $item] = orderForListing();
+
+        expect(app(SupplierPayable::class)->reverseCharge($item))->toBeNull()
+            ->and(SupplierPayableEntry::count())->toBe(0);
+    });
+
+    test('money already paid to him stays paid — the reversal leaves a credit, not a rewrite', function () {
+        ['order' => $order, 'link' => $link, 'item' => $item] = orderForListing(quantity: 1, supplierPrice: 10000);
+        receiveSupplierOrderPayment($order);
+        app(SupplierPayable::class)->pay($link, 10000);
+
+        app(SupplierPayable::class)->reverseCharge($item->fresh());
+
+        expect(app(SupplierPayable::class)->balance($link))->toBe(-10000.0)
+            ->and(SupplierPayableEntry::payments()->count())->toBe(1);
+    });
+});

@@ -144,10 +144,16 @@ class SupplierPayablePage extends Page implements HasTable
                 Tables\Columns\TextColumn::make('entry_type')
                     ->label('Entry')
                     ->badge()
-                    ->color(fn (string $state) => $state === SupplierPayableEntry::TYPE_CHARGE ? 'warning' : 'success')
-                    ->formatStateUsing(fn (string $state) => $state === SupplierPayableEntry::TYPE_CHARGE
-                        ? 'Owed'
-                        : 'Paid'),
+                    ->color(fn (string $state) => match ($state) {
+                        SupplierPayableEntry::TYPE_CHARGE   => 'warning',
+                        SupplierPayableEntry::TYPE_REVERSAL => 'gray',
+                        default                             => 'success',
+                    })
+                    ->formatStateUsing(fn (string $state) => match ($state) {
+                        SupplierPayableEntry::TYPE_CHARGE   => 'Owed',
+                        SupplierPayableEntry::TYPE_REVERSAL => 'Cancelled order',
+                        default                             => 'Paid',
+                    }),
 
                 Tables\Columns\TextColumn::make('quantity')
                     ->label('Units')
