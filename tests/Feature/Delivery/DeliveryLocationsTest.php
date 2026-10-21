@@ -279,9 +279,59 @@ describe('checkout', function () {
     });
 });
 
-describe('until Phase 5, each part\'s message stands on its own', function () {
-    test('a mixed checkout\'s customer messages each list only that part\'s items and total', function () {
-        config(['services.messaging.whatsapp_driver' => 'log_null']);
+describe('the customer confirmation shows the delivery fee', function () {
+    beforeEach(fn () => config(['services.messaging.whatsapp_driver' => 'log_null']));
+
+    function confirmationFor(Order $order): string
+    {
+        return DeliveryMessage::where('order_id', $order->id)->where('recipient_type', 'customer')->sole()->body;
+    }
+
+    test('pay on delivery: items, delivery fee and the total to pay', function () {
+        DeliveryRule::setForLga(lga('Ikot Ekpene'), ['mode' => 'fee', 'fee' => 1500]);
+        $vendor = deliveryVendor();
+        MessageTemplateSeeder::forVendor($vendor);
+
+        deliveryCheckout([[deliveryProduct($vendor, 10000), 2]], lga('Ikot Ekpene'))->call('processCheckout');
+
+        expect(confirmationFor(Order::sole()))
+            ->toContain('*Items:* ₦20,000.00')
+            ->toContain('*Delivery:* ₦1,500.00')
+            ->toContain('*Total to pay:* ₦21,500.00')
+            ->not->toContain('*Total:*');
+    });
+
+    test('Paystack: the same lines, as total paid', function () {
+        config(['services.paystack.secret_key' => 'sk_test_delivery']);
+        DeliveryRule::setForLga(lga('Ikot Ekpene'), ['mode' => 'fee', 'fee' => 1500]);
+        $vendor = deliveryVendor();
+        MessageTemplateSeeder::forVendor($vendor);
+        Http::fake(['api.paystack.co/transaction/initialize' => Http::response(['status' => true, 'data' => ['authorization_url' => 'https://checkout.paystack.com/x']])]);
+        deliveryCheckout([[deliveryProduct($vendor, 10000), 1]], lga('Ikot Ekpene'), 'paystack')->call('processCheckout');
+        $checkout = Checkout::sole();
+
+        Http::fake(['api.paystack.co/transaction/verify/*' => Http::response(['status' => true, 'data' => [
+            'status' => 'success', 'amount' => 1150000, 'currency' => 'NGN', 'reference' => $checkout->reference,
+        ]])]);
+        $this->get(route('payment.callback', ['reference' => $checkout->reference]));
+
+        expect(confirmationFor(Order::sole()))
+            ->toContain('*Items:* ₦10,000.00')
+            ->toContain('*Delivery:* ₦1,500.00')
+            ->toContain('*Total paid:* ₦11,500.00');
+    });
+
+    test('a free delivery says so', function () {
+        $vendor = deliveryVendor();
+        MessageTemplateSeeder::forVendor($vendor);
+
+        deliveryCheckout([[deliveryProduct($vendor, 10000), 1]], lga('Uyo'))->call('processCheckout');
+
+        expect(confirmationFor(Order::sole()))->toContain('*Delivery:* Free')->toContain('*Total to pay:* ₦10,000.00');
+    });
+
+    test('mixed checkout: only REF-1 carries the fee and the grand total; the other parts point at it', function () {
+        DeliveryRule::setForLga(lga('Ikot Ekpene'), ['mode' => 'fee', 'fee' => 1500]);
         $a = deliveryVendor('Alpha');
         $b = deliveryVendor('Beta');
         foreach ([$a, $b] as $v) {
@@ -292,16 +342,35 @@ describe('until Phase 5, each part\'s message stands on its own', function () {
         $pa->update(['name' => 'ALPHA THING']);
         $pb->update(['name' => 'BETA THING']);
 
-        deliveryCheckout([[$pa, 1], [$pb, 1]], lga('Uyo'))->call('processCheckout');
+        deliveryCheckout([[$pa, 1], [$pb, 1]], lga('Ikot Ekpene'))->call('processCheckout');
 
         [$first, $second] = Checkout::sole()->orders->all();
-        $msgA = DeliveryMessage::where('order_id', $first->id)->where('recipient_type', 'customer')->sole()->body;
-        $msgB = DeliveryMessage::where('order_id', $second->id)->where('recipient_type', 'customer')->sole()->body;
+        $msgA = confirmationFor($first);
+        $msgB = confirmationFor($second);
 
-        expect($msgA)->toContain('ALPHA THING')->toContain('₦10,000.00')->toContain($first->reference)
-            ->not->toContain('BETA THING')->not->toContain('₦50,000')
-            ->and($msgB)->toContain('BETA THING')->toContain('₦40,000.00')->toContain($second->reference)
-            ->not->toContain('ALPHA THING');
+        expect($first->reference)->toEndWith('-1')
+            ->and($msgA)->toContain('ALPHA THING')->not->toContain('BETA THING')
+            ->toContain('*Items (this part):* ₦10,000.00')
+            ->toContain('*Delivery (whole order):* ₦1,500.00')
+            ->toContain('*Total to pay (whole order, all 2 parts):* ₦51,500.00')
+            ->and($msgB)->toContain('BETA THING')->not->toContain('ALPHA THING')
+            ->toContain('*Items (this part):* ₦40,000.00')
+            ->toContain('*Total to pay for this part:* ₦40,000.00')
+            ->toContain('Delivery fee is on '.$first->reference.'.')
+            ->not->toContain('₦1,500')
+            ->not->toContain('₦51,500');
+    });
+
+    test('vendors\' stored copies of the template are switched to the new lines; customised ones are left alone', function () {
+        $vendor = deliveryVendor();
+        $old = "Hello\n\n*Your items*\n{{order_items}}\n\n*Total:* {{total}}\n*Payment:* {{payment_method}}";
+        $stored = App\Models\MessageTemplate::create(['vendor_id' => $vendor->id, 'key' => 'customer_received', 'recipient_type' => 'customer', 'channel' => 'whatsapp', 'body' => $old]);
+        $custom = App\Models\MessageTemplate::create(['vendor_id' => deliveryVendor()->id, 'key' => 'customer_received', 'recipient_type' => 'customer', 'channel' => 'whatsapp', 'body' => 'Custom {{order_items}}']);
+
+        (require database_path('migrations/2026_10_21_120000_add_payment_summary_to_customer_received_template.php'))->up();
+
+        expect($stored->fresh()->body)->toContain('{{payment_summary}}')->not->toContain('*Total:* {{total}}')
+            ->and($custom->fresh()->body)->toBe('Custom {{order_items}}');
     });
 });
 

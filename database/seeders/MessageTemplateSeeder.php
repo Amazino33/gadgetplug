@@ -23,7 +23,7 @@ class MessageTemplateSeeder extends Seeder
                 'key'            => 'customer_received',
                 'recipient_type' => 'customer',
                 'channel'        => 'whatsapp',
-                'body'           => "Hello {{customer_name}} 👋\n\nThank you for shopping with GadgetPlug! We have received your order *{{order_number}}*.\n\n*Your items*\n{{order_items}}\n\n*Total:* {{total}}\n*Payment:* {{payment_method}}\n*Deliver to:* {{delivery_address}}\n\n{{rider_line}}\n\nWe truly appreciate your business 💚\n— GadgetPlug",
+                'body'           => "Hello {{customer_name}} 👋\n\nThank you for shopping with GadgetPlug! We have received your order *{{order_number}}*.\n\n*Your items*\n{{order_items}}\n\n{{payment_summary}}\n*Payment:* {{payment_method}}\n*Deliver to:* {{delivery_address}}\n\n{{rider_line}}\n\nWe truly appreciate your business 💚\n— GadgetPlug",
             ],
             [
                 'key'            => 'customer_confirmed',

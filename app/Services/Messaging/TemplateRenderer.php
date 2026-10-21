@@ -46,7 +46,59 @@ class TemplateRenderer
             'order_items'      => self::itemLines($order, $audience),
             'item_count'       => (string) self::itemCount($order),
             'payment_method'   => self::paymentMethod($order),
+            'payment_summary'  => self::paymentSummary($order),
         ];
+    }
+
+    /**
+     * The money lines of a customer message: what the items come to, the
+     * delivery fee, and what is paid (or still to pay at the door).
+     *
+     * The delivery fee belongs to the checkout, not to any vendor's order. In a
+     * checkout split across vendors, the first part (REF-1) carries the fee and
+     * the whole checkout's total; every other part shows its own items and
+     * points at REF-1 for the fee — so the fee is never counted twice.
+     */
+    public static function paymentSummary(Order $order): string
+    {
+        $checkout = $order->checkout;
+        $prepaid  = in_array($order->payment_method, ['paystack', 'wallet'], true);
+        $label    = $prepaid ? 'Total paid' : 'Total to pay';
+        $items    = (float) $order->total_amount;
+
+        // An order created outside the checkout flow has no fee to show.
+        if (! $checkout) {
+            return '*Items:* '.self::naira($items)."
+*{$label}:* ".self::naira($items);
+        }
+
+        $parts = $checkout->orders()->orderBy('id')->get(['id', 'reference']);
+        $fee   = (float) $checkout->delivery_fee;
+        $feeText = $fee > 0 ? self::naira($fee) : 'Free';
+
+        if ($parts->count() <= 1) {
+            return '*Items:* '.self::naira($items)
+                ."
+*Delivery:* {$feeText}"
+                ."
+*{$label}:* ".self::naira((float) $checkout->grand_total);
+        }
+
+        $first = $parts->first();
+
+        if ($first->id === $order->id) {
+            return '*Items (this part):* '.self::naira($items)
+                ."
+*Delivery (whole order):* {$feeText}"
+                ."
+*{$label} (whole order, all ".$parts->count().' parts):* '.self::naira((float) $checkout->grand_total);
+        }
+
+        return '*Items (this part):* '.self::naira($items)
+            ."
+*{$label} for this part:* ".self::naira($items)
+            ."
+Delivery fee is on {$first->reference}.";
     }
 
     // Itemised list for the message body, one line per product:
