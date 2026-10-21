@@ -2,6 +2,7 @@
 
 namespace App\Filament\Vendor\Resources\OrderItems\Tables;
 
+use App\Services\Orders\OrderStatusService;
 use App\Filament\Vendor\Resources\Orders\OrderResource;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
@@ -27,18 +28,9 @@ class OrderItemsTable
                 TextColumn::make('order.status')
                     ->label('Order Status')
                     ->badge()
-                    ->formatStateUsing(fn ($state) => match ($state) {
-                        'pending'               => 'Pending',
-                        'confirmed'             => 'Confirmed',
-                        'paid'                  => 'Paid',
-                        'shipped'               => 'Dispatched',
-                        'delivered'             => 'Delivered',
-                        'cancelled'             => 'Cancelled',
-                        'paid_but_failed_stock' => 'Stock Issue',
-                        default                 => ucfirst((string) $state),
-                    })
+                    ->formatStateUsing(fn ($state) => OrderStatusService::LABELS[$state] ?? ucfirst((string) $state))
                     ->color(fn ($state) => match ($state) {
-                        'confirmed'                          => 'info',
+                        'confirmed', 'packed'                => 'info',
                         'paid', 'delivered'                  => 'success',
                         'shipped'                            => 'warning',
                         'cancelled', 'paid_but_failed_stock' => 'danger',
@@ -98,15 +90,7 @@ class OrderItemsTable
             ->filters([
                 SelectFilter::make('order_status')
                     ->label('Order Status')
-                    ->options([
-                        'pending'               => 'Pending',
-                        'confirmed'             => 'Confirmed',
-                        'paid'                  => 'Paid',
-                        'shipped'               => 'Dispatched',
-                        'delivered'             => 'Delivered',
-                        'cancelled'             => 'Cancelled',
-                        'paid_but_failed_stock' => 'Stock Issue',
-                    ])
+                    ->options(OrderStatusService::LABELS)
                     ->query(fn ($query, array $data) => $query->when(
                         $data['value'],
                         fn ($q, $status) => $q->whereHas('order', fn ($q2) => $q2->where('status', $status))

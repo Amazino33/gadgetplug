@@ -5,6 +5,7 @@ namespace App\Actions\Payment;
 use App\Actions\Inventory\ReserveStockAction;
 use App\Models\Checkout;
 use App\Models\Order;
+use App\Services\Orders\OrderStatusService;
 use App\Services\Payment\PaystackClient;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -120,13 +121,15 @@ class ConfirmPaystackPaymentAction
                 } catch (Throwable $e) {
                     Log::error("Stock reservation failed after payment for order {$order->id}: ".$e->getMessage());
 
-                    $order->update(['status' => 'paid_but_failed_stock']);
+                    app(OrderStatusService::class)->markPaidButFailedStock($order);
                     $anyFailed = true;
 
                     continue;
                 }
 
-                $order->update(['status' => 'paid']);
+                // Revenue into Due from GadgetPlug, per vendor order, with any
+                // supplier payable — the service books both with the status.
+                app(OrderStatusService::class)->markPaid($order);
             }
 
             return $anyFailed ? self::FAILED_STOCK : self::PAID;

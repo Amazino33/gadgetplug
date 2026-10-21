@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Orders;
 
 use App\Models\Order;
 use App\Models\Vendor;
+use App\Services\Orders\OrderStatusService;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Resources\Resource;
@@ -66,18 +67,9 @@ class OrderResource extends Resource
 
                 TextColumn::make('status')
                     ->badge()
-                    ->formatStateUsing(fn ($state) => match ($state) {
-                        'pending'               => 'Pending',
-                        'confirmed'             => 'Confirmed',
-                        'paid'                  => 'Paid',
-                        'shipped'               => 'Dispatched',
-                        'delivered'             => 'Delivered',
-                        'cancelled'             => 'Cancelled',
-                        'paid_but_failed_stock' => 'Stock Issue',
-                        default                 => ucfirst($state),
-                    })
+                    ->formatStateUsing(fn ($state) => OrderStatusService::LABELS[$state] ?? ucfirst((string) $state))
                     ->color(fn ($state) => match ($state) {
-                        'confirmed'                          => 'info',
+                        'confirmed', 'packed'                => 'info',
                         'paid', 'delivered'                  => 'success',
                         'shipped'                            => 'warning',
                         'cancelled', 'paid_but_failed_stock' => 'danger',
@@ -102,15 +94,7 @@ class OrderResource extends Resource
             ->defaultSort('created_at', 'desc')
             ->filters([
                 SelectFilter::make('status')
-                    ->options([
-                        'pending'               => 'Pending',
-                        'confirmed'             => 'Confirmed',
-                        'paid'                  => 'Paid',
-                        'shipped'               => 'Dispatched',
-                        'delivered'             => 'Delivered',
-                        'cancelled'             => 'Cancelled',
-                        'paid_but_failed_stock' => 'Stock Issue',
-                    ]),
+                    ->options(OrderStatusService::LABELS),
 
                 SelectFilter::make('vendor_id')
                     ->label('Store')

@@ -3,12 +3,16 @@
 namespace App\Filament\Vendor\Resources\Orders\Tables;
 
 use App\Models\Order;
+use App\Services\Orders\InvalidOrderTransition;
+use App\Services\Orders\OrderStatusService;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\Select;
+use Filament\Notifications\Notification;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Auth\Access\AuthorizationException;
 
 class OrdersTable
 {
@@ -55,20 +59,12 @@ class OrdersTable
 
                 TextColumn::make('status')
                     ->badge()
-                    ->formatStateUsing(fn($state) => match($state) {
-                        'pending'               => 'Pending',
-                        'confirmed'             => 'Confirmed',
-                        'paid'                  => 'Paid',
-                        'shipped'               => 'Dispatched',
-                        'delivered'             => 'Delivered',
-                        'cancelled'             => 'Cancelled',
-                        'paid_but_failed_stock' => 'Stock Issue',
-                        default                 => ucfirst($state),
-                    })
+                    ->formatStateUsing(fn($state) => OrderStatusService::LABELS[$state] ?? ucfirst($state))
                     ->color(fn($state) => match($state) {
                         'pending'               => 'gray',
                         'confirmed'             => 'info',
                         'paid'                  => 'success',
+                        'packed'                => 'info',
                         'shipped'               => 'warning',
                         'delivered'             => 'success',
                         'cancelled'             => 'danger',
@@ -89,14 +85,7 @@ class OrdersTable
             ->defaultSort('created_at', 'desc')
             ->filters([
                 SelectFilter::make('status')
-                    ->options([
-                        'pending'   => 'Pending',
-                        'confirmed' => 'Confirmed',
-                        'paid'      => 'Paid',
-                        'shipped'   => 'Dispatched',
-                        'delivered' => 'Delivered',
-                        'cancelled' => 'Cancelled',
-                    ]),
+                    ->options(OrderStatusService::LABELS),
                 SelectFilter::make('payment_method')
                     ->label('Payment')
                     ->options([
@@ -111,50 +100,22 @@ class OrdersTable
                     ->icon('heroicon-o-arrow-path')
                     ->color('warning')
                     ->schema([
+                        // The store's steps only — see OrderStatusService.
                         Select::make('status')
                             ->label('New Status')
-                            ->options(fn(Order $record) => match($record->status) {
-                                'pending', 'confirmed' => [
-                                    'shipped'   => 'Mark as Dispatched',
-                                    'cancelled' => 'Cancel Order',
-                                ],
-                                'paid' => [
-                                    'shipped'   => 'Mark as Dispatched',
-                                    'cancelled' => 'Cancel Order',
-                                ],
-                                'shipped' => [
-                                    'delivered' => 'Mark as Delivered',
-                                    'cancelled' => 'Cancel Order',
-                                ],
-                                default => [],
-                            })
+                            ->options(fn(Order $record) => OrderStatusService::storeOptionsFor($record))
                             ->live()
                             ->required(),
-
-                        // Without this, marking a pay-on-delivery order delivered
-                        // from the list left the observer with no channel to post
-                        // to, so the sale showed on the Sales Report and never
-                        // reached the Financial Report. Asked here for the same
-                        // reason the order page asks it.
-                        Select::make('payment_channel')
-                            ->label('How did the customer pay on delivery?')
-                            ->options(['cash' => 'Cash', 'bank_transfer' => 'Bank Transfer'])
-                            ->required()
-                            ->helperText('The full order amount is added to whichever account you pick, as money received — once, right now.')
-                            ->visible(fn(Order $record, $get) => $get('status') === 'delivered'
-                                && $record->payment_method === 'pay_on_delivery'
-                                && ! $record->isRevenueRecognized()),
                     ])
                     ->action(function (Order $record, array $data): void {
-                        $update = ['status' => $data['status']];
-
-                        if (filled($data['payment_channel'] ?? null)) {
-                            $update['payment_channel'] = $data['payment_channel'];
+                        try {
+                            OrderStatusService::applyStoreStep($record, auth()->user(), $data['status']);
+                        } catch (InvalidOrderTransition|AuthorizationException $e) {
+                            Notification::make()->title($e instanceof AuthorizationException ? 'Only staff of the store holding this order can update it.' : $e->getMessage())->danger()->send();
                         }
-
-                        $record->update($update);
                     })
-                    ->visible(fn(Order $record) => !in_array($record->status, ['delivered', 'cancelled', 'paid_but_failed_stock'])),
+                    ->visible(fn(Order $record) => OrderStatusService::storeOptionsFor($record) !== []
+                        && auth()->user()->can('fulfil', $record)),
             ]);
     }
 }

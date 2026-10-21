@@ -44,6 +44,15 @@ class VendorPayoutsTable
                     })
                     ->sortable(),
 
+                // Old-rule requests were drawn on "earned from paid and
+                // delivered orders" and move nothing in the books when paid;
+                // new ones are drawn on collected money (Due from GadgetPlug).
+                TextColumn::make('funded_from')
+                    ->label('Rule')
+                    ->badge()
+                    ->formatStateUsing(fn (?string $state) => $state === VendorPayout::FUNDED_GADGETPLUG_DUE ? 'Collected money' : 'Old rule')
+                    ->color(fn (?string $state) => $state === VendorPayout::FUNDED_GADGETPLUG_DUE ? 'success' : 'gray'),
+
                 TextColumn::make('created_at')
                     ->label('Requested')
                     ->dateTime('d M Y, H:i')
@@ -95,11 +104,7 @@ class VendorPayoutsTable
                             ->required(),
                     ])
                     ->action(function (VendorPayout $record, array $data) {
-                        $record->update([
-                            'status'      => 'paid',
-                            'admin_notes' => $data['admin_notes'],
-                            'settled_at'  => now(),
-                        ]);
+                        $record->markPaid($data['admin_notes'], auth()->id());
                         Notification::make()->title('Marked as paid')->success()->send();
                     }),
 

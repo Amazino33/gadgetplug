@@ -2,7 +2,6 @@
 
 namespace App\Filament\Vendor\Pages;
 
-use App\Models\OrderItem;
 use App\Models\VendorPayout;
 use Filament\Schemas\Components\Placeholder;
 use Filament\Schemas\Components\Section;
@@ -18,7 +17,6 @@ use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\DB;
 
 class PayoutsPage extends Page implements HasTable
 {
@@ -45,22 +43,24 @@ class PayoutsPage extends Page implements HasTable
     {
         $vendor = filament()->getTenant();
 
-        $earned = OrderItem::where('vendor_id', $vendor->id)
-            ->whereHas('order', fn($q) => $q->whereIn('status', ['paid', 'delivered']))
-            ->sum(DB::raw('quantity * unit_price'));
+        // Only money GadgetPlug has actually collected can be withdrawn: the
+        // Due from GadgetPlug balance (VendorPayout::balanceFor). Order status
+        // alone no longer counts — a delivered pay-on-delivery order is not
+        // money until its payment is recorded.
+        $balance = VendorPayout::balanceFor($vendor->id);
 
         $paid = VendorPayout::where('vendor_id', $vendor->id)
-            ->whereIn('status', ['approved', 'paid'])
+            ->where('status', 'paid')
             ->sum('amount');
 
         $pending = VendorPayout::where('vendor_id', $vendor->id)
-            ->where('status', 'pending')
+            ->whereIn('status', ['pending', 'approved'])
             ->sum('amount');
 
-        $this->totalEarned      = (float) $earned;
+        $this->totalEarned      = $balance['collected'];
         $this->totalPaid        = (float) $paid;
         $this->totalPending     = (float) $pending;
-        $this->availableBalance = max(0, $this->totalEarned - $this->totalPaid - $this->totalPending);
+        $this->availableBalance = $balance['available'];
 
         $this->form->fill([
             'bank_name'      => $vendor->bank_name ?? '',
@@ -80,7 +80,7 @@ class PayoutsPage extends Page implements HasTable
                             ->label('Amount to Withdraw (₦)')
                             ->numeric()
                             ->required()
-                            ->minValue(500)
+                            ->minValue(VendorPayout::MINIMUM)
                             ->maxValue(fn() => $this->availableBalance)
                             ->helperText(fn() => 'Available: ₦' . number_format($this->availableBalance, 2)),
 
@@ -153,7 +153,10 @@ class PayoutsPage extends Page implements HasTable
         $data   = $this->form->getState();
         $vendor = filament()->getTenant();
 
-        if ($this->availableBalance < 500) {
+        // Recomputed now, not trusted from when the page loaded.
+        $this->availableBalance = VendorPayout::balanceFor($vendor->id)['available'];
+
+        if ($this->availableBalance < VendorPayout::MINIMUM) {
             Notification::make()
                 ->title('Insufficient balance')
                 ->body('Your available balance is below the minimum withdrawal of ₦500.')
@@ -186,6 +189,7 @@ class PayoutsPage extends Page implements HasTable
             'account_number' => $vendor->account_number,
             'account_name'   => $vendor->account_name,
             'status'         => 'pending',
+            'funded_from'    => VendorPayout::FUNDED_GADGETPLUG_DUE,
         ]);
 
         // Refresh balance stats

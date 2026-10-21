@@ -13,12 +13,15 @@ use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
- * When goods reach the customer, book what the supplier is owed for them.
+ * Book what the supplier is owed for an order's resold lines.
  *
- * At delivery, not at order. A pay-on-delivery order that never arrives — the
- * race where the supplier sells the last unit from his own counter first — is
- * cancelled with nothing paid by anybody, so it must leave no debt and no cost
- * behind it. Booking at checkout would create both for goods that never moved.
+ * At the moment the order's revenue is booked — OrderStatusService calls this
+ * right after recognising it: a Paystack order when it is paid, a
+ * pay-on-delivery order when GadgetPlug records the money received. Revenue
+ * and the cost of earning it land together, on either channel. A
+ * pay-on-delivery order that never arrives — the race where the supplier sells
+ * the last unit from his own counter first — is cancelled before any money is
+ * received, so it leaves no debt and no cost behind it.
  *
  * The supplier's price is frozen onto the ledger row here and never recomputed.
  * He will change it again; what he charged for these units on the day they were

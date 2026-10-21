@@ -61,6 +61,19 @@ function actAsAutomationVendor(array $data): void
     Filament::setTenant($data['vendor']);
 }
 
+// Delivered and cancelled are GadgetPlug's to record, from the admin panel.
+function actAsAutomationAdmin(): void
+{
+    $admin = User::factory()->create();
+    Spatie\Permission\Models\Role::firstOrCreate(['name' => 'super_admin', 'guard_name' => 'web', 'team_id' => null]);
+    setPermissionsTeamId(null);
+    $admin->assignRole('super_admin');
+
+    test()->actingAs($admin);
+    Filament::setCurrentPanel(Filament::getPanel('admin'));
+    Filament::bootCurrentPanel();
+}
+
 test('advancing status to shipped auto-sends the customer_dispatched template', function () {
     $data = setUpAutomationOrderVendor('paid');
     MessageTemplate::create([
@@ -99,12 +112,10 @@ test('advancing status to delivered auto-sends the customer_delivered template',
         'body' => 'Hi {{customer_name}}, order {{order_number}} delivered. Thanks!',
     ]);
 
-    actAsAutomationVendor($data);
+    actAsAutomationAdmin();
 
-    Livewire::test(ViewOrder::class, ['record' => $data['order']->getRouteKey()])
-        ->mountAction('updateStatus')
-        ->setActionData(['status' => 'delivered', 'notify_customer' => true])
-        ->callMountedAction()
+    Livewire::test(App\Filament\Resources\Orders\Pages\ViewOrder::class, ['record' => $data['order']->getRouteKey()])
+        ->callAction('markDelivered', data: ['reason' => 'Customer confirmed', 'notify_customer' => true])
         ->assertHasNoActionErrors();
 
     $message = DeliveryMessage::where('order_id', $data['order']->id)->where('recipient_type', 'customer')->first();
@@ -174,12 +185,10 @@ test('an inactive template is never used for automatic customer notification', f
 
 test('cancelling an order never sends a customer message regardless of the notify toggle', function () {
     $data = setUpAutomationOrderVendor('paid');
-    actAsAutomationVendor($data);
+    actAsAutomationAdmin();
 
-    Livewire::test(ViewOrder::class, ['record' => $data['order']->getRouteKey()])
-        ->mountAction('updateStatus')
-        ->setActionData(['status' => 'cancelled'])
-        ->callMountedAction()
+    Livewire::test(App\Filament\Resources\Orders\Pages\ViewOrder::class, ['record' => $data['order']->getRouteKey()])
+        ->callAction('cancelOrder', data: ['reason' => 'Customer asked'])
         ->assertHasNoActionErrors();
 
     expect(DeliveryMessage::where('order_id', $data['order']->id)->exists())->toBeFalse()

@@ -2,7 +2,6 @@
 
 namespace App\Filament\Vendor\Resources\Orders\Pages;
 
-use App\Actions\Finance\RecognizeOrderRevenueAction;
 use App\Filament\Vendor\Resources\Orders\OrderResource;
 use App\Models\DeliveryMessage;
 use App\Models\FinancialAccount;
@@ -11,6 +10,8 @@ use App\Models\Order;
 use App\Services\FinancialLedger;
 use App\Services\Messaging\MessagingService;
 use App\Services\Messaging\TemplateRenderer;
+use App\Services\Orders\InvalidOrderTransition;
+use App\Services\Orders\OrderStatusService;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -18,6 +19,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
+use Illuminate\Auth\Access\AuthorizationException;
 
 class ViewOrder extends ViewRecord
 {
@@ -32,6 +34,9 @@ class ViewOrder extends ViewRecord
                 ->color('info')
                 ->url(fn () => 'tel:'.$this->record->customer_phone),
 
+            // The store's part only: pack, then hand to the rider. Delivered,
+            // cancelled and "payment received" are GadgetPlug's to record (admin
+            // panel); stock and money move inside OrderStatusService.
             Action::make('updateStatus')
                 ->label('Update Status')
                 ->icon('heroicon-o-arrow-path')
@@ -39,16 +44,7 @@ class ViewOrder extends ViewRecord
                 ->schema([
                     Select::make('status')
                         ->label('New Status')
-                        ->options(fn () => match ($this->record->status) {
-                            'pending', 'confirmed', 'paid' => [
-                                'shipped' => 'Hand to Logistics / Rider',
-                                'cancelled' => 'Cancel Order',
-                            ],
-                            'shipped' => [
-                                'delivered' => 'Mark as Delivered',
-                            ],
-                            default => [],
-                        })
+                        ->options(fn () => OrderStatusService::storeOptionsFor($this->record))
                         ->live()
                         ->required(),
 
@@ -56,95 +52,27 @@ class ViewOrder extends ViewRecord
                         ->label('Notify customer')
                         ->helperText('Sends the matching customer update automatically. Turn off to change status silently.')
                         ->default(true)
-                        ->visible(fn ($get) => in_array($get('status'), ['shipped', 'delivered'])),
-
-                    Select::make('payment_channel')
-                        ->label('How did the customer pay on delivery?')
-                        ->options(['cash' => 'Cash', 'bank_transfer' => 'Bank Transfer'])
-                        ->required()
-                        ->helperText('The full order amount will be added to whichever account you pick here, as money received — this only happens once, right now.')
-                        ->visible(fn ($get) => $get('status') === 'delivered' && $this->record->payment_method === 'pay_on_delivery'),
+                        ->visible(fn ($get) => $get('status') === 'shipped'),
                 ])
                 ->action(function (array $data): void {
-                    $newStatus = $data['status'];
-                    $order = $this->record;
-
-                    // Physical stock deduction (on 'shipped') and reservation release (on
-                    // 'cancelled') now happen centrally in OrderObserver::updated(), so
-                    // they apply no matter which UI changed the status — not just here.
-                    // Revenue recognition (Prompt 4) is centralized there too; this only
-                    // captures the channel a POD delivery needs it to act on.
-                    $order->skipCustomerNotification = ! ($data['notify_customer'] ?? true);
-
-                    $update = ['status' => $newStatus];
-
-                    if ($newStatus === 'delivered' && $order->payment_method === 'pay_on_delivery' && ! $order->isRevenueRecognized()) {
-                        $update['payment_channel'] = $data['payment_channel'] ?? null;
-                    }
-
-                    $order->update($update);
-                    $this->refreshFormData(['status']);
-
-                    Notification::make()
-                        ->title(match ($newStatus) {
-                            'shipped' => 'Order handed to rider — stock deducted',
-                            'delivered' => 'Order marked as delivered',
-                            'cancelled' => 'Order cancelled — stock released',
-                            default => 'Status updated',
-                        })
-                        ->success()
-                        ->send();
-                })
-                ->visible(fn () => ! in_array($this->record->status, ['delivered', 'cancelled', 'paid_but_failed_stock'])),
-
-            // The recovery path for money that was earned but never recorded: an
-            // order marked delivered from the orders list (or by an older build
-            // that never asked how the customer paid) sits at 'delivered' with no
-            // revenue_recognized_at, so it shows on the Sales Report but not in
-            // the Financial Report. This is how the owner closes that gap without
-            // touching the ledger by hand. Hidden the moment revenue is
-            // recognized, so it can never be used to count one sale twice.
-            Action::make('recordPaymentReceived')
-                ->label('Record Payment Received')
-                ->icon('heroicon-o-banknotes')
-                ->color('success')
-                ->requiresConfirmation()
-                ->modalHeading('Record Payment Received')
-                ->modalDescription(fn () => 'Adds ₦'.number_format((float) $this->record->total_amount, 2).' to the account you pick, as money received on this order. Do this only if the customer has actually paid — it happens once and cannot be undone from here.')
-                ->schema([
-                    Select::make('payment_channel')
-                        ->label('How did the customer pay?')
-                        ->options(['cash' => 'Cash', 'bank_transfer' => 'Bank Transfer'])
-                        ->required()
-                        ->helperText('Cash goes to your cash account, bank transfer to your bank account.'),
-                ])
-                ->visible(fn () => in_array($this->record->status, ['paid', 'delivered'], true)
-                    && ! $this->record->isRevenueRecognized()
-                    && auth()->user()->hasVendorPermission(filament()->getTenant()->id, 'manage_financial_accounts'))
-                ->action(function (array $data): void {
-                    $reason = app(RecognizeOrderRevenueAction::class)
-                        ->execute($this->record, $data['payment_channel']);
-
-                    if ($reason !== null) {
-                        Notification::make()
-                            ->title(match ($reason) {
-                                'already_recognized' => 'This order was already counted — nothing changed.',
-                                'no_account'         => 'No matching account. Create a cash and a bank account under Financial Accounts first.',
-                                default              => 'Could not record this payment. Try again, or contact support if it keeps failing.',
-                            })
-                            ->warning()
-                            ->send();
+                    try {
+                        OrderStatusService::applyStoreStep($this->record, auth()->user(), $data['status'], $data['notify_customer'] ?? true);
+                    } catch (InvalidOrderTransition|AuthorizationException $e) {
+                        Notification::make()->title($e instanceof AuthorizationException ? 'Only staff of the store holding this order can update it.' : $e->getMessage())->danger()->send();
 
                         return;
                     }
 
-                    $this->refreshFormData(['payment_channel', 'revenue_recognized_at']);
+                    $this->record->refresh();
+                    $this->refreshFormData(['status']);
 
                     Notification::make()
-                        ->title('Payment recorded — this order now counts in the Financial Report.')
+                        ->title($data['status'] === 'shipped' ? 'Order handed to rider — stock deducted' : 'Order marked as packed')
                         ->success()
                         ->send();
-                }),
+                })
+                ->visible(fn () => OrderStatusService::storeOptionsFor($this->record) !== []
+                    && auth()->user()->can('fulfil', $this->record)),
 
             Action::make('assignLogistics')
                 ->label('Assign & Notify Rider')
@@ -245,7 +173,7 @@ class ViewOrder extends ViewRecord
                 ->schema([
                     Select::make('financial_account_id')
                         ->label('Paid From')
-                        ->options(fn () => FinancialAccount::where('vendor_id', filament()->getTenant()->id)->pluck('name', 'id'))
+                        ->options(fn () => FinancialAccount::where('vendor_id', filament()->getTenant()->id)->spendable()->pluck('name', 'id'))
                         ->searchable()
                         ->required(),
                 ])

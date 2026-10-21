@@ -14,11 +14,10 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
 // The Order Items page has its own "Update Status" action, entirely separate
-// from the Orders list and the order's own detail page — before this fix it
-// was the one remaining way to mark a pay-on-delivery order "delivered"
-// without ever being asked how the customer paid, so the sale would sit
-// forever off the Financial Report with no error to explain why. Mirrors
-// RevenueRecognitionTest's coverage of the same behavior on ListOrders.
+// from the Orders list and the order's own detail page. Since the status
+// service (Prompt 3, Phase 3) it offers the store's steps only — packed and
+// handed to rider. Delivered and the money received are GadgetPlug's to record
+// from the admin panel, so nothing here can recognise revenue.
 uses(RefreshDatabase::class);
 
 function setUpOrderItemRevenueVendor(): array
@@ -68,34 +67,40 @@ function actAsOrderItemRevenueOwner(array $data): void
     Filament::setTenant($data['vendor']);
 }
 
-test('marking delivered from the order item page without a channel is refused', function () {
+test('the order item page cannot mark an order delivered', function () {
     $data = setUpOrderItemRevenueVendor();
     $item = makeOrderItemRevenueOrder($data, 'pay_on_delivery', 'shipped');
     actAsOrderItemRevenueOwner($data);
 
+    // Nothing left for the store to do once the rider has it: the action is gone.
     Livewire::test(ViewOrderItem::class, ['record' => $item->getRouteKey()])
-        ->callAction('updateStatus', data: ['status' => 'delivered']);
+        ->assertActionHidden('updateStatus');
 
     expect($item->order->fresh()->status)->toBe('shipped')
         ->and($item->order->fresh()->isRevenueRecognized())->toBeFalse()
         ->and(FinancialLedgerEntry::count())->toBe(0);
 });
 
-test('marking delivered from the order item page with a channel recognizes revenue', function () {
+test('handing over from the order item page records who did it and books no revenue', function () {
     $data = setUpOrderItemRevenueVendor();
-    $item = makeOrderItemRevenueOrder($data, 'pay_on_delivery', 'shipped');
-    $bank = FinancialAccount::where('vendor_id', $data['vendor']->id)->where('type', 'bank')->first();
+    $item = makeOrderItemRevenueOrder($data, 'pay_on_delivery', 'confirmed');
     actAsOrderItemRevenueOwner($data);
 
     Livewire::test(ViewOrderItem::class, ['record' => $item->getRouteKey()])
-        ->callAction('updateStatus', data: ['status' => 'delivered', 'payment_channel' => 'bank_transfer']);
+        ->callAction('updateStatus', data: ['status' => 'packed']);
+
+    expect($item->order->fresh()->status)->toBe('packed')
+        ->and($item->order->fresh()->packed_by)->toBe($data['owner']->id);
+
+    Livewire::test(ViewOrderItem::class, ['record' => $item->getRouteKey()])
+        ->callAction('updateStatus', data: ['status' => 'shipped']);
 
     $order = $item->order->fresh();
 
-    expect($order->status)->toBe('delivered')
-        ->and($order->isRevenueRecognized())->toBeTrue()
-        ->and($order->payment_channel)->toBe('bank_transfer')
-        ->and($bank->fresh()->balance())->toBe(5000.0);
+    expect($order->status)->toBe('shipped')
+        ->and($order->handed_over_by)->toBe($data['owner']->id)
+        ->and($order->isRevenueRecognized())->toBeFalse()
+        ->and(FinancialLedgerEntry::count())->toBe(0);
 });
 
 test('a prepaid order is never blocked by the channel check from the order item page', function () {

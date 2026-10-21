@@ -77,6 +77,7 @@
                 ['Bank', $report['balances']['bank']],
                 ['Cash', $report['balances']['cash']],
                 ['Total Cash + Bank', $report['balances']['total_liquid']],
+                ['Due from GadgetPlug (online sales not yet paid out)', $report['balances']['gadgetplug_due'] ?? 0],
                 ['Value of Stock on Hand', $report['balances']['inventory_value']],
                 ['Owed by Customers (credit sales)', $report['balances']['customer_debt']],
                 ['Initial Capital (what you started with)', $report['balances']['initial_capital']],

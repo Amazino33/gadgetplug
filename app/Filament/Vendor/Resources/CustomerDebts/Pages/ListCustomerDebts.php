@@ -90,7 +90,7 @@ class ListCustomerDebts extends ListRecords
 
                         Select::make('account_id')
                             ->label('Paid into')
-                            ->options(fn () => FinancialAccount::where('vendor_id', filament()->getTenant()?->id)
+                            ->options(fn () => FinancialAccount::where('vendor_id', filament()->getTenant()?->id)->spendable()
                                 ->pluck('name', 'id')
                             )
                             ->required()

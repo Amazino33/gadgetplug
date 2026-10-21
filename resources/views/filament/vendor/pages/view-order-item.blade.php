@@ -20,25 +20,17 @@
         'pending'               => ['placed' => 'done', 'payment' => 'active', 'dispatched' => '', 'enroute' => '', 'delivered' => ''],
         'confirmed'             => ['placed' => 'done', 'payment' => 'done',   'dispatched' => 'active', 'enroute' => '', 'delivered' => ''],
         'paid'                  => ['placed' => 'done', 'payment' => 'done',   'dispatched' => 'active', 'enroute' => '', 'delivered' => ''],
+        'packed'                => ['placed' => 'done', 'payment' => 'done',   'dispatched' => 'active', 'enroute' => '', 'delivered' => ''],
         'shipped'               => ['placed' => 'done', 'payment' => 'done',   'dispatched' => 'done', 'enroute' => 'active', 'delivered' => ''],
         'delivered'             => ['placed' => 'done', 'payment' => 'done',   'dispatched' => 'done', 'enroute' => 'done', 'delivered' => 'done'],
         'cancelled'             => ['placed' => 'done', 'payment' => 'done',   'dispatched' => '', 'enroute' => '', 'delivered' => ''],
         default                 => [],
     };
 
-    $statusLabel = match($order->status) {
-        'pending'               => 'Pending',
-        'confirmed'             => 'Confirmed',
-        'paid'                  => 'Paid',
-        'shipped'               => 'Dispatched',
-        'delivered'             => 'Delivered',
-        'cancelled'             => 'Cancelled',
-        'paid_but_failed_stock' => 'Stock Issue',
-        default                 => ucfirst($order->status),
-    };
+    $statusLabel = \App\Services\Orders\OrderStatusService::LABELS[$order->status] ?? ucfirst($order->status);
 
     $statusColor = match($order->status) {
-        'confirmed'             => 'bg-blue-100 text-blue-700',
+        'confirmed', 'packed'   => 'bg-blue-100 text-blue-700',
         'paid', 'delivered'     => 'bg-emerald-100 text-emerald-700',
         'shipped'               => 'bg-amber-100 text-amber-700',
         'cancelled', 'paid_but_failed_stock' => 'bg-red-100 text-red-700',

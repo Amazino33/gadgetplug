@@ -10,11 +10,14 @@ use App\Services\FinancialLedger;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
-// The one place an order's sale turns into money in an account. Extracted from
-// OrderObserver so the automatic path (a status change to paid/delivered) and
-// the manual "Record Payment Received" recovery on the order page run the exact
-// same logic — an order recovered by hand is recognized the way the observer
-// would have recognized it, never by a second, looser definition.
+// The one place an online order's sale turns into money in an account. Called
+// by OrderStatusService at the moment the money is actually collected: Paystack
+// at 'paid', pay-on-delivery when an admin records the payment received.
+//
+// The money lands in the vendor's "Due from GadgetPlug" account, not their own
+// cash or bank: GadgetPlug collected it (Paystack, or its riders at the door)
+// and owes it to them until a payout. Revenue posted before this rule stays in
+// the cash/bank account it was posted to — nothing here moves history.
 //
 // Posting is idempotent twice over: FinancialLedger::postEntry() returns the
 // existing entry for the same (source, direction), and this refuses outright
@@ -31,8 +34,9 @@ class RecognizeOrderRevenueAction
             return 'already_recognized';
         }
 
-        // Paystack money always lands in the bank — there is no cash variant of
-        // a card payment, so the caller's channel is ignored rather than trusted.
+        // How the customer paid — recorded on the order. Paystack is always a
+        // transfer; there is no cash variant of a card payment, so the caller's
+        // channel is ignored rather than trusted.
         $channel = $order->payment_method === 'paystack'
             ? 'bank_transfer'
             : ($channel ?? $order->payment_channel);
@@ -47,15 +51,8 @@ class RecognizeOrderRevenueAction
             return 'no_vendor';
         }
 
-        $type = $channel === 'cash' ? 'cash' : 'bank';
-
-        $account = FinancialAccount::where('vendor_id', $vendorId)->where('type', $type)->first();
-
-        if (! $account) {
-            Log::error("Revenue recognition skipped for order {$order->id}: no {$type} account found for vendor {$vendorId}.");
-
-            return 'no_account';
-        }
+        // Created on first use, so no vendor is ever missing one.
+        $account = FinancialAccount::gadgetplugDueFor((int) $vendorId);
 
         try {
             FinancialLedger::postEntry(

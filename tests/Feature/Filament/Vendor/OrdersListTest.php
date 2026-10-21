@@ -122,7 +122,8 @@ test('searching by reference finds the matching order', function () {
 
 test('updateOrderStatus applies an allowed transition', function () {
     $data  = setUpOrdersListVendor();
-    $order = makeOrdersListOrder($data['vendor'], 'pending', 'ORD-TRANSITION');
+    // Confirmed, not pending: an unpaid Paystack order is never handed over.
+    $order = makeOrdersListOrder($data['vendor'], 'confirmed', 'ORD-TRANSITION');
 
     actAsOrdersListVendor($data);
 
@@ -140,6 +141,18 @@ test('updateOrderStatus rejects a transition that is not offered for the current
 
     Livewire::test(ListOrders::class)
         ->call('updateOrderStatus', $order->id, 'delivered');
+
+    expect($order->fresh()->status)->toBe('pending');
+});
+
+test('updateOrderStatus will not hand over an order that has not been paid for', function () {
+    $data  = setUpOrdersListVendor();
+    $order = makeOrdersListOrder($data['vendor'], 'pending', 'ORD-UNPAID');
+
+    actAsOrdersListVendor($data);
+
+    Livewire::test(ListOrders::class)
+        ->call('updateOrderStatus', $order->id, 'shipped');
 
     expect($order->fresh()->status)->toBe('pending');
 });
@@ -176,7 +189,7 @@ test('a note can be added from the orders list without changing status', functio
 
 test('a note can be added together with a status change in the same call', function () {
     $data  = setUpOrdersListVendor();
-    $order = makeOrdersListOrder($data['vendor'], 'pending', 'ORD-NOTE-AND-STATUS');
+    $order = makeOrdersListOrder($data['vendor'], 'confirmed', 'ORD-NOTE-AND-STATUS');
 
     actAsOrdersListVendor($data);
 

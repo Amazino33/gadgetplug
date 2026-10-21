@@ -36,11 +36,12 @@ class EarningsWidget extends StatsOverviewWidget
             CarbonImmutable::now()->addDay(),
         );
 
-        // Money that is promised but not yet earned, so it is intentionally kept
-        // out of revenue above. Online-only by nature: a POS sale is settled at
-        // the counter, there is nothing left to clear.
+        // Money that is promised but not yet collected, so it is intentionally
+        // kept out of revenue above: pay-on-delivery orders whose payment
+        // GadgetPlug has not yet recorded, delivered or not. Online-only by
+        // nature: a POS sale is settled at the counter.
         $pendingRevenue = (float) OrderItem::where('vendor_id', $vendor->id)
-            ->whereHas('order', fn ($q) => $q->whereIn('status', ['confirmed', 'shipped']))
+            ->whereHas('order', fn ($q) => $q->whereIn('status', ['confirmed', 'packed', 'shipped', 'delivered'])->whereNull('revenue_recognized_at'))
             ->sum(DB::raw('quantity * unit_price'));
 
         return [
@@ -56,7 +57,7 @@ class EarningsWidget extends StatsOverviewWidget
                 ->color($all['profit'] >= 0 ? 'success' : 'danger'),
 
             Stat::make('Pending Clearance', '₦'.number_format($pendingRevenue, 2))
-                ->description('Confirmed or in transit, not yet paid out')
+                ->description('Pay-on-delivery orders not yet paid for')
                 ->descriptionIcon('heroicon-m-clock')
                 ->color('warning'),
 

@@ -87,7 +87,7 @@ class ExpenseResource extends Resource
 
                     Select::make('financial_account_id')
                         ->label('Paid From')
-                        ->options(fn () => FinancialAccount::where('vendor_id', filament()->getTenant()?->id)->pluck('name', 'id'))
+                        ->options(fn () => FinancialAccount::where('vendor_id', filament()->getTenant()?->id)->spendable()->pluck('name', 'id'))
                         ->searchable()
                         ->placeholder('Leave blank — not paid yet')
                         ->helperText(fn (?Expense $record) => $record?->isPosted()

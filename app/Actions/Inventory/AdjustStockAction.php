@@ -95,7 +95,7 @@ class AdjustStockAction
 
     private function notifyOfOversoldReservation(Product $product, ProductStoreStock $row): void
     {
-        $atRiskOrders = Order::whereIn('status', ['pending', 'confirmed', 'paid'])
+        $atRiskOrders = Order::whereIn('status', ['pending', 'confirmed', 'paid', 'packed'])
             ->whereHas('items', fn ($q) => $q
                 ->where('product_id', $product->id)
                 ->whereHas('storeAllocations', fn ($sa) => $sa->where('store_id', $row->store_id)))

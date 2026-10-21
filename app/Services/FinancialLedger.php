@@ -33,6 +33,19 @@ class FinancialLedger
             throw new InvalidArgumentException('Ledger amount must be non-negative — direction carries the sign.');
         }
 
+        // The Due from GadgetPlug balance moves only three ways: online revenue
+        // in (sourced from the order), that revenue's reversal out (sourced
+        // from the original entry), and a payout out (sourced from the payout).
+        // Checked here, where every posting passes, so no picker or tampered
+        // request can spend from it or pay into it by hand.
+        if ($account->isGadgetplugDue() && ! (
+            ($source instanceof \App\Models\Order && $direction === 'in')
+            || ($source instanceof FinancialLedgerEntry && $direction === 'out' && $source->financial_account_id === $account->id)
+            || ($source instanceof \App\Models\VendorPayout && $direction === 'out')
+        )) {
+            throw new InvalidArgumentException('The Due from GadgetPlug account only moves through online revenue and payouts.');
+        }
+
         $sourceType = $source?->getMorphClass();
         $sourceId   = $source?->getKey();
 

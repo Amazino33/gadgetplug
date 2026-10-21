@@ -55,7 +55,7 @@ class Order extends Model
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['status', 'payment_status', 'logistics_company_id', 'delivery_person_id', 'delivery_cost', 'payment_channel', 'revenue_recognized_at'])
+            ->logOnly(['status', 'payment_status', 'logistics_company_id', 'delivery_person_id', 'delivery_cost', 'payment_channel', 'revenue_recognized_at', 'delivered_override_reason', 'cancel_reason'])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs();
     }
@@ -67,6 +67,13 @@ class Order extends Model
             'delivery_preference_set_at' => 'datetime',
             'reserved_at'                => 'datetime',
             'reservation_released_at'    => 'datetime',
+            // The fulfilment timeline OrderStatusService writes.
+            'packed_at'                  => 'datetime',
+            'handed_over_at'             => 'datetime',
+            'delivered_at'               => 'datetime',
+            'payment_collected_at'       => 'datetime',
+            'cancelled_at'               => 'datetime',
+            'stale_alerted_at'           => 'datetime',
         ];
     }
 
@@ -156,6 +163,31 @@ class Order extends Model
     public function isRevenueRecognized(): bool
     {
         return $this->revenue_recognized_at !== null;
+    }
+
+    public function packedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'packed_by');
+    }
+
+    public function handedOverBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'handed_over_by');
+    }
+
+    public function deliveredBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'delivered_by');
+    }
+
+    public function paymentCollectedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'payment_collected_by');
+    }
+
+    public function cancelledBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'cancelled_by');
     }
 
     public function deliveryMessages(): HasMany

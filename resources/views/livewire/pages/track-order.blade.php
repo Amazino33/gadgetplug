@@ -154,6 +154,7 @@ new class extends Component {
             'pending'               => 'Pending Payment',
             'confirmed'             => 'Confirmed',
             'paid'                  => 'Paid',
+            'packed'                => 'Packed',
             'shipped'               => 'On the Way',
             'delivered'             => 'Delivered',
             'cancelled'             => 'Cancelled',
@@ -162,7 +163,7 @@ new class extends Component {
         };
         $statusClass = match($order->status) {
             'paid', 'delivered'     => 'bg-[#e8f5e8] text-brand dark:bg-[#1a2a1a] dark:text-brand-lime',
-            'confirmed'             => 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400',
+            'confirmed', 'packed'   => 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400',
             'shipped'               => 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400',
             'cancelled', 'paid_but_failed_stock' => 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400',
             default                 => 'bg-gray-100 text-gray-600 dark:bg-[#1a2a1a] dark:text-[#b0c8b0]',
@@ -180,6 +181,7 @@ new class extends Component {
             'pending'               => ['placed' => 'done', 'confirmed' => 'active', 'processing' => '', 'shipped' => '', 'delivered' => ''],
             'confirmed'             => ['placed' => 'done', 'confirmed' => 'done',   'processing' => 'active', 'shipped' => '', 'delivered' => ''],
             'paid'                  => ['placed' => 'done', 'confirmed' => 'done',   'processing' => 'active', 'shipped' => '', 'delivered' => ''],
+            'packed'                => ['placed' => 'done', 'confirmed' => 'done',   'processing' => 'done',   'shipped' => '',       'delivered' => ''],
             'shipped'               => ['placed' => 'done', 'confirmed' => 'done',   'processing' => 'done',   'shipped' => 'active', 'delivered' => ''],
             'delivered'             => ['placed' => 'done', 'confirmed' => 'done',   'processing' => 'done',   'shipped' => 'done',   'delivered' => 'done'],
             default                 => ['placed' => 'done', 'confirmed' => '',        'processing' => '',       'shipped' => '',       'delivered' => ''],

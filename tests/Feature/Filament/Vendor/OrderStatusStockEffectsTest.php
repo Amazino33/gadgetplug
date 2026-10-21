@@ -76,11 +76,28 @@ test('changing status to shipped via the orders list deducts stock and clears th
         ->and(InventoryLedger::where('product_id', $product->id)->where('transaction_type', 'dispatched')->count())->toBe(1);
 });
 
-test('changing status to cancelled via the orders list releases the reservation without touching physical stock', function () {
+test('the orders list can no longer cancel — cancelling is GadgetPlug\'s, from the admin panel', function () {
     $data = setUpStockEffectsFixture('paid');
     actAsStockEffectsVendor($data);
 
     Livewire::test(ListOrders::class)->call('updateOrderStatus', $data['order']->id, 'cancelled');
+
+    $product = $data['product']->fresh();
+
+    expect($data['order']->fresh()->status)->toBe('paid')
+        ->and($product->reserved_stock)->toBe(3)
+        ->and(InventoryLedger::where('product_id', $product->id)->where('transaction_type', 'reservation_released')->count())->toBe(0);
+});
+
+test('cancelling through the status service releases the reservation without touching physical stock', function () {
+    $data = setUpStockEffectsFixture('paid');
+
+    $admin = User::factory()->create();
+    Spatie\Permission\Models\Role::firstOrCreate(['name' => 'super_admin', 'guard_name' => 'web', 'team_id' => null]);
+    setPermissionsTeamId(null);
+    $admin->assignRole('super_admin');
+
+    app(App\Services\Orders\OrderStatusService::class)->cancel($data['order'], $admin, 'Customer cancelled');
 
     $product = $data['product']->fresh();
 

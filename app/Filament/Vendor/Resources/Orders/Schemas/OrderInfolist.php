@@ -2,6 +2,7 @@
 
 namespace App\Filament\Vendor\Resources\Orders\Schemas;
 
+use App\Services\Orders\OrderStatusService;
 use App\Models\Affiliate;
 use App\Models\Order;
 use Filament\Infolists\Components\RepeatableEntry;
@@ -24,18 +25,9 @@ class OrderInfolist
 
                     TextEntry::make('status')
                         ->badge()
-                        ->formatStateUsing(fn ($state) => match ($state) {
-                            'pending'               => 'Pending',
-                            'confirmed'             => 'Confirmed',
-                            'paid'                  => 'Paid',
-                            'shipped'               => 'Dispatched',
-                            'delivered'             => 'Delivered',
-                            'cancelled'             => 'Cancelled',
-                            'paid_but_failed_stock' => 'Stock Issue',
-                            default                 => ucfirst($state),
-                        })
+                        ->formatStateUsing(fn ($state) => OrderStatusService::LABELS[$state] ?? ucfirst((string) $state))
                         ->color(fn ($state) => match ($state) {
-                            'confirmed'                          => 'info',
+                            'confirmed', 'packed'                => 'info',
                             'paid', 'delivered'                  => 'success',
                             'shipped'                            => 'warning',
                             'cancelled', 'paid_but_failed_stock' => 'danger',
@@ -137,6 +129,43 @@ class OrderInfolist
                         ->badge()
                         ->color(fn ($state) => $state ? 'success' : 'warning')
                         ->visible(fn (Order $record) => filled($record->delivery_cost)),
+                ]),
+
+            // Who moved the order and when — written by OrderStatusService.
+            Section::make('Fulfilment')
+                ->columns(2)
+                ->schema([
+                    TextEntry::make('packed_at')
+                        ->label('Packed')
+                        ->dateTime('d M Y, g:ia')
+                        ->placeholder('Not yet')
+                        ->helperText(fn (Order $record) => $record->packedBy?->name),
+
+                    TextEntry::make('handed_over_at')
+                        ->label('Handed to rider')
+                        ->dateTime('d M Y, g:ia')
+                        ->placeholder('Not yet')
+                        ->helperText(fn (Order $record) => $record->handedOverBy?->name),
+
+                    TextEntry::make('delivered_at')
+                        ->label('Delivered')
+                        ->dateTime('d M Y, g:ia')
+                        ->placeholder('Not yet')
+                        ->helperText(fn (Order $record) => $record->delivered_override_reason
+                            ? 'Marked by '.($record->deliveredBy?->name ?? 'GadgetPlug').': '.$record->delivered_override_reason
+                            : null),
+
+                    TextEntry::make('payment_collected_at')
+                        ->label('Payment received by GadgetPlug')
+                        ->dateTime('d M Y, g:ia')
+                        ->placeholder('Not yet')
+                        ->visible(fn (Order $record) => $record->payment_method === 'pay_on_delivery'),
+
+                    TextEntry::make('cancel_reason')
+                        ->label('Cancelled')
+                        ->columnSpanFull()
+                        ->visible(fn (Order $record) => filled($record->cancel_reason))
+                        ->helperText(fn (Order $record) => $record->cancelled_at?->format('d M Y, g:ia')),
                 ]),
 
             Section::make('Items Ordered')

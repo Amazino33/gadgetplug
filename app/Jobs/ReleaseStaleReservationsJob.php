@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Actions\Inventory\ReleaseReservationAction;
 use App\Models\Order;
+use App\Models\User;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -18,6 +19,11 @@ use Illuminate\Support\Facades\Log;
 // It only lifts the online hold so the stock becomes sellable again (POS or
 // another online order); the vendor is notified so a human decides what
 // happens to the original order next.
+//
+// Only an order nobody has committed money or a promise to is released: one
+// still pending payment. A paid order's stock is the customer's — never freed
+// behind their back. A confirmed pay-on-delivery order past the cutoff is not
+// released either: GadgetPlug's admins are alerted once, to chase or cancel it.
 class ReleaseStaleReservationsJob
 {
     public const STALE_AFTER_HOURS = 24;
@@ -29,12 +35,54 @@ class ReleaseStaleReservationsJob
         Order::whereNotNull('reserved_at')
             ->whereNull('reservation_released_at')
             ->where('reserved_at', '<=', $cutoff)
-            ->whereIn('status', ['pending', 'confirmed', 'paid'])
+            ->where('status', 'pending')
             ->chunkById(100, function ($orders) {
                 foreach ($orders as $order) {
                     $this->release($order);
                 }
             });
+
+        Order::whereNotNull('reserved_at')
+            ->whereNull('reservation_released_at')
+            ->whereNull('stale_alerted_at')
+            ->where('reserved_at', '<=', $cutoff)
+            ->where('status', 'confirmed')
+            ->where('payment_method', 'pay_on_delivery')
+            ->chunkById(100, function ($orders) {
+                foreach ($orders as $order) {
+                    $this->alertAdmins($order);
+                }
+            });
+    }
+
+    // Once per order: stale_alerted_at is set whether or not anyone was there
+    // to receive it, so the hourly sweep never repeats itself.
+    private function alertAdmins(Order $order): void
+    {
+        try {
+            $order->updateQuietly(['stale_alerted_at' => now()]);
+
+            // Read raw, like User::isSuperAdmin(): the roles relation filters by
+            // whichever team is current, and a job has none it should trust.
+            $admins = User::whereIn('id', DB::table('model_has_roles')
+                ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+                ->where('model_has_roles.model_type', (new User)->getMorphClass())
+                ->whereNull('model_has_roles.team_id')
+                ->where('roles.name', 'super_admin')
+                ->pluck('model_has_roles.model_id'))
+                ->get();
+
+            foreach ($admins as $admin) {
+                Notification::make()
+                    ->title('Pay-on-delivery order waiting: #'.$order->reference)
+                    ->body('Confirmed over '.self::STALE_AFTER_HOURS.'h ago and not yet handed to a rider. Its stock is still held — chase the store or cancel the order.')
+                    ->icon('heroicon-o-clock')
+                    ->warning()
+                    ->sendToDatabase($admin);
+            }
+        } catch (\Throwable $e) {
+            Log::error("Failed to alert admins about stale order {$order->id}: ".$e->getMessage());
+        }
     }
 
     private function release(Order $order): void

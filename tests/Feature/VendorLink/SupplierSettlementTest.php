@@ -51,11 +51,32 @@ function orderForListing(int $quantity = 1, float $supplierPrice = 10000, float 
     return compact('order', 'item', 'listing', 'source', 'link', 'reseller');
 }
 
+/**
+ * GadgetPlug records the pay-on-delivery money as received — the moment the
+ * order's revenue, and with it what the supplier is owed, books. The order is
+ * put at "handed to rider" directly: getting it there is not under test here.
+ */
+function receiveSupplierOrderPayment(Order $order): ?string
+{
+    $admin = User::factory()->create();
+    Spatie\Permission\Models\Role::firstOrCreate(['name' => 'super_admin', 'guard_name' => 'web', 'team_id' => null]);
+    setPermissionsTeamId(null);
+    $admin->assignRole('super_admin');
+
+    $order->refresh();
+
+    if (! in_array($order->status, ['shipped', 'delivered'], true)) {
+        $order->updateQuietly(['status' => 'shipped']);
+    }
+
+    return app(App\Services\Orders\OrderStatusService::class)->recordPaymentReceived($order->fresh(), $admin, 'cash');
+}
+
 describe('booking what the supplier is owed', function () {
-    test('delivery books the debt, frozen at his price that day', function () {
+    test('payment received books the debt, frozen at his price that day', function () {
         ['order' => $order, 'link' => $link] = orderForListing(quantity: 2, supplierPrice: 10000);
 
-        $order->update(['status' => 'delivered']);
+        receiveSupplierOrderPayment($order);
 
         $entry = SupplierPayableEntry::charges()->firstOrFail();
 
@@ -65,10 +86,11 @@ describe('booking what the supplier is owed', function () {
             ->and(app(SupplierPayable::class)->balance($link))->toBe(20000.0);
     });
 
-    test('an undelivered order owes him nothing', function () {
+    test('an order whose money has not come in owes him nothing — even delivered', function () {
         ['order' => $order, 'link' => $link] = orderForListing();
 
-        $order->update(['status' => 'confirmed']);
+        // Delivered is a logistics fact; nothing is booked until the money is.
+        $order->updateQuietly(['status' => 'delivered']);
 
         expect(SupplierPayableEntry::count())->toBe(0)
             ->and(app(SupplierPayable::class)->balance($link))->toBe(0.0);
@@ -79,19 +101,19 @@ describe('booking what the supplier is owed', function () {
 
         // He sold the last unit at his own counter first. Pay on delivery, so
         // nothing was paid and nothing is lost.
-        $order->update(['status' => 'cancelled']);
+        $order->updateQuietly(['status' => 'cancelled']);
 
         expect(SupplierPayableEntry::count())->toBe(0)
             ->and(app(SupplierPayable::class)->balance($link))->toBe(0.0);
     });
 
-    test('delivery firing twice books the debt once', function () {
+    test('recording the payment twice books the debt once', function () {
         ['order' => $order, 'link' => $link] = orderForListing(quantity: 2);
 
-        $order->update(['status' => 'delivered']);
-        // A status flipped back and forth, a retried job, two tabs.
-        $order->update(['status' => 'shipped']);
-        $order->update(['status' => 'delivered']);
+        receiveSupplierOrderPayment($order);
+        // Two tabs, a double click.
+        receiveSupplierOrderPayment($order);
+        app(App\Actions\VendorLink\BookSupplierPayableAction::class)->execute($order->fresh());
 
         expect(SupplierPayableEntry::charges()->count())->toBe(1)
             ->and(app(SupplierPayable::class)->balance($link))->toBe(20000.0);
@@ -100,27 +122,24 @@ describe('booking what the supplier is owed', function () {
     test('his later price rise does not restate a debt already booked', function () {
         ['order' => $order, 'source' => $source, 'link' => $link] = orderForListing(quantity: 1, supplierPrice: 10000);
 
-        $order->update(['status' => 'delivered']);
+        receiveSupplierOrderPayment($order);
         $source->update(['price' => 18000]);
-        $order->update(['status' => 'delivered']);
+        app(App\Actions\VendorLink\BookSupplierPayableAction::class)->execute($order->fresh());
 
         expect(app(SupplierPayable::class)->balance($link))->toBe(10000.0);
     });
 
-    test('a prepaid order books nothing, because its revenue landed earlier', function () {
-        ['order' => $order, 'link' => $link, 'item' => $item] = orderForListing(quantity: 2);
+    test('a prepaid order books the debt when it is paid, with its revenue', function () {
+        ['order' => $order, 'link' => $link, 'item' => $item] = orderForListing(quantity: 2, supplierPrice: 10000);
 
-        // Prepaid recognises revenue at 'paid' and delivers later, so booking
-        // the cost at delivery would put the earning in one period and the cost
-        // of earning it in another. Pay-on-delivery is the arrangement this
-        // feature serves; a prepaid resale needs its timing decided on purpose
-        // before it books anything.
+        // Revenue and the cost of earning it land together on both channels:
+        // Paystack at paid, pay-on-delivery at payment received.
         $order->update(['payment_method' => 'paystack']);
-        $order->update(['status' => 'delivered']);
+        app(App\Services\Orders\OrderStatusService::class)->markPaid($order->fresh());
 
-        expect(SupplierPayableEntry::count())->toBe(0)
-            ->and(app(SupplierPayable::class)->balance($link))->toBe(0.0)
-            ->and($item->fresh()->unit_cost)->toBeNull();
+        expect(SupplierPayableEntry::charges()->count())->toBe(1)
+            ->and(app(SupplierPayable::class)->balance($link))->toBe(20000.0)
+            ->and((float) $item->fresh()->unit_cost)->toBe(10000.0);
     });
 
     test('an ordinary product owes no supplier anything', function () {
@@ -143,7 +162,7 @@ describe('booking what the supplier is owed', function () {
             'quantity' => 1, 'unit_price' => 5000, 'unit_cost' => 3000,
         ]);
 
-        $order->update(['status' => 'delivered']);
+        receiveSupplierOrderPayment($order);
 
         expect(SupplierPayableEntry::count())->toBe(0);
     });
@@ -155,7 +174,7 @@ describe('cost of goods sold', function () {
 
         expect($item->unit_cost)->toBeNull();
 
-        $order->update(['status' => 'delivered']);
+        receiveSupplierOrderPayment($order);
 
         // The column the rest of the platform already reads for COGS, so
         // reporting needs no knowledge of VendorLink.
@@ -165,10 +184,9 @@ describe('cost of goods sold', function () {
     test('profit is retail less what the supplier charged', function () {
         ['order' => $order, 'reseller' => $reseller] = orderForListing(quantity: 1, supplierPrice: 10000, markup: 40);
 
-        $order->update([
-            'status'                => 'delivered',
-            'revenue_recognized_at' => now(),
-        ]);
+        // Delivered and paid for: the Sales Report counts paid/delivered orders.
+        $order->updateQuietly(['status' => 'delivered']);
+        receiveSupplierOrderPayment($order);
 
         $summary = app(SalesReportService::class)->summary(
             $reseller->id,
@@ -187,7 +205,7 @@ describe('settling up', function () {
     test('payments reduce the balance and never touch the supplier account', function () {
         ['order' => $order, 'link' => $link, 'reseller' => $reseller, 'source' => $source] = orderForListing(quantity: 3);
 
-        $order->update(['status' => 'delivered']);
+        receiveSupplierOrderPayment($order);
 
         $payable = app(SupplierPayable::class);
         $payable->pay($link, 12000, User::find($reseller->user_id), 'Part payment');
@@ -205,7 +223,7 @@ describe('settling up', function () {
     test('paying it off leaves nothing owed', function () {
         ['order' => $order, 'link' => $link] = orderForListing(quantity: 1);
 
-        $order->update(['status' => 'delivered']);
+        receiveSupplierOrderPayment($order);
         app(SupplierPayable::class)->pay($link, 10000);
 
         expect(app(SupplierPayable::class)->balance($link))->toBe(0.0)
@@ -217,7 +235,7 @@ describe('the settlement screen', function () {
     test('shows what each supplier is owed, summed from the ledger', function () {
         ['order' => $order, 'reseller' => $reseller] = orderForListing(quantity: 2, supplierPrice: 10000);
 
-        $order->update(['status' => 'delivered']);
+        receiveSupplierOrderPayment($order);
 
         settlementPanel($reseller, User::find($reseller->user_id));
 
@@ -233,7 +251,7 @@ describe('the settlement screen', function () {
     test('a payment recorded on the screen moves the derived balance', function () {
         ['order' => $order, 'reseller' => $reseller, 'link' => $link] = orderForListing(quantity: 2);
 
-        $order->update(['status' => 'delivered']);
+        receiveSupplierOrderPayment($order);
         settlementPanel($reseller, User::find($reseller->user_id));
 
         Livewire\Livewire::test(App\Filament\Vendor\Pages\SupplierPayablePage::class)

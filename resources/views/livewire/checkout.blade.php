@@ -646,7 +646,7 @@ new class extends Component {
             }
 
             foreach ($checkout->orders as $order) {
-                $order->update(['status' => 'confirmed']);
+                app(\App\Services\Orders\OrderStatusService::class)->confirm($order);
             }
 
             Session::forget('cart');

@@ -1,16 +1,7 @@
 @php
-    $statusLabel = match ($order->status) {
-        'pending'               => 'Pending',
-        'confirmed'             => 'Confirmed',
-        'paid'                  => 'Paid',
-        'shipped'               => 'Dispatched',
-        'delivered'             => 'Delivered',
-        'cancelled'             => 'Cancelled',
-        'paid_but_failed_stock' => 'Stock Issue',
-        default                 => ucfirst($order->status),
-    };
+    $statusLabel = \App\Services\Orders\OrderStatusService::LABELS[$order->status] ?? ucfirst($order->status);
     $statusClasses = match ($order->status) {
-        'confirmed'                          => 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+        'confirmed', 'packed'                => 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
         'paid', 'delivered'                  => 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400',
         'shipped'                            => 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
         'cancelled', 'paid_but_failed_stock'  => 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
@@ -90,7 +81,7 @@
             </button>
             <button type="button"
                 x-data
-                x-on:click="window.dispatchEvent(new CustomEvent('open-update-status', { detail: { id: {{ $order->id }}, options: @js($statusOptions), needsChannel: @js($this->requiresPaymentChannel($order)) } }))"
+                x-on:click="window.dispatchEvent(new CustomEvent('open-update-status', { detail: { id: {{ $order->id }}, options: @js($statusOptions) } }))"
                 title="Update status / add note" aria-label="Update status or add a note for order {{ $order->reference }}"
                 class="flex h-9 w-9 items-center justify-center rounded-full text-gray-400 transition-colors hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:text-amber-600">
                 <x-heroicon-o-pencil-square class="h-4 w-4"/>

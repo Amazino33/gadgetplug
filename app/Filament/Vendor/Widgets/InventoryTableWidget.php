@@ -308,7 +308,7 @@ class InventoryTableWidget extends BaseWidget
     {
         $items = OrderItem::query()
             ->where('product_id', $product->id)
-            ->whereHas('order', fn ($q) => $q->whereIn('status', ['pending', 'confirmed', 'paid']))
+            ->whereHas('order', fn ($q) => $q->whereIn('status', ['pending', 'confirmed', 'paid', 'packed']))
             ->with('order')
             ->get();
 

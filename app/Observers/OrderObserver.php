@@ -2,16 +2,9 @@
 
 namespace App\Observers;
 
-use App\Actions\Finance\RecognizeOrderRevenueAction;
-use App\Actions\VendorLink\BookSupplierPayableAction;
-use App\Actions\Inventory\DispatchStockAction;
-use App\Actions\Inventory\ReleaseReservationAction;
 use App\Models\DeliveryMessage;
-use App\Models\FinancialLedgerEntry;
 use App\Models\MessageTemplate;
 use App\Models\Order;
-use App\Services\Affiliate\CommissionService;
-use App\Services\FinancialLedger;
 use App\Services\Messaging\MessagingService;
 use App\Services\Messaging\StorekeeperNotifier;
 use App\Services\Messaging\TemplateRenderer;
@@ -47,92 +40,12 @@ class OrderObserver
             $this->notifyVendorOfNewOrder($order);
         }
 
-        $this->applyStatusTransitionSideEffects($order);
-        $this->applyAffiliateCommissionLifecycle($order);
-        $this->applyRevenueRecognition($order);
-        $this->applyRevenueReversal($order);
+        // Stock, revenue, supplier payables and commissions move in
+        // OrderStatusService with the status itself. What stays here only
+        // tells people and Meta that it changed.
         $this->applyMetaConversionEvents($order);
         $this->notifyCustomerOfStatusChange($order);
         $this->notifyStorekeeperOfStatusChange($order);
-    }
-
-    // Centralized here — not in ViewOrder's updateStatus alone — because
-    // status can also change from the Orders list row action, ListOrders'
-    // custom table, and Order Items' own status form (see Prompt 4 recon).
-    // Same reasoning as applyStatusTransitionSideEffects below: whichever UI
-    // changed the status, this fires. POD needs payment_channel already on
-    // the order to post (only ViewOrder's updateStatus captures it today —
-    // delivered via one of the other three entry points recognizes nothing
-    // and is left for the safety net to surface, never guessed at).
-    private function applyRevenueRecognition(Order $order): void
-    {
-        if (! $order->wasChanged('status') || $order->isRevenueRecognized()) {
-            return;
-        }
-
-        if (in_array($order->status, ['cancelled', 'paid_but_failed_stock'], true)) {
-            return;
-        }
-
-        $isPrepaidRecognition = $order->payment_method === 'paystack' && $order->status === 'paid';
-        $isPodRecognition     = $order->payment_method === 'pay_on_delivery' && $order->status === 'delivered';
-
-        if (! $isPrepaidRecognition && ! $isPodRecognition) {
-            return;
-        }
-
-        // Which transitions count is decided here; what recognition *is* lives in
-        // the action, shared with the order page's manual recovery. A POD order
-        // delivered without a captured channel returns 'no_channel' and stays
-        // unrecognized — not an error, just money still waiting to be recorded,
-        // which the order page's "Record Payment Received" action clears.
-        app(RecognizeOrderRevenueAction::class)->execute($order);
-    }
-
-    // Cancelling a previously-recognized order — today this is only reachable
-    // for a prepaid order (paid → cancelled): POD's cancellable window is
-    // pending/confirmed/paid, all of which are before delivery, the only POD
-    // recognition trigger, so a POD order is never both recognized and still
-    // cancellable. Kept general rather than paystack-only in case a future
-    // status change ever makes a delivered order cancellable too.
-    //
-    // Never edits/deletes the original 'in' entry — posts a reversing 'out'
-    // sourced from that entry itself, not the order. Order already owns the
-    // 'out' direction (delivery cost, Prompt 2); sourcing the reversal from
-    // the order too would recreate the exact collision the
-    // (source_type, source_id, direction) uniqueness fix above exists to
-    // prevent. revenue_recognized_at is deliberately left set, not cleared —
-    // it remains true that recognition happened at that timestamp; the
-    // reversing entry is the correction, not an erasure of history.
-    private function applyRevenueReversal(Order $order): void
-    {
-        if (! $order->wasChanged('status') || $order->status !== 'cancelled' || ! $order->isRevenueRecognized()) {
-            return;
-        }
-
-        $original = FinancialLedgerEntry::where('source_type', $order->getMorphClass())
-            ->where('source_id', $order->id)
-            ->where('direction', 'in')
-            ->first();
-
-        if (! $original) {
-            Log::error("Revenue reversal skipped for order {$order->id}: recognized but no original ledger entry found.");
-
-            return;
-        }
-
-        try {
-            FinancialLedger::postEntry(
-                account: $original->account,
-                direction: 'out',
-                amount: (float) $original->amount,
-                source: $original,
-                description: "Reversal — order {$order->reference} cancelled after revenue recognition",
-                createdBy: auth()->id(),
-            );
-        } catch (\Throwable $e) {
-            Log::error("Revenue reversal failed for order {$order->id}: " . $e->getMessage());
-        }
     }
 
     // Server-side CAPI copy of Purchase — fires on the same "money is settled"
@@ -250,119 +163,6 @@ class OrderObserver
                 'status'    => $order->status,
                 'exception' => $e->getMessage(),
             ]);
-        }
-    }
-
-    // Delivered starts the commission's hold; cancelled rejects it outright
-    // (the only reject-capable transition that exists today — see Prompt 1's
-    // Phase 0 recon: 'delivered' is currently terminal in the vendor UI, so a
-    // return after delivery has no status to hook here yet). Swallows its own
-    // failures rather than letting a bug in commission logic block a vendor
-    // from updating order status, matching applyStatusTransitionSideEffects's
-    // discipline above.
-    private function applyAffiliateCommissionLifecycle(Order $order): void
-    {
-        if (! $order->wasChanged('status')) {
-            return;
-        }
-
-        try {
-            $commissionService = app(CommissionService::class);
-
-            if ($order->status === 'delivered') {
-                $commissionService->startReturnWindow($order);
-            }
-
-            if ($order->status === 'cancelled') {
-                $commissionService->reject($order, 'order_cancelled');
-            }
-        } catch (\Throwable $e) {
-            Log::error("Affiliate commission lifecycle failed for order {$order->id}: " . $e->getMessage());
-        }
-    }
-
-    // Centralized here rather than in each Filament action (ViewOrder, the Orders
-    // list, Order Items) so stock always moves correctly no matter which of the
-    // several UI entry points changed the status — a status update previously
-    // bypassed physical stock deduction/release entirely unless made from the
-    // order's own detail page.
-    private function applyStatusTransitionSideEffects(Order $order): void
-    {
-        if (! $order->wasChanged('status')) {
-            return;
-        }
-
-        $userId = auth()->id();
-
-        if ($order->status === 'shipped') {
-            $order->load('items.product');
-            foreach ($order->items as $item) {
-                // Nothing of ours moved: a resold line's goods are the
-                // supplier's and were never reserved out of our stock, so there
-                // is nothing here to deduct. Skipped rather than left to fail
-                // and be logged, which would bury a real dispatch failure in
-                // noise.
-                if (! $item->tracksStock()) {
-                    continue;
-                }
-
-                try {
-                    app(DispatchStockAction::class)->execute(
-                        productId:   $item->product_id,
-                        quantity:    $item->quantity,
-                        userId:      $userId,
-                        reference:   $order->reference,
-                        description: 'Physical deduction — order handed to rider.',
-                        // Dispatches out of whichever store(s) reserved these
-                        // units, rather than re-deriving a store now.
-                        orderItemId: $item->id,
-                    );
-                } catch (\Exception $e) {
-                    Log::error("Dispatch stock failed for order {$order->id}: " . $e->getMessage());
-                }
-            }
-        }
-
-        // Goods reached the customer, so the supplier is now owed for any
-        // resold lines on this order.
-        //
-        // Hung on the delivered transition itself rather than on revenue
-        // recognition, which no-ops when a POD order has no payment_channel
-        // captured. What we owe him does not depend on whether we recorded how
-        // the customer paid us — the goods are gone either way, and a debt that
-        // silently fails to book is money quietly lost.
-        //
-        // Pay-on-delivery only. A prepaid order recognises its revenue at
-        // 'paid' and is delivered later, so booking the cost here would put
-        // revenue in one period and the cost of earning it in another. Until a
-        // prepaid resale exists and its timing is decided deliberately, it books
-        // nothing rather than booking it at the wrong moment.
-        if ($order->status === 'delivered' && $order->payment_method === 'pay_on_delivery') {
-            app(BookSupplierPayableAction::class)->execute($order);
-        }
-
-        if ($order->status === 'cancelled') {
-            $order->load('items.product');
-            foreach ($order->items as $item) {
-                // Nothing was reserved for a resold line, so there is nothing
-                // to give back.
-                if (! $item->tracksStock()) {
-                    continue;
-                }
-
-                try {
-                    app(ReleaseReservationAction::class)->execute(
-                        productId:   $item->product_id,
-                        quantity:    $item->quantity,
-                        userId:      $userId,
-                        reference:   $order->reference,
-                        description: 'Reservation released — order cancelled.',
-                        orderItemId: $item->id,
-                    );
-                } catch (\Exception $e) {
-                    Log::error("Release reservation failed for order {$order->id}: " . $e->getMessage());
-                }
-            }
         }
     }
 

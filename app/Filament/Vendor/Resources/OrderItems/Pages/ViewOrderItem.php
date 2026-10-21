@@ -5,11 +5,13 @@ namespace App\Filament\Vendor\Resources\OrderItems\Pages;
 use App\Filament\Vendor\Resources\OrderItems\OrderItemResource;
 use App\Filament\Vendor\Resources\Orders\OrderResource;
 use App\Models\OrderItem;
+use App\Services\Orders\InvalidOrderTransition;
+use App\Services\Orders\OrderStatusService;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
-use Filament\Schemas\Components\Utilities\Get;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Model;
 
 
@@ -51,6 +53,7 @@ class ViewOrderItem extends ViewRecord
                 ->color('success')
                 ->url(fn () => OrderResource::getUrl('view', ['record' => $this->record->order_id], tenant: filament()->getTenant())),
 
+            // The store's steps only — see OrderStatusService.
             Action::make('updateStatus')
                 ->label('Update Status')
                 ->icon('heroicon-o-arrow-path')
@@ -58,74 +61,27 @@ class ViewOrderItem extends ViewRecord
                 ->schema([
                     Select::make('status')
                         ->label('New Status')
-                        ->options(fn () => match ($this->record->order->status) {
-                            'pending', 'confirmed', 'paid' => [
-                                'shipped'   => 'Hand to Rider / Dispatch',
-                                'cancelled' => 'Cancel Order',
-                            ],
-                            'shipped' => [
-                                'delivered' => 'Mark as Delivered',
-                            ],
-                            default => [],
-                        })
-                        ->required()
-                        ->live(),
-
-                    // Mirrors ListOrders::requiresPaymentChannel() exactly — this
-                    // was the one remaining entry point that let a pay-on-delivery
-                    // order reach 'delivered' without ever being asked how the
-                    // customer paid, leaving it stuck off the Financial Report
-                    // with no error to say so.
-                    Select::make('payment_channel')
-                        ->label('How did the customer pay?')
-                        ->options(['cash' => 'Cash', 'bank_transfer' => 'Bank Transfer'])
-                        ->required()
-                        ->helperText('Cash goes to your cash account, bank transfer to your bank account.')
-                        ->visible(fn (Get $get) => $this->requiresPaymentChannel($get('status'))),
+                        ->options(fn () => OrderStatusService::storeOptionsFor($this->record->order))
+                        ->required(),
                 ])
                 ->action(function (array $data): void {
-                    $order = $this->record->order;
-
-                    if ($this->requiresPaymentChannel($data['status']) && ! in_array($data['payment_channel'] ?? null, ['cash', 'bank_transfer'], true)) {
-                        Notification::make()
-                            ->title('Say how the customer paid before marking this delivered.')
-                            ->body('Pick Cash or Bank Transfer — that is what puts the money into your accounts and onto the Financial Report.')
-                            ->warning()
-                            ->send();
+                    try {
+                        OrderStatusService::applyStoreStep($this->record->order, auth()->user(), $data['status']);
+                    } catch (InvalidOrderTransition|AuthorizationException $e) {
+                        Notification::make()->title($e instanceof AuthorizationException ? 'Only staff of the store holding this order can update it.' : $e->getMessage())->danger()->send();
 
                         return;
                     }
 
-                    $order->update(array_filter([
-                        'status'          => $data['status'],
-                        'payment_channel' => $this->requiresPaymentChannel($data['status']) ? $data['payment_channel'] : null,
-                    ]));
-
                     $this->record->refresh()->load(['order.items.product', 'product']);
 
                     Notification::make()
-                        ->title(match ($data['status']) {
-                            'shipped'   => 'Order handed to rider',
-                            'delivered' => 'Order marked as delivered',
-                            'cancelled' => 'Order cancelled',
-                            default     => 'Status updated',
-                        })
+                        ->title($data['status'] === 'shipped' ? 'Order handed to rider' : 'Order marked as packed')
                         ->success()
                         ->send();
                 })
-                ->visible(fn () => !in_array(
-                    $this->record->order->status,
-                    ['delivered', 'cancelled', 'paid_but_failed_stock']
-                )),
+                ->visible(fn () => OrderStatusService::storeOptionsFor($this->record->order) !== []
+                    && auth()->user()->can('fulfil', $this->record->order)),
         ];
-    }
-
-    private function requiresPaymentChannel(?string $newStatus): bool
-    {
-        $order = $this->record->order;
-
-        return $newStatus === 'delivered'
-            && $order->payment_method === 'pay_on_delivery'
-            && ! $order->isRevenueRecognized();
     }
 }

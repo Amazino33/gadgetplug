@@ -59,6 +59,9 @@ function staleLinkedOrder(): array
 
 test('the stale sweep releases stock-tracked lines and ignores linked lines', function () {
     $c = staleLinkedOrder();
+    // Only a hold nobody has paid or committed to is released (a confirmed
+    // pay-on-delivery order alerts the admins instead — OrderStatusServiceTest).
+    $c['order']->forceFill(['status' => 'pending'])->saveQuietly();
 
     (new ReleaseStaleReservationsJob)->handle();
 

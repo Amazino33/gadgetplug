@@ -63,9 +63,9 @@ it('stamps reserved_at the moment stock is actually reserved for an order', func
     expect($order->reserved_at)->not->toBeNull();
 });
 
-it('auto-releases a reservation held for over 24 hours with no dispatch or cancellation', function () {
+it('auto-releases an unpaid order\'s reservation held for over 24 hours', function () {
     $c     = staleReservationContext();
-    $order = reservedOrder($c, 'paid', 3);
+    $order = reservedOrder($c, 'pending', 3);
 
     $this->travelTo($order->reserved_at->copy()->addHours(25));
 
@@ -75,9 +75,22 @@ it('auto-releases a reservation held for over 24 hours with no dispatch or cance
 
     expect($row->reserved)->toBe(0)
         ->and($order->fresh()->reservation_released_at)->not->toBeNull()
-        // The order itself is not cancelled — the goods might still be
-        // handed over; only the hold is lifted.
-        ->and($order->fresh()->status)->toBe('paid');
+        // The order itself is not cancelled — only the hold is lifted.
+        ->and($order->fresh()->status)->toBe('pending');
+});
+
+it('never auto-releases a paid order\'s reservation — that stock is the customer\'s', function () {
+    $c     = staleReservationContext();
+    $order = reservedOrder($c, 'paid', 3);
+
+    $this->travelTo($order->reserved_at->copy()->addHours(72));
+
+    (new ReleaseStaleReservationsJob())->handle();
+
+    $row = ProductStoreStock::where('product_id', $c['product']->id)->where('store_id', $c['store']->id)->first();
+
+    expect($row->reserved)->toBe(3)
+        ->and($order->fresh()->reservation_released_at)->toBeNull();
 });
 
 it('leaves a reservation alone before the 24 hour window has passed', function () {
@@ -96,7 +109,7 @@ it('leaves a reservation alone before the 24 hour window has passed', function (
 
 it('never releases the same order twice', function () {
     $c     = staleReservationContext();
-    $order = reservedOrder($c, 'paid', 3);
+    $order = reservedOrder($c, 'pending', 3);
 
     $this->travelTo($order->reserved_at->copy()->addHours(25));
 
@@ -121,7 +134,7 @@ it('does not touch a shipped order — dispatch already resolved its reservation
 
 it('notifies the vendor when a reservation is auto-released', function () {
     $c     = staleReservationContext();
-    $order = reservedOrder($c, 'paid', 3);
+    $order = reservedOrder($c, 'pending', 3);
 
     $this->travelTo($order->reserved_at->copy()->addHours(25));
 

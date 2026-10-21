@@ -32,6 +32,10 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->login()
+            // The bell: stale pay-on-delivery alerts (ReleaseStaleReservationsJob)
+            // land here as database notifications.
+            ->databaseNotifications()
+            ->databaseNotificationsPolling('60s')
             ->colors([
                 'primary' => Color::Amber,
             ])

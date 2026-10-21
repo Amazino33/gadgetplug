@@ -280,6 +280,12 @@ class FinancialReportService
         $bankBalance = $bank?->balance($asOf) ?? 0.0;
         $cashBalance = $cash?->balance($asOf) ?? 0.0;
 
+        // Online money GadgetPlug collected and has not yet paid out. Owed to
+        // the vendor, not in their hands — so shown on its own, not in
+        // Cash + Bank.
+        $due = FinancialAccount::where('vendor_id', $vendorId)->where('type', FinancialAccount::TYPE_GADGETPLUG_DUE)->first();
+        $dueBalance = $due?->balance($asOf) ?? 0.0;
+
         // Valued from the batches the goods actually arrived in, so restocking
         // at a higher price no longer revalues stock bought cheaply. Units with
         // no recorded cost are counted separately rather than quietly valued at
@@ -309,6 +315,7 @@ class FinancialReportService
             'bank'               => $bankBalance,
             'cash'               => $cashBalance,
             'total_liquid'       => $bankBalance + $cashBalance,
+            'gadgetplug_due'     => round($dueBalance, 2),
             'inventory_value'    => $inventoryValue,
             // True when inventory_value is understated because some stocked
             // products have no cost recorded at all.

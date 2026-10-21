@@ -2,6 +2,7 @@
 
 namespace App\Filament\Vendor\Resources\OrderItems\Schemas;
 
+use App\Services\Orders\OrderStatusService;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -23,18 +24,9 @@ class OrderItemInfolist
                     TextEntry::make('order.status')
                         ->label('Status')
                         ->badge()
-                        ->formatStateUsing(fn ($state) => match ($state) {
-                            'pending'               => 'Pending',
-                            'confirmed'             => 'Confirmed',
-                            'paid'                  => 'Paid',
-                            'shipped'               => 'Dispatched',
-                            'delivered'             => 'Delivered',
-                            'cancelled'             => 'Cancelled',
-                            'paid_but_failed_stock' => 'Stock Issue',
-                            default                 => ucfirst($state),
-                        })
+                        ->formatStateUsing(fn ($state) => OrderStatusService::LABELS[$state] ?? ucfirst((string) $state))
                         ->color(fn ($state) => match ($state) {
-                            'confirmed'                          => 'info',
+                            'confirmed', 'packed'                => 'info',
                             'paid', 'delivered'                  => 'success',
                             'shipped'                            => 'warning',
                             'cancelled', 'paid_but_failed_stock' => 'danger',
