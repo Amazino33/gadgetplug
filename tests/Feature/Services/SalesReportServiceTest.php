@@ -65,8 +65,15 @@ function makePosSale(array $ctx, float $unitPrice, float $unitCost, int $qty, ?C
     return $sale;
 }
 
-function makeOnlineOrder(array $ctx, float $unitPrice, float $unitCost, int $qty, string $status = 'paid'): Order
+// A Paystack order at $status. Paid and onward, its revenue is recorded (as
+// the status service does at payment) — that, not the status, is what makes it
+// a sale in the report.
+function makeOnlineOrder(array $ctx, float $unitPrice, float $unitCost, int $qty, string $status = 'paid', string $method = 'paystack', ?CarbonImmutable $recordedAt = null): Order
 {
+    $recorded = $recordedAt ?? (
+        $method === 'paystack' && in_array($status, ['paid', 'packed', 'shipped', 'delivered'], true) ? CarbonImmutable::now() : null
+    );
+
     $order = Order::create([
         'user_id' => $ctx['owner']->id,
         'reference' => 'GP-'.Str::random(10),
@@ -76,7 +83,8 @@ function makeOnlineOrder(array $ctx, float $unitPrice, float $unitCost, int $qty
         'shipping_address' => 'Uyo',
         'total_amount' => $unitPrice * $qty,
         'status' => $status,
-        'payment_method' => 'paystack',
+        'payment_method' => $method,
+        'revenue_recognized_at' => $recorded,
     ]);
 
     OrderItem::create([
@@ -274,4 +282,55 @@ it('reports online order counts by status, including ones not yet earning revenu
     );
 
     expect($breakdown)->toBe(['paid' => 1, 'confirmed' => 2, 'cancelled' => 1]);
+});
+
+// ── Counted when the revenue is recorded, not by status ──────────────────────
+
+it('counts a paid order while it is packed or with the rider', function () {
+    $ctx = makeReportVendor('In Transit Store');
+    makeOnlineOrder($ctx, unitPrice: 2000, unitCost: 1000, qty: 1, status: 'packed');
+    makeOnlineOrder($ctx, unitPrice: 3000, unitCost: 1000, qty: 1, status: 'shipped');
+
+    $summary = app(SalesReportService::class)->summary($ctx['vendor']->id, CarbonImmutable::now()->subDay(), CarbonImmutable::now()->addDay());
+
+    expect($summary['revenue'])->toEqualWithDelta(5000.0, 0.01)
+        ->and($summary['orders'])->toBe(2);
+});
+
+it('does not count a delivered pay-on-delivery order until its payment is recorded, then counts it on that date', function () {
+    $ctx = makeReportVendor('POD Store');
+    makeOnlineOrder($ctx, unitPrice: 4000, unitCost: 1000, qty: 1, status: 'delivered', method: 'pay_on_delivery');
+
+    $from = CarbonImmutable::now()->subDays(10);
+    $to = CarbonImmutable::now()->addDay();
+
+    expect(app(SalesReportService::class)->summary($ctx['vendor']->id, $from, $to)['revenue'])->toEqualWithDelta(0.0, 0.01);
+
+    // Placed long ago, paid for today: it belongs to today.
+    $old = makeOnlineOrder($ctx, unitPrice: 6000, unitCost: 1000, qty: 1, status: 'delivered', method: 'pay_on_delivery', recordedAt: CarbonImmutable::now());
+    $old->forceFill(['created_at' => now()->subDays(60)])->saveQuietly();
+
+    $summary = app(SalesReportService::class)->summary($ctx['vendor']->id, $from, $to);
+    $series  = app(SalesReportService::class)->dailySeries($ctx['vendor']->id, $from, $to);
+
+    expect($summary['revenue'])->toEqualWithDelta(6000.0, 0.01)
+        ->and(array_sum($series['revenue']))->toEqualWithDelta(6000.0, 0.01);
+});
+
+it('leaves out a sale that was cancelled after its revenue was recorded', function () {
+    $ctx = makeReportVendor('Cancelled After Paid Store');
+    makeOnlineOrder($ctx, unitPrice: 5000, unitCost: 1000, qty: 1, status: 'cancelled', recordedAt: CarbonImmutable::now());
+
+    $summary = app(SalesReportService::class)->summary($ctx['vendor']->id, CarbonImmutable::now()->subDay(), CarbonImmutable::now()->addDay());
+
+    expect($summary['revenue'])->toEqualWithDelta(0.0, 0.01)
+        ->and(app(SalesReportService::class)->topProducts($ctx['vendor']->id, CarbonImmutable::now()->subDay(), CarbonImmutable::now()->addDay()))->toBeEmpty();
+});
+
+it('counts a wallet purchase as a sale at its payment', function () {
+    $ctx = makeReportVendor('Wallet Sale Store');
+    makeOnlineOrder($ctx, unitPrice: 2500, unitCost: 1000, qty: 2, status: 'confirmed', method: 'wallet', recordedAt: CarbonImmutable::now());
+
+    expect(app(SalesReportService::class)->summary($ctx['vendor']->id, CarbonImmutable::now()->subDay(), CarbonImmutable::now()->addDay())['revenue'])
+        ->toEqualWithDelta(5000.0, 0.01);
 });

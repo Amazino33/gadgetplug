@@ -37,10 +37,23 @@ use Illuminate\Support\Facades\DB;
 class SalesReportService
 {
     /**
-     * Order statuses that represent money actually earned online.
-     * 'confirmed'/'shipped' are deliberately excluded — those are not yet paid.
+     * An online sale counts when its revenue is recorded — the moment the money
+     * is in hand: Paystack and wallet orders at payment, pay-on-delivery when
+     * GadgetPlug records the payment received — and on that date, the same
+     * basis as the Financial Report (orders.revenue_recognized_at). Not by
+     * status: a paid order that is packed or with the rider is still a sale,
+     * and a delivered pay-on-delivery order is not one until it is paid for.
+     *
+     * A recorded sale that was later cancelled is left out: its revenue was
+     * reversed, so it was never earned.
      */
-    private const PAID_ORDER_STATUSES = ['paid', 'delivered'];
+    private static function recordedOnline($query, CarbonInterface $from, CarbonInterface $to)
+    {
+        return $query
+            ->whereNotNull('orders.revenue_recognized_at')
+            ->whereBetween('orders.revenue_recognized_at', [$from, $to])
+            ->where('orders.status', '!=', 'cancelled');
+    }
 
     // Shared by the totals and the per-day series so the stat cards and the
     // chart can never disagree about what a naira of revenue or cost is.
@@ -109,10 +122,9 @@ class SalesReportService
             ->join('orders', 'orders.id', '=', 'order_items.order_id')
             ->join('products', 'products.id', '=', 'order_items.product_id')
             ->where('order_items.vendor_id', $vendorId)
-            ->whereIn('orders.status', self::PAID_ORDER_STATUSES)
-            ->whereBetween('orders.created_at', [$from, $to])
-            ->groupBy(DB::raw('DATE(orders.created_at)'))
-            ->selectRaw('DATE(orders.created_at) as day')
+            ->tap(fn ($q) => self::recordedOnline($q, $from, $to))
+            ->groupBy(DB::raw('DATE(orders.revenue_recognized_at)'))
+            ->selectRaw('DATE(orders.revenue_recognized_at) as day')
             ->selectRaw(self::ONLINE_REVENUE_SQL.' as revenue')
             ->selectRaw(self::ONLINE_COST_SQL.' as cost')
             ->get()
@@ -289,8 +301,7 @@ class SalesReportService
                 'storeAllocations',
                 fn ($a) => $a->where('store_id', $storeId),
             ))
-            ->whereIn('orders.status', self::PAID_ORDER_STATUSES)
-            ->whereBetween('orders.created_at', [$from, $to])
+            ->tap(fn ($q) => self::recordedOnline($q, $from, $to))
             ->groupBy('order_items.product_id', 'products.name')
             ->selectRaw('order_items.product_id, products.name as name')
             ->selectRaw('SUM(order_items.quantity) as units')
@@ -359,8 +370,7 @@ class SalesReportService
             ->join('orders', 'orders.id', '=', 'order_items.order_id')
             ->join('products', 'products.id', '=', 'order_items.product_id')
             ->where('order_items.vendor_id', $vendorId)
-            ->whereIn('orders.status', self::PAID_ORDER_STATUSES)
-            ->whereBetween('orders.created_at', [$from, $to])
+            ->tap(fn ($q) => self::recordedOnline($q, $from, $to))
             ->selectRaw('COUNT(DISTINCT order_items.order_id) as orders')
             ->selectRaw('SUM(CASE WHEN order_items.unit_cost IS NULL THEN 1 ELSE 0 END) as estimated')
             ->first();
