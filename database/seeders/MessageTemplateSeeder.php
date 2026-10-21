@@ -16,6 +16,12 @@ class MessageTemplateSeeder extends Seeder
     /**
      * @return array<int, array<string, mixed>>
      */
+    /** One shipped default body, by key. */
+    public static function defaultBody(string $key): ?string
+    {
+        return collect(self::defaults())->firstWhere('key', $key)['body'] ?? null;
+    }
+
     public static function defaults(): array
     {
         return [
@@ -97,7 +103,18 @@ class MessageTemplateSeeder extends Seeder
                 'key'            => 'customer_delivery_code',
                 'recipient_type' => 'customer',
                 'channel'        => 'whatsapp',
-                'body'           => "Hello {{customer_name}} 👋\n\nYour order *{{order_number}}* is on its way.\n\nYour delivery code is *{{delivery_code}}*\nGive it to the rider only when your items are in your hands — they need it to complete the delivery.\n\n{{collect_line}}\n\nThank you for shopping with GadgetPlug 💚",
+                // The one message at handover: "on its way" and the delivery
+                // code together (the vendor's customer_dispatched no longer
+                // goes out on its own when an order is handed over).
+                'body'           => "Hello {{customer_name}} 👋\n\nYour order *{{order_number}}* is on its way!\n\n*Your items*\n{{order_items}}\n\n*Deliver to:* {{delivery_address}}\n{{collect_line}}\n\nYour delivery code is *{{delivery_code}}*\nGive it to the rider only when your items are in your hands — they need it to complete the delivery.\n\n{{rider_line}}\n\nThank you for shopping with GadgetPlug 💚",
+            ],
+            [
+                // To the vendor owner's WhatsApp (owner_whatsapp) — sent only
+                // when one is set.
+                'key'            => 'vendor_new_order',
+                'recipient_type' => 'vendor',
+                'channel'        => 'whatsapp',
+                'body'           => "New online order 🛍️\n\n*Order:* {{order_number}}\n*Items ({{item_count}})*\n{{order_items}}\n\n*Total:* {{total}}\n*Payment:* {{payment_method}}\n\nYour store has been asked to pack it.",
             ],
             [
                 'key'            => 'logistics_dispatch',

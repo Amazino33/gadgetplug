@@ -330,7 +330,10 @@ describe('the customer confirmation shows the delivery fee', function () {
         expect(confirmationFor(Order::sole()))->toContain('*Delivery:* Free')->toContain('*Total to pay:* ₦10,000.00');
     });
 
-    test('mixed checkout: only REF-1 carries the fee and the grand total; the other parts point at it', function () {
+    // One confirmation per checkout (Prompt 3, Phase 5): a checkout split
+    // across vendors confirms once, listing every part, with the fee and the
+    // grand total once.
+    test('mixed checkout: one confirmation for the whole checkout, every part listed, fee and total once', function () {
         DeliveryRule::setForLga(lga('Ikot Ekpene'), ['mode' => 'fee', 'fee' => 1500]);
         $a = deliveryVendor('Alpha');
         $b = deliveryVendor('Beta');
@@ -344,21 +347,21 @@ describe('the customer confirmation shows the delivery fee', function () {
 
         deliveryCheckout([[$pa, 1], [$pb, 1]], lga('Ikot Ekpene'))->call('processCheckout');
 
-        [$first, $second] = Checkout::sole()->orders->all();
-        $msgA = confirmationFor($first);
-        $msgB = confirmationFor($second);
+        $checkout = Checkout::sole();
+        [$first, $second] = $checkout->orders->all();
+        $confirmations = DeliveryMessage::whereIn('order_id', [$first->id, $second->id])
+            ->where('recipient_type', 'customer')->get();
+        $body = $confirmations->sole()->body;
 
-        expect($first->reference)->toEndWith('-1')
-            ->and($msgA)->toContain('ALPHA THING')->not->toContain('BETA THING')
-            ->toContain('*Items (this part):* ₦10,000.00')
-            ->toContain('*Delivery (whole order):* ₦1,500.00')
-            ->toContain('*Total to pay (whole order, all 2 parts):* ₦51,500.00')
-            ->and($msgB)->toContain('BETA THING')->not->toContain('ALPHA THING')
-            ->toContain('*Items (this part):* ₦40,000.00')
-            ->toContain('*Total to pay for this part:* ₦40,000.00')
-            ->toContain('Delivery fee is on '.$first->reference.'.')
-            ->not->toContain('₦1,500')
-            ->not->toContain('₦51,500');
+        expect($confirmations)->toHaveCount(1)
+            ->and($confirmations->sole()->vendor_id)->toBeNull()
+            ->and($body)->toContain($checkout->reference)
+            ->toContain('ALPHA THING')->toContain('BETA THING')
+            ->toContain('*'.$first->reference.'*')->toContain('*'.$second->reference.'*')
+            ->toContain('*Items:* ₦50,000.00')
+            ->toContain('*Delivery:* ₦1,500.00')
+            ->toContain('*Total to pay:* ₦51,500.00')
+            ->and(substr_count($body, '₦1,500.00'))->toBe(1);
     });
 
     test('vendors\' stored copies of the template are switched to the new lines; customised ones are left alone', function () {

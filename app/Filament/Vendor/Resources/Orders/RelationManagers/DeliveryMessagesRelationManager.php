@@ -44,10 +44,15 @@ class DeliveryMessagesRelationManager extends RelationManager
                         'sent', 'link_generated' => 'success',
                         'queued'                 => 'gray',
                         'failed'                 => 'danger',
+                        'held'                   => 'warning',
                         default                  => 'gray',
                     })
                     ->formatStateUsing(fn (string $state) => match ($state) {
                         'link_generated' => 'Link Generated',
+                        // WhatsApp paused: goes out when an admin resumes.
+                        'held'           => 'Held',
+                        // Sent as part of a combined message to the same number.
+                        'merged'         => 'Combined',
                         default          => ucfirst($state),
                     }),
 

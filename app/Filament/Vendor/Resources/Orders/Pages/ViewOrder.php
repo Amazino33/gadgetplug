@@ -43,16 +43,12 @@ class ViewOrder extends ViewRecord
                         ->options(fn () => OrderStatusService::storeOptionsFor($this->record))
                         ->live()
                         ->required(),
-
-                    Toggle::make('notify_customer')
-                        ->label('Notify customer')
-                        ->helperText('Sends the matching customer update automatically. Turn off to change status silently.')
-                        ->default(true)
-                        ->visible(fn ($get) => $get('status') === 'shipped'),
+                    // No "notify customer" switch: at handover the customer always
+                    // gets their delivery code — the order cannot be delivered without it.
                 ])
                 ->action(function (array $data): void {
                     try {
-                        OrderStatusService::applyStoreStep($this->record, auth()->user(), $data['status'], $data['notify_customer'] ?? true);
+                        OrderStatusService::applyStoreStep($this->record, auth()->user(), $data['status']);
                     } catch (InvalidOrderTransition|AuthorizationException $e) {
                         Notification::make()->title($e instanceof AuthorizationException ? 'Only staff of the store holding this order can update it.' : $e->getMessage())->danger()->send();
 
@@ -84,7 +80,9 @@ class ViewOrder extends ViewRecord
                         ->label('Send to')
                         ->options(fn () => array_filter([
                             'customer' => 'Customer',
-                            'rider' => $this->record->delivery_person_id ? 'Rider' : null,
+                            // The rider GadgetPlug assigned (or their company's dispatch
+                            // line); a vendor's own rider only on older orders.
+                            'rider' => $this->record->riderContactNumber() ? 'Rider' : null,
                         ]))
                         ->default('customer')
                         ->live()
@@ -130,7 +128,7 @@ class ViewOrder extends ViewRecord
                     $order = $this->record;
                     $to = $data['recipient_type'] === 'customer'
                         ? $order->customer_phone
-                        : $order->deliveryPerson?->phone;
+                        : $order->riderContactNumber();
 
                     if (! $to) {
                         Notification::make()

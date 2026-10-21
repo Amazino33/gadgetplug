@@ -25,10 +25,13 @@ class OrderObserver
     //
     // 'out_for_delivery' isn't a status this app's orders table uses; its template
     // exists for vendors who send that message by hand from the order page.
+    //
+    // No 'shipped' entry: at handover the customer gets ONE message — "on its
+    // way" with their delivery code — sent by OrderStatusService/DispatchMessages
+    // (customer_delivery_code). customer_dispatched stays for sending by hand.
     private const CUSTOMER_STATUS_TEMPLATES = [
         'paid'      => 'customer_received',
         'confirmed' => 'customer_received',
-        'shipped'   => 'customer_dispatched',
         'delivered' => 'customer_delivered',
     ];
 
@@ -197,6 +200,42 @@ class OrderObserver
                     ->success()
                     ->sendToDatabase($user);
             }
+
+            $this->whatsAppVendorOwner($vendor, $order);
+        }
+    }
+
+    // The owner's own WhatsApp alert, when they have given an owner number.
+    // Non-urgent (P2), so three orders in two minutes arrive as one message.
+    private function whatsAppVendorOwner(\App\Models\Vendor $vendor, Order $order): void
+    {
+        try {
+            $to = \App\Models\VendorNotificationSetting::forVendor($vendor)->owner_whatsapp;
+
+            if (blank($to)) {
+                return;
+            }
+
+            $template = MessageTemplate::resolveFor($vendor->id, 'vendor_new_order');
+
+            if (! $template) {
+                return;
+            }
+
+            $message = DeliveryMessage::create([
+                'vendor_id'      => $vendor->id,
+                'order_id'       => $order->id,
+                'recipient_type' => 'vendor',
+                'channel'        => $template->channel,
+                'to_number'      => $to,
+                'body'           => app(TemplateRenderer::class)->render($template->body, TemplateRenderer::contextForOrder($order, TemplateRenderer::AUDIENCE_STOREKEEPER)),
+                'status'         => 'queued',
+                'template_key'   => 'vendor_new_order',
+            ]);
+
+            app(MessagingService::class)->dispatch($message);
+        } catch (\Throwable $e) {
+            Log::warning("Vendor new-order WhatsApp failed for order {$order->id}: ".$e->getMessage());
         }
     }
 
@@ -232,14 +271,28 @@ class OrderObserver
             return;
         }
 
+        // The confirmation is one per checkout, not one per vendor part: the
+        // first part to settle claims it and lists the whole checkout. It is
+        // GadgetPlug's message, so it is filed under no vendor.
+        $checkout = $templateKey === 'customer_received' ? $order->checkout : null;
+
+        if ($checkout && ! $checkout->claimCustomerConfirmation()) {
+            return;
+        }
+
+        $context = $checkout
+            ? TemplateRenderer::contextForCheckout($checkout)
+            : TemplateRenderer::contextForOrder($order, TemplateRenderer::AUDIENCE_CUSTOMER);
+
         $message = DeliveryMessage::create([
-            'vendor_id'      => $vendorId,
+            'vendor_id'      => $checkout ? null : $vendorId,
             'order_id'       => $order->id,
             'recipient_type' => 'customer',
             'channel'        => $template->channel,
             'to_number'      => $order->customer_phone,
-            'body'           => app(TemplateRenderer::class)->render($template->body, TemplateRenderer::contextForOrder($order, TemplateRenderer::AUDIENCE_CUSTOMER)),
+            'body'           => app(TemplateRenderer::class)->render($template->body, $context),
             'status'         => 'queued',
+            'template_key'   => $templateKey,
         ]);
 
         // Queued: this runs inside checkout, which must not wait on a gateway.

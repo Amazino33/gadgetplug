@@ -5,6 +5,8 @@ namespace App\Services\Messaging;
 use App\Models\DeliveryMessage;
 use App\Models\MessageTemplate;
 use App\Models\Order;
+use App\Models\OrderItemStoreAllocation;
+use App\Models\User;
 use App\Models\PlatformMessagingSetting;
 use App\Models\Product;
 use App\Models\Store;
@@ -12,6 +14,7 @@ use App\Models\Vendor;
 use App\Models\VendorNotificationSetting;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 // Sends the storekeeper's WhatsApp alerts. Storekeepers are usually on the shop
@@ -38,6 +41,17 @@ class StorekeeperNotifier
         return $this->notifyForOrder($order, 'notify_cancelled', 'storekeeper_cancelled');
     }
 
+    /**
+     * An order alert goes to each store holding the order's stock — the
+     * branch that has to pack it — not to one number for the whole vendor.
+     * Per store, the first of these that exists:
+     *   1. the phones of the storekeepers assigned to that store;
+     *   2. the store's own phone;
+     *   3. the vendor's storekeeper number;
+     *   4. GadgetPlug's fallback number (platform-locked alerts only).
+     * An order holding no stock anywhere (resold lines only) goes the
+     * vendor-level way (3 then 4).
+     */
     private function notifyForOrder(Order $order, string $toggle, string $templateKey): ?DeliveryMessage
     {
         $vendorId = $order->items()->value('vendor_id');
@@ -52,13 +66,116 @@ class StorekeeperNotifier
             return null;
         }
 
-        return $this->notify(
-            vendor: $vendor,
-            templateKey: $templateKey,
-            toggle: $toggle,
-            context: TemplateRenderer::contextForOrder($order, TemplateRenderer::AUDIENCE_STOREKEEPER) + ['store_name' => $vendor->name],
-            order: $order,
-        );
+        $context = TemplateRenderer::contextForOrder($order, TemplateRenderer::AUDIENCE_STOREKEEPER);
+
+        $stores = Store::query()
+            ->whereIn('id', OrderItemStoreAllocation::query()
+                ->whereIn('order_item_id', $order->items()->pluck('id'))
+                ->distinct()
+                ->pluck('store_id'))
+            ->orderBy('id')
+            ->get();
+
+        if ($stores->isEmpty()) {
+            return $this->notify(
+                vendor: $vendor,
+                templateKey: $templateKey,
+                toggle: $toggle,
+                context: $context + ['store_name' => $vendor->name],
+                order: $order,
+            );
+        }
+
+        $last = null;
+        $sentTo = [];
+
+        foreach ($stores as $store) {
+            $own = $this->storeNumbers($vendor, $store);
+
+            // Nothing at this store or the vendor: notify() applies GadgetPlug's
+            // fallback for a locked alert (and logs the gap if there is none).
+            if ($own === []) {
+                $fallbackTo = $this->recipientFor(VendorNotificationSetting::forVendor($vendor), MessageTemplate::isPlatformLocked($templateKey));
+
+                if (filled($fallbackTo) && in_array(PhoneNumber::toNigerianInternational($fallbackTo), $sentTo, true)) {
+                    continue;
+                }
+
+                $last = $this->notify(
+                    vendor: $vendor,
+                    templateKey: $templateKey,
+                    toggle: $toggle,
+                    context: $context + ['store_name' => $vendor->name.' — '.$store->name],
+                    order: $order,
+                ) ?? $last;
+
+                if (filled($fallbackTo)) {
+                    $sentTo[] = PhoneNumber::toNigerianInternational($fallbackTo);
+                }
+
+                continue;
+            }
+
+            $numbers = array_values(array_diff($own, $sentTo));
+
+            foreach ($numbers as $number) {
+                $last = $this->notify(
+                    vendor: $vendor,
+                    templateKey: $templateKey,
+                    toggle: $toggle,
+                    context: $context + ['store_name' => $vendor->name.' — '.$store->name],
+                    order: $order,
+                    to: $number,
+                ) ?? $last;
+
+                $sentTo[] = $number;
+            }
+        }
+
+        return $last;
+    }
+
+    /**
+     * The numbers for one store, by the chain above (steps 1–3; the platform
+     * fallback is applied in notify() for a locked alert).
+     *
+     * @return array<int, string>
+     */
+    public function storeNumbers(Vendor $vendor, Store $store): array
+    {
+        $storekeeperIds = DB::table('model_has_roles')
+            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+            ->where('roles.name', 'storekeeper')
+            ->where('model_has_roles.team_id', $vendor->id)
+            ->where('model_has_roles.model_type', (new User)->getMorphClass())
+            ->pluck('model_has_roles.model_id');
+
+        $keepers = User::query()
+            ->whereIn('id', $storekeeperIds)
+            ->whereHas('stores', fn ($q) => $q->where('stores.id', $store->id))
+            ->whereNotNull('phone')
+            ->where('phone', '!=', '')
+            ->orderBy('id')
+            ->pluck('phone')
+            ->map(fn ($p) => PhoneNumber::toNigerianInternational($p))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($keepers !== []) {
+            return $keepers;
+        }
+
+        if (filled($store->phone)) {
+            return [PhoneNumber::toNigerianInternational($store->phone)];
+        }
+
+        $settings = VendorNotificationSetting::forVendor($vendor);
+
+        return $settings->hasStorekeeperNumber()
+            ? [PhoneNumber::toNigerianInternational($settings->storekeeper_whatsapp)]
+            : [];
     }
 
     // One digest per vendor listing everything still unshipped, rather than one
@@ -180,6 +297,7 @@ class StorekeeperNotifier
         string $toggle,
         array $context,
         ?Order $order,
+        ?string $to = null,
     ): ?DeliveryMessage {
         $settings = VendorNotificationSetting::forVendor($vendor);
         $locked   = MessageTemplate::isPlatformLocked($templateKey);
@@ -191,7 +309,7 @@ class StorekeeperNotifier
             return null;
         }
 
-        $to = $this->recipientFor($settings, $locked);
+        $to = filled($to) ? $to : $this->recipientFor($settings, $locked);
 
         if (blank($to)) {
             // Only reachable for a locked alert with no vendor number AND no
@@ -222,6 +340,7 @@ class StorekeeperNotifier
             'to_number'      => $to,
             'body'           => app(TemplateRenderer::class)->render($template->body, $context),
             'status'         => 'queued',
+            'template_key'   => $templateKey,
         ]);
 
         return $this->messaging->dispatch($message);

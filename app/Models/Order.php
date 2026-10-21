@@ -270,6 +270,18 @@ class Order extends Model
         return round((float) $this->total_amount + $this->deliveryFeeShare(), 2);
     }
 
+    /**
+     * Who to reach about delivering this order: the rider GadgetPlug named,
+     * else the logistics company's dispatch line, else (orders from before
+     * platform dispatch) the vendor's own rider.
+     */
+    public function riderContactNumber(): ?string
+    {
+        return $this->rider_phone
+            ?: $this->logisticsCompany?->dispatchNumber()
+            ?: $this->deliveryPerson?->phone;
+    }
+
     public function isDeliveryCodeLocked(): bool
     {
         return $this->delivery_code_locked_at !== null;

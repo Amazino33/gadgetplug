@@ -78,4 +78,15 @@ class Checkout extends Model
             ->whereNull('purchase_tracked_at')
             ->update(['purchase_tracked_at' => now()]) === 1;
     }
+
+    /**
+     * Claim the one customer confirmation for this checkout, atomically, so a
+     * checkout split across vendors confirms once — not once per part.
+     */
+    public function claimCustomerConfirmation(): bool
+    {
+        return static::whereKey($this->id)
+            ->whereNull('customer_confirmation_sent_at')
+            ->update(['customer_confirmation_sent_at' => now()]) === 1;
+    }
 }

@@ -212,6 +212,7 @@ test('message template seeder creates the expected default templates for a vendo
         'storekeeper_undispatched',
         'storekeeper_unremitted_cash',
         'vendor_daily_summary',
+        'vendor_new_order',
     ]);
 });
 

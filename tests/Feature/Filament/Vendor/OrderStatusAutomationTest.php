@@ -53,16 +53,6 @@ function setUpAutomationOrderVendor(string $initialStatus = 'paid'): array
     return compact('owner', 'vendor', 'order');
 }
 
-// Handing over also sends the customer their delivery code (a platform message
-// that cannot be switched off); these tests are about the vendor's own
-// "dispatched" message, so that one is left out.
-function dispatchedMessageExists(Order $order): bool
-{
-    return DeliveryMessage::where('order_id', $order->id)
-        ->where('body', 'not like', '%delivery code%')
-        ->exists();
-}
-
 function actAsAutomationVendor(array $data): void
 {
     test()->actingAs($data['owner']);
@@ -84,7 +74,11 @@ function actAsAutomationAdmin(): void
     Filament::bootCurrentPanel();
 }
 
-test('advancing status to shipped auto-sends the customer_dispatched template', function () {
+// Handover sends the customer ONE message (Prompt 3, Phase 5): on its way,
+// what to have ready, and the delivery code — not the vendor's separate
+// customer_dispatched, which is now for sending by hand only. It cannot be
+// silenced: without the code the order cannot be marked delivered.
+test('handing over sends the customer one message: on its way, with the delivery code', function () {
     $data = setUpAutomationOrderVendor('paid');
     MessageTemplate::create([
         'vendor_id' => $data['vendor']->id,
@@ -98,18 +92,22 @@ test('advancing status to shipped auto-sends the customer_dispatched template', 
 
     Livewire::test(ViewOrder::class, ['record' => $data['order']->getRouteKey()])
         ->mountAction('updateStatus')
-        ->setActionData(['status' => 'shipped', 'notify_customer' => true])
+        ->setActionData(['status' => 'shipped'])
         ->callMountedAction()
         ->assertHasNoActionErrors();
 
-    $message = DeliveryMessage::where('order_id', $data['order']->id)->where('recipient_type', 'customer')->first();
+    $messages = DeliveryMessage::where('order_id', $data['order']->id)->where('recipient_type', 'customer')->get();
+    $message = $messages->sole();
 
-    expect($message)->not->toBeNull()
-        ->and($message->channel)->toBe('whatsapp')
+    expect($message->channel)->toBe('whatsapp')
         ->and($message->to_number)->toBe('2348040000000')
-        ->and($message->body)->toBe('Hi Jane Customer, order '.$data['order']->reference.' is dispatched.')
+        ->and($message->body)->toContain('is on its way')
+        ->and($message->body)->toMatch('/delivery code is \*\d{4}\*/')
+        ->and($message->body)->toContain('Automation Product')
+        ->and($message->body)->not->toContain('is dispatched.')
         ->and($message->status)->toBe('sent')
-        ->and($message->sent_by)->toBeNull();
+        ->and($message->sent_by)->toBeNull()
+        ->and($data['order']->fresh()->status)->toBe('shipped');
 });
 
 test('advancing status to delivered auto-sends the customer_delivered template', function () {
@@ -135,62 +133,56 @@ test('advancing status to delivered auto-sends the customer_delivered template',
         ->and($message->body)->toBe('Hi Jane Customer, order '.$data['order']->reference.' delivered. Thanks!');
 });
 
-test('the notify toggle set to false suppresses the customer message but still updates status', function () {
-    $data = setUpAutomationOrderVendor('paid');
+test('the notify toggle set to false suppresses the delivered message but still updates status', function () {
+    $data = setUpAutomationOrderVendor('shipped');
     MessageTemplate::create([
         'vendor_id' => $data['vendor']->id,
-        'key' => 'customer_dispatched',
+        'key' => 'customer_delivered',
         'recipient_type' => 'customer',
         'channel' => 'whatsapp',
-        'body' => 'Hi {{customer_name}}, dispatched.',
+        'body' => 'Hi {{customer_name}}, delivered.',
     ]);
 
-    actAsAutomationVendor($data);
+    actAsAutomationAdmin();
 
-    Livewire::test(ViewOrder::class, ['record' => $data['order']->getRouteKey()])
-        ->mountAction('updateStatus')
-        ->setActionData(['status' => 'shipped', 'notify_customer' => false])
-        ->callMountedAction()
+    Livewire::test(App\Filament\Resources\Orders\Pages\ViewOrder::class, ['record' => $data['order']->getRouteKey()])
+        ->callAction('markDelivered', data: ['reason' => 'Customer confirmed', 'notify_customer' => false])
         ->assertHasNoActionErrors();
 
-    expect(dispatchedMessageExists($data['order']))->toBeFalse()
-        ->and($data['order']->fresh()->status)->toBe('shipped');
+    expect(DeliveryMessage::where('order_id', $data['order']->id)->exists())->toBeFalse()
+        ->and($data['order']->fresh()->status)->toBe('delivered');
 });
 
-test('no message is sent when there is no active matching template for the vendor', function () {
-    $data = setUpAutomationOrderVendor('paid');
-    actAsAutomationVendor($data);
+test('no delivered message is sent when there is no active matching template for the vendor', function () {
+    $data = setUpAutomationOrderVendor('shipped');
+    actAsAutomationAdmin();
 
-    Livewire::test(ViewOrder::class, ['record' => $data['order']->getRouteKey()])
-        ->mountAction('updateStatus')
-        ->setActionData(['status' => 'shipped', 'notify_customer' => true])
-        ->callMountedAction()
+    Livewire::test(App\Filament\Resources\Orders\Pages\ViewOrder::class, ['record' => $data['order']->getRouteKey()])
+        ->callAction('markDelivered', data: ['reason' => 'Customer confirmed', 'notify_customer' => true])
         ->assertHasNoActionErrors();
 
-    expect(dispatchedMessageExists($data['order']))->toBeFalse()
-        ->and($data['order']->fresh()->status)->toBe('shipped');
+    expect(DeliveryMessage::where('order_id', $data['order']->id)->exists())->toBeFalse()
+        ->and($data['order']->fresh()->status)->toBe('delivered');
 });
 
 test('an inactive template is never used for automatic customer notification', function () {
-    $data = setUpAutomationOrderVendor('paid');
+    $data = setUpAutomationOrderVendor('shipped');
     MessageTemplate::create([
         'vendor_id' => $data['vendor']->id,
-        'key' => 'customer_dispatched',
+        'key' => 'customer_delivered',
         'recipient_type' => 'customer',
         'channel' => 'whatsapp',
-        'body' => 'Hi {{customer_name}}, dispatched.',
+        'body' => 'Hi {{customer_name}}, delivered.',
         'is_active' => false,
     ]);
 
-    actAsAutomationVendor($data);
+    actAsAutomationAdmin();
 
-    Livewire::test(ViewOrder::class, ['record' => $data['order']->getRouteKey()])
-        ->mountAction('updateStatus')
-        ->setActionData(['status' => 'shipped', 'notify_customer' => true])
-        ->callMountedAction()
+    Livewire::test(App\Filament\Resources\Orders\Pages\ViewOrder::class, ['record' => $data['order']->getRouteKey()])
+        ->callAction('markDelivered', data: ['reason' => 'Customer confirmed', 'notify_customer' => true])
         ->assertHasNoActionErrors();
 
-    expect(dispatchedMessageExists($data['order']))->toBeFalse();
+    expect(DeliveryMessage::where('order_id', $data['order']->id)->exists())->toBeFalse();
 });
 
 test('cancelling an order never sends a customer message regardless of the notify toggle', function () {

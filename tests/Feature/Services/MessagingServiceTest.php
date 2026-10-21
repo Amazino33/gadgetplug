@@ -478,13 +478,15 @@ test('a provider failure is recorded as a failed status without throwing', funct
         ->and($result->sent_at)->toBeNull();
 });
 
-test('sending persists the normalized to_number back onto the delivery message row', function () {
+test('the to_number is stored normalized from the start, and stays so after sending', function () {
     config(['services.termii.api_key' => null, 'services.messaging.sms_driver' => null]);
 
     $data = setUpMessagingVendor();
     $message = makeDeliveryMessage($data['vendor'], $data['order'], 'sms');
 
-    expect($message->to_number)->toBe('08040000000');
+    // Normalized when the row is created, so the WhatsApp throttle and digest
+    // match "the same number" however it was typed.
+    expect($message->to_number)->toBe('2348040000000');
 
     $result = app(MessagingService::class)->send($message);
 

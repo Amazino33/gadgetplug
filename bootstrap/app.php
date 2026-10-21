@@ -57,7 +57,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // --stop-when-empty exits as soon as both queues are clear rather
         // than idling; --max-time=50 is a safety net so a run can't still be
         // going when the next minute's cron tick starts.
-        $schedule->command('queue:work --queue=meta,messaging,default --stop-when-empty --max-time=50')
+        // WhatsApp lanes after meta and before default: P1 (codes, confirmations,
+        // rider links) is always taken first; throttled messages wait as delayed
+        // jobs, not in a sleeping worker.
+        $schedule->command('queue:work --queue=meta,messaging-p1,messaging,messaging-p2,messaging-p3,default --stop-when-empty --max-time=50')
             ->everyMinute()
             ->withoutOverlapping();
 
@@ -95,6 +98,12 @@ return Application::configure(basePath: dirname(__DIR__))
         // sitting stuck for up to a day longer than that window blocks real
         // stock from real buyers the whole time it waits.
         $schedule->job(new ReleaseStaleReservationsJob())->hourly();
+
+        // Packed but not handed over: a reminder to admin dispatch, not the
+        // storekeeper. The command keeps its own interval between reminders.
+        $schedule->command('dispatch:remind-packed')
+            ->hourly()
+            ->withoutOverlapping();
 
         // Daily, in the morning: the threshold is measured in days, and the
         // action it asks for — walk the cash to somebody — can only happen in

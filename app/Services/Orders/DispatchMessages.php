@@ -21,14 +21,19 @@ use Throwable;
  * (the global sender), and the alert to dispatch staff when a rider link locks.
  *
  * Both templates are platform-locked: a vendor cannot switch them off, and a
- * vendor with no stored row gets the shipped default.
+ * vendor with no stored row gets the shipped default. Both are urgent (P1):
+ * the handover message carries the customer's code, the other the rider link.
  */
 class DispatchMessages
 {
     /** How long a rider link works. */
     public const LINK_HOURS = 48;
 
-    /** The customer's delivery code — the only place it ever appears in plain text. */
+    /**
+     * The customer's one message at handover: on its way, what to have ready,
+     * and the delivery code — the only place the code ever appears in plain
+     * text. Also sent alone when dispatch issues a new code.
+     */
     public function sendDeliveryCode(Order $order, string $code): void
     {
         $this->queue($order, 'customer_delivery_code', $order->customer_phone, TemplateRenderer::AUDIENCE_CUSTOMER, [
@@ -141,8 +146,9 @@ class DispatchMessages
                 return;
             }
 
+            // GadgetPlug's own message: tied to the order, filed under no vendor.
             $message = DeliveryMessage::create([
-                'vendor_id'      => $vendorId,
+                'vendor_id'      => null,
                 'order_id'       => $order->id,
                 'recipient_type' => $template->recipient_type,
                 'channel'        => $template->channel,
@@ -152,6 +158,7 @@ class DispatchMessages
                     TemplateRenderer::contextForOrder($order, $audience) + $extra,
                 ),
                 'status'         => 'queued',
+                'template_key'   => $key,
             ]);
 
             app(MessagingService::class)->dispatch($message);

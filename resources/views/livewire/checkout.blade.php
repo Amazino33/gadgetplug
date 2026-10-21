@@ -458,6 +458,23 @@ new class extends Component {
             : collect();
     }
 
+    /**
+     * The success page's "Get updates on WhatsApp": a chat with our automation
+     * number, opened by the customer, the order reference already typed.
+     * Customer-first: the customer starts the chat, so our messages to them
+     * are replies to a conversation they opened.
+     */
+    public function updatesWhatsAppUrl(?string $reference): ?string
+    {
+        $number = PhoneNumber::toNigerianInternational(config('messaging.automation_whatsapp'));
+
+        if (blank($number) || blank($reference)) {
+            return null;
+        }
+
+        return 'https://wa.me/'.$number.'?text='.rawurlencode('Hi GadgetPlug, my order is '.$reference);
+    }
+
     /** Our WhatsApp, for "we don't deliver there yet — ask us". */
     public function supportWhatsApp(): ?string
     {
@@ -898,6 +915,14 @@ that screen is where they carry on shopping, not somewhere to be held. --}}
             <span class="text-[11px] text-brand-muted font-medium">Order Reference:</span>
             <span class="font-montserrat font-black text-[12px] text-brand tracking-wide">{{ $paidReference }}</span>
         </div>
+
+        @if ($updatesUrl = $this->updatesWhatsAppUrl($paidReference))
+            <a href="{{ $updatesUrl }}" target="_blank" rel="noopener"
+               class="-mt-4 mb-8 inline-flex items-center gap-2 rounded-full bg-[#25D366] px-5 py-2.5 text-[13px] font-bold text-white shadow-sm hover:bg-[#1ebe5b]">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.7.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.8 11.8 0 0 0 4.5 4c1.7.7 2.3.8 3.1.6a2.7 2.7 0 0 0 1.8-1.3 2.2 2.2 0 0 0 .2-1.3c-.1-.1-.3-.2-.5-.3z"/></svg>
+                Get updates on WhatsApp
+            </a>
+        @endif
 
         <div class="w-full max-w-[620px] space-y-4 text-left">
 

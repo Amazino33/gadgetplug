@@ -51,6 +51,48 @@ class TemplateRenderer
     }
 
     /**
+     * The whole checkout, for the one customer confirmation: every part's
+     * items (grouped by part when there is more than one) and the checkout's
+     * own totals — items, delivery fee, what is paid or to pay.
+     *
+     * @return array<string, string>
+     */
+    public static function contextForCheckout(\App\Models\Checkout $checkout): array
+    {
+        $checkout->loadMissing('orders.items.product');
+        $parts = $checkout->orders->sortBy('id')->values();
+        $first = $parts->first();
+        $prepaid = in_array($checkout->payment_method, ['paystack', 'wallet'], true);
+        $fee = (float) $checkout->delivery_fee;
+
+        $items = $parts->count() > 1
+            ? $parts->map(fn (Order $part) => '*'.$part->reference."*\n".self::itemLines($part))->implode("\n\n")
+            : ($first ? self::itemLines($first) : '');
+
+        $summary = '*Items:* '.self::naira($checkout->items_total)
+            ."\n*Delivery:* ".($fee > 0 ? self::naira($fee) : 'Free')
+            ."\n*".($prepaid ? 'Total paid' : 'Total to pay').':* '.self::naira($checkout->grand_total)
+            .($parts->count() > 1 ? "\n_Your order comes from ".$parts->count().' stores, so it may arrive in '.$parts->count().' deliveries._' : '');
+
+        return [
+            'customer_name'    => $checkout->customer_name,
+            'customer_phone'   => $checkout->customer_phone,
+            'order_number'     => $checkout->reference,
+            'rider_name'       => '',
+            'rider_phone'      => '',
+            'company_name'     => '',
+            'rider_line'       => 'Our dispatch rider will call you soon to arrange delivery.',
+            'status'           => (string) $first?->status,
+            'total'            => self::naira($checkout->grand_total),
+            'delivery_address' => $checkout->shipping_address,
+            'order_items'      => $items,
+            'item_count'       => (string) $parts->sum(fn (Order $part) => self::itemCount($part)),
+            'payment_method'   => $first ? self::paymentMethod($first) : (string) $checkout->payment_method,
+            'payment_summary'  => $summary,
+        ];
+    }
+
+    /**
      * The money lines of a customer message: what the items come to, the
      * delivery fee, and what is paid (or still to pay at the door).
      *

@@ -34,6 +34,8 @@ class MessageTemplate extends Model
         'customer_delivery_code',
         // GadgetPlug's dispatch link to the logistics company.
         'logistics_dispatch',
+        // The vendor owner's new-order alert: sent whenever an owner number is set.
+        'vendor_new_order',
     ];
 
     public function vendor(): BelongsTo

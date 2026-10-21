@@ -128,10 +128,11 @@ test('the rider option is unavailable on the send-message form when no rider is 
 
 test('sending a message to a rider with no phone number on file fails gracefully without creating a log entry', function () {
     $data = setUpMessagingOrderVendor();
-    $company = LogisticsCompany::create(['vendor_id' => $data['vendor']->id, 'name' => 'Speedy Dispatch', 'phone' => '08010000000']);
-    $rider = DeliveryPerson::create(['vendor_id' => $data['vendor']->id, 'logistics_company_id' => $company->id, 'name' => 'No Phone Rider', 'phone' => '']);
+    // An older order: the vendor's own rider, no phone, and no company whose
+    // dispatch line could stand in (the rider option falls back to that).
+    $rider = DeliveryPerson::create(['vendor_id' => $data['vendor']->id, 'name' => 'No Phone Rider', 'phone' => '']);
 
-    $data['order']->update(['logistics_company_id' => $company->id, 'delivery_person_id' => $rider->id]);
+    $data['order']->update(['delivery_person_id' => $rider->id]);
 
     actAsMessagingVendor($data);
 
@@ -143,7 +144,8 @@ test('sending a message to a rider with no phone number on file fails gracefully
             'body' => 'You have a delivery.',
         ])
         ->callMountedAction()
-        ->assertHasNoActionErrors();
+        // Nobody to reach: the rider option is not offered at all.
+        ->assertHasActionErrors(['recipient_type']);
 
     expect(DeliveryMessage::where('order_id', $data['order']->id)->exists())->toBeFalse();
 });

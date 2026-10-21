@@ -33,6 +33,12 @@ class MessagingService
         // who the message was for; only the outbound copy is diverted.
         $intendedNumber = $message->to_number;
         $intendedBody   = $message->body;
+        $onWawp         = $message->channel === 'whatsapp' && $this->usesWawp();
+
+        if ($onWawp && ($refusal = $this->refusalOnWawp($message))) {
+            return $refusal;
+        }
+
         $redirectedTo   = $this->applyTestRedirect($message);
 
         try {
@@ -55,6 +61,13 @@ class MessagingService
 
         $message->to_number = $intendedNumber;
         $message->body      = $intendedBody;
+
+        // The brake watches every Wawp send, automated or pressed by hand.
+        if ($onWawp) {
+            $result->status === 'failed'
+                ? app(WhatsAppGate::class)->recordFailure($result->providerResponse)
+                : app(WhatsAppGate::class)->recordSuccess();
+        }
 
         $message->update([
             'to_number' => $intendedNumber,
@@ -81,7 +94,18 @@ class MessagingService
     public function dispatch(DeliveryMessage $message): DeliveryMessage
     {
         try {
-            SendDeliveryMessageJob::dispatch($message->id);
+            $job = SendDeliveryMessageJob::dispatch($message->id)
+                ->onQueue(SendDeliveryMessageJob::queueFor($message));
+
+            // Non-urgent WhatsApp waits out the digest window first, so other
+            // messages to the same number in that window go with it as one.
+            if ($this->throttles($message) && ! $message->isUrgent()) {
+                $job->delay(now()->addSeconds((int) config('messaging.throttle.digest_window', 120)));
+            }
+
+            // A pending dispatch is sent when it is destroyed: release it here,
+            // so a sync queue has run it before the row is read back below.
+            unset($job);
         } catch (Throwable $e) {
             Log::warning('Could not run queued delivery message.', [
                 'delivery_message_id' => $message->id,
@@ -90,6 +114,75 @@ class MessagingService
         }
 
         return $message->fresh() ?? $message;
+    }
+
+    /**
+     * Send an urgent WhatsApp message by SMS instead — WhatsApp is paused or
+     * at its cap. The row becomes an SMS (so the order page shows what really
+     * went), with WhatsApp's *bold* marks taken out.
+     */
+    public function sendAsSms(DeliveryMessage $message, string $reason): DeliveryMessage
+    {
+        $message->update([
+            'channel'           => 'sms',
+            'body'              => str_replace(['*', '_', '~'], '', (string) $message->body),
+            'provider_response' => ['fallback_from' => 'whatsapp', 'fallback_reason' => $reason],
+        ]);
+
+        $sent = $this->send($message);
+
+        $sent->update(['provider_response' => ['fallback_from' => 'whatsapp', 'fallback_reason' => $reason] + (array) $sent->provider_response]);
+
+        return $sent->fresh();
+    }
+
+    /** Whether the WhatsApp throttle and brake apply to this message: WhatsApp, through Wawp, throttle on. */
+    public function throttles(DeliveryMessage $message): bool
+    {
+        return $message->channel === 'whatsapp'
+            && (bool) config('messaging.throttle.enabled', true)
+            && $this->usesWawp();
+    }
+
+    public function usesWawp(): bool
+    {
+        try {
+            return $this->driverKeyFor('whatsapp') === 'wawp';
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * What Wawp must never send: marketing or broadcast (a linked personal
+     * session is banned fast for bulk sending), and anything while sending is
+     * paused (only the queue's SMS fallback goes out then).
+     */
+    private function refusalOnWawp(DeliveryMessage $message): ?DeliveryMessage
+    {
+        $error = match (true) {
+            $message->category === DeliveryMessage::CATEGORY_MARKETING => 'marketing_refused',
+            app(WhatsAppGate::class)->isPaused()                       => 'whatsapp_paused',
+            default                                                     => null,
+        };
+
+        if ($error === null) {
+            return null;
+        }
+
+        Log::warning($error === 'marketing_refused'
+            ? 'Refused a marketing/broadcast message on the Wawp WhatsApp driver.'
+            : 'WhatsApp is paused — message not sent.', [
+            'delivery_message_id' => $message->id,
+            'template_key'        => $message->template_key,
+        ]);
+
+        $message->update([
+            'status'            => 'failed',
+            'provider_response' => ['driver' => 'wawp', 'error' => $error],
+        ]);
+
+        return $message->fresh();
     }
 
     /** The number every message is currently diverted to, or null when the valve is off. */
@@ -139,10 +232,16 @@ class MessagingService
 
     private function resolveDriver(string $channel): MessagingDriver
     {
+        return $this->makeDriver($this->driverKeyFor($channel));
+    }
+
+    /** Which driver a channel sends through: the configured one, else the best available. */
+    public function driverKeyFor(string $channel): string
+    {
         $configured = config("services.messaging.{$channel}_driver");
 
         if ($configured) {
-            return $this->makeDriver($configured);
+            return $configured;
         }
 
         // Automation is the default: use the real provider when it's configured,
@@ -153,17 +252,15 @@ class MessagingService
             // tap) is the last resort when neither is configured.
             'whatsapp' => match (true) {
                 filled(config('services.whatsapp_cloud.token')) && filled(config('services.whatsapp_cloud.phone_number_id'))
-                    => $this->makeDriver('whatsapp_cloud'),
+                    => 'whatsapp_cloud',
 
                 filled(config('services.wawp.instance_id')) && filled(config('services.wawp.access_token'))
-                    => $this->makeDriver('wawp'),
+                    => 'wawp',
 
-                default => $this->makeDriver('wa_link'),
+                default => 'wa_link',
             },
 
-            'sms' => filled(config('services.termii.api_key'))
-                ? $this->makeDriver('termii')
-                : $this->makeDriver('log_null'),
+            'sms' => filled(config('services.termii.api_key')) ? 'termii' : 'log_null',
 
             default => throw new InvalidArgumentException("Unsupported messaging channel [{$channel}]."),
         };

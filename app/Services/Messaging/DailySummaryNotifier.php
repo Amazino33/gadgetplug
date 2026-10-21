@@ -64,6 +64,7 @@ class DailySummaryNotifier
                 $this->context($data),
             ),
             'status'         => 'queued',
+            'template_key'   => self::TEMPLATE_KEY,
         ]);
 
         return $this->messaging->dispatch($message);

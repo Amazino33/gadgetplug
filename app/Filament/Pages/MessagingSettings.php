@@ -6,6 +6,8 @@ use App\Models\PlatformMessagingSetting;
 use App\Models\Vendor;
 use App\Models\VendorNotificationSetting;
 use App\Services\Messaging\PhoneNumber;
+use App\Services\Messaging\WhatsAppGate;
+use Filament\Actions\Action;
 use BackedEnum;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Concerns\InteractsWithForms;
@@ -92,6 +94,36 @@ class MessagingSettings extends Page
         }
 
         return $names->map(fn (string $name): string => '• '.$name)->implode("\n");
+    }
+
+    /** The WhatsApp brake's state, for the panel at the top of the page. */
+    public function health(): array
+    {
+        return app(WhatsAppGate::class)->health();
+    }
+
+    protected function getHeaderActions(): array
+    {
+        return [
+            // After the Wawp session has been re-scanned: start sending again.
+            // Everything held while paused goes back through the throttle.
+            Action::make('resumeWhatsApp')
+                ->label('Resume WhatsApp sending')
+                ->icon('heroicon-o-play')
+                ->color('success')
+                ->requiresConfirmation()
+                ->modalDescription('Do this only after re-scanning the QR code in Wawp. Messages held while paused will be sent again, spaced out as usual.')
+                ->visible(fn () => app(WhatsAppGate::class)->isPaused())
+                ->action(function () {
+                    $count = app(WhatsAppGate::class)->resume(auth()->user());
+
+                    Notification::make()
+                        ->title('WhatsApp sending resumed')
+                        ->body($count > 0 ? "{$count} held ".str('message')->plural($count).' queued again.' : 'Nothing was waiting.')
+                        ->success()
+                        ->send();
+                }),
+        ];
     }
 
     public function save(): void

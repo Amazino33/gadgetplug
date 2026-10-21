@@ -59,7 +59,8 @@ test('an automated status-change message is queued on the messaging queue, not s
     $message = DeliveryMessage::where('order_id', $c['order']->id)->where('recipient_type', 'customer')->sole();
 
     expect($message->status)->toBe('queued');
-    Queue::assertPushedOn('messaging', SendDeliveryMessageJob::class, fn ($job) => $job->deliveryMessageId === $message->id);
+    // The confirmation is urgent (P1): its WhatsApp lane is drained first.
+    Queue::assertPushedOn('messaging-p1', SendDeliveryMessageJob::class, fn ($job) => $job->deliveryMessageId === $message->id);
     Http::assertNothingSent();
 });
 
@@ -105,10 +106,12 @@ test('a failing send stays queued between retries and is marked failed once retr
     expect($message->fresh()->status)->toBe('failed');
 });
 
-test('the job retries three times with backoff', function () {
+test('the job gives up after three failed sends, with backoff — throttle waits are not failures', function () {
     $job = new SendDeliveryMessageJob(1);
 
-    expect($job->tries)->toBe(3)
+    expect($job->maxExceptions)->toBe(3)
+        ->and(SendDeliveryMessageJob::MAX_SEND_FAILURES)->toBe(3)
+        ->and($job->retryUntil())->toBeInstanceOf(DateTimeInterface::class)
         ->and($job->backoff())->toBe([10, 60, 300])
         ->and($job->queue)->toBe('messaging')
         ->and($job->afterCommit)->toBeTrue();
@@ -116,13 +119,14 @@ test('the job retries three times with backoff', function () {
 
 test('the scheduled worker drains the messaging queue', function () {
     // A job on a queue nobody drains never sends. This guards the worker line
-    // in bootstrap/app.php against losing 'messaging'.
+    // in bootstrap/app.php against losing 'messaging' or a WhatsApp lane —
+    // and keeps P1 ahead of the rest.
     Artisan::call('schedule:list');
     $worker = collect(preg_split('/\R/', Artisan::output()))
         ->first(fn (string $line) => str_contains($line, 'queue:work'));
 
     expect($worker)->not->toBeNull()
-        ->and($worker)->toContain('--queue=meta,messaging,default');
+        ->and($worker)->toContain('--queue=meta,messaging-p1,messaging,messaging-p2,messaging-p3,default');
 });
 
 test('a manual Send Message from the order page still sends synchronously', function () {
