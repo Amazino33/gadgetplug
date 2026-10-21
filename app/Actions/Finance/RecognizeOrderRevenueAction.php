@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Finance;
 
 use App\Models\FinancialAccount;
+use Carbon\CarbonInterface;
 use App\Models\Order;
 use App\Services\FinancialLedger;
 use Illuminate\Support\Facades\Log;
@@ -33,7 +34,9 @@ class RecognizeOrderRevenueAction
     // Returns null when revenue was recognized, or a machine-readable reason it
     // could not be. The observer only logs the reason; the UI turns it into a
     // message the owner can act on.
-    public function execute(Order $order, ?string $channel = null, bool $collectedByVendor = false): ?string
+    // $occurredAt backdates the booking — only the one-off backfill uses it, to
+    // book an order that was paid before this rule at the day it was paid.
+    public function execute(Order $order, ?string $channel = null, bool $collectedByVendor = false, ?CarbonInterface $occurredAt = null): ?string
     {
         if ($order->isRevenueRecognized()) {
             return 'already_recognized';
@@ -87,13 +90,14 @@ class RecognizeOrderRevenueAction
                 description: $collectedByVendor
                     ? "Revenue recognized — order {$order->reference} (cash collected by vendor, before cut-over)"
                     : "Revenue recognized — order {$order->reference} ({$channel})",
+                occurredAt: $occurredAt,
                 createdBy: auth()->id(),
             );
 
             // Quietly — setting these must not re-trigger the observer (or any
             // other side effect) recursively.
             $order->updateQuietly([
-                'revenue_recognized_at' => now(),
+                'revenue_recognized_at' => $occurredAt ?? now(),
                 'payment_channel'       => $channel,
             ]);
         } catch (Throwable $e) {
