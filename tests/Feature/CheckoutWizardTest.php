@@ -81,7 +81,7 @@ test('delivery details must be complete before the confirm step', function () {
     Volt::test('checkout')
         ->call('choosePayment', 'pay_on_delivery')
         ->call('goToConfirm')
-        ->assertHasErrors(['name', 'phone', 'lga', 'address'])
+        ->assertHasErrors(['name', 'phone', 'lgaId', 'address'])
         ->assertSet('step', 2);
 });
 
@@ -92,7 +92,7 @@ test('a complete delivery step reaches confirm', function () {
         ->call('choosePayment', 'pay_on_delivery')
         ->set('name', 'Aniekan Udo')
         ->set('phone', '08012345678')
-        ->set('lga', 'Uyo')
+        ->set('stateId', checkoutLocation()[0])->set('lgaId', checkoutLocation()[1])
         ->set('address', '12 Test Close, near the market')
         ->call('goToConfirm')
         ->assertHasNoErrors()
@@ -106,7 +106,7 @@ test('going back keeps everything already typed', function () {
         ->call('choosePayment', 'pay_on_delivery')
         ->set('name', 'Aniekan Udo')
         ->set('phone', '08012345678')
-        ->set('lga', 'Uyo')
+        ->set('stateId', checkoutLocation()[0])->set('lgaId', checkoutLocation()[1])
         ->set('address', '12 Test Close, near the market')
         ->call('goToConfirm')
         ->call('goToStep', 2)
@@ -136,7 +136,7 @@ test('a pay-on-delivery order goes through with no email at all', function () {
         ->call('choosePayment', 'pay_on_delivery')
         ->set('name', 'Aniekan Udo')
         ->set('phone', '08012345678')
-        ->set('lga', 'Uyo')
+        ->set('stateId', checkoutLocation()[0])->set('lgaId', checkoutLocation()[1])
         ->set('address', '12 Test Close, near the market')
         ->call('goToConfirm')
         ->call('processCheckout')
@@ -157,7 +157,7 @@ test('an email given on the delivery path is still kept', function () {
         ->set('name', 'Aniekan Udo')
         ->set('email', 'aniekan@example.com')
         ->set('phone', '08012345678')
-        ->set('lga', 'Uyo')
+        ->set('stateId', checkoutLocation()[0])->set('lgaId', checkoutLocation()[1])
         ->set('address', '12 Test Close, near the market')
         ->call('goToConfirm')
         ->call('processCheckout');
@@ -172,7 +172,7 @@ test('paying online still requires an email, because Paystack will not open a tr
         ->call('choosePayment', 'paystack')
         ->set('name', 'Aniekan Udo')
         ->set('phone', '08012345678')
-        ->set('lga', 'Uyo')
+        ->set('stateId', checkoutLocation()[0])->set('lgaId', checkoutLocation()[1])
         ->set('address', '12 Test Close, near the market')
         ->call('goToConfirm')
         ->assertHasErrors(['email'])
@@ -198,7 +198,7 @@ test('a complete delivery step needs nothing but name, phone, area and address',
         ->call('choosePayment', 'pay_on_delivery')
         ->set('name', 'Aniekan Udo')
         ->set('phone', '08012345678')
-        ->set('lga', 'Uyo')
+        ->set('stateId', checkoutLocation()[0])->set('lgaId', checkoutLocation()[1])
         ->set('address', '12 Test Close, near the market')
         ->call('goToConfirm')
         ->assertHasNoErrors()
@@ -214,7 +214,7 @@ test('processCheckout enforces the delivery rules even when the steps are skippe
     Volt::test('checkout')
         ->set('paymentMethod', 'pay_on_delivery')
         ->call('processCheckout')
-        ->assertHasErrors(['name', 'phone', 'lga', 'address']);
+        ->assertHasErrors(['name', 'phone', 'lgaId', 'address']);
 
     expect(Order::count())->toBe(0);
 });

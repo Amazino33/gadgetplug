@@ -49,7 +49,7 @@ function readyCheckout(Product $product, int $quantity = 1): \Livewire\Features\
         ->set('name', 'Ndianabasi Tester')
         ->set('email', 'ndianabasi@example.com')
         ->set('phone', '08057189760')
-        ->set('lga', 'Uyo')
+        ->set('stateId', checkoutLocation()[0])->set('lgaId', checkoutLocation()[1])
         ->set('address', '12 Test Close, enough characters')
         ->set('paymentMethod', 'pay_on_delivery');
 }

@@ -233,3 +233,25 @@ function stockValue(array $ctx): float
 {
     return App\Services\Inventory\StockValuation::forVendor($ctx['vendor']->id)['value'];
 }
+
+/*
+|--------------------------------------------------------------------------
+| Delivery locations
+|--------------------------------------------------------------------------
+|
+| States and LGAs are seeded by a migration, so every test database has them.
+| Checkout tests pick a real LGA by name rather than hard-coding ids.
+|
+*/
+/** @return array{0: int, 1: int} [stateId, lgaId] */
+function checkoutLocation(string $lga = 'Uyo', string $state = 'Akwa Ibom'): array
+{
+    $stateId = App\Models\State::where('name', $state)->value('id');
+    $lgaId   = App\Models\Lga::where('state_id', $stateId)->where('name', $lga)->value('id');
+
+    if (! $stateId || ! $lgaId) {
+        throw new RuntimeException("No LGA {$lga} in {$state}.");
+    }
+
+    return [$stateId, $lgaId];
+}

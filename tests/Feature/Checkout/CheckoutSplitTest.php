@@ -50,7 +50,7 @@ function splitCheckoutForm(array $lines, string $method = 'pay_on_delivery'): \L
         ->set('name', 'Ada Split')
         ->set('email', 'ada@example.com')
         ->set('phone', '08057189760')
-        ->set('lga', 'Uyo')
+        ->set('stateId', checkoutLocation()[0])->set('lgaId', checkoutLocation()[1])
         ->set('address', '12 Test Close, enough characters')
         ->set('paymentMethod', $method);
 }
@@ -97,9 +97,9 @@ describe('placing a checkout', function () {
             ->and((float) $checkout->items_total)->toBe(55000.0)
             ->and((float) $checkout->delivery_fee)->toBe(0.0)
             ->and((float) $checkout->grand_total)->toBe(55000.0)
-            ->and($checkout->state_id)->toBeNull()
-            ->and($checkout->lga_id)->toBeNull()
-            ->and($checkout->delivery_rule_snapshot)->toBeNull();
+            // Uyo is free on day one (DeliveryRulesSeeder).
+            ->and([$checkout->state_id, $checkout->lga_id])->toBe(checkoutLocation())
+            ->and($checkout->delivery_rule_snapshot['mode'])->toBe('free');
 
         $alpha = $orders->firstWhere(fn ($o) => $o->items->first()->vendor_id === $p['a']->id);
         $beta = $orders->firstWhere(fn ($o) => $o->items->first()->vendor_id === $p['b']->id);

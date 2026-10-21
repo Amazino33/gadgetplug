@@ -35,8 +35,9 @@ class LoginResponse implements LoginResponseContract
             return Filament::getPanel('admin')->getUrl();
         }
 
-        if ($user->isCatalogueEditor()) {
-            return \App\Filament\Resources\Products\ProductResource::getUrl('index', panel: 'admin');
+        // Single-job admin staff (catalogue editor, delivery settings).
+        if ($home = \App\Filament\Pages\Dashboard::homeFor($user)) {
+            return $home;
         }
 
         if ($user->vendors()->isNotEmpty()) {

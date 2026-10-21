@@ -4,6 +4,12 @@ use Livewire\Volt\Component;
 use App\Actions\Checkout\PlaceCheckoutAction;
 use Illuminate\Support\Facades\DB;
 use App\Models\Checkout;
+use App\Models\Lga;
+use App\Models\PlatformMessagingSetting;
+use App\Models\State;
+use App\Services\Delivery\DeliveryPricing;
+use App\Services\Delivery\DeliveryQuote;
+use Illuminate\Validation\Rule;
 use App\Models\Order;
 use App\Models\Product;
 use App\Services\Affiliate\AttributionService;
@@ -42,7 +48,16 @@ new class extends Component {
     public string $name          = '';
     public string $email         = '';
     public string $phone         = '';
+    // The LGA's name, kept in step with lgaId — for the address line and the
+    // order's local_government. Never trusted as input.
     public string $lga           = '';
+    public ?int   $stateId       = null;
+    public ?int   $lgaId         = null;
+    // The live quote for the chosen LGA, for display only. processCheckout()
+    // recomputes it on the server and never reads these.
+    public float   $deliveryFee   = 0.0;
+    public string  $deliveryMode  = '';
+    public ?string $deliveryDays  = null;
     public string $address       = '';
     public string $paymentMethod = '';
     public string $referralCode  = '';
@@ -54,6 +69,7 @@ new class extends Component {
     public string $paidReference = '';
     public string $paidMethod    = '';
     public float  $paidTotal     = 0.0;
+    public float  $paidDeliveryFee = 0.0;
     public string $paidName      = '';
     public array  $paidItems     = [];
     public array  $paidProductIds = [];
@@ -88,6 +104,7 @@ new class extends Component {
                 $this->paidReference = $head->reference;
                 $this->paidMethod    = $head->payment_method;
                 $this->paidTotal     = (float) ($checkout ? $checkout->grand_total : $head->total_amount);
+                $this->paidDeliveryFee = (float) ($checkout?->delivery_fee ?? 0);
                 $this->paidName      = $head->customer_name;
 
                 foreach ($orders->flatMap->items as $item) {
@@ -175,6 +192,10 @@ new class extends Component {
             $this->redirectRoute('cart');
             return;
         }
+
+        // Akwa Ibom is pre-selected: it is where every order has gone so far.
+        // The customer can pick any state; the LGA list follows it.
+        $this->stateId ??= State::where('name', 'Akwa Ibom')->value('id');
 
         if (auth()->check()) {
             $user          = auth()->user();
@@ -352,7 +373,8 @@ new class extends Component {
                     $fail('Enter a valid Nigerian WhatsApp number, for example 08012345678.');
                 }
             }],
-            'lga'             => 'required|in:Uyo,Mkpat Enin,Eket',
+            'stateId'         => 'required|integer|exists:states,id',
+            'lgaId'           => ['required', 'integer', Rule::exists('lgas', 'id')->where('state_id', $this->stateId)],
             'address'         => 'required|string|min:10',
         ];
     }
@@ -364,8 +386,9 @@ new class extends Component {
             'email.required'           => 'Paystack sends your receipt here, so an email is needed to pay online.',
             'email.email'              => 'That email address does not look right.',
             'phone.required'           => 'We need a WhatsApp number to send your order updates to.',
-            'lga.required'             => 'Choose the area we are delivering to.',
-            'lga.in'                   => 'We only deliver to Uyo, Mkpat Enin and Eket right now.',
+            'stateId.required'         => 'Choose your state.',
+            'lgaId.required'           => 'Choose your local government area.',
+            'lgaId.exists'             => 'Choose a local government area in that state.',
             'address.required'         => 'Where should the rider bring it?',
             'address.min'              => 'Add a bit more — a house number, street and a landmark nearby.',
         ];
@@ -378,6 +401,16 @@ new class extends Component {
      */
     public function updated(string $property): void
     {
+        // A new state empties the LGA: an LGA from another state is never valid.
+        if ($property === 'stateId') {
+            $this->lgaId = null;
+            $this->refreshDeliveryQuote();
+        }
+
+        if ($property === 'lgaId') {
+            $this->refreshDeliveryQuote();
+        }
+
         if ($this->step !== self::STEP_DELIVERY) {
             return;
         }
@@ -389,6 +422,48 @@ new class extends Component {
         }
 
         $this->validateOnly($property, $rules, $this->deliveryMessages());
+    }
+
+    /** The live, display-only quote for the chosen LGA. */
+    private function refreshDeliveryQuote(): void
+    {
+        $quote = $this->currentQuote();
+
+        $this->lga          = $quote?->lga->name ?? '';
+        $this->deliveryFee  = $quote?->fee ?? 0.0;
+        $this->deliveryMode = $quote?->mode ?? '';
+        $this->deliveryDays = $quote?->deliveryDays;
+    }
+
+    /** Resolved from the database every time — the one answer that is charged. */
+    private function currentQuote(): ?DeliveryQuote
+    {
+        $quote = app(DeliveryPricing::class)->quoteForLgaId($this->lgaId);
+
+        // An LGA from a different state than the one selected is no answer.
+        return $quote && $quote->lga->state_id === $this->stateId ? $quote : null;
+    }
+
+    /** States for the first select. */
+    public function states(): \Illuminate\Support\Collection
+    {
+        return State::orderBy('name')->get(['id', 'name']);
+    }
+
+    /** LGAs of the chosen state for the second select. */
+    public function lgasForState(): \Illuminate\Support\Collection
+    {
+        return $this->stateId
+            ? Lga::where('state_id', $this->stateId)->orderBy('name')->get(['id', 'name'])
+            : collect();
+    }
+
+    /** Our WhatsApp, for "we don't deliver there yet — ask us". */
+    public function supportWhatsApp(): ?string
+    {
+        $number = config('app.support_whatsapp') ?: PlatformMessagingSetting::current()->fallback_storekeeper_whatsapp;
+
+        return filled($number) ? PhoneNumber::toNigerianInternational($number) : null;
     }
 
     public function processCheckout(): void
@@ -425,6 +500,20 @@ new class extends Component {
             return;
         }
 
+        // The delivery fee is worked out here, from the rules in the database,
+        // never taken from the page: a tampered request changes nothing.
+        $quote = $this->currentQuote();
+
+        if (! $quote) {
+            $this->addError('lgaId', 'Choose your local government area.');
+            return;
+        }
+
+        if (! $quote->deliverable()) {
+            $this->addError('lgaId', "We don't deliver to {$quote->lga->name} yet.");
+            return;
+        }
+
         // ── One submission, one checkout ─────────────────────────────────────
         //
         // Two layers, because either alone leaves a hole. The disabled button
@@ -456,10 +545,16 @@ new class extends Component {
                 // requires it.
                 'customer_email'   => $this->email ?: null,
                 'customer_phone'   => $this->phone,
-                'shipping_address' => $this->lga . ', Akwa Ibom State — ' . $this->address,
-                'local_government' => $this->lga,
-                // Delivery fee stays 0 until the delivery-location rules land.
-                'delivery_fee'     => 0,
+                'shipping_address' => $quote->lga->name . ', ' . $quote->lga->state->addressName() . ' — ' . $this->address,
+                'local_government' => $quote->lga->name,
+                'state_id'         => $quote->lga->state_id,
+                'lga_id'           => $quote->lga->id,
+                // Snapshot of the rule used, so a later price change never
+                // alters what this checkout was charged or why.
+                'delivery_rule_snapshot' => $quote->snapshot(),
+                // The checkout's alone: never part of a vendor order's total,
+                // revenue or the affiliate commission base.
+                'delivery_fee'     => $quote->fee,
                 'payment_method'   => $this->paymentMethod,
                 // Captured here (shared by both payment paths) so the server-side
                 // Purchase CAPI event — fired later from OrderObserver, possibly
@@ -624,6 +719,7 @@ new class extends Component {
             (string) PhoneNumber::toNigerianInternational($this->phone),
             number_format($this->total, 2, '.', ''),
             $this->paymentMethod,
+            (string) $this->lgaId,
             $basket,
         ]));
     }
@@ -893,6 +989,11 @@ that screen is where they carry on shopping, not somewhere to be held. --}}
                     </div>
                     @endforeach
 
+                    <div class="border-t border-brand-border dark:border-[#2a3a2a] pt-3 flex justify-between text-[12px]">
+                        <span class="text-brand-muted">Delivery</span>
+                        <span class="text-[#111] dark:text-[#e8f5e9] font-medium">{{ $paidDeliveryFee > 0 ? '₦'.number_format($paidDeliveryFee) : 'Free' }}</span>
+                    </div>
+
                     <div class="border-t border-brand-border dark:border-[#2a3a2a] pt-3 flex justify-between items-center">
                         <span class="font-montserrat font-bold text-[14px] text-brand-dark dark:text-[#e8f5e9]">
                             {{ $paidMethod === 'pay_on_delivery' ? 'Total (Pay on Delivery)' : 'Total Paid' }}
@@ -1035,20 +1136,54 @@ that screen is where they carry on shopping, not somewhere to be held. --}}
                     @error('address') <p class="text-red-500 text-[11px] mt-1">{{ $message }}</p> @enderror
                 </div>
 
-                {{-- LGA. Required by the order itself — shipping_address is
-                     composed from it — so it stays on this step. --}}
+                {{-- State → LGA. The LGA decides the delivery fee (or whether
+                     we deliver there at all), shown live below and worked out
+                     again on the server when the order is placed. --}}
                 <div>
-                    <label for="f-lga" class="block text-[12px] font-semibold text-brand-dark dark:text-[#e8f5e9] mb-1.5">Area</label>
-                    <select id="f-lga" wire:model.live="lga"
+                    <label for="f-state" class="block text-[12px] font-semibold text-brand-dark dark:text-[#e8f5e9] mb-1.5">State</label>
+                    <select id="f-state" wire:model.live="stateId"
                         class="w-full min-h-[48px] bg-brand-bg dark:bg-[#0d1a0d] border rounded-xl px-3.5 py-2.5 text-[14px] text-[#111] dark:text-[#e8f5e9] outline-none transition-colors appearance-none cursor-pointer
-                            {{ $errors->has('lga') ? 'border-red-400' : 'border-[#d0d9d2] dark:border-[#2a3a2a] focus:border-brand' }}">
-                        <option value="">Select your area…</option>
-                        <option value="Uyo">Uyo</option>
-                        <option value="Mkpat Enin">Mkpat Enin</option>
-                        <option value="Eket">Eket</option>
+                            {{ $errors->has('stateId') ? 'border-red-400' : 'border-[#d0d9d2] dark:border-[#2a3a2a] focus:border-brand' }}">
+                        <option value="">Select your state…</option>
+                        @foreach ($this->states() as $state)
+                            <option value="{{ $state->id }}">{{ $state->name }}</option>
+                        @endforeach
                     </select>
-                    <p class="text-[11px] text-brand-muted mt-1">Akwa Ibom State — we deliver to these three areas today.</p>
-                    @error('lga') <p class="text-red-500 text-[11px] mt-1">{{ $message }}</p> @enderror
+                    @error('stateId') <p class="text-red-500 text-[11px] mt-1">{{ $message }}</p> @enderror
+                </div>
+
+                <div x-data="{ term: '' }">
+                    <label for="f-lga" class="block text-[12px] font-semibold text-brand-dark dark:text-[#e8f5e9] mb-1.5">Local government area</label>
+                    @php $lgaOptions = $this->lgasForState(); @endphp
+                    @if ($lgaOptions->count() > 12)
+                    {{-- Narrows the list as you type; the select below stays the
+                         control, so it works the same on every phone. --}}
+                    <input type="search" x-model="term" placeholder="Type to find your LGA…" aria-label="Find your LGA"
+                        class="w-full mb-2 bg-brand-bg dark:bg-[#0d1a0d] border border-[#d0d9d2] dark:border-[#2a3a2a] rounded-xl px-3.5 py-2 text-[13px] text-[#111] dark:text-[#e8f5e9] outline-none focus:border-brand">
+                    @endif
+                    <select id="f-lga" wire:model.live="lgaId" @disabled($lgaOptions->isEmpty())
+                        class="w-full min-h-[48px] bg-brand-bg dark:bg-[#0d1a0d] border rounded-xl px-3.5 py-2.5 text-[14px] text-[#111] dark:text-[#e8f5e9] outline-none transition-colors appearance-none cursor-pointer
+                            {{ $errors->has('lgaId') ? 'border-red-400' : 'border-[#d0d9d2] dark:border-[#2a3a2a] focus:border-brand' }}">
+                        <option value="">{{ $lgaOptions->isEmpty() ? 'Choose a state first' : 'Select your LGA…' }}</option>
+                        @foreach ($lgaOptions as $option)
+                            <option value="{{ $option->id }}" x-show="! term || @js(mb_strtolower($option->name)).includes(term.toLowerCase())">{{ $option->name }}</option>
+                        @endforeach
+                    </select>
+                    @error('lgaId') <p class="text-red-500 text-[11px] mt-1">{{ $message }}</p> @enderror
+
+                    @if ($lgaId && $deliveryMode === 'not_delivered')
+                    <div role="alert" class="mt-2 rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700 px-3.5 py-2.5 text-[12px] text-amber-800 dark:text-amber-300">
+                        We don't deliver to {{ $lga }} yet.
+                        @if ($wa = $this->supportWhatsApp())
+                            <a href="https://wa.me/{{ $wa }}?text={{ rawurlencode('Hi GadgetPlug, do you deliver to '.$lga.'?') }}" target="_blank" rel="noopener" class="font-semibold underline">Ask us on WhatsApp</a>
+                        @endif
+                    </div>
+                    @elseif ($lgaId && $deliveryMode !== '')
+                    <p class="text-[12px] mt-1.5 text-brand-dark dark:text-[#e8f5e9]">
+                        Delivery to {{ $lga }}:
+                        <span class="font-semibold">{{ $deliveryFee > 0 ? '₦'.number_format($deliveryFee) : 'Free' }}</span>@if ($deliveryDays) · {{ $deliveryDays }}@endif
+                    </p>
+                    @endif
                 </div>
 
                 {{-- Email. Required only to pay online, because Paystack will
@@ -1144,14 +1279,14 @@ that screen is where they carry on shopping, not somewhere to be held. --}}
                             <span class="text-[#111] dark:text-[#e8f5e9] font-medium">₦{{ number_format($total) }}</span>
                         </div>
                         <div class="flex justify-between text-[12px]">
-                            <span class="text-brand-muted">Delivery</span>
-                            <span class="text-brand font-semibold">Confirmed at delivery</span>
+                            <span class="text-brand-muted">Delivery{{ $lga ? ' to '.$lga : '' }}</span>
+                            <span class="text-brand font-semibold">{{ ! $lgaId ? 'Choose your area' : ($deliveryMode === 'not_delivered' ? 'Not available' : ($deliveryFee > 0 ? '₦'.number_format($deliveryFee) : 'Free')) }}</span>
                         </div>
                     </div>
 
                     <div class="border-t-2 border-brand-border dark:border-[#2a3a2a] pt-3 flex justify-between items-center">
                         <span class="font-montserrat font-bold text-[14px] text-brand-dark dark:text-[#e8f5e9]">Total</span>
-                        <span class="font-montserrat font-black text-[22px] text-brand">₦{{ number_format($total) }}</span>
+                        <span class="font-montserrat font-black text-[22px] text-brand">₦{{ number_format($total + $deliveryFee) }}</span>
                     </div>
                 </div>
             </div>
@@ -1184,7 +1319,7 @@ that screen is where they carry on shopping, not somewhere to be held. --}}
                         <p class="text-[11px] text-brand-muted mb-1">Delivering to</p>
                         <p class="font-montserrat font-bold text-[14px] text-brand-dark dark:text-[#e8f5e9]">{{ $name }}</p>
                         <p class="text-[12px] text-[#444] dark:text-[#b0c8b0] mt-0.5 break-words">{{ $address }}</p>
-                        <p class="text-[12px] text-[#444] dark:text-[#b0c8b0]">{{ $lga }}, Akwa Ibom State</p>
+                        <p class="text-[12px] text-[#444] dark:text-[#b0c8b0]">{{ $lga }}, {{ \App\Models\State::find($stateId)?->addressName() }}</p>
                         <p class="text-[12px] text-brand-muted mt-1.5">{{ $phone }}</p>
                         @if ($email)
                         <p class="text-[12px] text-brand-muted">{{ $email }}</p>
@@ -1243,10 +1378,10 @@ that screen is where they carry on shopping, not somewhere to be held. --}}
                     <path d="M21 12a9 9 0 0 0-9-9" stroke-linecap="round"/>
                 </svg>
                 @if ($paymentMethod === 'pay_on_delivery')
-                    <span wire:loading.remove wire:target="processCheckout">Place order — ₦{{ number_format($total) }} on delivery</span>
+                    <span wire:loading.remove wire:target="processCheckout">Place order — ₦{{ number_format($total + $deliveryFee) }} on delivery</span>
                     <span wire:loading wire:target="processCheckout">Placing your order…</span>
                 @else
-                    <span wire:loading.remove wire:target="processCheckout">Pay ₦{{ number_format($total) }} with Paystack</span>
+                    <span wire:loading.remove wire:target="processCheckout">Pay ₦{{ number_format($total + $deliveryFee) }} with Paystack</span>
                     <span wire:loading wire:target="processCheckout">Taking you to Paystack…</span>
                 @endif
             </button>

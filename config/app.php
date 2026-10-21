@@ -59,6 +59,11 @@ return [
     // sitemap must point search engines at the storefront instead.
     'storefront_url' => rtrim((string) env('STOREFRONT_URL', 'https://gadgetplug.ng'), '/'),
 
+    // GadgetPlug's own WhatsApp, offered at checkout when we don't deliver to
+    // the customer's area yet. Falls back to the platform storekeeper number
+    // (Admin → WhatsApp settings) when unset.
+    'support_whatsapp' => env('SUPPORT_WHATSAPP'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Timezone

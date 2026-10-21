@@ -230,7 +230,10 @@ class User extends Authenticatable implements HasTenants, FilamentUser
             // The catalogue editor is admitted to the panel, but every admin
             // resource and page except All Products keeps its own super_admin
             // gate — see AdminPanelAccessTest, which checks all of them.
-            return $this->isSuperAdmin() || $this->isCatalogueEditor();
+            // Delivery-settings staff come in for that one page; every other
+            // admin page keeps its own gate (see AdminPanelAccessTest).
+            return $this->isSuperAdmin() || $this->isCatalogueEditor()
+                || $this->hasGlobalPermission('manage_delivery_settings');
         }
 
         if ($panel->getId() === 'vendor') {
