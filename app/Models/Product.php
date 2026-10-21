@@ -99,6 +99,16 @@ class Product extends Model implements HasMedia
         return $product;
     }
 
+    /**
+     * The product a slug points at — today's slug first, then one it used to
+     * have — for links that carry a slug outside route binding, like an
+     * affiliate's /r/{code}?to= deep link handed out before a rename.
+     */
+    public static function findBySlug(string $slug): ?self
+    {
+        return static::query()->where('slug', $slug)->first() ?? self::movedFromSlug($slug);
+    }
+
     /** The product that used to live at this slug, preferring one customers can see. */
     private static function movedFromSlug(string $slug): ?self
     {

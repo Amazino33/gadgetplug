@@ -42,7 +42,7 @@ test('an affiliate sees their referral link and QR code', function () {
         ->assertSee('<svg', false);
 });
 
-test('searching for a product and selecting it reveals a product-specific link and QR', function () {
+test('the page ships the linkable products once, for the in-browser search', function () {
     $user = User::factory()->create();
     Affiliate::findOrCreateForUser($user);
     $this->actingAs($user);
@@ -50,10 +50,12 @@ test('searching for a product and selecting it reveals a product-specific link a
     $product = makeAffiliatePageProduct();
 
     Volt::test('pages.account.affiliate')
-        ->set('productSearch', 'Affiliate Page Widget')
         ->assertSee('Affiliate Page Widget')
-        ->call('selectProduct', $product->id)
-        ->assertSee($product->slug);
+        ->assertSee($product->slug)
+        // A later re-render (cancelling a task, a page of commissions) doesn't
+        // resend the catalogue — the search sits under wire:ignore.
+        ->call('cancelTaskSubmission')
+        ->assertDontSee($product->slug);
 });
 
 test('the affiliate nav tab only appears for users who have an affiliate profile', function () {

@@ -31,11 +31,13 @@ class AffiliateClickController extends Controller
 
         // ?to= a product slug lands the scan/click on that product page,
         // carrying the code via the cookie just set above — same
-        // attribution, just a different landing URL than the homepage.
+        // attribution, just a different landing URL than the homepage. A slug
+        // the product has since been renamed away from still finds it, the
+        // same way the product page's own old URLs do.
         $productSlug = $request->query('to');
 
-        if ($productSlug) {
-            $product = Product::where('slug', $productSlug)->first();
+        if (is_string($productSlug) && $productSlug !== '') {
+            $product = Product::findBySlug($productSlug);
 
             if ($product) {
                 return redirect()->route('product.show', ['product' => $product]);
