@@ -208,8 +208,12 @@ class OrderStatusService
      * Pay-on-delivery money is in GadgetPlug's hands: revenue and the supplier
      * payable book now, on this vendor order only, into Due from GadgetPlug.
      * Changes no status.
+     *
+     * $collectedByVendor is for orders placed before the cut-over only: the
+     * vendor's own rider took the cash, so it books to the vendor's own cash
+     * account as the old rule did (channel cash). Refused on any later order.
      */
-    public function recordPaymentReceived(Order $order, User $actor, string $channel): ?string
+    public function recordPaymentReceived(Order $order, User $actor, string $channel, bool $collectedByVendor = false): ?string
     {
         Gate::forUser($actor)->authorize('dispatch', $order);
 
@@ -221,11 +225,19 @@ class OrderStatusService
             throw new InvalidOrderTransition('Record the payment once the order has been handed to the rider.');
         }
 
+        if ($collectedByVendor) {
+            if (! $order->predatesStatusCutover()) {
+                throw new InvalidOrderTransition('Only an order placed before the switch to Due from GadgetPlug can be recorded as collected by the vendor.');
+            }
+
+            $channel = 'cash';
+        }
+
         if (! in_array($channel, ['cash', 'bank_transfer'], true)) {
             throw new InvalidOrderTransition('Choose cash or bank transfer.');
         }
 
-        return DB::transaction(function () use ($order, $actor, $channel) {
+        return DB::transaction(function () use ($order, $actor, $channel, $collectedByVendor) {
             $locked = Order::whereKey($order->id)->lockForUpdate()->firstOrFail();
 
             if ($locked->isRevenueRecognized()) {
@@ -238,11 +250,16 @@ class OrderStatusService
                 'payment_channel'      => $channel,
             ]);
 
-            $reason = $this->recogniseRevenue($locked, $channel);
+            $reason = $this->recogniseRevenue($locked, $channel, $collectedByVendor);
 
             activity()->performedOn($locked)->causedBy($actor)->event('payment_received')
-                ->withProperties(['channel' => $channel, 'amount' => (float) $locked->total_amount, 'result' => $reason ?? 'recognised'])
-                ->log('Payment received recorded');
+                ->withProperties([
+                    'channel'      => $channel,
+                    'collected_by' => $collectedByVendor ? 'vendor_legacy' : 'gadgetplug',
+                    'amount'       => (float) $locked->total_amount,
+                    'result'       => $reason ?? 'recognised',
+                ])
+                ->log($collectedByVendor ? 'Payment received recorded — collected by vendor (legacy)' : 'Payment received recorded');
 
             $order->refresh();
 
@@ -339,9 +356,9 @@ class OrderStatusService
     }
 
     /** Revenue into Due from GadgetPlug, then the supplier payable at the same moment. */
-    private function recogniseRevenue(Order $order, ?string $channel = null): ?string
+    private function recogniseRevenue(Order $order, ?string $channel = null, bool $collectedByVendor = false): ?string
     {
-        $reason = app(RecognizeOrderRevenueAction::class)->execute($order, $channel);
+        $reason = app(RecognizeOrderRevenueAction::class)->execute($order, $channel, $collectedByVendor);
 
         if ($reason !== null && $reason !== 'already_recognized') {
             Log::warning("Revenue not recognised for order {$order->id}: {$reason}");

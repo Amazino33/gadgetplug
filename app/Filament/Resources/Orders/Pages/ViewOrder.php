@@ -25,6 +25,8 @@ class ViewOrder extends ViewRecord
 {
     protected static string $resource = OrderResource::class;
 
+    private const VENDOR_LEGACY = 'collected_by_vendor';
+
     public function infolist(Schema $schema): Schema
     {
         return OrderInfolist::configure($schema);
@@ -50,7 +52,11 @@ class ViewOrder extends ViewRecord
                 ->schema([
                     Select::make('payment_channel')
                         ->label('How did the customer pay?')
-                        ->options(['cash' => 'Cash', 'bank_transfer' => 'Bank transfer'])
+                        // An order placed before the switch may have had its cash
+                        // taken by the vendor's own rider: that books the old way,
+                        // to the vendor's own cash account. Never offered after.
+                        ->options(fn (Order $record) => ['cash' => 'Cash', 'bank_transfer' => 'Bank transfer']
+                            + ($record->predatesStatusCutover() ? [self::VENDOR_LEGACY => 'Collected by vendor (legacy) — to the vendor\'s own cash account'] : []))
                         ->required(),
                 ])
                 ->visible(fn (Order $record) => $record->payment_method === 'pay_on_delivery'
@@ -58,8 +64,10 @@ class ViewOrder extends ViewRecord
                     && ! $record->isRevenueRecognized()
                     && auth()->user()->can('dispatch', $record))
                 ->action(function (Order $record, array $data): void {
+                    $legacy = $data['payment_channel'] === self::VENDOR_LEGACY;
+
                     $reason = $this->attempt(fn () => app(OrderStatusService::class)
-                        ->recordPaymentReceived($record, auth()->user(), $data['payment_channel']));
+                        ->recordPaymentReceived($record, auth()->user(), $legacy ? 'cash' : $data['payment_channel'], collectedByVendor: $legacy));
 
                     if ($reason === false) {
                         return;
@@ -67,9 +75,11 @@ class ViewOrder extends ViewRecord
 
                     if ($reason !== null) {
                         Notification::make()
-                            ->title($reason === 'already_recognized'
-                                ? 'This order was already counted — nothing changed.'
-                                : 'Could not record this payment. Try again; if it keeps failing, check the log.')
+                            ->title(match ($reason) {
+                                'already_recognized' => 'This order was already counted — nothing changed.',
+                                'no_account'         => 'This vendor has no active cash account to book it to.',
+                                default              => 'Could not record this payment. Try again; if it keeps failing, check the log.',
+                            })
                             ->warning()
                             ->send();
 
@@ -78,7 +88,9 @@ class ViewOrder extends ViewRecord
 
                     $this->refreshFormData(['payment_channel', 'revenue_recognized_at']);
 
-                    Notification::make()->title('Payment recorded — added to the vendor\'s Due from GadgetPlug balance.')->success()->send();
+                    Notification::make()->title($legacy
+                        ? 'Payment recorded — booked to the vendor\'s own cash account.'
+                        : 'Payment recorded — added to the vendor\'s Due from GadgetPlug balance.')->success()->send();
                 }),
 
             // Until riders confirm delivery with the customer's code, this is

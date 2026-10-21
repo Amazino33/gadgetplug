@@ -165,6 +165,18 @@ class Order extends Model
         return $this->revenue_recognized_at !== null;
     }
 
+    /**
+     * Placed before online money started going to Due from GadgetPlug — the
+     * only orders whose pay-on-delivery cash may be booked the old way, as
+     * collected by the vendor. False when the cut-over was never recorded.
+     */
+    public function predatesStatusCutover(): bool
+    {
+        $cutover = Cutover::at(Cutover::ORDER_STATUS_SERVICE);
+
+        return $cutover !== null && $this->created_at !== null && $this->created_at->lt($cutover);
+    }
+
     public function packedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'packed_by');

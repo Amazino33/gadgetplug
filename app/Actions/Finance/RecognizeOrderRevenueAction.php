@@ -19,6 +19,11 @@ use Throwable;
 // and owes it to them until a payout. Revenue posted before this rule stays in
 // the cash/bank account it was posted to — nothing here moves history.
 //
+// One exception, for orders placed before that change only: the admin may
+// record a pay-on-delivery order's cash as collected by the vendor's own rider
+// (OrderStatusService::recordPaymentReceived). That money really is in the
+// vendor's hands, so it posts to their own cash account, as the old rule did.
+//
 // Posting is idempotent twice over: FinancialLedger::postEntry() returns the
 // existing entry for the same (source, direction), and this refuses outright
 // once revenue_recognized_at is set. Calling it again on a recognized order is
@@ -28,7 +33,7 @@ class RecognizeOrderRevenueAction
     // Returns null when revenue was recognized, or a machine-readable reason it
     // could not be. The observer only logs the reason; the UI turns it into a
     // message the owner can act on.
-    public function execute(Order $order, ?string $channel = null): ?string
+    public function execute(Order $order, ?string $channel = null, bool $collectedByVendor = false): ?string
     {
         if ($order->isRevenueRecognized()) {
             return 'already_recognized';
@@ -51,8 +56,20 @@ class RecognizeOrderRevenueAction
             return 'no_vendor';
         }
 
-        // Created on first use, so no vendor is ever missing one.
-        $account = FinancialAccount::gadgetplugDueFor((int) $vendorId);
+        if ($collectedByVendor) {
+            $account = FinancialAccount::where('vendor_id', $vendorId)
+                ->where('type', FinancialAccount::TYPE_CASH)
+                ->where('is_active', true)
+                ->orderBy('id')
+                ->first();
+
+            if (! $account) {
+                return 'no_account';
+            }
+        } else {
+            // Created on first use, so no vendor is ever missing one.
+            $account = FinancialAccount::gadgetplugDueFor((int) $vendorId);
+        }
 
         try {
             FinancialLedger::postEntry(
@@ -60,7 +77,9 @@ class RecognizeOrderRevenueAction
                 direction: 'in',
                 amount: (float) $order->total_amount,
                 source: $order,
-                description: "Revenue recognized — order {$order->reference} ({$channel})",
+                description: $collectedByVendor
+                    ? "Revenue recognized — order {$order->reference} (cash collected by vendor, before cut-over)"
+                    : "Revenue recognized — order {$order->reference} ({$channel})",
                 createdBy: auth()->id(),
             );
 
