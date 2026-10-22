@@ -552,7 +552,10 @@ describe('Delivery settings, redesigned', function () {
             ->assertSee('Rules by state and LGA')
             ->assertSee('Price by distance')
             ->assertSee('Not delivered')
-            ->assertDontSee('NGN', false);
+            // Money as ₦1,500 — never Filament's "NGN 1,500.00". (Not "NGN" on
+            // its own: the Meta pixel script names the currency that way.)
+            ->assertDontSee('NGN 1', false)
+            ->assertDontSee('1,500.00', false);
 
         expect(App\Filament\Pages\Delivery\DeliveryStats::summary())->toMatchArray(['paid' => 1, 'pinned' => 1]);
     });

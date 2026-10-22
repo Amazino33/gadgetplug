@@ -64,7 +64,7 @@ class MessagingSettings extends Page
         return $schema->components([
             ...$this->getWidgetsSchemaComponents([WhatsAppHealthWidget::class]),
 
-            Callout::make('WhatsApp sending is paused')
+            Callout::make('WhatsApp sending is PAUSED')
                 ->description(fn (): string => trim(($this->health()['pause_reason'] ?? '').' Urgent messages are going by SMS; '
                     .$this->health()['held'].' other '.str('message')->plural($this->health()['held']).' waiting. Re-scan the QR code in Wawp, then press "Resume WhatsApp sending".'))
                 ->danger()
