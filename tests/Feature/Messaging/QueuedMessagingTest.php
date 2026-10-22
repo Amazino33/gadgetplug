@@ -163,6 +163,8 @@ test('the admin panel shows a banner while every message is being redirected', f
     test()->actingAs($admin)->get('/admin')
         ->assertOk()
         ->assertSee('Messaging is in test mode')
+        // The one-line version a phone shows until tapped.
+        ->assertSee('messages go to')
         ->assertSee('8888')
         ->assertDontSee('08099998888');
 });

@@ -19,7 +19,9 @@ use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use Filament\Tables\View\TablesRenderHook;
 use Filament\View\PanelsRenderHook;
+use App\Filament\Resources\Products\Pages\ListProducts;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\URL;
 
@@ -36,6 +38,9 @@ class AdminPanelProvider extends PanelProvider
             // land here as database notifications.
             ->databaseNotifications()
             ->databaseNotificationsPolling('60s')
+            // Only what our own admin markup needs on top of Filament's styles
+            // (phone layout of All Products, the test-mode banner).
+            ->viteTheme('resources/css/filament/admin/theme.css')
             ->colors([
                 'primary' => Color::Amber,
             ])
@@ -72,6 +77,18 @@ class AdminPanelProvider extends PanelProvider
 
                     return Blade::render("@include('partials.messaging-redirect-banner')");
                 },
+            )
+            // "No photo" / "No online name" chips beside the All Products search.
+            ->renderHook(
+                TablesRenderHook::TOOLBAR_SEARCH_AFTER,
+                fn () => view('filament.admin.products.quick-filters'),
+                scopes: ListProducts::class,
+            )
+            // Camera / gallery buttons and photo ordering in "Manage images".
+            ->renderHook(
+                PanelsRenderHook::SCRIPTS_BEFORE,
+                fn () => view('filament.admin.products.photo-tools-script'),
+                scopes: ListProducts::class,
             )
             ->renderHook(
                 PanelsRenderHook::HEAD_END,

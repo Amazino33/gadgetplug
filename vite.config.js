@@ -33,6 +33,7 @@ export default defineConfig({
                 'resources/js/app.js',
                 'resources/js/pwa.js',
                 'resources/css/filament/vendor/theme.css',
+                'resources/css/filament/admin/theme.css',
                 'resources/js/pos/main.jsx',
                 // Vendor-panel only (see resources/views/components/vendor-tours.blade.php)
                 'resources/js/vendor-tours.js',

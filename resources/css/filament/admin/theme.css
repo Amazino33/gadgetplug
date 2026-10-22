@@ -1,0 +1,525 @@
+@import '../../../../vendor/filament/filament/resources/css/theme.css';
+
+/* Admin panel theme. Plain CSS rather than utility classes, like the vendor
+   theme: this markup sits inside Filament's own tables and modals, so it uses
+   Filament's colour variables and follows the panel's light/dark theme. No
+   @source lines on purpose — every other admin view compiles exactly as it did
+   before this theme existed. Phone means below Filament's md (48rem / 768px). */
+
+/* ── Messaging test-mode banner (partials/messaging-redirect-banner) ────────── */
+
+.gp-redirect-banner {
+    /* Lined up with the page content's gutter. */
+    margin: 0.5rem 1rem 1rem;
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: var(--danger-800);
+    background-color: var(--danger-50);
+    border: 1px solid var(--danger-300);
+    border-radius: 0.5rem;
+}
+
+.dark .gp-redirect-banner {
+    color: var(--danger-200);
+    background-color: var(--danger-950);
+    border-color: var(--danger-700);
+}
+
+.gp-redirect-banner code,
+.gp-redirect-banner .gp-mono {
+    font-family: var(--font-mono);
+}
+
+.gp-redirect-banner-phone {
+    display: none;
+}
+
+.gp-redirect-banner-phone > summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    min-height: 2.75rem;
+    margin: -0.75rem -1rem;
+    padding: 0 1rem;
+    cursor: pointer;
+    list-style: none;
+}
+
+.gp-redirect-banner-phone > summary::-webkit-details-marker {
+    display: none;
+}
+
+.gp-redirect-banner-phone[open] > summary {
+    margin-bottom: 0;
+}
+
+.gp-redirect-banner-phone .gp-mono {
+    white-space: nowrap;
+}
+
+/* A chevron, turned when open. */
+.gp-redirect-banner-more {
+    flex-shrink: 0;
+    width: 0.5rem;
+    height: 0.5rem;
+    margin-inline-end: 0.25rem;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(45deg) translate(-2px, -2px);
+    transition: transform 150ms;
+}
+
+.gp-redirect-banner-phone[open] .gp-redirect-banner-more {
+    transform: rotate(-135deg) translate(-2px, -2px);
+}
+
+.gp-redirect-banner-phone > p {
+    margin-top: 0.25rem;
+}
+
+@media (width >= 48rem) {
+    .gp-redirect-banner {
+        margin-inline: 1.5rem;
+    }
+}
+
+@media (width >= 64rem) {
+    .gp-redirect-banner {
+        margin-inline: 2rem;
+    }
+}
+
+@media (width < 48rem) {
+    .gp-redirect-banner-phone {
+        display: block;
+    }
+
+    .gp-redirect-banner-full {
+        display: none;
+    }
+}
+
+/* ── All Products: quick filter chips (beside the table search) ─────────────── */
+
+.gp-quick-filters {
+    display: none;
+}
+
+.gp-quick-filter {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    min-height: 2.75rem;
+    padding: 0 0.875rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    white-space: nowrap;
+    color: var(--gray-700);
+    background-color: var(--gray-50);
+    border: 1px solid var(--gray-300);
+    border-radius: 9999px;
+}
+
+.gp-quick-filter-active {
+    color: var(--primary-800);
+    background-color: var(--primary-50);
+    border-color: var(--primary-500);
+}
+
+.dark .gp-quick-filter {
+    color: var(--gray-200);
+    background-color: var(--gray-800);
+    border-color: var(--gray-600);
+}
+
+.dark .gp-quick-filter-active {
+    color: var(--primary-200);
+    background-color: var(--primary-950);
+    border-color: var(--primary-500);
+}
+
+.gp-quick-filter-icon {
+    width: 1rem;
+    height: 1rem;
+}
+
+/* ── All Products on a phone ─────────────────────────────────────────────────── */
+
+@media (width < 48rem) {
+    /* Search on its own full-width line; chips and the filter button below. */
+    .gp-products-table .fi-ta-header-toolbar > :nth-child(2) {
+        flex-wrap: wrap;
+        width: 100%;
+        gap: 0.5rem;
+    }
+
+    .gp-products-table .fi-ta-search-field {
+        flex: 1 1 100%;
+    }
+
+    .gp-products-table .fi-ta-search-field .fi-input {
+        min-height: 2.75rem;
+        font-size: 1rem;
+    }
+
+    .gp-products-table .gp-quick-filters {
+        display: flex;
+        flex: 1 1 auto;
+        gap: 0.5rem;
+    }
+
+    /* Every column but the card is hidden here, so there is nothing to manage. */
+    .gp-products-table .fi-ta-col-manager-dropdown,
+    .gp-products-table .fi-ta-col-manager-modal {
+        display: none;
+    }
+
+    .gp-products-table .fi-ta-header-toolbar .fi-icon-btn {
+        width: 2.75rem;
+        height: 2.75rem;
+    }
+
+    /* One card per row: no header row, no actions column (the card has its own
+       buttons), so nothing is wider than the screen. */
+    .gp-products-table .fi-ta-table > thead {
+        display: none;
+    }
+
+    .gp-products-table .fi-ta-row > td.fi-ta-cell:has(> .fi-ta-actions) {
+        display: none;
+    }
+
+    .gp-products-table td.fi-ta-cell-mobile-card {
+        width: 100%;
+        padding: 0;
+        white-space: normal;
+    }
+
+    .gp-products-table td.fi-ta-cell-mobile-card > .fi-ta-col {
+        display: block;
+        width: 100%;
+    }
+
+    .gp-products-table .fi-ta-filters-modal .fi-input-wrp,
+    .gp-products-table .fi-ta-filters-modal .fi-select-input-btn,
+    .gp-products-table .fi-ta-filters-modal .fi-modal-footer .fi-btn,
+    .gp-products-table .fi-pagination-previous-btn,
+    .gp-products-table .fi-pagination-next-btn,
+    .gp-products-table .fi-pagination-records-per-page-select .fi-input-wrp {
+        min-height: 2.75rem;
+    }
+
+    /* Vendor headers: a clear band between each vendor's products. */
+    .gp-products-table .fi-ta-group-header {
+        min-height: 2.75rem;
+        background-color: var(--gray-100);
+    }
+
+    .dark .gp-products-table .fi-ta-group-header {
+        background-color: var(--gray-800);
+    }
+
+    .gp-products-table .fi-ta-group-heading {
+        font-size: 0.9375rem;
+        font-weight: 600;
+    }
+
+    .gp-products-table .fi-ta-group-header .fi-icon-btn {
+        width: 2.75rem;
+        height: 2.75rem;
+    }
+}
+
+.gp-card {
+    display: grid;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem 1rem;
+}
+
+.gp-card-main {
+    display: flex;
+    gap: 0.875rem;
+    align-items: flex-start;
+}
+
+.gp-card-thumb {
+    flex-shrink: 0;
+    width: 5.5rem;
+    height: 5.5rem;
+    object-fit: cover;
+    border-radius: 0.5rem;
+    background-color: var(--gray-100);
+}
+
+.gp-card-thumb-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--gray-500);
+    border: 2px dashed var(--gray-300);
+}
+
+.dark .gp-card-thumb-empty {
+    color: var(--gray-400);
+    background-color: var(--gray-800);
+    border-color: var(--gray-600);
+}
+
+.gp-card-thumb-icon {
+    width: 1.75rem;
+    height: 1.75rem;
+}
+
+.gp-card-body {
+    display: grid;
+    gap: 0.25rem;
+    min-width: 0;
+}
+
+.gp-card-title {
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.35;
+    color: var(--gray-950);
+    overflow-wrap: anywhere;
+}
+
+.dark .gp-card-title {
+    color: var(--color-white, #fff);
+}
+
+.gp-card-subtitle,
+.gp-card-meta,
+.gp-card-note {
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    color: var(--gray-500);
+    overflow-wrap: anywhere;
+}
+
+.dark .gp-card-subtitle,
+.dark .gp-card-meta,
+.dark .gp-card-note {
+    color: var(--gray-400);
+}
+
+.gp-card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    column-gap: 0.5rem;
+}
+
+.gp-card-price {
+    font-weight: 600;
+    color: var(--gray-950);
+}
+
+.dark .gp-card-price {
+    color: var(--color-white, #fff);
+}
+
+.gp-card-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.375rem;
+    margin-top: 0.25rem;
+}
+
+.gp-card-linked {
+    display: grid;
+    gap: 0.25rem;
+    padding: 0.625rem 0.75rem;
+    font-size: 0.8125rem;
+    color: var(--info-800);
+    background-color: var(--info-50);
+    border-radius: 0.5rem;
+}
+
+.dark .gp-card-linked {
+    color: var(--info-200);
+    background-color: var(--info-950);
+}
+
+.gp-card-linked-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+    font-weight: 600;
+    text-decoration: underline;
+}
+
+.gp-card-actions {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.gp-card-actions .gp-card-action {
+    width: 100%;
+    min-height: 2.75rem;
+    justify-content: center;
+}
+
+/* ── Manage images / Online name & SEO: full screen on a phone ──────────────── */
+
+.gp-photo-sources {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+}
+
+.gp-photo-source {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    min-height: 4.5rem;
+    padding: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--gray-800);
+    background-color: var(--gray-50);
+    border: 1px solid var(--gray-300);
+    border-radius: 0.75rem;
+}
+
+.dark .gp-photo-source {
+    color: var(--gray-100);
+    background-color: var(--gray-800);
+    border-color: var(--gray-600);
+}
+
+.gp-photo-source-icon {
+    width: 1.5rem;
+    height: 1.5rem;
+}
+
+/* A desktop has no camera to open; the drop zone does both jobs there. */
+@media (width >= 48rem) and (pointer: fine) {
+    .gp-photo-sources {
+        display: none;
+    }
+}
+
+/* Per-photo controls (photo-tools-script), along the bottom of each tile. */
+.gp-photo-tools {
+    position: absolute;
+    inset-inline: 0.375rem;
+    bottom: 0.375rem;
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.25rem;
+    pointer-events: none;
+}
+
+.gp-photo-tools > * {
+    pointer-events: auto;
+}
+
+.gp-photo-tools > button,
+.gp-photo-main {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    padding: 0 0.625rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #fff;
+    background-color: rgb(0 0 0 / 0.6);
+    border-radius: 0.5rem;
+}
+
+.gp-photo-main {
+    margin-inline: auto;
+    background-color: var(--primary-600);
+}
+
+.gp-photo-tools > button:first-child:not(:only-child) + .gp-photo-main,
+.gp-photo-tools > .gp-photo-main:first-child {
+    margin-inline: 0 auto;
+}
+
+[data-gp-main] .filepond--panel-root {
+    outline: 3px solid var(--primary-500);
+    outline-offset: -3px;
+}
+
+@media (width < 48rem) {
+    .fi-modal-window.gp-phone-sheet {
+        width: 100vw;
+        max-width: none;
+        height: 100dvh;
+        max-height: none;
+        margin: 0;
+        border-radius: 0;
+    }
+
+    .fi-modal-window-ctn:has(> .gp-phone-sheet) {
+        padding: 0;
+    }
+
+    .gp-phone-sheet .fi-modal-footer-actions {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+    }
+
+    .gp-phone-sheet .fi-modal-footer-actions .fi-btn {
+        width: 100%;
+        min-height: 3rem;
+        font-size: 1rem;
+    }
+
+    /* Big, zoom-free inputs (16px stops iOS zooming into the field). */
+    .gp-phone-sheet .fi-input {
+        min-height: 3rem;
+        font-size: 1rem;
+    }
+
+    .gp-phone-sheet textarea.fi-input {
+        min-height: 7.5rem;
+    }
+
+    .gp-phone-sheet .gp-suggest-name {
+        min-height: 2.75rem;
+        padding: 0 0.875rem;
+        font-size: 0.875rem;
+        border: 1px solid var(--primary-500);
+        border-radius: 9999px;
+    }
+
+    /* One big tile per row on a phone, two on a small tablet, instead of
+       three small ones — room for the move buttons under a thumb. */
+    .gp-phone-sheet .filepond--item {
+        width: calc(100% - 0.5em);
+    }
+
+    .gp-phone-sheet .fi-modal-close-btn {
+        width: 2.75rem;
+        height: 2.75rem;
+    }
+}
+
+@media (30rem <= width < 48rem) {
+    .gp-phone-sheet .filepond--item {
+        width: calc(50% - 0.5em);
+    }
+}
+
+.gp-char-count {
+    display: block;
+    font-size: 0.75rem;
+    text-align: end;
+    color: var(--gray-500);
+    font-variant-numeric: tabular-nums;
+}

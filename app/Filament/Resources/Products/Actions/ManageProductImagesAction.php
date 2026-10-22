@@ -7,6 +7,7 @@ use App\Services\Catalogue\ProductMediaActivity;
 use Filament\Actions\Action;
 use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Components\View;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
@@ -33,18 +34,32 @@ class ManageProductImagesAction
             ->icon('heroicon-o-photo')
             ->color('gray')
             ->modalHeading(fn (Product $record): string => 'Photos — '.$record->name)
-            ->modalDescription('The first photo is the main one shown to customers. Drag to reorder. Up to 8 photos, 10 MB each.')
+            ->modalDescription('The first photo is the main one shown to customers. Drag to reorder, or use the arrows. Up to 8 photos, 10 MB each.')
             ->modalSubmitActionLabel('Save photos')
+            // Full screen below md (admin theme); a normal modal above it.
+            ->extraModalWindowAttributes(['class' => 'gp-phone-sheet'])
+            ->stickyModalHeader()
+            ->stickyModalFooter()
+            // An empty array, not the default fill(): only a fill with state
+            // loads relationships, so without it the product's existing photos
+            // never reached the upload field — the modal opened empty, and
+            // saving would have deleted every photo missing from that state.
+            ->fillForm([])
             // Linked (resold) listings show their supplier's photos, so there is
             // nothing of their own to manage.
             ->visible(fn (Product $record): bool => ! $record->isLinked())
             ->authorize(fn (Product $record): bool => ! $record->isLinked() && Gate::allows('updateMedia', $record))
             ->schema([
+                View::make('filament.admin.products.photo-tools'),
+
                 SpatieMediaLibraryFileUpload::make('images')
                     ->label('')
                     ->collection(ProductMediaActivity::COLLECTION)
                     ->multiple()
                     ->reorderable()
+                    // On-screen order = saved order, so the first tile really is
+                    // the main photo. Filament's default shows them reversed.
+                    ->appendFiles()
                     ->image()
                     ->maxFiles(8)
                     ->maxSize(10240)

@@ -4,6 +4,7 @@ use App\Filament\Pages\Dashboard;
 use App\Filament\Resources\Products\Pages\EditProduct;
 use App\Filament\Resources\Products\Pages\ListProducts;
 use App\Filament\Resources\Products\ProductResource;
+use App\Filament\Resources\Products\Tables\ProductsTable;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\SupplierLink;
@@ -238,10 +239,12 @@ test('the editor can remove and reorder photos, and the first becomes primary', 
     [$a, $b, $c] = addPhotos($product, 3);
     $uuids = $product->getMedia('product-images')->pluck('uuid', 'id');
 
-    // Drop B, put C first.
+    // Drop B, put C first. The modal opens holding all three, so the state is
+    // replaced whole, as the browser does — setTableActionData() merges key by
+    // key and would leave B in place.
     Livewire::test(ListProducts::class)
         ->mountTableAction('manageImages', $product)
-        ->setTableActionData(['images' => [$uuids[$c] => $uuids[$c], $uuids[$a] => $uuids[$a]]])
+        ->set('mountedActions.0.data.images', [$uuids[$c] => $uuids[$c], $uuids[$a] => $uuids[$a]])
         ->callMountedTableAction()
         ->assertHasNoTableActionErrors();
 
@@ -317,4 +320,134 @@ test('the no-photo filter finds products without images', function () {
         ->filterTable('no_photo', true)
         ->assertCanSeeTableRecords([$without])
         ->assertCanNotSeeTableRecords([$withPhoto]);
+});
+
+// ── Manage images: what the modal opens with ────────────────────────────────
+
+test('manage images opens with the product\'s photos already in it, in saved order', function () {
+    actAsAdminPanel(catalogueEditor());
+    $product = catalogueProduct();
+    addPhotos($product, 3);
+    $uuids = $product->fresh()->getMedia('product-images')->pluck('uuid')->all();
+
+    $component = Livewire::test(ListProducts::class)->mountTableAction('manageImages', $product);
+
+    expect(array_keys($component->get('mountedActions.0.data.images')))->toBe($uuids);
+});
+
+test('adding a photo to what the modal opened with keeps the existing photos', function () {
+    actAsAdminPanel(catalogueEditor());
+    $product = catalogueProduct();
+    [$first, $second] = addPhotos($product, 2);
+
+    // Exactly what the browser does: start from the pre-filled state, upload one.
+    $component = Livewire::test(ListProducts::class)->mountTableAction('manageImages', $product);
+    $images = $component->get('mountedActions.0.data.images');
+
+    $component
+        ->setTableActionData(['images' => [...$images, UploadedFile::fake()->image('new.jpg', 60, 60)]])
+        ->callMountedTableAction()
+        ->assertHasNoTableActionErrors();
+
+    $media = $product->fresh()->getMedia('product-images');
+
+    expect($media)->toHaveCount(3)
+        ->and($media->pluck('id')->take(2)->all())->toBe([$first, $second]);
+});
+
+test('"Make main" and the arrows reorder through the upload field, saved on Save', function () {
+    actAsAdminPanel(catalogueEditor());
+    $product = catalogueProduct();
+    [$a, $b, $c] = addPhotos($product, 3);
+    $uuids = $product->getMedia('product-images')->pluck('uuid', 'id');
+
+    // The call photo-tools-script makes: the field's own reorderUploadedFiles.
+    Livewire::test(ListProducts::class)
+        ->mountTableAction('manageImages', $product)
+        ->call('callSchemaComponentMethod', 'mountedActionSchema0.images', 'reorderUploadedFiles', [
+            'fileKeys' => [$uuids[$c], $uuids[$a], $uuids[$b]],
+        ])
+        ->callMountedTableAction()
+        ->assertHasNoTableActionErrors();
+
+    expect($product->fresh()->getMedia('product-images')->pluck('id')->all())->toBe([$c, $a, $b])
+        ->and($product->fresh()->getFirstMedia('product-images')->id)->toBe($c);
+});
+
+// ── Phone layout ────────────────────────────────────────────────────────────
+
+test('each product also renders as a phone card, showing what the editor may see and no cost', function () {
+    actAsAdminPanel(catalogueEditor());
+    $named = catalogueProduct(null, ['online_name' => 'itel 2160 Keypad Phone']);
+    addPhotos($named, 2);
+    catalogueProduct();
+
+    Livewire::test(ListProducts::class)
+        ->assertSeeHtml('class="gp-card"')
+        ->assertSeeHtml('gp-card-action')
+        ->assertSee('itel 2160 Keypad Phone')
+        ->assertSee('Shelf name: '.$named->name)
+        ->assertSee('2 photos')
+        ->assertSee('No photo')
+        ->assertSee('No online name')
+        ->assertSee('Offline')
+        ->assertDontSee('77777')
+        ->assertDontSee('77,777');
+});
+
+test('a linked listing\'s phone card says so and points at the supplier product', function () {
+    actAsAdminPanel(catalogueEditor());
+    $supplierProduct = catalogueProduct();
+    $reseller = Vendor::create(['user_id' => User::factory()->create()->id, 'name' => 'Card Reseller', 'online_sales_enabled' => true]);
+    $link = SupplierLink::create([
+        'reseller_vendor_id' => $reseller->id,
+        'supplier_vendor_id' => $supplierProduct->vendor_id,
+        'markup_percent'     => 20,
+    ]);
+    $listing = catalogueProduct($reseller, [
+        'source_product_id' => $supplierProduct->id,
+        'supplier_link_id'  => $link->id,
+        'cost_price'        => null,
+    ]);
+
+    Livewire::test(ListProducts::class)
+        ->filterTable('vendor_id', $reseller->id)
+        ->assertSee('Linked to supplier')
+        ->assertSee('Open supplier product')
+        ->assertSeeHtml(e(ProductsTable::supplierRowUrl($listing)))
+        // Its card offers neither action, like its desktop row.
+        ->assertDontSeeHtml('gp-card-action');
+});
+
+test('the quick filter chips toggle the table\'s own filters, and nothing else', function () {
+    actAsAdminPanel(catalogueEditor());
+    $complete = catalogueProduct(null, ['online_name' => 'Named Phone']);
+    addPhotos($complete, 1);
+    $bare = catalogueProduct();
+
+    $component = Livewire::test(ListProducts::class)
+        ->call('toggleQuickFilter', 'no_photo')
+        ->assertSet('tableFilters.no_photo.isActive', true)
+        ->assertCanSeeTableRecords([$bare])
+        ->assertCanNotSeeTableRecords([$complete])
+        ->call('toggleQuickFilter', 'no_photo')
+        ->assertCanSeeTableRecords([$bare, $complete])
+        ->call('toggleQuickFilter', 'no_online_name')
+        ->assertCanSeeTableRecords([$bare])
+        ->assertCanNotSeeTableRecords([$complete]);
+
+    $filters = $component->get('tableFilters');
+    $component->call('toggleQuickFilter', 'visible_online');
+
+    expect($component->get('tableFilters'))->toBe($filters);
+});
+
+test('the All Products page renders the quick filter chips', function () {
+    actAsAdminPanel(catalogueEditor());
+
+    $this->get(ListProducts::getUrl())
+        ->assertOk()
+        ->assertSee('gp-quick-filters', false)
+        ->assertSee("toggleQuickFilter('no_photo')", false)
+        ->assertSee("toggleQuickFilter('no_online_name')", false);
 });

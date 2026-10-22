@@ -8,11 +8,13 @@ use App\Filament\Resources\Products\Pages\ListProducts;
 use App\Filament\Resources\Products\ProductResource;
 use App\Models\Product;
 use App\Models\Vendor;
+use Filament\Actions\Action;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\TextInput;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ViewColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
@@ -30,13 +32,28 @@ class ProductsTable
         $canSeeCost = ProductResource::canSeeCost();
 
         return $table
+            // Scopes the phone styles in the admin theme to this table.
+            ->extraAttributes(['class' => 'gp-products-table'])
             ->columns([
+                // Phone only. A Split/Stack layout would give a card too, but
+                // Filament then drops the table header at every width, and the
+                // desktop table is what the super-admin reads across. So the
+                // phone gets one full-width card cell and every column below
+                // is visibleFrom('md'); search, filters and grouping are the
+                // same table either way.
+                ViewColumn::make('mobile_card')
+                    ->label('')
+                    ->view('filament.admin.products.mobile-card')
+                    ->disabledClick()
+                    ->hiddenFrom('md'),
+
                 ImageColumn::make('thumb')
                     ->label('')
                     // A resold listing shows its supplier's photo, as customers see it.
                     ->getStateUsing(fn (Product $record): ?string => $record->catalogueImageUrl('thumb') ?: null)
                     ->defaultImageUrl(self::PLACEHOLDER_IMAGE)
-                    ->size(44),
+                    ->size(44)
+                    ->visibleFrom('md'),
 
                 TextColumn::make('name')
                     ->label('Internal name')
@@ -46,7 +63,8 @@ class ProductsTable
                     ->wrap()
                     ->description(fn (Product $record): ?string => $record->isLinked()
                         ? 'Images managed on supplier product'
-                        : null),
+                        : null)
+                    ->visibleFrom('md'),
 
                 TextColumn::make('online_name')
                     ->label('Online name')
@@ -54,22 +72,24 @@ class ProductsTable
                     ->state(fn (Product $record): ?string => $record->isLinked() ? $record->catalogueSource()?->online_name : $record->online_name)
                     ->placeholder('—')
                     ->searchable()
-                    ->wrap(),
+                    ->wrap()
+                    ->visibleFrom('md'),
 
-                TextColumn::make('vendor.name')->label('Vendor')->searchable()->sortable(),
+                TextColumn::make('vendor.name')->label('Vendor')->searchable()->sortable()->visibleFrom('md'),
 
-                TextColumn::make('category.name')->label('Category')->sortable()->toggleable(),
+                TextColumn::make('category.name')->label('Category')->sortable()->toggleable()->visibleFrom('md'),
 
-                TextColumn::make('brand')->placeholder('—')->searchable()->toggleable(),
+                TextColumn::make('brand')->placeholder('—')->searchable()->toggleable()->visibleFrom('md'),
 
-                TextColumn::make('price')->label('Selling price')->money('NGN')->sortable(),
+                TextColumn::make('price')->label('Selling price')->money('NGN')->sortable()->visibleFrom('md'),
 
                 TextColumn::make('image_count')
                     ->label('Photos')
                     ->numeric()
                     ->sortable()
                     ->badge()
-                    ->color(fn ($state): string => (int) $state === 0 ? 'danger' : 'gray'),
+                    ->color(fn ($state): string => (int) $state === 0 ? 'danger' : 'gray')
+                    ->visibleFrom('md'),
 
                 TextColumn::make('vendorlink')
                     ->label('VendorLink')
@@ -79,13 +99,15 @@ class ProductsTable
                     // A resold listing's photos live on the supplier's product, so
                     // the useful thing to offer is a jump to that row.
                     ->url(fn (Product $record): ?string => $record->isLinked()
-                        ? ListProducts::getUrl(['tableFilters' => ['product' => ['id' => $record->source_product_id]]])
-                        : null),
+                        ? self::supplierRowUrl($record)
+                        : null)
+                    ->visibleFrom('md'),
 
                 IconColumn::make('visible_online')
                     ->label('Online')
                     ->boolean()
-                    ->state(fn (Product $record): bool => isset(self::visibleOnlineIds()[$record->id])),
+                    ->state(fn (Product $record): bool => self::isVisibleOnline($record))
+                    ->visibleFrom('md'),
 
                 // Super-admin only — the reason this page originally existed.
                 TextColumn::make('commission_rate')
@@ -94,20 +116,27 @@ class ProductsTable
                     ->badge()
                     ->color(fn ($state) => $state !== null ? 'success' : 'gray')
                     ->visible($canSeeCost)
-                    ->toggleable(),
+                    ->toggleable()
+                    ->visibleFrom('md'),
                 TextColumn::make('reseller_discount')
                     ->label('Discount Override')
                     ->formatStateUsing(fn ($state) => $state !== null ? number_format((float) $state, 2).'%' : '—')
                     ->badge()
                     ->color(fn ($state) => $state !== null ? 'success' : 'gray')
                     ->visible($canSeeCost)
-                    ->toggleable(),
+                    ->toggleable()
+                    ->visibleFrom('md'),
             ])
             ->groups([
                 Group::make('vendor.name')->label('Vendor')->collapsible(),
             ])
             ->defaultGroup('vendor.name')
             ->defaultSort('name')
+            // A slide-over rather than the dropdown: on a phone the dropdown
+            // was a narrow pop-up holding seven fields and two searchable
+            // selects. "No photo" and "No online name" are also one tap away
+            // as chips beside the search (ListProducts::QUICK_FILTERS).
+            ->filtersTriggerAction(fn (Action $action) => $action->slideOver())
             ->filters([
                 SelectFilter::make('vendor_id')
                     ->label('Vendor')
@@ -173,7 +202,18 @@ class ProductsTable
             ]);
     }
 
-    private static function vendorLinkLabel(Product $record): ?string
+    // Where "Images managed on supplier product" sends you: the supplier's row.
+    public static function supplierRowUrl(Product $record): string
+    {
+        return ListProducts::getUrl(['tableFilters' => ['product' => ['id' => $record->source_product_id]]]);
+    }
+
+    public static function isVisibleOnline(Product $record): bool
+    {
+        return isset(self::visibleOnlineIds()[$record->id]);
+    }
+
+    public static function vendorLinkLabel(Product $record): ?string
     {
         if ($record->isLinked()) {
             return 'Reseller of '.($record->supplierLink?->supplierName() ?? 'a supplier');
