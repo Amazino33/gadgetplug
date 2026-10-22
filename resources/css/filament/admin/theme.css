@@ -1,10 +1,21 @@
 @import '../../../../vendor/filament/filament/resources/css/theme.css';
 
-/* Admin panel theme. Plain CSS rather than utility classes, like the vendor
-   theme: this markup sits inside Filament's own tables and modals, so it uses
-   Filament's colour variables and follows the panel's light/dark theme. No
-   @source lines on purpose — every other admin view compiles exactly as it did
-   before this theme existed. Phone means below Filament's md (48rem / 768px). */
+/* Every place admin markup can carry Tailwind classes. Filament's own CSS only
+   holds the utilities Filament itself uses, so a class written in one of our
+   views exists only if Tailwind scans that file here. Leaving these out is
+   what rendered Delivery settings unstyled (legend as plain text, borderless
+   inputs, table columns run together). A new admin view under these paths is
+   picked up by the next build; one anywhere else needs a line here. */
+@source '../../../../app/Filament/**/*.php';
+@source '../../../../app/Livewire/**/*.php';
+@source '../../../../resources/views/filament/**/*.blade.php';
+@source '../../../../resources/views/livewire/**/*.blade.php';
+@source '../../../../resources/views/partials/**/*.blade.php';
+
+/* The gp-* classes below are plain CSS, like the vendor theme's: that markup
+   sits inside Filament's own tables and modals, so it uses Filament's colour
+   variables and follows the panel's light/dark theme. Phone means below
+   Filament's md (48rem / 768px). */
 
 /* ── Messaging test-mode banner (partials/messaging-redirect-banner) ────────── */
 

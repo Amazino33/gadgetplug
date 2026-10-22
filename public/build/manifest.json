@@ -9,7 +9,7 @@
     ]
   },
   "resources/css/filament/admin/theme.css": {
-    "file": "assets/theme-CIAvbpVt.css",
+    "file": "assets/theme-SOO571cc.css",
     "src": "resources/css/filament/admin/theme.css",
     "isEntry": true,
     "name": "theme",
@@ -28,7 +28,7 @@
     "isEntry": true
   },
   "resources/js/pos/main.jsx": {
-    "file": "assets/main-B8x-7aUW.js",
+    "file": "assets/main-CL8AyzaE.js",
     "name": "main",
     "src": "resources/js/pos/main.jsx",
     "isEntry": true,
