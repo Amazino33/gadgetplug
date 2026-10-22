@@ -529,3 +529,152 @@ describe('legacy checkouts', function () {
             ->once();
     });
 });
+
+describe('Delivery settings, redesigned', function () {
+    beforeEach(function () {
+        setPermissionsTeamId(null);
+        $staff = User::factory()->create();
+        $staff->givePermissionTo('manage_delivery_settings');
+        $this->actingAs($staff);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+    });
+
+    test('the page renders its summary, map, hub and rule tables, and the price form', function () {
+        $uyo = lga('Uyo');
+        deliveryVendor()->defaultStore->update(['latitude' => $uyo->latitude, 'longitude' => $uyo->longitude]);
+        DeliveryRule::setForLga($uyo, ['mode' => 'fee', 'fee' => 1500]);
+
+        $this->get(DeliverySettings::getUrl(panel: 'admin'))
+            ->assertOk()
+            ->assertSee('Areas we deliver to')
+            ->assertSee('Hubs pinned')
+            ->assertSee('Store locations (hubs)')
+            ->assertSee('Rules by state and LGA')
+            ->assertSee('Price by distance')
+            ->assertSee('Not delivered')
+            ->assertDontSee('NGN', false);
+
+        expect(App\Filament\Pages\Delivery\DeliveryStats::summary())->toMatchArray(['paid' => 1, 'pinned' => 1]);
+    });
+
+    test('tapping an LGA on the map opens its rule, saves it, and resets it to the state default', function () {
+        $uyo = lga('Uyo');
+
+        Livewire::test(DeliverySettings::class)
+            ->mountAction('editLga', ['lga' => $uyo->id])
+            ->assertActionMounted('editLga')
+            ->setActionData(['mode' => 'fee', 'fee' => 1200, 'expected_cost' => 800, 'delivery_days' => '1–2 days'])
+            ->callMountedAction()
+            ->assertHasNoActionErrors()
+            ->assertDispatched('delivery-data-updated');
+
+        expect(app(DeliveryPricing::class)->quote($uyo))->toMatchObject(['mode' => 'fee', 'fee' => 1200.0, 'source' => 'lga']);
+
+        Livewire::test(DeliverySettings::class)->call('clearOverrides', [$uyo->id]);
+
+        expect(app(DeliveryPricing::class)->quote($uyo)->source)->toBe('state');
+    });
+
+    test('a store is pinned from the hubs table, and a pin outside Nigeria is refused', function () {
+        $store = deliveryVendor()->defaultStore;
+
+        Livewire::test(App\Filament\Pages\Delivery\HubsTable::class)
+            ->callTableAction('editCoordinates', $store, ['latitude' => 5.0377, 'longitude' => 7.9128])
+            ->assertHasNoTableActionErrors()
+            ->assertDispatched('delivery-rules-changed');
+
+        expect([(float) $store->fresh()->latitude, (float) $store->fresh()->longitude])->toBe([5.0377, 7.9128]);
+
+        // Latitude and longitude swapped: not in Nigeria.
+        Livewire::test(App\Filament\Pages\Delivery\HubsTable::class)
+            ->callTableAction('pinOnMap', $store, ['latitude' => 7.9128, 'longitude' => 51.5])
+            ->assertHasTableActionErrors(['longitude']);
+
+        // London, through the page's own write.
+        Livewire::test(DeliverySettings::class)
+            ->call('setHub', $store->id, '51.5', '-0.12')
+            ->assertHasErrors(['lat', 'lng']);
+
+        expect([(float) $store->fresh()->latitude, (float) $store->fresh()->longitude])->toBe([5.0377, 7.9128]);
+    });
+
+    test('the hubs table filters pinned and unpinned stores', function () {
+        $pinned = deliveryVendor()->defaultStore;
+        $pinned->update(['latitude' => 5.03, 'longitude' => 7.91]);
+        $unpinned = deliveryVendor()->defaultStore;
+
+        Livewire::test(App\Filament\Pages\Delivery\HubsTable::class)
+            ->filterTable('pinned', true)
+            ->assertCanSeeTableRecords([$pinned])
+            ->assertCanNotSeeTableRecords([$unpinned])
+            ->filterTable('pinned', false)
+            ->assertCanSeeTableRecords([$unpinned])
+            ->assertCanNotSeeTableRecords([$pinned]);
+    });
+
+    test('bulk actions set a rule for several LGAs, and clearing overrides needs a confirm', function () {
+        $akwaIbom = state('Akwa Ibom');
+        $picked = [lga('Uyo'), lga('Eket'), lga('Abak')];
+
+        Livewire::test(App\Filament\Pages\Delivery\LgaRulesTable::class, ['stateId' => $akwaIbom->id])
+            ->callTableBulkAction('setRule', $picked, ['mode' => 'fee', 'fee' => 2000, 'expected_cost' => 1500, 'delivery_days' => '2 days'])
+            ->assertHasNoTableBulkActionErrors();
+
+        foreach ($picked as $lga) {
+            expect(app(DeliveryPricing::class)->quote($lga))->toMatchObject(['mode' => 'fee', 'fee' => 2000.0, 'source' => 'lga']);
+        }
+
+        Livewire::test(App\Filament\Pages\Delivery\LgaRulesTable::class, ['stateId' => $akwaIbom->id])
+            ->assertTableBulkActionExists('clearOverrides', fn ($action) => $action->isConfirmationRequired())
+            ->callTableBulkAction('clearOverrides', [$picked[0], $picked[1]]);
+
+        expect(app(DeliveryPricing::class)->quote($picked[0])->source)->toBe('state')
+            ->and(app(DeliveryPricing::class)->quote($picked[2])->source)->toBe('lga');
+    });
+
+    test('the rules table counts delivered LGAs per state and finds a state by an LGA name', function () {
+        DeliveryRule::setForLga(lga('Uyo'), ['mode' => 'fee', 'fee' => 1500]);
+
+        Livewire::test(App\Filament\Pages\Delivery\StateRulesTable::class)
+            ->searchTable('Eket')
+            ->assertCanSeeTableRecords([state('Akwa Ibom')])
+            ->assertCanNotSeeTableRecords([state('Lagos')])
+            ->assertSee('of 31 delivered');
+    });
+
+    test('price by distance: preview writes nothing, and apply is behind a confirm', function () {
+        $uyo = lga('Uyo');
+        deliveryVendor()->defaultStore->update(['latitude' => $uyo->latitude, 'longitude' => $uyo->longitude]);
+        $before = DeliveryRule::orderBy('id')->get()->toArray();
+
+        $page = Livewire::test(DeliverySettings::class)
+            ->set('bandData.scope', state('Akwa Ibom')->id)
+            ->callAction('previewBands');
+
+        expect($page->get('bandPreview'))->not->toBeEmpty()
+            ->and(DeliveryRule::orderBy('id')->get()->toArray())->toBe($before);
+
+        $page->assertSee('LGAs would change')
+            ->assertActionVisible('applyBands')
+            ->assertActionExists('applyBands', fn ($action) => $action->isConfirmationRequired());
+
+        // Mounting Apply only opens the confirm; nothing is written yet.
+        $page->mountAction('applyBands');
+        expect(DeliveryRule::orderBy('id')->get()->toArray())->toBe($before);
+
+        $page->callMountedAction();
+
+        expect(DeliveryRule::whereNotNull('lga_id')->count())->toBeGreaterThan(collect($before)->whereNotNull('lga_id')->count())
+            ->and($page->get('bandPreview'))->toBe([]);
+    });
+
+    test('the delivery widgets refuse anyone the page refuses', function () {
+        setPermissionsTeamId(null);
+        $this->actingAs(User::factory()->create());
+
+        // A 403, which the app turns into a redirect away (bootstrap/app.php).
+        Livewire::test(App\Filament\Pages\Delivery\HubsTable::class)->assertRedirect()->assertDontSee('Store locations');
+        Livewire::test(App\Filament\Pages\Delivery\StateRulesTable::class)->assertRedirect()->assertDontSee('Rules by state');
+        Livewire::test(App\Filament\Pages\Delivery\LgaRulesTable::class, ['stateId' => state('Lagos')->id])->assertRedirect();
+    });
+});

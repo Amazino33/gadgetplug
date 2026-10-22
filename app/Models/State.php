@@ -27,6 +27,12 @@ class State extends Model
         return $this->hasOne(DeliveryRule::class)->whereNull('lga_id');
     }
 
+    /** LGA overrides of the state's default. */
+    public function overrideRules(): HasMany
+    {
+        return $this->hasMany(DeliveryRule::class)->whereNotNull('lga_id');
+    }
+
     /** How the state is named in an address: the FCT is not a "State". */
     public function addressName(): string
     {

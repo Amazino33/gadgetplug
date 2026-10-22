@@ -39,8 +39,8 @@ test('the built admin theme holds the classes used in custom admin views, not on
 
     // Each of these appears only in our own views — none in Filament's.
     foreach ([
-        '.min-h-\[320px\]',   // the delivery map's height
-        '.bg-amber-50',       // the "no hub pinned" notice
+        '.h-\[60vh\]',        // the delivery map's height
+        '.h-\[45vh\]',        // the "Pin on map" picker's height
         '.gp-card',           // All Products phone card (plain CSS in the theme)
     ] as $selector) {
         expect(str_contains($css, $selector))->toBeTrue("Missing from the admin theme build: {$selector}");

@@ -22,6 +22,7 @@ use Illuminate\View\Middleware\ShareErrorsFromSession;
 use Filament\Tables\View\TablesRenderHook;
 use Filament\View\PanelsRenderHook;
 use App\Filament\Resources\Products\Pages\ListProducts;
+use App\Filament\Pages\DeliverySettings;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\URL;
 
@@ -89,6 +90,12 @@ class AdminPanelProvider extends PanelProvider
                 PanelsRenderHook::SCRIPTS_BEFORE,
                 fn () => view('filament.admin.products.photo-tools-script'),
                 scopes: ListProducts::class,
+            )
+            // Leaflet and the map components, only where a page draws a map.
+            ->renderHook(
+                PanelsRenderHook::HEAD_END,
+                fn () => view('filament.admin.partials.leaflet'),
+                scopes: [DeliverySettings::class],
             )
             ->renderHook(
                 PanelsRenderHook::HEAD_END,

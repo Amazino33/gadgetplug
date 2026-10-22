@@ -28,6 +28,27 @@ class DeliveryRule extends Model
 
     public const MODES = [self::FREE, self::FEE, self::NOT_DELIVERED];
 
+    public const LABELS = [
+        self::FREE          => 'Free',
+        self::FEE           => 'Fee',
+        self::NOT_DELIVERED => 'Not delivered',
+    ];
+
+    /** Filament colours: the same green / amber / grey as the delivery map's dots. */
+    public const COLORS = [
+        self::FREE          => 'success',
+        self::FEE           => 'warning',
+        self::NOT_DELIVERED => 'gray',
+    ];
+
+    /** "Free", "₦1,500" or "Not delivered" — a rule as one short phrase. */
+    public static function describe(?string $mode, float|int|string|null $fee = null): string
+    {
+        return $mode === self::FEE
+            ? \App\Support\Naira::format($fee)
+            : (self::LABELS[$mode] ?? self::LABELS[self::NOT_DELIVERED]);
+    }
+
     protected $guarded = [];
 
     protected function casts(): array
