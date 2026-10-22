@@ -216,6 +216,25 @@ describe('the VendorLink page', function () {
         expect($page->instance()->retailFor($source))->toBe(14000.0);
     });
 
+    test('"In stock only" leaves out sold-out supplier products', function () {
+        $reseller = linkVendor('Reseller');
+        $supplier = linkVendor('Wholesaler', online: false);
+        makeLink($reseller, $supplier);
+        $inStock = linkProduct($supplier, stock: 5);
+        $soldOut = linkProduct($supplier, stock: 0);
+
+        publishPanel($reseller, User::find($reseller->user_id));
+
+        // Its query closure once named the query $q, so Filament filtered a
+        // throwaway builder and the filter did nothing.
+        Livewire::test(VendorLinkPage::class)
+            ->loadTable()
+            ->assertCanSeeTableRecords([$inStock, $soldOut])
+            ->filterTable('in_stock')
+            ->assertCanSeeTableRecords([$inStock])
+            ->assertCanNotSeeTableRecords([$soldOut]);
+    });
+
     test('a vendor sees only catalogues linked to them', function () {
         $reseller = linkVendor('Reseller');
         $supplier = linkVendor('Wholesaler', online: false);

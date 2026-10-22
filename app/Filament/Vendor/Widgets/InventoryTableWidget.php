@@ -186,12 +186,12 @@ class InventoryTableWidget extends BaseWidget
                         'low'     => 'Low Stock',
                         'healthy' => 'Healthy',
                     ])
-                    ->query(fn (\Illuminate\Database\Eloquent\Builder $q, array $data) => match ($data['value'] ?? null) {
-                        'out'     => $q->whereRaw('CAST(stock_quantity AS SIGNED) - CAST(reserved_stock AS SIGNED) <= 0'),
-                        'low'     => $q->whereRaw('CAST(stock_quantity AS SIGNED) - CAST(reserved_stock AS SIGNED) > 0')
+                    ->query(fn (\Illuminate\Database\Eloquent\Builder $query, array $data) => match ($data['value'] ?? null) {
+                        'out'     => $query->whereRaw('CAST(stock_quantity AS SIGNED) - CAST(reserved_stock AS SIGNED) <= 0'),
+                        'low'     => $query->whereRaw('CAST(stock_quantity AS SIGNED) - CAST(reserved_stock AS SIGNED) > 0')
                                        ->whereRaw('CAST(stock_quantity AS SIGNED) - CAST(reserved_stock AS SIGNED) < 5'),
-                        'healthy' => $q->whereRaw('CAST(stock_quantity AS SIGNED) - CAST(reserved_stock AS SIGNED) >= 5'),
-                        default   => $q,
+                        'healthy' => $query->whereRaw('CAST(stock_quantity AS SIGNED) - CAST(reserved_stock AS SIGNED) >= 5'),
+                        default   => $query,
                     }),
             ])
             ->paginated([15, 25, 50]);

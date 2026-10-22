@@ -135,11 +135,11 @@ class VendorLinkPage extends Page implements HasTable
             ->filters([
                 Tables\Filters\Filter::make('in_stock')
                     ->label('In stock only')
-                    ->query(fn (Builder $q) => $q->where('stock_quantity', '>', 0)),
+                    ->query(fn (Builder $query) => $query->where('stock_quantity', '>', 0)),
 
                 Tables\Filters\Filter::make('unpublished')
                     ->label('Not yet published')
-                    ->query(fn (Builder $q) => $q->whereNotIn('id', $this->publishedSourceIds()->all())),
+                    ->query(fn (Builder $query) => $query->whereNotIn('id', $this->publishedSourceIds()->all())),
             ])
             // Select-all across the page, then untick what is not wanted —
             // publishing a catalogue one row at a time is the thing this screen

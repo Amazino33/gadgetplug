@@ -477,3 +477,28 @@ it('shows dispatch staff the cost, payment and code state on the order — never
 
     expect(strip_tags($html))->not->toContain($code);
 });
+
+// ── The stage tabs ──────────────────────────────────────────────────────────
+
+it('opens every dispatch stage tab, each showing only its own orders', function () {
+    // A vendor each: one fixture vendor's stock runs out after a couple of orders.
+    $confirmed = ossOrder(ossVendor(), 'paystack', 'confirmed');
+    $packed = ossOrder(ossVendor(), 'paystack', 'packed');
+    $shipped = ossOrder(ossVendor(), 'pay_on_delivery', 'shipped');
+
+    actAsDispatcher(dispatcherUser());
+
+    // Every tab but "All" used to crash: its closure named the query $q, so
+    // Filament gave it an empty, model-less builder.
+    foreach (['needs_packing', 'packed', 'with_rider', 'delivered', 'payment_pending', 'returned', 'cancelled'] as $tab) {
+        Livewire::test(AdminListOrders::class)->set('activeTab', $tab)->assertOk();
+    }
+
+    Livewire::test(AdminListOrders::class)
+        ->set('activeTab', 'needs_packing')
+        ->assertCanSeeTableRecords([$confirmed])
+        ->assertCanNotSeeTableRecords([$packed, $shipped])
+        ->set('activeTab', 'with_rider')
+        ->assertCanSeeTableRecords([$shipped])
+        ->assertCanNotSeeTableRecords([$confirmed, $packed]);
+});
