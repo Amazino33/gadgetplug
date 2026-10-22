@@ -53,6 +53,17 @@
             <p class="mt-1 text-sm"><span class="font-semibold">{{ $order->customer_name }}</span><br>
                 <a class="text-green-700 underline" href="tel:{{ $order->customer_phone }}">{{ $order->customer_phone }}</a><br>
                 {{ $order->shipping_address }}</p>
+
+            @if ($directions)
+                {{-- Google Maps' public directions link: no key, nothing paid. --}}
+                <a href="{{ $directions }}" target="_blank" rel="noopener"
+                   class="mt-3 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg border border-green-700 px-4 py-2 text-sm font-semibold text-green-700">
+                    Open directions in Google Maps
+                </a>
+                <p class="mt-1 text-xs text-gray-500">
+                    {{ $destinationExact ? 'To the customer\'s shared location.' : 'To the centre of their area — confirm the address by phone.' }}
+                </p>
+            @endif
         </section>
 
         <section class="mt-3 rounded-lg bg-white p-4 shadow-sm">

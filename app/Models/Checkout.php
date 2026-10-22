@@ -21,6 +21,9 @@ class Checkout extends Model
             'grand_total'            => 'decimal:2',
             'delivery_rule_snapshot' => 'array',
             'purchase_tracked_at'    => 'datetime',
+            // The customer's optional shared location. Staff and rider only.
+            'customer_latitude'      => 'float',
+            'customer_longitude'     => 'float',
         ];
     }
 

@@ -678,3 +678,51 @@ describe('Delivery settings, redesigned', function () {
         Livewire::test(App\Filament\Pages\Delivery\LgaRulesTable::class, ['stateId' => state('Lagos')->id])->assertRedirect();
     });
 });
+
+describe('the customer\'s shared location at checkout', function () {
+    test('checkout works exactly as before without a location', function () {
+        DeliveryRule::setForLga(lga('Ikot Ekpene'), ['mode' => 'fee', 'fee' => 1500]);
+
+        deliveryCheckout([[deliveryProduct(deliveryVendor()), 1]], lga('Ikot Ekpene'))
+            ->call('processCheckout')
+            ->assertHasNoErrors();
+
+        $checkout = Checkout::latest('id')->first();
+
+        expect($checkout->customer_latitude)->toBeNull()
+            ->and($checkout->customer_longitude)->toBeNull()
+            ->and((float) $checkout->delivery_fee)->toBe(1500.0);
+    });
+
+    test('a shared location is saved on the checkout — and the fee stays the LGA\'s, however far the pin is', function () {
+        DeliveryRule::setForLga(lga('Ikot Ekpene'), ['mode' => 'fee', 'fee' => 1500]);
+
+        // A pin in Lagos while the order says Ikot Ekpene.
+        deliveryCheckout([[deliveryProduct(deliveryVendor()), 1]], lga('Ikot Ekpene'))
+            ->call('setLocation', 6.4541, 3.3947, 18)
+            ->assertSet('customerLat', 6.4541)
+            ->call('processCheckout')
+            ->assertHasNoErrors();
+
+        $checkout = Checkout::latest('id')->first();
+
+        expect($checkout->customer_latitude)->toBe(6.4541)
+            ->and($checkout->customer_longitude)->toBe(3.3947)
+            ->and($checkout->customer_location_accuracy)->toBe(18)
+            ->and((float) $checkout->delivery_fee)->toBe(1500.0)
+            ->and(app(App\Services\Orders\OrderLocation::class)->mismatched($checkout->orders()->first()))->toBeTrue();
+    });
+
+    test('a location outside Nigeria is left off, and the checkout still goes through', function () {
+        DeliveryRule::setForLga(lga('Ikot Ekpene'), ['mode' => 'free']);
+
+        deliveryCheckout([[deliveryProduct(deliveryVendor()), 1]], lga('Ikot Ekpene'))
+            ->call('setLocation', 51.5072, -0.1276)
+            ->assertSet('customerLat', null)
+            ->assertSet('locationNote', fn (?string $note) => str_contains((string) $note, 'outside Nigeria'))
+            ->call('processCheckout')
+            ->assertHasNoErrors();
+
+        expect(Checkout::latest('id')->first()->customer_latitude)->toBeNull();
+    });
+});

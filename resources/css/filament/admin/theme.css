@@ -593,13 +593,39 @@
    here each LGA is a small card instead: name across the top, then distance
    and the before / after badges side by side. */
 @container (width < 36rem) {
-    .gp-band-preview > table > tbody > tr {
+    .gp-band-preview > table > tbody > tr,
+    .gp-compact-rows > table > tbody > tr {
         grid-template-columns: repeat(3, max-content);
         gap: 0.5rem 1.25rem;
         padding: 0.875rem 1rem;
     }
 
-    .gp-band-preview > table > tbody > tr > td:first-child {
+    .gp-band-preview > table > tbody > tr > td:first-child,
+    .gp-compact-rows > table > tbody > tr > td:first-child {
         grid-column: 1 / -1;
+    }
+}
+
+/* ── Actions that change with the screen (order page header) ────────────────── */
+
+@media (width < 48rem) {
+    .gp-only-wide {
+        display: none !important;
+    }
+}
+
+@media (width >= 48rem) {
+    .gp-only-phone {
+        display: none !important;
+    }
+}
+
+/* ── Tap targets on a phone ─────────────────────────────────────────────────── */
+
+@media (width < 48rem) {
+    /* Every button in the admin panel's pages and modals is at least 44px tall. */
+    .fi-main .fi-btn,
+    .fi-modal-window .fi-btn {
+        min-height: 2.75rem;
     }
 }

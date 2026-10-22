@@ -23,6 +23,7 @@ use Filament\Tables\View\TablesRenderHook;
 use Filament\View\PanelsRenderHook;
 use App\Filament\Resources\Products\Pages\ListProducts;
 use App\Filament\Pages\DeliverySettings;
+use App\Filament\Resources\Orders\Pages\ViewOrder;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\URL;
 
@@ -95,7 +96,7 @@ class AdminPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
                 fn () => view('filament.admin.partials.leaflet'),
-                scopes: [DeliverySettings::class],
+                scopes: [DeliverySettings::class, ViewOrder::class],
             )
             ->renderHook(
                 PanelsRenderHook::HEAD_END,

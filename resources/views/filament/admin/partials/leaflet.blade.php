@@ -114,6 +114,34 @@
             },
         }));
 
+        // An order: the store, the customer and the straight line between them.
+        window.Alpine.data('gpOrderMap', (data) => ({
+            init() {
+                const from = [data.store.lat, data.store.lng];
+                const to = [data.customer.lat, data.customer.lng];
+                const map = L.map(this.$refs.map, { scrollWheelZoom: false });
+
+                gpMaps.tiles(map);
+                gpMaps.settle(map);
+
+                L.marker(from, { icon: gpMaps.pin('#2563eb'), title: data.store.name })
+                    .bindTooltip(data.store.name).addTo(map);
+                L.marker(to, { icon: gpMaps.pin(data.customer.precision === 'exact' ? '#16a34a' : '#d97706'), title: data.customer.label })
+                    .bindTooltip(data.customer.label).addTo(map);
+
+                // An approximate point gets a soft circle: "somewhere around here".
+                if (data.customer.precision !== 'exact') {
+                    L.circle(to, { radius: 3000, color: '#d97706', weight: 1, fillOpacity: 0.08 }).addTo(map);
+                }
+
+                L.polyline([from, to], { color: '#2563eb', weight: 3, dashArray: '6 6' })
+                    .bindTooltip(data.km + ' km straight-line', { permanent: false })
+                    .addTo(map);
+
+                map.fitBounds([from, to], { padding: [40, 40], maxZoom: 15 });
+            },
+        }));
+
         // "Pin on map": tap or drag to place a store, or use this phone's location.
         // Writes into the action form's latitude / longitude fields; nothing is
         // saved until the form is.

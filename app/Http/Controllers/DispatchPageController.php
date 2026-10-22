@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Order;
 use App\Services\Orders\DispatchMessages;
+use App\Services\Orders\OrderLocation;
 use App\Services\Orders\OrderStatusService;
 use App\Services\Messaging\TemplateRenderer;
 use Illuminate\Http\Request;
@@ -41,7 +42,7 @@ class DispatchPageController extends Controller
 
     private function page(Order $order, int $v, ?array $outcome = null): View
     {
-        $order->loadMissing('items.product', 'checkout', 'logisticsCompany');
+        $order->loadMissing('items.product', 'checkout.lga', 'logisticsCompany');
 
         return view('dispatch.show', [
             'order'    => $order,
@@ -49,6 +50,10 @@ class DispatchPageController extends Controller
             'outcome'  => $outcome,
             'pickups'  => DispatchMessages::pickupStores($order),
             'collect'  => $order->amountToCollect(),
+            // The signed link is the assigned rider's alone, so it may carry
+            // the customer's exact pin; /track never does.
+            'directions'       => app(OrderLocation::class)->directionsUrl($order),
+            'destinationExact' => (app(OrderLocation::class)->customer($order)['precision'] ?? null) === OrderLocation::EXACT,
             'items'    => $order->items->map(fn ($item) => [
                 'name'     => TemplateRenderer::riderName($item),
                 'quantity' => (int) $item->quantity,

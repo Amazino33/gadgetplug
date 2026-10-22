@@ -470,9 +470,9 @@ it('shows dispatch staff the cost, payment and code state on the order — never
     actAsDispatcher(dispatcherUser());
 
     $html = Livewire::test(AdminViewOrder::class, ['record' => $order->getRouteKey()])
-        ->assertSee('What we pay the company')
-        ->assertSee('1,750.00')
-        ->assertSee('Sent to the customer')
+        ->assertSee('We pay the company')
+        ->assertSee('₦1,750')
+        ->assertSee('Sent to customer')
         ->html();
 
     expect(strip_tags($html))->not->toContain($code);

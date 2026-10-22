@@ -95,6 +95,14 @@ class OrderResource extends Resource
                         ? 'Part of '.$record->checkout?->reference.' ('.$record->checkout_parts_count.' parts)'
                         : null),
 
+                // The customer's shared pin is far from the LGA they chose.
+                TextColumn::make('location_check')
+                    ->label('')
+                    ->badge()
+                    ->color('warning')
+                    ->icon('heroicon-m-exclamation-triangle')
+                    ->state(fn (Order $record): ?string => app(\App\Services\Orders\OrderLocation::class)->mismatched($record) ? "Location doesn't match LGA" : null),
+
                 TextColumn::make('vendor_name')
                     ->label('Store')
                     ->getStateUsing(fn (Order $record) => $record->items->first()?->vendor?->name ?? '—'),

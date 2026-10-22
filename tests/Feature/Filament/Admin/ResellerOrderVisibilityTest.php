@@ -81,7 +81,8 @@ test('the order detail page shows the reseller affiliate and the exact wallet de
 
     // 25% off 2000 = 1500
     Livewire::test(ViewOrder::class, ['record' => $order->getRouteKey()])
-        ->assertSee('₦1,500.00');
+        ->assertSee('Wallet debited')
+        ->assertSee('₦1,500');
 });
 
 test('the reseller purchase section is hidden on a normal Paystack order', function () {
@@ -119,5 +120,5 @@ test('the reseller purchase section is hidden on a normal Paystack order', funct
     ]);
 
     Livewire::test(ViewOrder::class, ['record' => $order->getRouteKey()])
-        ->assertDontSee('Wallet Debited');
+        ->assertDontSee('Wallet debited');
 });

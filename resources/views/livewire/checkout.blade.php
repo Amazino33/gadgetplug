@@ -9,6 +9,7 @@ use App\Models\PlatformMessagingSetting;
 use App\Models\State;
 use App\Services\Delivery\DeliveryPricing;
 use App\Services\Delivery\DeliveryQuote;
+use App\Services\Delivery\NigeriaBounds;
 use Illuminate\Validation\Rule;
 use App\Models\Order;
 use App\Models\Product;
@@ -80,6 +81,14 @@ new class extends Component {
     // from OrderObserver off the order's own reference) so Meta deduplicates
     // browser + server into one event instead of double-counting.
     public ?string $pixelEventId = null;
+
+    // The customer's own location, only if they tap "Use my current location".
+    // It helps the rider find them; it never sets the delivery fee (the LGA
+    // does) and is never shown anywhere public.
+    public ?float $customerLat = null;
+    public ?float $customerLng = null;
+    public ?int   $customerAccuracy = null;
+    public ?string $locationNote = null;
 
     public function mount(): void
     {
@@ -251,6 +260,33 @@ new class extends Component {
      * Step 1 → 2. A payment method was chosen here rather than on a product
      * page, which is what happens when the customer came from the cart.
      */
+    /** From the browser's geolocation, after the customer allowed it. */
+    public function setLocation($lat, $lng, $accuracy = null): void
+    {
+        $lat = is_numeric($lat) ? (float) $lat : null;
+        $lng = is_numeric($lng) ? (float) $lng : null;
+
+        if ($lat === null || $lng === null || ! NigeriaBounds::contains($lat, $lng)) {
+            $this->clearLocation();
+            $this->locationNote = 'That location looks outside Nigeria, so we left it off. Your address is enough.';
+
+            return;
+        }
+
+        $this->customerLat = round($lat, 7);
+        $this->customerLng = round($lng, 7);
+        $this->customerAccuracy = is_numeric($accuracy) ? (int) round((float) $accuracy) : null;
+        $this->locationNote = null;
+    }
+
+    public function clearLocation(): void
+    {
+        $this->customerLat = null;
+        $this->customerLng = null;
+        $this->customerAccuracy = null;
+        $this->locationNote = null;
+    }
+
     public function choosePayment(string $method): void
     {
         if (! in_array($method, ['paystack', 'pay_on_delivery'], true)) {
@@ -578,6 +614,10 @@ new class extends Component {
                 // disconnected from this request — can still include them.
                 'fbp'              => request()->cookie('_fbp'),
                 'fbc'              => request()->cookie('_fbc'),
+                // Optional, and never priced from — see setLocation().
+                'customer_latitude'          => $this->customerLat,
+                'customer_longitude'         => $this->customerLng,
+                'customer_location_accuracy' => $this->customerAccuracy,
             ], array_map(fn (array $item) => [
                 'product'    => $item['product'],
                 'quantity'   => (int) $item['quantity'],
@@ -1159,6 +1199,39 @@ that screen is where they carry on shopping, not somewhere to be held. --}}
                         class="w-full bg-brand-bg dark:bg-[#0d1a0d] border rounded-xl px-3.5 py-2.5 text-[14px] text-[#111] dark:text-[#e8f5e9] outline-none transition-colors placeholder-[#8a9e8c] resize-none
                             {{ $errors->has('address') ? 'border-red-400' : 'border-[#d0d9d2] dark:border-[#2a3a2a] focus:border-brand' }}"></textarea>
                     @error('address') <p class="text-red-500 text-[11px] mt-1">{{ $message }}</p> @enderror
+
+                    {{-- Optional: the rider finds the door faster. Never sets the fee. --}}
+                    <div x-data="{
+                            locating: false,
+                            failed: false,
+                            locate() {
+                                if (! navigator.geolocation) { this.failed = true; return; }
+                                this.locating = true;
+                                this.failed = false;
+                                navigator.geolocation.getCurrentPosition(
+                                    (p) => { this.locating = false; $wire.setLocation(p.coords.latitude, p.coords.longitude, p.coords.accuracy); },
+                                    () => { this.locating = false; this.failed = true; },
+                                    { enableHighAccuracy: true, timeout: 15000 },
+                                );
+                            },
+                        }" class="mt-2">
+                        @if ($customerLat !== null)
+                            <p class="flex flex-wrap items-center gap-x-2 text-[12px] text-brand-dark dark:text-[#e8f5e9]">
+                                <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-brand text-white text-[11px]" aria-hidden="true">✓</span>
+                                Location added — the rider will see where you are.
+                                <button type="button" wire:click="clearLocation" class="min-h-[44px] px-2 font-semibold text-brand underline">Remove</button>
+                            </p>
+                        @else
+                            <button type="button" x-on:click="locate()" x-bind:disabled="locating"
+                                class="inline-flex min-h-[44px] items-center gap-2 rounded-xl border border-[#d0d9d2] dark:border-[#2a3a2a] bg-white dark:bg-[#0d1a0d] px-3.5 text-[13px] font-semibold text-brand-dark dark:text-[#e8f5e9]">
+                                <span aria-hidden="true">📍</span>
+                                <span x-text="locating ? 'Finding you…' : 'Use my current location'">Use my current location</span>
+                            </button>
+                            <p class="text-[11px] text-[#5a6e5c] dark:text-[#8a9e8c] mt-1">Optional. Helps the rider find you.</p>
+                            <p x-show="failed" x-cloak class="text-[11px] text-red-500 mt-1">Couldn't get your location — that's fine, your address is enough.</p>
+                        @endif
+                        @if ($locationNote) <p class="text-[11px] text-red-500 mt-1">{{ $locationNote }}</p> @endif
+                    </div>
                 </div>
 
                 {{-- State → LGA. The LGA decides the delivery fee (or whether
