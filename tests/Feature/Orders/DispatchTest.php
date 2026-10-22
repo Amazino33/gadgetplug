@@ -240,9 +240,9 @@ it('shows the fee carried by each part against its cost on the dispatch board', 
     actAsDispatcher(dispatcherUser());
 
     Livewire::test(AdminListOrders::class)
-        ->assertTableColumnFormattedStateSet('fee_vs_cost', 'Fee ₦2,500.00 · Cost ₦1,800.00 · +₦700.00', $first)
-        ->assertTableColumnFormattedStateSet('fee_vs_cost', 'Fee ₦0.00 · Cost ₦1,000.00 · −₦1,000.00', $second)
-        ->assertSee('Whole checkout: fee ₦2,500.00 vs cost ₦2,800.00');
+        ->assertTableColumnFormattedStateSet('fee_vs_cost', 'Fee ₦2,500 · Cost ₦1,800 · +₦700', $first)
+        ->assertTableColumnFormattedStateSet('fee_vs_cost', 'Fee ₦0 · Cost ₦1,000 · −₦1,000', $second)
+        ->assertSee('Whole checkout: fee ₦2,500 vs cost ₦2,800');
 });
 
 // ── The delivery code ───────────────────────────────────────────────────────

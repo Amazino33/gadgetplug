@@ -13,7 +13,14 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use App\Filament\Widgets\WhatsAppHealthWidget;
+use Filament\Schemas\Components\Actions;
+use Filament\Schemas\Components\Callout;
+use Filament\Schemas\Components\EmbeddedSchema;
+use Filament\Schemas\Components\Form;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Text;
+use Filament\Schemas\Components\UnorderedList;
 use Filament\Schemas\Schema;
 
 // Platform-owned WhatsApp settings, separate from each vendor's own page.
@@ -32,7 +39,6 @@ class MessagingSettings extends Page
 
     protected static ?int $navigationSort = 90;
 
-    protected string $view = 'filament.pages.messaging-settings';
 
     /** @var array<string, mixed> */
     public ?array $data = [];
@@ -47,6 +53,35 @@ class MessagingSettings extends Page
         $this->form->fill(
             PlatformMessagingSetting::current()->only(['fallback_storekeeper_whatsapp'])
         );
+    }
+
+    /**
+     * Health first (the brake: sending or paused, today's numbers), then the
+     * settings. All Filament components; the old hand-built panel is gone.
+     */
+    public function content(Schema $schema): Schema
+    {
+        return $schema->components([
+            ...$this->getWidgetsSchemaComponents([WhatsAppHealthWidget::class]),
+
+            Callout::make('WhatsApp sending is paused')
+                ->description(fn (): string => trim(($this->health()['pause_reason'] ?? '').' Urgent messages are going by SMS; '
+                    .$this->health()['held'].' other '.str('message')->plural($this->health()['held']).' waiting. Re-scan the QR code in Wawp, then press "Resume WhatsApp sending".'))
+                ->danger()
+                ->visible(fn (): bool => (bool) $this->health()['paused']),
+
+            Form::make([EmbeddedSchema::make('form')])
+                ->id('form')
+                ->livewireSubmitHandler('save')
+                ->footer([
+                    Actions::make([
+                        Action::make('save')
+                            ->label('Save settings')
+                            ->submit('save')
+                            ->keyBindings(['mod+s']),
+                    ]),
+                ]),
+        ]);
     }
 
     public function form(Schema $form): Schema
@@ -69,34 +104,33 @@ class MessagingSettings extends Page
                     ->schema([
                         // Rendered as static text rather than a table: this is a
                         // prompt to go and fix something, not a record to manage.
-                        \Filament\Forms\Components\Placeholder::make('unconfigured_vendors')
-                            ->hiddenLabel()
-                            ->content(fn (): string => $this->unconfiguredVendorSummary()),
+                        Text::make('Every vendor has their own storekeeper number set.')
+                            ->color('success')
+                            ->visible(fn (): bool => $this->unconfiguredVendors()->isEmpty()),
+                        UnorderedList::make(fn (): array => $this->unconfiguredVendors()
+                            ->map(fn (string $name) => Text::make($name))
+                            ->all())
+                            ->visible(fn (): bool => $this->unconfiguredVendors()->isNotEmpty()),
                     ]),
             ])
             ->statePath('data');
     }
 
-    private function unconfiguredVendorSummary(): string
+    /** @return \Illuminate\Support\Collection<int, string> */
+    private function unconfiguredVendors(): \Illuminate\Support\Collection
     {
         $configured = VendorNotificationSetting::query()
             ->whereNotNull('storekeeper_whatsapp')
             ->where('storekeeper_whatsapp', '!=', '')
             ->pluck('vendor_id');
 
-        $names = Vendor::query()
+        return Vendor::query()
             ->whereNotIn('id', $configured)
             ->orderBy('name')
             ->pluck('name');
-
-        if ($names->isEmpty()) {
-            return 'Every vendor has their own storekeeper number set.';
-        }
-
-        return $names->map(fn (string $name): string => '• '.$name)->implode("\n");
     }
 
-    /** The WhatsApp brake's state, for the panel at the top of the page. */
+    /** The WhatsApp brake's state. Read fresh: "Resume" changes it mid-request. */
     public function health(): array
     {
         return app(WhatsAppGate::class)->health();

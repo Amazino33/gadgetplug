@@ -15,7 +15,8 @@ class ManageLogisticsCompanies extends ManageRecords
         return [
             CreateAction::make()
                 // Always a platform company: never tied to a vendor.
-                ->mutateDataUsing(fn (array $data) => ['vendor_id' => null] + $data),
+                ->mutateDataUsing(fn (array $data) => ['vendor_id' => null] + $data)
+                ->successNotificationTitle('Company added'),
         ];
     }
 }

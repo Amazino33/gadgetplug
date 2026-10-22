@@ -28,6 +28,14 @@
             [50, 250, 600].forEach((ms) => setTimeout(() => map.invalidateSize(), ms));
         },
 
+        // Leaflet comes from a CDN; on a bad connection it can fail to load.
+        // Say so in the map's place rather than throwing.
+        missing(el) {
+            if (window.L) return false;
+            el.innerHTML = '<p style="padding:1rem;font-size:.875rem;color:#6b7280">The map could not load — check the connection and reload the page.</p>';
+            return true;
+        },
+
         pin(color) {
             return L.divIcon({
                 className: 'gp-map-pin',
@@ -51,6 +59,8 @@
             ringLayer: null,
 
             init() {
+                if (gpMaps.missing(this.$refs.map)) return;
+
                 this.map = L.map(this.$refs.map, { preferCanvas: true }).setView(gpMaps.NIGERIA, 6);
                 gpMaps.tiles(this.map);
                 gpMaps.settle(this.map);
@@ -67,7 +77,7 @@
 
             refresh(data) {
                 this.data = data;
-                this.draw();
+                if (this.map) this.draw();
             },
 
             draw() {
@@ -117,6 +127,8 @@
         // An order: the store, the customer and the straight line between them.
         window.Alpine.data('gpOrderMap', (data) => ({
             init() {
+                if (gpMaps.missing(this.$refs.map)) return;
+
                 const from = [data.store.lat, data.store.lng];
                 const to = [data.customer.lat, data.customer.lng];
                 const map = L.map(this.$refs.map, { scrollWheelZoom: false });
@@ -157,6 +169,9 @@
                 this.latPath = this.$root.dataset.latPath;
                 this.lngPath = this.$root.dataset.lngPath;
 
+                // Typing the coordinates still works without the map.
+                if (gpMaps.missing(this.$refs.map)) return;
+
                 const lat = parseFloat(this.$wire.$get(this.latPath));
                 const lng = parseFloat(this.$wire.$get(this.lngPath));
                 const has = ! isNaN(lat) && ! isNaN(lng);
@@ -175,6 +190,11 @@
             },
 
             place(lat, lng, write) {
+                if (! this.map) {
+                    if (write) this.write(lat, lng);
+                    return;
+                }
+
                 if (! this.marker) {
                     this.marker = L.marker([lat, lng], { draggable: true, icon: gpMaps.pin('#2563eb') }).addTo(this.map);
                     this.marker.on('dragend', () => {
@@ -212,7 +232,7 @@
                     (pos) => {
                         this.locating = false;
                         this.place(pos.coords.latitude, pos.coords.longitude, true);
-                        this.map.setView([pos.coords.latitude, pos.coords.longitude], 17);
+                        this.map?.setView([pos.coords.latitude, pos.coords.longitude], 17);
                     },
                     () => {
                         this.locating = false;

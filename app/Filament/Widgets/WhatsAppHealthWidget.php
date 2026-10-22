@@ -16,6 +16,12 @@ class WhatsAppHealthWidget extends StatsOverviewWidget
 {
     protected static ?int $sort = -10;
 
+    // Rendered with the page: on the WhatsApp page it is the point of the page.
+    protected static bool $isLazy = false;
+
+    // Two by two on a phone, one row of four on a wide screen.
+    protected int|array|null $columns = ['default' => 2, '@xl' => 4, '!@lg' => 4];
+
     public static function canView(): bool
     {
         return auth()->user()?->isSuperAdmin() ?? false;

@@ -4,6 +4,7 @@ namespace App\Filament\Resources\LogisticsCompanies;
 
 use App\Models\Lga;
 use App\Models\LogisticsCompany;
+use App\Support\Plural;
 use App\Models\State;
 use BackedEnum;
 use Filament\Actions\EditAction;
@@ -114,15 +115,21 @@ class LogisticsCompanyResource extends Resource
     {
         return $table
             ->columns([
-                TextColumn::make('name')->searchable()->sortable()->weight('bold')
-                    ->description(fn (LogisticsCompany $record) => $record->contact_person),
-                TextColumn::make('phone')->label('Dispatch phone')->placeholder('—'),
-                TextColumn::make('whatsapp')->label('WhatsApp')->placeholder('—')->visibleFrom('md'),
+                TextColumn::make('name')->searchable()->sortable()->weight('bold')->wrap()
+                    // On a phone the phone column is hidden; the number shows here.
+                    ->description(fn (LogisticsCompany $record) => collect([$record->contact_person, $record->phone])->filter()->implode(' · ') ?: null),
+                TextColumn::make('phone')
+                    ->label('Dispatch phone')
+                    ->placeholder('—')
+                    ->url(fn (?string $state): ?string => $state ? 'tel:'.preg_replace('/[^\d+]/', '', $state) : null)
+                    ->color('primary')
+                    ->visibleFrom('md'),
+                TextColumn::make('whatsapp')->label('WhatsApp')->placeholder('—')->visibleFrom('lg'),
                 TextColumn::make('coverage')
                     ->label('Covers')
                     ->getStateUsing(fn (LogisticsCompany $record) => collect([
-                        count($record->coverage_state_ids ?? []) ? count($record->coverage_state_ids).' state(s)' : null,
-                        count($record->coverage_lga_ids ?? []) ? count($record->coverage_lga_ids).' LGA(s)' : null,
+                        ($states = count($record->coverage_state_ids ?? [])) ? $states.' '.str('state')->plural($states) : null,
+                        ($lgas = count($record->coverage_lga_ids ?? [])) ? $lgas.' '.Plural::lgas($lgas) : null,
                     ])->filter()->implode(', ') ?: 'Not set')
                     ->visibleFrom('md'),
                 TextColumn::make('orders_count')
@@ -130,9 +137,24 @@ class LogisticsCompanyResource extends Resource
                     ->counts('orders')
                     ->alignCenter()
                     ->visibleFrom('md'),
-                IconColumn::make('is_active')->label('Active')->boolean(),
+                TextColumn::make('is_active')
+                    ->label('Status')
+                    ->badge()
+                    ->formatStateUsing(fn (bool $state): string => $state ? 'Active' : 'Inactive')
+                    ->color(fn (bool $state): string => $state ? 'success' : 'gray'),
             ])
-            ->recordActions([EditAction::make()])
+            // Tapping a company opens it; the pencil is there too.
+            ->recordAction('edit')
+            ->recordActions([
+                EditAction::make()
+                    ->iconButton()
+                    ->size('lg')
+                    ->modalWidth('2xl')
+                    ->successNotificationTitle('Saved'),
+            ])
+            ->emptyStateHeading('No logistics companies yet')
+            ->emptyStateDescription('Add the companies GadgetPlug pays to deliver orders. Dispatch assigns them to orders.')
+            ->emptyStateIcon('heroicon-o-truck')
             ->defaultSort('name');
     }
 

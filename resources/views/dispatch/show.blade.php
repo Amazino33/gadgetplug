@@ -9,9 +9,28 @@
 </head>
 <body class="min-h-screen bg-gray-50 text-gray-900">
 <main class="mx-auto max-w-md p-4">
-    <h1 class="text-lg font-bold">GadgetPlug delivery</h1>
-    <p class="text-sm text-gray-500">Order <span class="font-semibold text-gray-900">{{ $order->reference }}</span>
-        @if ($order->logisticsCompany) · {{ $order->logisticsCompany->name }} @endif</p>
+    @php
+        // The same status wording and colour as the admin screens
+        // (App\Support\OrderBadges), drawn with this page's Tailwind.
+        $badge = [
+            'success' => 'bg-green-50 text-green-800 ring-green-600/20',
+            'warning' => 'bg-amber-50 text-amber-800 ring-amber-600/20',
+            'info'    => 'bg-blue-50 text-blue-800 ring-blue-600/20',
+            'primary' => 'bg-amber-50 text-amber-800 ring-amber-600/20',
+            'danger'  => 'bg-red-50 text-red-800 ring-red-600/20',
+            'gray'    => 'bg-gray-100 text-gray-700 ring-gray-500/20',
+        ][\App\Support\OrderBadges::statusColor($order->status)];
+    @endphp
+    <div class="flex items-start justify-between gap-3">
+        <div>
+            <h1 class="text-lg font-bold">GadgetPlug delivery</h1>
+            <p class="text-sm text-gray-500">Order <span class="font-semibold text-gray-900">{{ $order->reference }}</span>
+                @if ($order->logisticsCompany) · {{ $order->logisticsCompany->name }} @endif</p>
+        </div>
+        <span class="mt-1 inline-flex shrink-0 items-center rounded-md px-2 py-1 text-xs font-semibold ring-1 {{ $badge }}">
+            {{ \App\Support\OrderBadges::statusLabel($order->status) }}
+        </span>
+    </div>
 
     @if ($stale)
         <div class="mt-4 rounded-lg bg-amber-50 p-4 text-sm text-amber-800">
@@ -41,8 +60,12 @@
             @forelse ($pickups as $store)
                 <p class="mt-1 text-sm"><span class="font-semibold">{{ $store->vendor?->name }} — {{ $store->name }}</span>
                     @if ($store->address)<br>{{ $store->address }}@endif
-                    @if ($store->phone)<br><a class="text-green-700 underline" href="tel:{{ $store->phone }}">{{ $store->phone }}</a>@endif
                 </p>
+                @if ($store->phone)
+                    <a href="tel:{{ $store->phone }}" class="mt-2 inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-gray-300 px-3 text-sm font-semibold text-gray-800">
+                        Call the store · {{ $store->phone }}
+                    </a>
+                @endif
             @empty
                 <p class="mt-1 text-sm">{{ $order->items->first()?->vendor?->name ?? 'The store' }} — call GadgetPlug for the address.</p>
             @endforelse
@@ -51,8 +74,10 @@
         <section class="mt-3 rounded-lg bg-white p-4 shadow-sm">
             <h2 class="text-sm font-semibold text-gray-500">Deliver to</h2>
             <p class="mt-1 text-sm"><span class="font-semibold">{{ $order->customer_name }}</span><br>
-                <a class="text-green-700 underline" href="tel:{{ $order->customer_phone }}">{{ $order->customer_phone }}</a><br>
                 {{ $order->shipping_address }}</p>
+            <a href="tel:{{ $order->customer_phone }}" class="mt-2 inline-flex min-h-[44px] items-center gap-2 rounded-lg border border-gray-300 px-3 text-sm font-semibold text-gray-800">
+                Call the customer · {{ $order->customer_phone }}
+            </a>
 
             @if ($directions)
                 {{-- Google Maps' public directions link: no key, nothing paid. --}}
@@ -75,7 +100,7 @@
             </ul>
             <p class="mt-3 text-sm font-semibold">
                 @if ($collect > 0)
-                    Collect from the customer: ₦{{ number_format($collect, 2) }}
+                    Collect from the customer: {{ \App\Support\Naira::format($collect) }}
                 @else
                     Already paid — collect nothing.
                 @endif
@@ -88,8 +113,8 @@
                 <label for="code" class="text-sm font-semibold">Customer's delivery code</label>
                 <p class="text-xs text-gray-500">Ask the customer for the 4-digit code when they have their items.</p>
                 <input id="code" name="code" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="one-time-code" required
-                       class="mt-2 w-full rounded-lg border border-gray-300 px-3 py-2 text-lg tracking-widest">
-                <button type="submit" class="mt-3 w-full rounded-lg bg-green-700 px-4 py-2 font-semibold text-white">Mark delivered</button>
+                       class="mt-2 min-h-[48px] w-full rounded-lg border border-gray-300 px-3 py-2 text-lg tracking-widest">
+                <button type="submit" class="mt-3 min-h-[48px] w-full rounded-lg bg-green-700 px-4 py-2 font-semibold text-white">Mark delivered</button>
             </form>
         @elseif ($order->status === 'delivered')
             <p class="mt-4 text-center text-sm font-semibold text-green-700">Delivered.</p>

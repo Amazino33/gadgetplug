@@ -625,7 +625,84 @@
 @media (width < 48rem) {
     /* Every button in the admin panel's pages and modals is at least 44px tall. */
     .fi-main .fi-btn,
-    .fi-modal-window .fi-btn {
+    .fi-modal-window .fi-btn,
+    .fi-main .fi-input-wrp,
+    .fi-modal-window .fi-input-wrp {
+        min-height: 2.75rem;
+    }
+}
+
+/* ── Card tables below lg: phones and tablets (dispatch board; All Products
+      has its own, phone-only, above) ─────────────────────────────────────── */
+
+@media (width < 64rem) {
+    .gp-card-table .fi-ta-table > thead,
+    .gp-card-table .fi-ta-row > td.fi-ta-cell:has(> .fi-ta-actions),
+    .gp-card-table .fi-ta-col-manager-dropdown,
+    .gp-card-table .fi-ta-col-manager-modal {
+        display: none;
+    }
+
+    .gp-card-table td.fi-ta-cell-mobile-card {
+        width: 100%;
+        padding: 0;
+        white-space: normal;
+    }
+
+    .gp-card-table td.fi-ta-cell-mobile-card > .fi-ta-col {
+        display: block;
+        width: 100%;
+    }
+
+    .gp-card-table .fi-ta-header-toolbar > :nth-child(2) {
+        flex-wrap: wrap;
+        width: 100%;
+        gap: 0.5rem;
+    }
+
+    .gp-card-table .fi-ta-search-field {
+        flex: 1 1 100%;
+    }
+
+    .gp-card-table .fi-ta-search-field .fi-input {
+        min-height: 2.75rem;
+        font-size: 1rem;
+    }
+
+    .gp-card-table .fi-ta-header-toolbar .fi-icon-btn,
+    .gp-card-table .fi-pagination-previous-btn,
+    .gp-card-table .fi-pagination-next-btn {
+        min-width: 2.75rem;
+        min-height: 2.75rem;
+    }
+}
+
+.gp-dispatch-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.gp-dispatch-card-head .gp-card-title {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+}
+
+/* ── Dispatch board: stage tabs on a phone or tablet ────────────────────────── */
+
+@media (width < 64rem) {
+    /* Eight stages: wrapped into rows of chips rather than a strip that
+       scrolls sideways, so every stage is one tap away. */
+    .gp-dispatch-page .fi-tabs {
+        flex-wrap: wrap;
+        justify-content: flex-start;
+        overflow-x: visible;
+        max-width: 100%;
+    }
+
+    .gp-dispatch-page .fi-tabs-item {
         min-height: 2.75rem;
     }
 }

@@ -7,7 +7,10 @@ use App\Models\LogisticsCompany;
 use App\Models\Order;
 use App\Models\Store;
 use App\Models\Vendor;
+use App\Services\Orders\OrderLocation;
 use App\Services\Orders\OrderStatusService;
+use App\Support\Naira;
+use App\Support\OrderBadges;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
@@ -16,6 +19,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ViewColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
@@ -86,14 +90,30 @@ class OrderResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            // Card styles below lg in the admin theme (no header row, no actions column).
+            ->extraAttributes(['class' => 'gp-card-table'])
             ->columns([
+                // Phone and tablet: one card per order with its next step as a
+                // button. Every column below is visibleFrom('lg'), so a laptop
+                // gets the table; search, tabs and filters are the same either way.
+                ViewColumn::make('mobile_card')
+                    ->label('')
+                    ->view('filament.admin.orders.dispatch-card')
+                    ->disabledClick()
+                    ->hiddenFrom('lg'),
+
                 TextColumn::make('reference')
                     ->searchable()
                     ->weight('bold')
                     ->copyable()
-                    ->description(fn (Order $record) => (int) $record->checkout_parts_count > 1
-                        ? 'Part of '.$record->checkout?->reference.' ('.$record->checkout_parts_count.' parts)'
-                        : null),
+                    // The store, and for a checkout in parts which part this is.
+                    ->description(fn (Order $record) => collect([
+                        $record->items->first()?->vendor?->name,
+                        (int) $record->checkout_parts_count > 1
+                            ? 'part of '.$record->checkout?->reference.' ('.$record->checkout_parts_count.' parts)'
+                            : null,
+                    ])->filter()->implode(' · ') ?: null)
+                    ->visibleFrom('lg'),
 
                 // The customer's shared pin is far from the LGA they chose.
                 TextColumn::make('location_check')
@@ -101,45 +121,31 @@ class OrderResource extends Resource
                     ->badge()
                     ->color('warning')
                     ->icon('heroicon-m-exclamation-triangle')
-                    ->state(fn (Order $record): ?string => app(\App\Services\Orders\OrderLocation::class)->mismatched($record) ? "Location doesn't match LGA" : null),
-
-                TextColumn::make('vendor_name')
-                    ->label('Store')
-                    ->getStateUsing(fn (Order $record) => $record->items->first()?->vendor?->name ?? '—'),
+                    ->state(fn (Order $record): ?string => app(OrderLocation::class)->mismatched($record) ? "Location doesn't match LGA" : null)
+                    ->wrap()
+                    ->visibleFrom('lg'),
 
                 TextColumn::make('customer_name')
                     ->label('Customer')
                     ->searchable()
-                    ->description(fn (Order $record) => $record->customer_phone)
-                    ->visibleFrom('md'),
-
-                TextColumn::make('area')
-                    ->label('Area')
-                    ->getStateUsing(fn (Order $record) => $record->checkout?->lga?->name ?? $record->local_government ?? '—')
-                    ->visibleFrom('md'),
+                    ->description(fn (Order $record) => collect([
+                        $record->checkout?->lga?->name ?? $record->local_government,
+                        $record->customer_phone,
+                    ])->filter()->implode(' · '))
+                    ->visibleFrom('lg'),
 
                 TextColumn::make('status')
                     ->badge()
-                    ->formatStateUsing(fn ($state) => OrderStatusService::LABELS[$state] ?? ucfirst((string) $state))
-                    ->color(fn ($state) => match ($state) {
-                        'confirmed', 'packed'                => 'info',
-                        'paid', 'delivered'                  => 'success',
-                        'shipped'                            => 'warning',
-                        'returned'                           => 'gray',
-                        'cancelled', 'paid_but_failed_stock' => 'danger',
-                        default                              => 'gray',
-                    }),
+                    ->formatStateUsing(fn ($state) => OrderBadges::statusLabel($state))
+                    ->color(fn ($state) => OrderBadges::statusColor($state))
+                    ->visibleFrom('lg'),
 
                 TextColumn::make('payment_state')
                     ->label('Payment')
                     ->badge()
-                    ->getStateUsing(fn (Order $record) => match (true) {
-                        $record->payment_method === 'wallet'   => 'Reseller wallet',
-                        $record->payment_method === 'paystack' => 'Paid online',
-                        $record->isRevenueRecognized()         => 'POD — collected',
-                        default                                => 'POD — to collect',
-                    })
-                    ->color(fn (string $state) => $state === 'POD — to collect' ? 'warning' : 'success'),
+                    ->getStateUsing(fn (Order $record) => OrderBadges::paymentState($record))
+                    ->color(fn (string $state) => OrderBadges::paymentStateColor($state))
+                    ->visibleFrom('lg'),
 
                 TextColumn::make('logisticsCompany.name')
                     ->label('Company')
@@ -147,7 +153,7 @@ class OrderResource extends Resource
                     ->description(fn (Order $record) => $record->rider_name
                         ? trim($record->rider_name.' '.($record->rider_phone ? '· '.$record->rider_phone : ''))
                         : null)
-                    ->visibleFrom('md'),
+                    ->visibleFrom('2xl'),
 
                 // What delivering this order earned or lost: its share of the
                 // checkout's fee (carried by REF-1) against what we pay the
@@ -158,25 +164,28 @@ class OrderResource extends Resource
                     ->getStateUsing(fn (Order $record) => $record->company_cost === null
                         ? null
                         : round($record->deliveryFeeShare() - (float) $record->company_cost, 2))
-                    ->formatStateUsing(fn ($state, Order $record) => 'Fee ₦'.number_format($record->deliveryFeeShare(), 2)
-                        .' · Cost ₦'.number_format((float) $record->company_cost, 2)
-                        .' · '.((float) $state >= 0 ? '+' : '−').'₦'.number_format(abs((float) $state), 2))
-                    ->placeholder(fn (Order $record) => 'Fee ₦'.number_format($record->deliveryFeeShare(), 2).' · cost not set')
+                    ->formatStateUsing(fn ($state, Order $record) => 'Fee '.Naira::format($record->deliveryFeeShare())
+                        .' · Cost '.Naira::format($record->company_cost)
+                        .' · '.((float) $state >= 0 ? '+' : '').Naira::format($state))
+                    ->placeholder(fn (Order $record) => 'Fee '.Naira::format($record->deliveryFeeShare()).' · cost not set')
                     ->color(fn ($state) => $state === null ? 'gray' : ((float) $state >= 0 ? 'success' : 'danger'))
                     ->description(fn (Order $record) => (int) $record->checkout_parts_count > 1 && $record->checkout
-                        ? 'Whole checkout: fee ₦'.number_format((float) $record->checkout->delivery_fee, 2)
-                            .' vs cost ₦'.number_format((float) $record->checkout_parts_cost, 2)
+                        ? 'Whole checkout: fee '.Naira::format($record->checkout->delivery_fee)
+                            .' vs cost '.Naira::format($record->checkout_parts_cost)
                         : null)
-                    ->visibleFrom('lg'),
+                    ->visibleFrom('2xl'),
 
                 IconColumn::make('company_paid_at')
                     ->label('Paid to company')
                     ->boolean()
                     ->getStateUsing(fn (Order $record) => $record->company_cost === null ? null : $record->company_paid_at !== null)
-                    ->visibleFrom('lg'),
+                    ->visibleFrom('2xl'),
 
-                TextColumn::make('created_at')->label('Placed')->dateTime('d M Y, H:i')->sortable()->visibleFrom('lg'),
+                TextColumn::make('created_at')->label('Placed')->dateTime('d M Y, H:i')->sortable()->visibleFrom('2xl'),
             ])
+            ->emptyStateHeading('No orders here')
+            ->emptyStateDescription('Orders in this stage show up here as they come in.')
+            ->emptyStateIcon('heroicon-o-truck')
             ->defaultSort('created_at', 'desc')
             ->filters([
                 SelectFilter::make('status')

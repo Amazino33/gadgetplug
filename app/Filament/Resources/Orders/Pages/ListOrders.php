@@ -13,6 +13,12 @@ class ListOrders extends ListRecords
 
     protected static ?string $title = 'Dispatch';
 
+    /** Phone styles in the admin theme: the stage tabs wrap instead of scrolling. */
+    public function getPageClasses(): array
+    {
+        return ['gp-dispatch-page'];
+    }
+
     /**
      * The dispatch stages, in the order an order moves through them.
      *
