@@ -160,3 +160,97 @@ test('an empty catalogue falls back to the shelves rather than an empty field', 
     expect(Volt::test('components.search-overlay')->instance()->suggestions)
         ->toBe(['Drones']);
 });
+
+// ── Word by word, Enter, and the full results page ──────────────────────────
+
+test('every word must match somewhere, in any order', function () {
+    searchableProduct('REDMI 15C 128GB + 4GB');
+    searchableProduct('Redmi A7 64GB');
+    searchableProduct('Tecno Spark 128GB');
+
+    Volt::test('components.search-overlay')
+        ->set('q', 'redmi 128gb')
+        ->assertSee('REDMI 15C 128GB + 4GB')
+        ->assertDontSee('Redmi A7 64GB')
+        ->assertDontSee('Tecno Spark 128GB');
+
+    Volt::test('components.search-overlay')
+        ->set('q', '128gb redmi')
+        ->assertSee('REDMI 15C 128GB + 4GB');
+});
+
+test('the category name counts as a match', function () {
+    $banks = Category::create(['name' => 'Power Banks']);
+    searchableProduct('Anker PowerCore 20000', ['brand' => 'Anker'], $banks);
+    searchableProduct('Anker Soundcore Earbuds', ['brand' => 'Anker']);
+
+    Volt::test('components.search-overlay')
+        ->set('q', 'anker power bank')
+        ->assertSee('Anker PowerCore 20000')
+        ->assertDontSee('Anker Soundcore Earbuds');
+});
+
+test('the words together, as typed, rank above the same words scattered', function () {
+    searchableProduct('Charger cable for Samsung phone');
+    searchableProduct('Samsung phone charger');
+
+    $names = Volt::test('components.search-overlay')
+        ->set('q', 'phone charger')
+        ->instance()->results->pluck('name')->all();
+
+    expect($names[0])->toBe('Samsung phone charger');
+});
+
+test('pressing Enter opens every result on the results page', function () {
+    searchableProduct('Baseus 65W GaN Charger');
+
+    Volt::test('components.search-overlay')
+        ->set('q', '  charger ')
+        ->call('seeAll')
+        ->assertRedirect(route('home', ['search' => 'charger']));
+
+    // Nothing typed: Enter does nothing.
+    Volt::test('components.search-overlay')
+        ->call('seeAll')
+        ->assertNoRedirect();
+});
+
+test('the panel says how many match in all when it shows only some', function () {
+    foreach (range(1, 15) as $i) {
+        searchableProduct("Fast Charger Model {$i}");
+    }
+
+    Volt::test('components.search-overlay')
+        ->set('q', 'charger')
+        ->assertSee('Showing 12 of 15')
+        ->assertSee('See all 15 results');
+});
+
+test('the results page shows two dozen at a time, full width, with no category sidebar', function () {
+    foreach (range(1, 30) as $i) {
+        searchableProduct("Wide Search Phone {$i}");
+    }
+
+    $this->get(route('home', ['search' => 'wide search']))
+        ->assertOk()
+        ->assertSee('Results for &quot;wide search&quot;', false)
+        ->assertSee('xl:grid-cols-5', false)
+        ->assertDontSee('Browse Categories');
+
+    // 24 on arrival rather than the catalogue's 9.
+    expect(substr_count(
+        $this->get(route('home', ['search' => 'wide search']))->getContent(),
+        'Wide Search Phone ',
+    ))->toBeGreaterThanOrEqual(24);
+
+    // The ordinary catalogue keeps its sidebar.
+    $this->get(route('home'))->assertSee('Browse Categories');
+});
+
+test('opened from a results page, the panel already holds that search', function () {
+    searchableProduct('Baseus 65W GaN Charger');
+
+    $this->get(route('home', ['search' => 'charger']))
+        ->assertOk()
+        ->assertSee('value="charger"', false);
+});

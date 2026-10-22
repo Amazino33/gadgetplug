@@ -337,35 +337,49 @@ class Product extends Model implements HasMedia
         return (string) (filled($source?->online_name) ? $source->online_name : ($source?->name ?? $this->name));
     }
 
+    /** Words beyond this are ignored: a pasted paragraph is not a search. */
+    private const SEARCH_MAX_WORDS = 6;
+
     /**
-     * Storefront search: internal name, online name and brand — and, for a
-     * resold listing, its supplier's online name, which is what the customer
-     * actually sees on it.
+     * Storefront search: internal name, online name, brand and category — and,
+     * for a resold listing, its supplier's online name, which is what the
+     * customer actually sees on it.
+     *
+     * Word by word: every word typed must appear somewhere in those, in any
+     * order, so "redmi 128gb" finds "REDMI 15C 128GB + 4GB" and "anker power
+     * bank" finds a power bank by Anker named anything at all.
      *
      * One definition for the catalogue, the search overlay and the feed, so a
-     * product findable in one is findable in all three. The term is escaped:
+     * product findable in one is findable in all three. Each word is escaped:
      * a customer typing "50%" means those characters, not a wildcard.
      */
     public function scopeSearchCatalogue(Builder $query, ?string $term): Builder
     {
-        if ($term === null || trim($term) === '') {
-            return $query;
+        $words = array_slice(preg_split('/\s+/', trim((string) $term), -1, PREG_SPLIT_NO_EMPTY), 0, self::SEARCH_MAX_WORDS);
+
+        foreach ($words as $word) {
+            $like = '%'.addcslashes($word, '%_\\').'%';
+
+            $query->where(function (Builder $q) use ($like) {
+                $q->where('products.name', 'like', $like)
+                    ->orWhere('products.online_name', 'like', $like)
+                    ->orWhere('products.brand', 'like', $like)
+                    ->orWhereExists(function ($src) use ($like) {
+                        $src->selectRaw('1')
+                            ->from('products as search_src')
+                            ->whereColumn('search_src.id', 'products.source_product_id')
+                            ->where('search_src.online_name', 'like', $like);
+                    })
+                    ->orWhereExists(function ($category) use ($like) {
+                        $category->selectRaw('1')
+                            ->from('categories as search_category')
+                            ->whereColumn('search_category.id', 'products.category_id')
+                            ->where('search_category.name', 'like', $like);
+                    });
+            });
         }
 
-        // Same escaping the search overlay has always used.
-        $like = '%'.addcslashes(trim($term), '%_\\').'%';
-
-        return $query->where(function (Builder $q) use ($like) {
-            $q->where('products.name', 'like', $like)
-                ->orWhere('products.online_name', 'like', $like)
-                ->orWhere('products.brand', 'like', $like)
-                ->orWhereExists(function ($src) use ($like) {
-                    $src->selectRaw('1')
-                        ->from('products as search_src')
-                        ->whereColumn('search_src.id', 'products.source_product_id')
-                        ->where('search_src.online_name', 'like', $like);
-                });
-        });
+        return $query;
     }
 
     /** The description a customer is shown. */

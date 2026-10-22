@@ -21,14 +21,21 @@ new class extends Component {
     public ?string $cartError = null;
     public int $perPage = 9;
 
+    /** A search shows more at a time: someone who pressed Enter wants to see it all. */
+    private const SEARCH_PAGE_SIZE = 24;
+
     public function loadMore(): void
     {
-        $this->perPage += 9;
+        $this->perPage += $this->search !== '' ? self::SEARCH_PAGE_SIZE : 9;
     }
 
     public function mount(): void
     {
-        $this->search = request('search', '');
+        $this->search = trim((string) request('search', ''));
+
+        if ($this->search !== '') {
+            $this->perPage = self::SEARCH_PAGE_SIZE;
+        }
 
         if ($slug = request('category')) {
             $category = Category::where('slug', $slug)->first();
@@ -316,7 +323,9 @@ $cardBgs = [
 {{-- ─── MAIN BODY: SIDEBAR + PRODUCTS ─────────────────────────────────────── --}}
 <div class="flex gap-5 px-4 md:px-6 py-7 items-start bg-[#f8fcf8] dark:bg-[#0d1a0d]">
 
-    {{-- Category sidebar (desktop only) --}}
+    {{-- Category sidebar (desktop only). Not on a search: the results get the
+         whole width instead. --}}
+    @if ($search === '')
     <aside class="hidden lg:block w-[200px] flex-shrink-0 bg-white dark:bg-[#1a2a1a] rounded-2xl border border-brand-border dark:border-[#2a3a2a] overflow-hidden sticky top-[92px] max-h-[calc(100vh-120px)] flex flex-col">
         <div class="bg-brand px-4 py-3.5 flex-shrink-0">
             <p class="font-montserrat font-bold text-[12px] text-white tracking-[0.5px] uppercase">Browse Categories</p>
@@ -349,6 +358,7 @@ $cardBgs = [
         {{-- The sidebar "FLASH DEAL" promo that sat here has been removed; the
              flash sale now has one call to action, in the strip above. --}}
     </aside>
+    @endif
 
     {{-- Product area --}}
     <div class="flex-1 min-w-0">
@@ -390,7 +400,7 @@ $cardBgs = [
 
         {{-- Skeleton — visible only while Livewire is fetching, so filtering or
              paging shows page structure instead of an empty column. --}}
-        <div wire:loading.flex wire:target="filterCategory, sort" class="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3.5" aria-hidden="true">
+        <div wire:loading.flex wire:target="filterCategory, sort" @class(['grid gap-3.5', 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5' => $search !== '', 'grid-cols-2 md:grid-cols-2 lg:grid-cols-3' => $search === '']) aria-hidden="true">
             @for ($i = 0; $i < 6; $i++)
             <div class="bg-white dark:bg-[#1a2a1a] rounded-2xl border border-brand-border dark:border-[#2a3a2a] overflow-hidden">
                 <div class="gp-skeleton h-[140px] w-full"></div>
@@ -410,7 +420,7 @@ $cardBgs = [
 
         {{-- Product grid --}}
         @if ($products->count())
-        <div id="products" wire:loading.remove wire:target="filterCategory, sort" class="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3.5 scroll-mt-24">
+        <div id="products" wire:loading.remove wire:target="filterCategory, sort" @class(['grid gap-3.5 scroll-mt-24', 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5' => $search !== '', 'grid-cols-2 md:grid-cols-2 lg:grid-cols-3' => $search === ''])>
             @foreach ($products as $product)
             @php
                 $bg = $cardBgs[$product->id % count($cardBgs)];

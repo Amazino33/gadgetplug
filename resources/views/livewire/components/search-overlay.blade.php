@@ -21,8 +21,11 @@ use Livewire\Volt\Component;
  */
 new class extends Component
 {
-    /** Enough to be useful on a phone screen without becoming a page of its own. */
-    private const RESULT_LIMIT = 8;
+    /**
+     * A quick look, not the whole answer: two columns of six on a wide
+     * screen. Enter (or "See all results") opens everything.
+     */
+    private const RESULT_LIMIT = 12;
 
     /**
      * Below this, almost everything in the catalogue matches and the list is
@@ -31,6 +34,15 @@ new class extends Component
     private const MIN_TERM_LENGTH = 2;
 
     public string $q = '';
+
+    /**
+     * Opened from a results page, the field already holds that search, so
+     * refining "redmi" to "redmi 128gb" does not start from nothing.
+     */
+    public function mount(): void
+    {
+        $this->q = trim((string) request('search', ''));
+    }
 
     #[Computed]
     public function results(): Collection
@@ -45,21 +57,52 @@ new class extends Component
         // otherwise be running a query they did not write.
         $escaped = addcslashes($term, '%_\\');
 
-        return Product::query()
-            ->visibleOnline()
-            ->inStockForSale()
+        return $this->matching($term)
             ->with(['vendor', 'category'])->withCatalogue()
-            // Internal name, online name, brand — one rule shared with the
-            // catalogue and the feed (Product::scopeSearchCatalogue).
-            ->searchCatalogue($term)
             // Something that starts with what they typed is much more likely to
             // be what they meant than something that merely contains it
             // somewhere — "charger" should not open on "Car charger adapter
-            // for wireless charger stand".
-            ->orderByRaw('CASE WHEN products.online_name LIKE ? OR products.name LIKE ? THEN 0 ELSE 1 END', ["{$escaped}%", "{$escaped}%"])
+            // for wireless charger stand" — and the words together, as typed,
+            // beat the same words scattered through a name.
+            ->orderByRaw(
+                'CASE WHEN products.online_name LIKE ? OR products.name LIKE ? THEN 0 WHEN products.online_name LIKE ? OR products.name LIKE ? THEN 1 ELSE 2 END',
+                ["{$escaped}%", "{$escaped}%", "%{$escaped}%", "%{$escaped}%"],
+            )
             ->orderBy('name')
             ->limit(self::RESULT_LIMIT)
             ->get();
+    }
+
+    /** How many products match in all, so the panel can say there are more. */
+    #[Computed]
+    public function total(): int
+    {
+        $term = trim($this->q);
+
+        return mb_strlen($term) < self::MIN_TERM_LENGTH ? 0 : $this->matching($term)->count();
+    }
+
+    /** Pressing Enter: everything that matches, on the full results page. */
+    public function seeAll(): void
+    {
+        $term = trim($this->q);
+
+        if ($term === '') {
+            return;
+        }
+
+        $this->redirect(route('home', ['search' => $term]));
+    }
+
+    private function matching(string $term)
+    {
+        return Product::query()
+            ->visibleOnline()
+            ->inStockForSale()
+            // Word by word across internal name, online name, brand and
+            // category — one rule shared with the catalogue and the feed
+            // (Product::scopeSearchCatalogue).
+            ->searchCatalogue($term);
     }
 
     /**
@@ -225,7 +268,7 @@ new class extends Component
             x-transition:enter="transition ease-out duration-200"
             x-transition:enter-start="opacity-0 -translate-y-3"
             x-transition:enter-end="opacity-100 translate-y-0"
-            class="mx-auto flex h-full w-full max-w-[640px] flex-col bg-[#f8fcf8] dark:bg-[#0d1a0d] md:mt-16 md:h-auto md:max-h-[80vh] md:rounded-2xl md:shadow-2xl md:overflow-hidden"
+            class="mx-auto flex h-full w-full max-w-5xl flex-col bg-[#f8fcf8] dark:bg-[#0d1a0d] md:mt-12 md:h-auto md:max-h-[85vh] md:w-[calc(100%-3rem)] md:rounded-2xl md:shadow-2xl md:overflow-hidden"
         >
             {{-- ─── FIELD ──────────────────────────────────────────────────── --}}
             <div class="flex items-center gap-2 border-b border-brand-border bg-white px-3 py-3 dark:border-[#2a3a2a] dark:bg-[#162016]"
@@ -237,7 +280,9 @@ new class extends Component
                     </svg>
                 </button>
 
-                <div class="flex h-11 flex-1 items-center gap-2 rounded-xl border-[1.5px] border-[#d0d9d2] bg-brand-bg px-3 transition-colors focus-within:border-brand dark:border-[#2a3a2a] dark:bg-[#0d1a0d]">
+                {{-- A form so Enter (or the keyboard's Search key) opens every
+                     result, not just the quick look below. --}}
+                <form wire:submit="seeAll" role="search" class="flex h-11 flex-1 items-center gap-2 rounded-xl border-[1.5px] border-[#d0d9d2] bg-brand-bg px-3 transition-colors focus-within:border-brand dark:border-[#2a3a2a] dark:bg-[#0d1a0d]">
                     <x-gp-icon name="search" class="w-4 h-4 flex-shrink-0 text-[#8a9e8c]" />
                     <label for="overlay-search" class="sr-only">Search products</label>
                     <input
@@ -263,7 +308,7 @@ new class extends Component
                         </svg>
                     </button>
                     @endif
-                </div>
+                </form>
             </div>
 
             {{-- ─── RESULTS ────────────────────────────────────────────────── --}}
@@ -324,10 +369,14 @@ new class extends Component
 
                     @else
                         <p class="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-brand-muted">
-                            {{ $this->results->count() }} {{ Str::plural('result', $this->results->count()) }}
+                            @if ($this->total > $this->results->count())
+                                Showing {{ $this->results->count() }} of {{ $this->total }} — press Enter for all
+                            @else
+                                {{ $this->total }} {{ Str::plural('result', $this->total) }}
+                            @endif
                         </p>
 
-                        <div class="space-y-2">
+                        <div class="grid gap-2 md:grid-cols-2">
                             @foreach ($this->results as $result)
                             @php $thumb = $result->catalogueImageUrl('thumb'); @endphp
                             <a href="{{ route('product.show', $result) }}"
@@ -351,10 +400,10 @@ new class extends Component
                             @endforeach
                         </div>
 
-                        {{-- The panel caps at eight; this is the way to the rest. --}}
+                        {{-- The panel caps at twelve; this (or Enter) is the way to the rest. --}}
                         <a href="{{ route('home', ['search' => trim($q)]) }}"
                            class="mt-3 block rounded-xl border border-brand-border py-3 text-center font-montserrat text-[12px] font-bold text-brand transition-colors hover:bg-white dark:border-[#2a3a2a] dark:hover:bg-[#162016]">
-                            See all results for "{{ trim($q) }}"
+                            See all {{ $this->total }} results for "{{ trim($q) }}"
                         </a>
                     @endif
                 </div>
