@@ -28,6 +28,7 @@ import DebtRepaymentModal from '../components/DebtRepaymentModal';
 import ReceiptModal from '../components/ReceiptModal';
 import StuckSalesModal from '../components/StuckSalesModal';
 import SalesHistoryModal from '../components/SalesHistoryModal';
+import SalesHistoryScreen from '../components/SalesHistoryScreen';
 import PickingsModal from '../components/PickingsModal';
 import CashSubmitModal from '../components/CashSubmitModal';
 import ProcurementsModal from '../components/ProcurementsModal';
@@ -1239,6 +1240,23 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
                     }}
                     cartEmpty={cartEmpty}
                     onReturnToCart={returnRefusedToCart}
+                    // Shown only to those allowed it; the endpoint checks again.
+                    onOpenFullHistory={vendorSettings.can?.view_sales_history === true
+                        ? () => setModal('fullSalesHistory')
+                        : null}
+                />
+            )}
+            {modal === 'fullSalesHistory' && (
+                <SalesHistoryScreen
+                    vendorId={vendorId}
+                    cashierId={user.id}
+                    onBack={() => setModal('salesHistory')}
+                    onClose={() => setModal(null)}
+                    onReprint={(sale) => {
+                        setModal(null);
+                        setIsReprintView(true);
+                        setLastSale(sale);
+                    }}
                 />
             )}
             {modal === 'suspendedSales' && (

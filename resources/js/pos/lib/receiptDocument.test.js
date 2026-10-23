@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { receiptHtml, zReportHtml, money, escapeHtml, THERMAL_CSS } from './receiptDocument';
+import { receiptHtml, zReportHtml, salesSummaryHtml, money, escapeHtml, THERMAL_CSS } from './receiptDocument';
 
 const config = {
     vat_enabled: true,
@@ -299,5 +299,61 @@ describe('the port has not drifted from the server template', () => {
         const blade = new Set(bladeCss);
 
         expect(strip(THERMAL_CSS).filter((rule) => !blade.has(rule))).toEqual([]);
+    });
+});
+
+describe('salesSummaryHtml', () => {
+    const summary = {
+        sales_count: 12,
+        collected: 150000,
+        credit: 5000,
+        tenders: { cash: 100000, card: 50000, bank_transfer: 0, debt: 5000 },
+        vat: 9000,
+        discounts: 1500,
+        revenue: 141000,
+        voided: { count: 1, total: 4000 },
+        refunds: { count: 2, total: 3000, money_out: 2500 },
+        net_collected: 147500,
+    };
+    const config = { vendor_name: 'Gadget Hub', cashier_name: 'Ada' };
+
+    it('prints what was collected, by tender, with refunds and voids', () => {
+        const html = salesSummaryHtml(summary, { from: '2026-10-01', to: '2026-10-22' }, config);
+
+        expect(html).toContain('Sales Summary');
+        expect(html).toContain('From');
+        expect(html).toContain('2026-10-22');
+        expect(html).toContain('Ada');
+        expect(html).toContain('150,000.00');
+        expect(html).toContain('On credit');
+        expect(html).toContain('Refunds (2)');
+        expect(html).toContain('Voided (1)');
+        expect(html).toContain('147,500.00');
+        expect(html).toContain('Revenue excl. VAT');
+        // A tender nobody used is left off rather than printed as zero.
+        expect(html).not.toContain('Bank Transfer');
+        expect(html).not.toContain('undefined');
+    });
+
+    it('names a single day once, and states any filter on the slip', () => {
+        const html = salesSummaryHtml(
+            { ...summary, refunds: null, revenue: null },
+            { from: '2026-10-22', to: '2026-10-22', filters: { Payment: 'Cash', Status: null } },
+            config,
+        );
+
+        expect(html).toContain('Date');
+        expect(html).not.toContain('>From<');
+        expect(html).toContain('Payment');
+        expect(html).not.toContain('Status');
+        expect(html).not.toContain('Refunds');
+        expect(html).not.toContain('Revenue excl. VAT');
+    });
+
+    it('is not a Z report: no drawer figures and nowhere to sign', () => {
+        const html = salesSummaryHtml(summary, {}, config);
+
+        expect(html).not.toContain('Cash Expected');
+        expect(html).not.toContain('signature');
     });
 });

@@ -4,6 +4,7 @@ use App\Http\Controllers\Pos\PosAuthController;
 use App\Http\Controllers\Pos\PosProductController;
 use App\Http\Controllers\Pos\PosCustomerController;
 use App\Http\Controllers\Pos\PosSaleController;
+use App\Http\Controllers\Pos\PosSalesHistoryController;
 use App\Http\Controllers\Pos\PosReceiptController;
 use App\Http\Controllers\Pos\PosSessionController;
 use App\Http\Controllers\Pos\PosCashController;
@@ -47,6 +48,7 @@ Route::prefix('pos')->middleware(NoStoreApiResponse::class)->group(function () {
         Route::post('sales/{sale}/return',         [PosSaleController::class, 'processReturn']);
         Route::get('sales/{reference}/by-ref',     [PosSaleController::class, 'findByReference']);
         Route::get('sales/my-history',              [PosSaleController::class, 'myHistory']);
+        Route::get('sales/history',                 PosSalesHistoryController::class);
 
         // Discounts — manager PIN approval
         Route::post('discounts/approve', [PosSaleController::class, 'approveDiscount']);

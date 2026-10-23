@@ -43,6 +43,10 @@ class VendorPermissionsSeeder extends Seeder
             'void_sale',
             'process_return',
             'close_pos_session',
+            // The till's full, any-date sales history. Separate from
+            // access_pos so an owner can withdraw it without taking away
+            // the quick My Sales list, which every cashier needs to reprint.
+            'view_sales_history',
 
             // Inventory
             'manage_inventory',

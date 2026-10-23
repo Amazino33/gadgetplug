@@ -469,3 +469,82 @@ export function zReportHtml(report, session = {}, config = {}) {
 
     return wrap('Z-Report', parts.join('\n'));
 }
+
+const TENDER_LABELS = {
+    cash:          'Cash',
+    card:          'POS / Card',
+    bank_transfer: 'Bank Transfer',
+    debt:          'On credit',
+};
+
+/**
+ * A cashier's sales summary for a day or a range, as an 80mm document.
+ *
+ * Printed from the full sales history. Not a Z report and must not be mistaken
+ * for one: it says nothing about the drawer, only what this cashier sold, so it
+ * carries no counted or expected figures and nowhere to sign.
+ *
+ * @param summary  the server's summary for the window (see CashierSalesHistory)
+ * @param period   {from, to} as YYYY-MM-DD, and the filters in force as `filters`
+ */
+export function salesSummaryHtml(summary, period = {}, config = {}) {
+    const parts = [header(config), '<hr>'];
+
+    parts.push('<p class="store-branch al-center">Sales Summary</p>', '<hr>');
+
+    if (period.from && period.from === period.to) {
+        parts.push(row('Date', period.from));
+    } else if (period.from) {
+        parts.push(row('From', period.from), row('To', period.to));
+    }
+
+    if (config.cashier_name) {
+        parts.push(row('Cashier', config.cashier_name));
+    }
+
+    parts.push(row('Printed', new Date().toLocaleString('en-GB')));
+
+    // Filters change every figure below, so a filtered slip says so on its face.
+    for (const [label, value] of Object.entries(period.filters ?? {})) {
+        if (value) parts.push(row(label, value));
+    }
+
+    parts.push('<hr>');
+
+    const tenders = Object.entries(TENDER_LABELS)
+        .filter(([key]) => Number(summary.tenders?.[key] ?? 0) !== 0)
+        .map(([key, label]) => row(label, money(summary.tenders[key])));
+
+    parts.push(
+        `<div class="totals">\n${row('Sales', String(summary.sales_count ?? 0))}\n${tenders.join('\n')}\n`
+        + `<div class="row grand"><span>COLLECTED</span><span class="v">${escapeHtml(money(summary.collected))}</span></div>\n`
+        + '</div>',
+    );
+
+    const adjustments = [];
+
+    if (summary.refunds) {
+        adjustments.push(row(`Refunds (${summary.refunds.count})`, `-${money(summary.refunds.total)}`));
+    }
+
+    if (Number(summary.voided?.count ?? 0) > 0) {
+        adjustments.push(row(`Voided (${summary.voided.count})`, money(summary.voided.total)));
+    }
+
+    adjustments.push(row('Discounts Given', money(summary.discounts)));
+    adjustments.push(row('VAT Collected', money(summary.vat)));
+
+    parts.push('<hr>', `<div class="totals">\n${adjustments.join('\n')}\n</div>`, '<hr>');
+
+    const net = [row('Net Collected', money(summary.net_collected))];
+
+    if (summary.revenue != null) {
+        net.push(row('Revenue excl. VAT', money(summary.revenue)));
+    }
+
+    parts.push(`<div class="totals">\n${net.join('\n')}\n</div>`);
+
+    parts.push(feed(config));
+
+    return wrap('Sales Summary', parts.join('\n'));
+}

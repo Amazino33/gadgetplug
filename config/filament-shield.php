@@ -238,6 +238,7 @@ return [
         'void_sale',
         'process_return',
         'close_pos_session',
+        'view_sales_history',
 
         // Team management
         'view_team_members',

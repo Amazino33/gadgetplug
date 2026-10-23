@@ -38,6 +38,12 @@ class TillProfile
             'vendor_name' => $vendor?->name,
             'receipt'     => self::receipt($vendor),
             'store'       => self::store($cashier, $vendor),
+            // Which till screens to offer. Only decides what is shown — every
+            // endpoint behind them checks the same permission again.
+            'can'         => [
+                'view_sales_history' => $vendor !== null
+                    && $cashier->hasVendorPermission((int) $vendor->id, 'view_sales_history'),
+            ],
         ];
     }
 

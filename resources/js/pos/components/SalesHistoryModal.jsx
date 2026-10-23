@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react';
-import { fmt } from '../lib/format';
 import api from '../lib/api';
 import { localSales, mergeSales, refusedSales, takeBackRefusedSale } from '../lib/salesHistory';
+import SaleHistoryRow from './SaleHistoryRow';
 
 // A cashier's own sales — for looking something up and reprinting a receipt.
 // Scoped server-side to sales this cashier personally rang up.
-export default function SalesHistoryModal({ vendorId, cashierId, onClose, onReprint, onReturnToCart, cartEmpty = true }) {
+//
+// Deliberately just the latest few. Anything older, or any particular day, is
+// the full history (onOpenFullHistory), which sits behind its own permission;
+// this list does not, because every cashier has to be able to reprint.
+export default function SalesHistoryModal({ vendorId, cashierId, onClose, onReprint, onReturnToCart, onOpenFullHistory = null, cartEmpty = true }) {
     const [sales, setSales]     = useState([]);
     // Refusal reasons by offline id. A refused sale used to read "Pending
     // upload" here, exactly like one merely waiting for signal, so a cashier
@@ -34,62 +38,12 @@ export default function SalesHistoryModal({ vendorId, cashierId, onClose, onRepr
         })();
     }, [vendorId, cashierId]);
 
-    const statusBadge = (status) => {
-        const styles = {
-            completed:      'bg-green-100 text-green-700',
-            voided:         'bg-red-100 text-red-700',
-            refunded:       'bg-orange-100 text-orange-700',
-            partial_refund: 'bg-orange-100 text-orange-700',
-        };
-        return styles[status] ?? 'bg-gray-100 text-gray-600';
-    };
-
-    const paymentLabel = (sale) => {
-        if (!sale.payment_method) return 'Unknown';
-        if (sale.payment_method === 'split') return 'Split Payment';
-        if (sale.payment_method === 'debt') return 'Credit / Debt';
-        if (sale.payment_method === 'bank_transfer') return 'Bank Transfer';
-        return sale.payment_method.charAt(0).toUpperCase() + sale.payment_method.slice(1);
-    };
-
-    const reprint = (e, sale) => {
-        e.stopPropagation();
-        onReprint({
-            id:                      sale.id,
-            reference:               sale.reference,
-            // Without this the receipt fell back to the current clock, so a
-            // reprint of an older sale was stamped with today's date and time.
-            completed_at:            sale.completed_at,
-            cashier_name:            sale.cashier_name ?? null,
-            vat_rate:                sale.vat_rate ?? null,
-            vat_enabled:             sale.vat_enabled ?? null,
-            items:                   sale.items,
-            subtotal:                sale.subtotal,
-            discount_amount:         sale.discount_amount,
-            vat_amount:              sale.vat_amount,
-            total:                   sale.total,
-            payment_method:          sale.payment_method,
-            amount_tendered:         sale.amount_tendered,
-            change_given:            sale.change_given,
-            bank_transfer_reference: sale.bank_transfer_reference,
-            payments:                sale.payments,
-            // The device now keeps the customer's name with the sale, so a
-            // reprint names them exactly as the first copy did. It was pinned
-            // to null because nothing local had one to give.
-            customer:                sale.customer ?? null,
-        });
-    };
-
     const returnToCart = async (e, sale) => {
         e.stopPropagation();
 
         const taken = await takeBackRefusedSale(sale.offline_id);
 
         if (taken) onReturnToCart?.(taken.lines, taken.completedAt);
-    };
-
-    const toggleExpand = (ref) => {
-        setExpandedRef(expandedRef === ref ? null : ref);
     };
 
     return (
@@ -118,109 +72,50 @@ export default function SalesHistoryModal({ vendorId, cashierId, onClose, onRepr
                     )}
                     {sales.map((sale) => {
                         const ref = sale.reference ?? sale.completed_at;
-                        const isExpanded = expandedRef === ref;
-                        
+                        const isRefused = sale.pending_sync && refused.has(sale.offline_id);
+
                         return (
-                            <div 
-                                key={ref} 
-                                onClick={() => toggleExpand(ref)}
-                                className={`rounded-xl border ${isExpanded ? 'border-green-500 shadow-sm dark:border-green-600' : 'border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700'} p-3 cursor-pointer transition-colors`}
-                            >
-                                <div className="flex items-center justify-between gap-3">
-                                    <div className="min-w-0">
-                                        <div className="flex items-center gap-2">
-                                            <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">{sale.reference ?? 'Not uploaded yet'}</p>
-                                            {sale.pending_sync && refused.has(sale.offline_id) ? (
-                                                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-red-100 text-red-700">Refused</span>
-                                            ) : sale.pending_sync && (
-                                                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">Pending upload</span>
-                                            )}
-                                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${statusBadge(sale.status)}`}>
-                                                {sale.status.replace('_', ' ')}
-                                            </span>
-                                        </div>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
-                                            {sale.items.map((i) => i.product_name).join(', ')}
-                                        </p>
-                                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                                            {new Date(sale.completed_at).toLocaleString('en-NG')}
-                                        </p>
-                                        {sale.pending_sync && refused.has(sale.offline_id) && (
-                                            <p className="text-xs font-medium text-red-700 dark:text-red-400 mt-1">
-                                                {refused.get(sale.offline_id)}
-                                            </p>
-                                        )}
-                                    </div>
-                                    <div className="text-right shrink-0 flex flex-col items-end">
-                                        <p className="text-sm font-bold text-gray-800 dark:text-gray-100 mb-1">{fmt(sale.total)}</p>
-                                        <button
-                                            onClick={(e) => reprint(e, sale)}
-                                            className="text-xs font-semibold text-[#068B03] hover:underline"
-                                        >
-                                            Reprint
-                                        </button>
-                                        {sale.pending_sync && refused.has(sale.offline_id) && onReturnToCart && (
-                                            <button
-                                                onClick={(e) => returnToCart(e, sale)}
-                                                disabled={!cartEmpty}
-                                                title={cartEmpty ? undefined : 'Finish or clear the sale on screen first'}
-                                                className="mt-1 text-xs font-semibold text-red-700 hover:underline disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
-                                            >
-                                                Return to cart
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                                
-                                {isExpanded && (
-                                    <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800">
-                                        <div className="mb-2 flex items-center justify-between">
-                                            <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">Payment: {paymentLabel(sale)}</span>
-                                            {sale.payment_method === 'split' && sale.payments && (
-                                                <div className="text-[10px] text-gray-500 flex gap-2">
-                                                    {sale.payments.map((p, i) => (
-                                                        <span key={i}>{p.method}: {fmt(p.amount)}</span>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                        
-                                        <div className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 space-y-1.5">
-                                            {sale.items.map((item, idx) => (
-                                                <div key={idx} className="flex justify-between text-xs">
-                                                    <div className="text-gray-700 dark:text-gray-300">
-                                                        <span className="text-gray-500 mr-2">{item.quantity}x</span>
-                                                        {item.product_name}
-                                                    </div>
-                                                    <div className="text-gray-800 dark:text-gray-200 font-medium">
-                                                        {fmt(item.total)}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                            
-                                            {(Number(sale.discount_amount) > 0 || Number(sale.vat_amount) > 0) && (
-                                                <div className="border-t border-gray-200 dark:border-gray-700 mt-1.5 pt-1.5">
-                                                    {Number(sale.discount_amount) > 0 && (
-                                                        <div className="flex justify-between text-xs text-red-600">
-                                                            <span>Discount</span>
-                                                            <span>-{fmt(sale.discount_amount)}</span>
-                                                        </div>
-                                                    )}
-                                                    {Number(sale.vat_amount) > 0 && (
-                                                        <div className="flex justify-between text-xs text-gray-500">
-                                                            <span>VAT</span>
-                                                            <span>{fmt(sale.vat_amount)}</span>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
+                            <SaleHistoryRow
+                                key={ref}
+                                sale={sale}
+                                expanded={expandedRef === ref}
+                                onToggle={() => setExpandedRef(expandedRef === ref ? null : ref)}
+                                onReprint={onReprint}
+                                badges={isRefused ? (
+                                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-red-100 text-red-700">Refused</span>
+                                ) : sale.pending_sync && (
+                                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700">Pending upload</span>
                                 )}
-                            </div>
+                                notice={isRefused && (
+                                    <p className="text-xs font-medium text-red-700 dark:text-red-400 mt-1">
+                                        {refused.get(sale.offline_id)}
+                                    </p>
+                                )}
+                                actions={isRefused && onReturnToCart && (
+                                    <button
+                                        onClick={(e) => returnToCart(e, sale)}
+                                        disabled={!cartEmpty}
+                                        title={cartEmpty ? undefined : 'Finish or clear the sale on screen first'}
+                                        className="mt-1 text-xs font-semibold text-red-700 hover:underline disabled:opacity-40 disabled:cursor-not-allowed disabled:no-underline"
+                                    >
+                                        Return to cart
+                                    </button>
+                                )}
+                            />
                         );
                     })}
                 </div>
+
+                {onOpenFullHistory && (
+                    <div className="shrink-0 border-t border-gray-100 dark:border-gray-800 px-6 py-3">
+                        <button
+                            onClick={onOpenFullHistory}
+                            className="w-full rounded-xl border border-[#068B03] py-2.5 text-sm font-semibold text-[#068B03] hover:bg-green-50 dark:hover:bg-green-900/20"
+                        >
+                            View full history by day or date range
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     );

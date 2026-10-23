@@ -19,7 +19,7 @@ class VendorRoles
             'view_order_items', 'view_any_order_items', 'edit_order_items',
             'view_vendor', 'edit_vendor',
             'view_team_members', 'invite_team_members', 'edit_team_members', 'remove_team_members',
-            'access_pos', 'void_sale', 'process_return', 'close_pos_session',
+            'access_pos', 'void_sale', 'process_return', 'close_pos_session', 'view_sales_history',
             'manage_inventory', 'view_inventory_reports', 'view_audit_sessions',
             'view_activity_log',
             'view_customer_debts',
@@ -39,7 +39,7 @@ class VendorRoles
         'order_manager' => [
             'view_products', 'view_any_products',
             'view_order_items', 'view_any_order_items', 'edit_order_items',
-            'access_pos', 'void_sale', 'process_return', 'close_pos_session',
+            'access_pos', 'void_sale', 'process_return', 'close_pos_session', 'view_sales_history',
         ],
         'inventory_manager' => [
             'view_products', 'view_any_products', 'create_products', 'edit_products', 'delete_products',
@@ -47,7 +47,7 @@ class VendorRoles
             'view_order_items', 'view_any_order_items', 'edit_order_items',
             'view_vendor',
             'view_team_members', 'invite_team_members', 'edit_team_members',
-            'access_pos', 'void_sale', 'process_return', 'close_pos_session',
+            'access_pos', 'void_sale', 'process_return', 'close_pos_session', 'view_sales_history',
             'manage_inventory', 'view_inventory_reports', 'view_audit_sessions',
             'authorize_recount', 'adjust_stock',
             'approve_procurement', 'manage_procurement',
@@ -60,6 +60,8 @@ class VendorRoles
             'view_products', 'view_any_products',
             'view_order_items', 'view_any_order_items',
             'access_pos',
+            // Their own sales only, any date — the same scope as My Sales.
+            'view_sales_history',
             'manage_inventory', 'perform_inventory_count',
             // Whoever is at the counter has to be able to take a repayment —
             // a customer settling up should never be told to come back when
