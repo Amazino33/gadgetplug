@@ -4,10 +4,12 @@ namespace App\Filament\Resources\LegalPolicies\Pages;
 
 use App\Filament\Resources\LegalPolicies\LegalPolicyResource;
 use App\Models\LegalPolicy;
+use Database\Seeders\LegalPolicySeeder;
 use Filament\Actions\Action;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -18,10 +20,34 @@ class ListLegalPolicies extends ListRecords
 {
     protected static string $resource = LegalPolicyResource::class;
 
+    public function mount(): void
+    {
+        parent::mount();
+
+        if (LegalPolicy::count() === 0) {
+            (new LegalPolicySeeder())->run();
+        }
+    }
+
     protected function getHeaderActions(): array
     {
         return [
             CreateAction::make()->label('New policy'),
+            Action::make('seed_defaults')
+                ->label('Restore Default Policies')
+                ->icon('heroicon-o-arrow-path')
+                ->color('gray')
+                ->requiresConfirmation()
+                ->modalHeading('Load Default Policies')
+                ->modalDescription('This will insert any missing default policies (Privacy Policy, Terms, Refund Policy, Affiliate Agreement) without overwriting your existing policies.')
+                ->action(function () {
+                    (new LegalPolicySeeder())->run();
+                    Notification::make()
+                        ->title('Default policies checked and loaded')
+                        ->success()
+                        ->send();
+                })
+                ->visible(fn () => LegalPolicy::count() < 4),
         ];
     }
 

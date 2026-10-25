@@ -6,6 +6,17 @@ use App\Models\User;
 use Database\Seeders\LegalPolicySeeder;
 use Spatie\Permission\Models\Role;
 
+test('visiting privacy policy auto-seeds if table is empty', function () {
+    LegalPolicy::query()->delete();
+    expect(LegalPolicy::count())->toBe(0);
+
+    $this->get(route('privacy-policy'))
+        ->assertOk()
+        ->assertSee('Privacy Policy');
+
+    expect(LegalPolicy::count())->toBe(4);
+});
+
 test('public legal routes return 200 and display policy content', function () {
     $this->seed(LegalPolicySeeder::class);
 

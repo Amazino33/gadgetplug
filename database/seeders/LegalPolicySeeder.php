@@ -198,7 +198,7 @@ HTML
         ];
 
         foreach ($policies as $data) {
-            LegalPolicy::updateOrCreate(
+            LegalPolicy::firstOrCreate(
                 ['slug' => $data['slug']],
                 $data
             );
