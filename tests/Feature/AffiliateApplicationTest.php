@@ -18,7 +18,8 @@ test('a user with no application sees the form and can submit one', function () 
         ->set('reason', 'I run a tech review page on Instagram with a decent following and share deals often.')
         ->set('consent', true)
         ->call('submit')
-        ->assertSet('submitted', true);
+        ->assertSet('submitted', true)
+        ->assertDispatched('affiliate-application-submitted');
 
     $application = AffiliateApplication::where('user_id', $user->id)->first();
 
@@ -47,7 +48,8 @@ test('submission without consent or without a platform fails validation', functi
         ->set('reason', 'I run a tech review page on Instagram with a decent following and share deals often.')
         ->set('consent', false)
         ->call('submit')
-        ->assertHasErrors(['consent']);
+        ->assertHasErrors(['consent'])
+        ->assertNotDispatched('affiliate-application-submitted');
 
     // Missing platforms
     Volt::test('pages.account.affiliate-apply')
@@ -59,7 +61,8 @@ test('submission without consent or without a platform fails validation', functi
         ->set('reason', 'I run a tech review page on Instagram with a decent following and share deals often.')
         ->set('consent', true)
         ->call('submit')
-        ->assertHasErrors(['platforms']);
+        ->assertHasErrors(['platforms'])
+        ->assertNotDispatched('affiliate-application-submitted');
 
     expect(AffiliateApplication::where('user_id', $user->id)->exists())->toBeFalse();
 });
@@ -76,7 +79,8 @@ test('a user with a pending application sees the status banner, not the form', f
 
     Volt::test('pages.account.affiliate-apply')
         ->assertSee('Application Under Review')
-        ->assertDontSee('Submit Application');
+        ->assertDontSee('Submit Application')
+        ->assertNotDispatched('affiliate-application-submitted');
 });
 
 test('a rejected application shows the reason and allows reapplying', function () {

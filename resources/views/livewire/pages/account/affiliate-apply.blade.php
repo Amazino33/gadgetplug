@@ -103,11 +103,16 @@ new class extends Component {
 
         $this->application = AffiliateApplication::where('user_id', auth()->id())->latest()->first();
         $this->submitted   = true;
+
+        $this->dispatch('affiliate-application-submitted');
     }
 }; ?>
 
 <div>
 <x-layouts.account active="account.affiliate-apply">
+
+    {{-- Meta Pixel: Track CompleteRegistration on successful submission --}}
+    <div x-data x-on:affiliate-application-submitted.window="if (typeof window.fbq === 'function') { window.fbq('track', 'CompleteRegistration'); }"></div>
 
     <div class="space-y-5">
 
