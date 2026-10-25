@@ -1,4 +1,7 @@
-@props(['title' => 'GadgetPlug'])
+@props([
+    'title'   => 'GadgetPlug',
+    'appMode' => false,
+])
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
@@ -28,6 +31,12 @@
     @include('partials.meta-pixel')
     @include('partials.ms-clarity')
 </head>
+@if ($appMode)
+<body class="min-h-screen bg-[#071107] font-inter text-[#111] dark:text-[#e8f5e9] antialiased">
+    {{ $slot }}
+    @livewireScripts
+</body>
+@else
 <body class="min-h-screen bg-[#0d1f0d] font-inter text-[#111] antialiased flex flex-col items-center justify-center px-4 py-10">
 
     {{-- Logo --}}
@@ -48,4 +57,5 @@
 
     @livewireScripts
 </body>
+@endif
 </html>
