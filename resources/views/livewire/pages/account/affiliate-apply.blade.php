@@ -420,7 +420,7 @@ new class extends Component {
                         <input type="checkbox" wire:model="consent"
                             class="mt-0.5 w-5 h-5 rounded text-brand focus:ring-brand border-[#d0d9d2] dark:border-[#2a3a2a] flex-shrink-0">
                         <span class="text-[12px] text-brand-dark dark:text-[#e8f5e9] leading-snug">
-                            I agree to receive affiliate updates and materials from GadgetPlug by WhatsApp and email. <span class="text-red-400">*</span>
+                            I agree to the <a href="{{ route('affiliate-terms') }}" target="_blank" class="underline font-semibold hover:text-brand">Affiliate Agreement</a> and <a href="{{ route('privacy-policy') }}" target="_blank" class="underline font-semibold hover:text-brand">Privacy Policy</a>, and to receive affiliate updates and materials from GadgetPlug by WhatsApp and email. <span class="text-red-400">*</span>
                         </span>
                     </label>
                     @error('consent')<p class="text-red-500 text-[11px] mt-1">{{ $message }}</p>@enderror

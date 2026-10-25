@@ -2,17 +2,23 @@
 
 use App\Http\Controllers\AffiliateClickController;
 use App\Http\Controllers\Payment\PaystackCallbackController;
-use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Storefront\FeedActionController;
 use App\Http\Controllers\Storefront\FeedController;
+use App\Http\Controllers\Storefront\LegalPolicyController;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Route;
 use Livewire\Volt\Volt;
 
 Volt::route('/', 'pages.product-catalog')
     ->middleware(\App\Http\Middleware\RedirectVendorToDashboard::class)
     ->name('home');
 Volt::route('/track', 'pages.track-order')->name('track-order');
-Route::view('/privacy-policy', 'pages.privacy-policy')->name('privacy-policy');
+Route::get('/privacy-policy', [LegalPolicyController::class, 'privacy'])->name('privacy-policy');
+Route::get('/terms', [LegalPolicyController::class, 'terms'])->name('terms');
+Route::get('/terms-of-service', [LegalPolicyController::class, 'terms'])->name('terms.service');
+Route::get('/affiliate-terms', [LegalPolicyController::class, 'affiliateTerms'])->name('affiliate-terms');
+Route::get('/refund-policy', [LegalPolicyController::class, 'refundPolicy'])->name('refund-policy');
+Route::get('/legal/{slug}', [LegalPolicyController::class, 'show'])->name('legal.show');
 Volt::route('/product/{product:slug}', 'pages.product-detail')->name('product.show');
 // A store's own page — where the feed's store line lands, so a customer who
 // likes one product can see the rest of what that shop sells.

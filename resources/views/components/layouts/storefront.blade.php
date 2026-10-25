@@ -532,7 +532,10 @@ $navCategories = \Illuminate\Support\Facades\Cache::remember(
             @php
                 $footerColumns = [
                     'Corporate' => [
-                        ['label' => 'Privacy Policy', 'url' => route('privacy-policy')],
+                        ['label' => 'Privacy Policy',         'url' => route('privacy-policy')],
+                        ['label' => 'Terms of Service',       'url' => route('terms')],
+                        ['label' => 'Return & Refund Policy', 'url' => route('refund-policy')],
+                        ['label' => 'Affiliate Agreement',    'url' => route('affiliate-terms')],
                     ],
                     'Sell on GadgetPlug' => [
                         ['label' => 'Become a Vendor', 'url' => route('account.vendor-apply')],
