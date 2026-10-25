@@ -219,3 +219,53 @@ summary:focus-visible,
    .scrollbar-none above — on mobile the scrollbar is noise. */
 .gp-rail { scroll-snap-type: x mandatory; overscroll-behavior-x: contain; }
 .gp-rail > * { scroll-snap-align: start; }
+
+/* ─── Affiliate CTA Breathing, Shimmer & Arrow Motion ────────────────────────── */
+@keyframes gp-cta-breathe {
+    0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 4px 16px rgba(6, 139, 3, 0.4);
+    }
+    50% {
+        transform: scale(1.02);
+        box-shadow: 0 6px 24px rgba(6, 139, 3, 0.65), 0 0 0 3px rgba(177, 255, 0, 0.35);
+    }
+}
+
+@keyframes gp-shimmer-sweep {
+    0% {
+        transform: translateX(-160%) skewX(-20deg);
+    }
+    35%, 100% {
+        transform: translateX(260%) skewX(-20deg);
+    }
+}
+
+@keyframes gp-arrow-nudge {
+    0%, 100% {
+        transform: translateX(0);
+    }
+    50% {
+        transform: translateX(4px);
+    }
+}
+
+.gp-animate-cta {
+    animation: gp-cta-breathe 2.6s ease-in-out infinite;
+}
+
+.gp-animate-shimmer {
+    animation: gp-shimmer-sweep 2.8s ease-in-out infinite;
+}
+
+.gp-animate-arrow {
+    animation: gp-arrow-nudge 1.3s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .gp-animate-cta,
+    .gp-animate-shimmer,
+    .gp-animate-arrow {
+        animation: none;
+    }
+}
