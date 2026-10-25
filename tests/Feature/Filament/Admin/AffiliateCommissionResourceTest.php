@@ -93,5 +93,6 @@ test('the commission list shows commissions across every affiliate', function ()
 
     Livewire::test(ListAffiliateCommissions::class)
         ->assertSee($available->affiliate->code)
-        ->assertSee($pending->affiliate->code);
+        ->assertSee($pending->affiliate->code)
+        ->assertTableActionExists('breakdown');
 });

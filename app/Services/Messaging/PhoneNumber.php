@@ -44,4 +44,15 @@ class PhoneNumber
         // path with several existing callers.
         return $digits;
     }
+
+    public static function toE164(?string $raw): ?string
+    {
+        $digits = self::toNigerianInternational($raw);
+
+        if (empty($digits)) {
+            return $digits;
+        }
+
+        return '+' . ltrim($digits, '+');
+    }
 }

@@ -10,8 +10,13 @@ test('a user with no application sees the form and can submit one', function () 
     $this->actingAs($user);
 
     Volt::test('pages.account.affiliate-apply')
-        ->set('whatsapp', '+2348000000000')
+        ->set('category', 'student')
+        ->set('school', 'UniUyo')
+        ->set('whatsapp', '08000000000')
+        ->set('platforms', ['whatsapp', 'instagram'])
+        ->set('audience_size', '100-500')
         ->set('reason', 'I run a tech review page on Instagram with a decent following and share deals often.')
+        ->set('consent', true)
         ->call('submit')
         ->assertSet('submitted', true);
 
@@ -19,7 +24,44 @@ test('a user with no application sees the form and can submit one', function () 
 
     expect($application)->not->toBeNull()
         ->and($application->status)->toBe('pending')
-        ->and($application->whatsapp)->toBe('+2348000000000');
+        ->and($application->whatsapp)->toBe('+2348000000000')
+        ->and($application->category)->toBe('student')
+        ->and($application->school)->toBe('UniUyo')
+        ->and($application->platforms)->toBe(['whatsapp', 'instagram'])
+        ->and($application->audience_size)->toBe('100-500')
+        ->and($application->consent)->toBeTrue()
+        ->and($application->consented_at)->not->toBeNull();
+});
+
+test('submission without consent or without a platform fails validation', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user);
+
+    // Missing consent
+    Volt::test('pages.account.affiliate-apply')
+        ->set('category', 'student')
+        ->set('school', 'UniUyo')
+        ->set('whatsapp', '08000000000')
+        ->set('platforms', ['whatsapp'])
+        ->set('audience_size', '100-500')
+        ->set('reason', 'I run a tech review page on Instagram with a decent following and share deals often.')
+        ->set('consent', false)
+        ->call('submit')
+        ->assertHasErrors(['consent']);
+
+    // Missing platforms
+    Volt::test('pages.account.affiliate-apply')
+        ->set('category', 'student')
+        ->set('school', 'UniUyo')
+        ->set('whatsapp', '08000000000')
+        ->set('platforms', [])
+        ->set('audience_size', '100-500')
+        ->set('reason', 'I run a tech review page on Instagram with a decent following and share deals often.')
+        ->set('consent', true)
+        ->call('submit')
+        ->assertHasErrors(['platforms']);
+
+    expect(AffiliateApplication::where('user_id', $user->id)->exists())->toBeFalse();
 });
 
 test('a user with a pending application sees the status banner, not the form', function () {
@@ -67,8 +109,13 @@ test('submitting with a reason that is too short fails validation', function () 
     $this->actingAs($user);
 
     Volt::test('pages.account.affiliate-apply')
-        ->set('whatsapp', '+2348000000000')
+        ->set('category', 'student')
+        ->set('school', 'UniUyo')
+        ->set('whatsapp', '08000000000')
+        ->set('platforms', ['whatsapp'])
+        ->set('audience_size', '100-500')
         ->set('reason', 'too short')
+        ->set('consent', true)
         ->call('submit')
         ->assertHasErrors(['reason']);
 

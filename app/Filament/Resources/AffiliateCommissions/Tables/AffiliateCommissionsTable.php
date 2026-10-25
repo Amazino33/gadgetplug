@@ -54,6 +54,16 @@ class AffiliateCommissionsTable
                     ->searchable(),
             ])
             ->recordActions([
+                Action::make('breakdown')
+                    ->label('Breakdown')
+                    ->icon('heroicon-o-calculator')
+                    ->modalHeading(fn (AffiliateCommission $record) => 'Commission Breakdown — ' . ($record->order?->reference ?? 'Order #' . $record->order_id))
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Close')
+                    ->modalContent(fn (AffiliateCommission $record) => view('filament.pages.affiliate-commission-breakdown-modal', [
+                        'commission' => $record->loadMissing('items.orderItem.product.category', 'affiliate.user', 'affiliate.level', 'order'),
+                    ])),
+
                 Action::make('viewOrder')
                     ->label('View Order')
                     ->icon('heroicon-o-shopping-bag')

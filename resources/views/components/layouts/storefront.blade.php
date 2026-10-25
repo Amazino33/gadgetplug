@@ -258,7 +258,7 @@ $navCategories = \Illuminate\Support\Facades\Cache::remember(
                             ['href' => route('account.wishlist'),      'label' => 'Wishlist'],
                             auth()->user()->affiliate
                                 ? ['href' => route('account.affiliate'), 'label' => 'Affiliate']
-                                : ['href' => route('account.affiliate-apply'), 'label' => 'Become an Affiliate'],
+                                : ['href' => route('affiliate.join'), 'label' => 'Become an Affiliate'],
                         ] as $link)
                         <a href="{{ $link['href'] }}" @click="acctOpen = false"
                            class="flex items-center px-4 py-2 text-[12px] text-[#333] dark:text-[#b0c8b0] hover:bg-brand-bg dark:hover:bg-[#1a2a1a] hover:text-brand transition-colors">
@@ -536,6 +536,7 @@ $navCategories = \Illuminate\Support\Facades\Cache::remember(
                     ],
                     'Sell on GadgetPlug' => [
                         ['label' => 'Become a Vendor', 'url' => route('account.vendor-apply')],
+                        ...(auth()->check() && auth()->user()->affiliate ? [] : [['label' => 'Become an Affiliate', 'url' => route('affiliate.join')]]),
                     ],
                     'Support' => [
                         ['label' => 'Track My Order', 'url' => route('track-order')],

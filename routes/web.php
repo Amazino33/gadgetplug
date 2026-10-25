@@ -69,6 +69,16 @@ Route::middleware('signed')->whereNumber(['order', 'v'])->group(function () {
 
 Route::get('/r/{code}', [AffiliateClickController::class, 'redirect'])->name('affiliate.click');
 
+Route::get('/affiliate/join', function () {
+    if (auth()->check()) {
+        return redirect()->route('account.affiliate-apply');
+    }
+
+    session()->put('url.intended', route('account.affiliate-apply', absolute: false));
+
+    return view('pages.affiliate-join');
+})->name('affiliate.join');
+
 
 Route::redirect('/dashboard', '/account')->name('dashboard');
 

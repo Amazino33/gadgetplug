@@ -66,7 +66,10 @@ test('PhoneNumber normalizes local Nigerian formats to the international digits-
         ->and(PhoneNumber::toNigerianInternational('2348012345678'))->toBe('2348012345678')
         ->and(PhoneNumber::toNigerianInternational('+234 801 234 5678'))->toBe('2348012345678')
         ->and(PhoneNumber::toNigerianInternational(null))->toBeNull()
-        ->and(PhoneNumber::toNigerianInternational(''))->toBe('');
+        ->and(PhoneNumber::toNigerianInternational(''))->toBe('')
+        ->and(PhoneNumber::toE164('08012345678'))->toBe('+2348012345678')
+        ->and(PhoneNumber::toE164('+234 801 234 5678'))->toBe('+2348012345678')
+        ->and(PhoneNumber::toE164(null))->toBeNull();
 });
 
 // --- TemplateRenderer -------------------------------------------------

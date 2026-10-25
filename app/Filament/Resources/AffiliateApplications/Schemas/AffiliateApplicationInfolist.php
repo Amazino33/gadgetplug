@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\AffiliateApplications\Schemas;
 
+use App\Models\AffiliateApplication;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
@@ -31,6 +32,11 @@ class AffiliateApplicationInfolist
                 ->columns(2)
                 ->schema([
                     TextEntry::make('whatsapp')->label('WhatsApp')->copyable(),
+                    TextEntry::make('category')->label('Category')->formatStateUsing(fn ($state) => AffiliateApplication::CATEGORIES[$state] ?? $state ?? '—'),
+                    TextEntry::make('school')->label('School')->placeholder('—'),
+                    TextEntry::make('audience_size')->label('Audience Size')->formatStateUsing(fn ($state) => AffiliateApplication::AUDIENCE_SIZES[$state] ?? $state ?? '—'),
+                    TextEntry::make('platforms')->label('Platforms')->badge()->placeholder('—'),
+                    TextEntry::make('consented_at')->label('Consented At')->dateTime('d M Y, g:ia')->placeholder('—'),
                     TextEntry::make('reason')->label('Why they want to be an affiliate')->columnSpanFull(),
                 ]),
 
