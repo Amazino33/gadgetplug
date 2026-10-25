@@ -1,6 +1,8 @@
 <?php
 
 use App\Models\AffiliateApplication;
+use App\Models\Lga;
+use App\Models\State;
 use App\Services\Messaging\PhoneNumber;
 use Illuminate\Validation\Rule;
 use Livewire\Volt\Component;
@@ -9,6 +11,9 @@ new class extends Component {
     public string $category      = '';
     public string $school        = '';
     public string $whatsapp      = '';
+    public ?int   $stateId       = null;
+    public ?int   $lgaId         = null;
+    public string $address       = '';
     public array $platforms      = [];
     public string $audience_size = '';
     public string $reason        = '';
@@ -33,11 +38,31 @@ new class extends Component {
             $this->category      = (string) ($this->application->category ?? '');
             $this->school        = (string) ($this->application->school ?? '');
             $this->whatsapp      = (string) ($this->application->whatsapp ?? '');
+            $this->stateId       = $this->application->state_id ? (int) $this->application->state_id : null;
+            $this->lgaId         = $this->application->lga_id ? (int) $this->application->lga_id : null;
+            $this->address       = (string) ($this->application->address ?? '');
             $this->platforms     = (array) ($this->application->platforms ?? []);
             $this->audience_size = (string) ($this->application->audience_size ?? '');
             $this->reason        = (string) ($this->application->reason ?? '');
             $this->consent       = (bool) ($this->application->consent ?? false);
         }
+    }
+
+    public function updatedStateId(): void
+    {
+        $this->lgaId = null;
+    }
+
+    public function states(): \Illuminate\Support\Collection
+    {
+        return State::orderBy('name')->get(['id', 'name']);
+    }
+
+    public function lgasForState(): \Illuminate\Support\Collection
+    {
+        return $this->stateId
+            ? Lga::where('state_id', $this->stateId)->orderBy('name')->get(['id', 'name'])
+            : collect();
     }
 
     public function submit(): void
@@ -59,6 +84,9 @@ new class extends Component {
                     $fail('Enter a valid Nigerian WhatsApp number, for example 08012345678.');
                 }
             }],
+            'stateId'       => ['required', 'integer', Rule::exists('states', 'id')],
+            'lgaId'         => ['required', 'integer', Rule::exists('lgas', 'id')->where('state_id', $this->stateId)],
+            'address'       => ['required', 'string', 'max:500'],
             'platforms'     => ['required', 'array', 'min:1'],
             'platforms.*'   => ['string'],
             'audience_size' => ['required', 'string', Rule::in([
@@ -76,6 +104,11 @@ new class extends Component {
             'category.in'            => 'Please select a valid category.',
             'school.required'        => 'Please enter your school or university.',
             'whatsapp.required'      => 'Please enter your WhatsApp number.',
+            'stateId.required'       => 'Please select your state.',
+            'stateId.exists'         => 'Please select a valid state.',
+            'lgaId.required'         => 'Please choose your local government area.',
+            'lgaId.exists'           => 'Please choose a local government area in that state.',
+            'address.required'       => 'Please enter your address.',
             'platforms.required'     => 'Select at least one platform you post on.',
             'platforms.min'          => 'Select at least one platform you post on.',
             'audience_size.required' => 'Select your main platform audience size.',
@@ -93,6 +126,9 @@ new class extends Component {
             'category'      => $this->category,
             'school'        => in_array($this->category, ['student', 'University student'], true) ? $this->school : null,
             'whatsapp'      => $normalizedPhone,
+            'state_id'      => $this->stateId,
+            'lga_id'        => $this->lgaId,
+            'address'       => $this->address,
             'platforms'     => array_values($this->platforms),
             'audience_size' => $this->audience_size,
             'reason'        => $this->reason,
@@ -259,6 +295,52 @@ new class extends Component {
                     <input id="whatsapp" wire:model="whatsapp" type="tel" placeholder="+234 800 000 0000"
                         class="w-full h-11 px-3.5 bg-brand-bg dark:bg-[#0d1a0d] border border-[#d0d9d2] dark:border-[#2a3a2a] rounded-xl text-[13px] text-[#111] dark:text-[#e8f5e9] focus:outline-none focus:border-brand transition-colors @error('whatsapp') border-red-400 @enderror">
                     @error('whatsapp')<p class="text-red-500 text-[11px] mt-1">{{ $message }}</p>@enderror
+                </div>
+
+                {{-- State --}}
+                <div>
+                    <label for="stateId" class="block text-[11px] font-semibold text-brand-muted uppercase tracking-[0.6px] mb-1.5">
+                        State <span class="text-red-400">*</span>
+                    </label>
+                    <select id="stateId" wire:model.live="stateId"
+                        class="w-full h-11 px-3.5 bg-brand-bg dark:bg-[#0d1a0d] border border-[#d0d9d2] dark:border-[#2a3a2a] rounded-xl text-[13px] text-[#111] dark:text-[#e8f5e9] focus:outline-none focus:border-brand transition-colors @error('stateId') border-red-400 @enderror">
+                        <option value="">Select your state…</option>
+                        @foreach ($this->states() as $state)
+                            <option value="{{ $state->id }}">{{ $state->name }}</option>
+                        @endforeach
+                    </select>
+                    @error('stateId')<p class="text-red-500 text-[11px] mt-1">{{ $message }}</p>@enderror
+                </div>
+
+                {{-- Local Government Area (LGA) --}}
+                <div x-data="{ term: '' }">
+                    <label for="lgaId" class="block text-[11px] font-semibold text-brand-muted uppercase tracking-[0.6px] mb-1.5">
+                        Local Government Area (LGA) <span class="text-red-400">*</span>
+                    </label>
+                    @php $lgaOptions = $this->lgasForState(); @endphp
+                    @if ($lgaOptions->count() > 12)
+                    <input type="search" x-model="term" placeholder="Type to find your LGA…" aria-label="Find your LGA"
+                        class="w-full mb-2 h-10 px-3.5 bg-brand-bg dark:bg-[#0d1a0d] border border-[#d0d9d2] dark:border-[#2a3a2a] rounded-xl text-[12px] text-[#111] dark:text-[#e8f5e9] outline-none focus:border-brand">
+                    @endif
+                    <select id="lgaId" wire:model.live="lgaId" @disabled($lgaOptions->isEmpty())
+                        class="w-full h-11 px-3.5 bg-brand-bg dark:bg-[#0d1a0d] border border-[#d0d9d2] dark:border-[#2a3a2a] rounded-xl text-[13px] text-[#111] dark:text-[#e8f5e9] focus:outline-none focus:border-brand transition-colors @error('lgaId') border-red-400 @enderror">
+                        <option value="">{{ $lgaOptions->isEmpty() ? 'Choose a state first' : 'Select your LGA…' }}</option>
+                        @foreach ($lgaOptions as $option)
+                            <option value="{{ $option->id }}" x-show="! term || @js(mb_strtolower($option->name)).includes(term.toLowerCase())">{{ $option->name }}</option>
+                        @endforeach
+                    </select>
+                    @error('lgaId')<p class="text-red-500 text-[11px] mt-1">{{ $message }}</p>@enderror
+                </div>
+
+                {{-- Address --}}
+                <div>
+                    <label for="address" class="block text-[11px] font-semibold text-brand-muted uppercase tracking-[0.6px] mb-1.5">
+                        Address <span class="text-red-400">*</span>
+                    </label>
+                    <input id="address" wire:model="address" type="text"
+                        placeholder="Street name, house number, area or landmark…"
+                        class="w-full h-11 px-3.5 bg-brand-bg dark:bg-[#0d1a0d] border border-[#d0d9d2] dark:border-[#2a3a2a] rounded-xl text-[13px] text-[#111] dark:text-[#e8f5e9] focus:outline-none focus:border-brand transition-colors @error('address') border-red-400 @enderror">
+                    @error('address')<p class="text-red-500 text-[11px] mt-1">{{ $message }}</p>@enderror
                 </div>
 
                 {{-- Platforms you post on --}}

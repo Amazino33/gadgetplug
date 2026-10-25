@@ -48,6 +48,16 @@ class AffiliateApplication extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function state(): BelongsTo
+    {
+        return $this->belongsTo(State::class);
+    }
+
+    public function lga(): BelongsTo
+    {
+        return $this->belongsTo(Lga::class);
+    }
+
     public function getConsentAtAttribute(): mixed
     {
         return $this->consented_at;
