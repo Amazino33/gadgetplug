@@ -40,7 +40,7 @@
             <label class="block text-[11px] font-semibold text-brand-muted uppercase tracking-[0.6px] mb-1.5">Confirm Password</label>
             <input name="password_confirmation" type="password" required autocomplete="new-password"
                 placeholder="Repeat your password"
-                class="w-full h-11 px-3.5 bg-brand-bg dark:bg-[#0d1a0d] border border-[#d0d9d2] dark:border-[#2a3a2a] rounded-xl text-[13px] text-[#111] dark:text-[#e8f5e9] focus:outline-none focus:border-brand transition-colors @error('password_confirmation') border-red-400 @enderror">
+                class="w-full h-11 px-3.5 bg-brand-bg dark:bg-[#0d1a0d] border rounded-xl text-[13px] text-[#111] dark:text-[#e8f5e9] focus:outline-none focus:border-brand transition-colors {{ $errors->has('password_confirmation') || ($errors->has('password') && str_contains(strtolower($errors->first('password')), 'confirmation')) ? 'border-red-400' : 'border-[#d0d9d2] dark:border-[#2a3a2a]' }}">
             @error('password_confirmation')<p class="text-red-500 text-[11px] mt-1">{{ $message }}</p>@enderror
         </div>
 
