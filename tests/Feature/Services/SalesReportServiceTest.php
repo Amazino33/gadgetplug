@@ -3,12 +3,18 @@
 use App\Models\Category;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\PosCustomer;
+use App\Models\PosCustomerLedgerEntry;
+use App\Models\PosDebtPayment;
+use App\Models\PosReturn;
 use App\Models\PosSale;
 use App\Models\PosSaleItem;
+use App\Models\PosSalePayment;
 use App\Models\Product;
 use App\Models\User;
 use App\Models\Vendor;
 use App\Services\Reporting\SalesReportService;
+use App\Support\Pos\BusinessDate;
 use Carbon\CarbonImmutable;
 
 function makeReportVendor(string $name): array
@@ -32,12 +38,12 @@ function makeReportVendor(string $name): array
     return compact('owner', 'vendor', 'product');
 }
 
-function makePosSale(array $ctx, float $unitPrice, float $unitCost, int $qty, ?CarbonImmutable $at = null): PosSale
+function makePosSale(array $ctx, float $unitPrice, float $unitCost, int $qty, ?CarbonImmutable $at = null, array $over = []): PosSale
 {
     $at ??= CarbonImmutable::now();
     $subtotal = $unitPrice * $qty;
 
-    $sale = PosSale::create([
+    $sale = PosSale::create($over + [
         'reference' => 'POS-'.Str::random(10),
         'vendor_id' => $ctx['vendor']->id,
         'cashier_id' => $ctx['owner']->id,
@@ -333,4 +339,74 @@ it('counts a wallet purchase as a sale at its payment', function () {
 
     expect(app(SalesReportService::class)->summary($ctx['vendor']->id, CarbonImmutable::now()->subDay(), CarbonImmutable::now()->addDay())['revenue'])
         ->toEqualWithDelta(5000.0, 0.01);
+});
+
+it('breaks shop takings down by how the customer paid, splitting split sales into their legs', function () {
+    $ctx = makeReportVendor('Tender Store');
+
+    // 1075 each, VAT included: what actually changed hands.
+    makePosSale($ctx, unitPrice: 1000, unitCost: 600, qty: 1);
+    makePosSale($ctx, unitPrice: 1000, unitCost: 600, qty: 1, over: ['payment_method' => 'card']);
+    makePosSale($ctx, unitPrice: 1000, unitCost: 600, qty: 1, over: ['payment_method' => 'debt']);
+
+    // 2150 owed, paid 1000 by transfer and 1200 in cash, so 50 change back in cash.
+    $split = makePosSale($ctx, unitPrice: 1000, unitCost: 600, qty: 2, over: [
+        'payment_method' => 'split', 'amount_tendered' => 2200, 'change_given' => 50,
+    ]);
+    PosSalePayment::create(['pos_sale_id' => $split->id, 'method' => 'bank_transfer', 'amount' => 1000]);
+    PosSalePayment::create(['pos_sale_id' => $split->id, 'method' => 'cash', 'amount' => 1200]);
+
+    $payments = app(SalesReportService::class)->paymentBreakdown(
+        $ctx['vendor']->id,
+        CarbonImmutable::now()->subDay(),
+        CarbonImmutable::now()->addDay(),
+    );
+
+    expect($payments['sales'])->toBe([
+        'cash' => 1075.0 + 1150.0,
+        'card' => 1075.0,
+        'bank_transfer' => 1000.0,
+        'debt' => 1075.0,
+    ])
+        ->and($payments['refunds'])->toBe([])
+        ->and($payments['repayments'])->toBe(['cash' => 0.0, 'card' => 0.0, 'bank_transfer' => 0.0]);
+});
+
+it('reports refunds and debt repayments beside the tenders without netting them in', function () {
+    $ctx = makeReportVendor('Refund Tender Store');
+    $sale = makePosSale($ctx, unitPrice: 1000, unitCost: 600, qty: 2);
+
+    PosReturn::create([
+        'reference' => 'RET-'.Str::random(8),
+        'vendor_id' => $ctx['vendor']->id,
+        'original_sale_id' => $sale->id,
+        'cashier_id' => $ctx['owner']->id,
+        'return_items' => [],
+        'refund_amount' => 500,
+        'refund_method' => 'bank_transfer',
+    ]);
+
+    $customer = PosCustomer::create(['vendor_id' => $ctx['vendor']->id, 'name' => 'Ada Obi', 'phone' => '08031234567']);
+    PosDebtPayment::create([
+        'pos_customer_id' => $customer->id,
+        'vendor_id' => $ctx['vendor']->id,
+        'collected_by' => $ctx['owner']->id,
+        'pos_customer_ledger_entry_id' => PosCustomerLedgerEntry::create([
+            'pos_customer_id' => $customer->id, 'vendor_id' => $ctx['vendor']->id,
+            'direction' => 'payment', 'amount' => -3000, 'occurred_at' => BusinessDate::today(),
+        ])->id,
+        'method' => 'card',
+        'amount' => 3000,
+        'collected_at' => BusinessDate::today(),
+    ]);
+
+    $payments = app(SalesReportService::class)->paymentBreakdown(
+        $ctx['vendor']->id,
+        CarbonImmutable::now()->subDay(),
+        CarbonImmutable::now()->addDay(),
+    );
+
+    expect($payments['sales']['cash'])->toBe(2150.0)
+        ->and($payments['refunds'])->toBe(['bank_transfer' => 500.0])
+        ->and($payments['repayments'])->toBe(['cash' => 0.0, 'card' => 3000.0, 'bank_transfer' => 0.0]);
 });

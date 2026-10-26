@@ -127,6 +127,7 @@ class SalesReport extends Page
             'channels' => $reports->channelBreakdown($vendorId, $period->from, $period->to, $storeId),
             'stores' => $reports->storeBreakdown($vendorId, $period->from, $period->to),
             'topProducts' => $reports->topProducts($vendorId, $period->from, $period->to, 10, $storeId),
+            'payments' => $reports->paymentBreakdown($vendorId, $period->from, $period->to, $storeId),
             'cashiers' => $reports->cashierBreakdown($vendorId, $period->from, $period->to, $storeId),
             'onlineStatuses' => $reports->onlineOrderStatusBreakdown($vendorId, $period->from, $period->to, $storeId),
         ];

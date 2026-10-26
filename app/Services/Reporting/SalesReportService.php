@@ -8,10 +8,13 @@ use App\Support\Quantity;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderItemStoreAllocation;
+use App\Models\PosDebtPayment;
 use App\Models\PosReturn;
 use App\Models\PosSale;
 use App\Models\PosSaleItem;
+use App\Models\PosSalePayment;
 use App\Models\Store;
+use App\Support\Pos\BusinessDate;
 use Carbon\CarbonPeriod;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
@@ -210,6 +213,98 @@ class SalesReportService
                 'orders' => (int) $row->orders,
                 'revenue' => (float) $row->revenue,
             ]);
+    }
+
+    /**
+     * How shop customers paid over the period, by tender, GROSS of VAT — the
+     * money that changed hands, not the revenue figure above it. The two differ
+     * by VAT and refunds, and the view says so rather than letting them be
+     * compared as if they were the same number.
+     *
+     * A split sale is counted under its real legs from pos_sale_payments, not as
+     * a "split" bucket, and its change comes off the cash leg because change is
+     * always handed back in cash — the same rules CashDrawer uses, so this
+     * cannot disagree with what the cashier is asked to hand over.
+     *
+     * 'debt' is goods that left on credit: a sale, but not money received.
+     * Refunds and debt repayments are reported beside the tenders rather than
+     * netted into them, so a quiet day of sales with a big repayment still
+     * reads as what it was.
+     *
+     * @return array{
+     *     sales: array{cash: float, card: float, bank_transfer: float, debt: float},
+     *     refunds: array<string, float>,
+     *     repayments: array{cash: float, card: float, bank_transfer: float},
+     * }
+     */
+    public function paymentBreakdown(int $vendorId, CarbonInterface $from, CarbonInterface $to, ?int $storeId = null): array
+    {
+        $completedAt = DB::raw('COALESCE(pos_sales.completed_at, pos_sales.created_at)');
+
+        $direct = PosSale::query()
+            ->where('pos_sales.vendor_id', $vendorId)
+            ->where('pos_sales.status', '!=', 'voided')
+            ->where('pos_sales.payment_method', '!=', 'split')
+            ->when($storeId, fn ($q) => $q->where('pos_sales.store_id', $storeId))
+            ->whereBetween($completedAt, [$from, $to])
+            ->groupBy('pos_sales.payment_method')
+            ->selectRaw('pos_sales.payment_method as method')
+            ->selectRaw('COALESCE(SUM(pos_sales.total), 0) as amount')
+            ->pluck('amount', 'method');
+
+        $split = PosSalePayment::query()
+            ->join('pos_sales', 'pos_sales.id', '=', 'pos_sale_payments.pos_sale_id')
+            ->where('pos_sales.vendor_id', $vendorId)
+            ->where('pos_sales.status', '!=', 'voided')
+            ->where('pos_sales.payment_method', 'split')
+            ->when($storeId, fn ($q) => $q->where('pos_sales.store_id', $storeId))
+            ->whereBetween($completedAt, [$from, $to])
+            ->groupBy('pos_sale_payments.method')
+            ->selectRaw('pos_sale_payments.method as method')
+            ->selectRaw("COALESCE(SUM(pos_sale_payments.amount - CASE WHEN pos_sale_payments.method = 'cash' THEN pos_sales.change_given ELSE 0 END), 0) as amount")
+            ->pluck('amount', 'method');
+
+        $sales = [];
+
+        foreach (['cash', 'card', 'bank_transfer', 'debt'] as $method) {
+            $sales[$method] = round((float) ($direct[$method] ?? 0) + (float) ($split[$method] ?? 0), 2);
+        }
+
+        // Dated by when the money went back, and tied to a branch through the
+        // sale it reverses — the same rules posTotals() nets revenue by.
+        $refunds = PosReturn::query()
+            ->where('pos_returns.vendor_id', $vendorId)
+            ->whereBetween('pos_returns.created_at', [$from, $to])
+            ->when($storeId, fn ($q) => $q->whereIn(
+                'pos_returns.original_sale_id',
+                PosSale::query()->select('id')->where('store_id', $storeId),
+            ))
+            ->groupBy('pos_returns.refund_method')
+            ->selectRaw('pos_returns.refund_method as method')
+            ->selectRaw('COALESCE(SUM(pos_returns.refund_amount), 0) as amount')
+            ->pluck('amount', 'method')
+            ->map(fn ($amount) => round((float) $amount, 2))
+            ->filter(fn (float $amount) => $amount > 0)
+            ->all();
+
+        // collected_at is a trading date, not a timestamp, so it is compared
+        // against the Lagos days the window covers.
+        $collected = PosDebtPayment::query()
+            ->where('vendor_id', $vendorId)
+            ->when($storeId, fn ($q) => $q->where('store_id', $storeId))
+            ->whereBetween('collected_at', [BusinessDate::of($from), BusinessDate::of($to)])
+            ->groupBy('method')
+            ->selectRaw('method')
+            ->selectRaw('COALESCE(SUM(amount), 0) as amount')
+            ->pluck('amount', 'method');
+
+        $repayments = [];
+
+        foreach (PosDebtPayment::METHODS as $method) {
+            $repayments[$method] = round((float) ($collected[$method] ?? 0), 2);
+        }
+
+        return ['sales' => $sales, 'refunds' => $refunds, 'repayments' => $repayments];
     }
 
     /**
