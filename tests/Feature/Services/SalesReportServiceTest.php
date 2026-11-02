@@ -410,3 +410,49 @@ it('reports refunds and debt repayments beside the tenders without netting them 
         ->and($payments['refunds'])->toBe(['bank_transfer' => 500.0])
         ->and($payments['repayments'])->toBe(['cash' => 0.0, 'card' => 3000.0, 'bank_transfer' => 0.0]);
 });
+
+it('gives payment methods a day at a time, on the Lagos clock, adding up to the period total', function () {
+    $ctx = makeReportVendor('Daily Tender Store');
+    $service = app(SalesReportService::class);
+
+    // 23:30 UTC on the 3rd is 00:30 on the 4th in Lagos, so it is the 4th's takings.
+    makePosSale($ctx, unitPrice: 1000, unitCost: 600, qty: 1, at: CarbonImmutable::parse('2026-10-03 10:00', 'UTC'));
+    makePosSale($ctx, unitPrice: 1000, unitCost: 600, qty: 1, at: CarbonImmutable::parse('2026-10-03 23:30', 'UTC'), over: ['payment_method' => 'card']);
+
+    $split = makePosSale($ctx, unitPrice: 1000, unitCost: 600, qty: 2, at: CarbonImmutable::parse('2026-10-04 12:00', 'UTC'), over: [
+        'payment_method' => 'split', 'amount_tendered' => 2200, 'change_given' => 50,
+    ]);
+    PosSalePayment::create(['pos_sale_id' => $split->id, 'method' => 'bank_transfer', 'amount' => 1000]);
+    PosSalePayment::create(['pos_sale_id' => $split->id, 'method' => 'cash', 'amount' => 1200]);
+
+    $customer = PosCustomer::create(['vendor_id' => $ctx['vendor']->id, 'name' => 'Ada Obi', 'phone' => '08031234567']);
+    PosDebtPayment::create([
+        'pos_customer_id' => $customer->id,
+        'vendor_id' => $ctx['vendor']->id,
+        'collected_by' => $ctx['owner']->id,
+        'pos_customer_ledger_entry_id' => PosCustomerLedgerEntry::create([
+            'pos_customer_id' => $customer->id, 'vendor_id' => $ctx['vendor']->id,
+            'direction' => 'payment', 'amount' => -3000, 'occurred_at' => '2026-10-05',
+        ])->id,
+        'method' => 'cash',
+        'amount' => 3000,
+        'collected_at' => '2026-10-05',
+    ]);
+
+    $from = CarbonImmutable::parse('2026-10-01', 'Africa/Lagos')->startOfDay()->utc();
+    $to = CarbonImmutable::parse('2026-10-07', 'Africa/Lagos')->endOfDay()->utc();
+
+    $days = $service->dailyPayments($ctx['vendor']->id, $from, $to);
+
+    expect($days->pluck('date')->all())->toBe(['2026-10-03', '2026-10-04', '2026-10-05'])
+        ->and($days[0]['sales'])->toBe(['cash' => 1075.0, 'card' => 0.0, 'bank_transfer' => 0.0, 'debt' => 0.0])
+        ->and($days[1]['sales'])->toBe(['cash' => 1150.0, 'card' => 1075.0, 'bank_transfer' => 1000.0, 'debt' => 0.0])
+        ->and($days[2]['sales'])->toBe(['cash' => 0.0, 'card' => 0.0, 'bank_transfer' => 0.0, 'debt' => 0.0])
+        ->and($days[2]['repayments'])->toBe(3000.0);
+
+    $total = $service->paymentBreakdown($ctx['vendor']->id, $from, $to);
+
+    foreach (SalesReportService::SALE_TENDERS as $method) {
+        expect(round($days->sum("sales.{$method}"), 2))->toBe($total['sales'][$method]);
+    }
+});

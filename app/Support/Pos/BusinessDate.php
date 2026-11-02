@@ -6,6 +6,7 @@ namespace App\Support\Pos;
 
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use Illuminate\Support\Facades\DB;
 
 // Which day a sale belongs to, on the shopkeeper's clock.
 //
@@ -66,6 +67,26 @@ final class BusinessDate
             self::toAppTimezone($local->startOfDay()),
             self::toAppTimezone($local->endOfDay()),
         ];
+    }
+
+    /**
+     * SQL for the trading day a stored timestamp column falls on, for grouping.
+     *
+     * DATE() straight on the column groups by the UTC day, which puts every
+     * sale rung between midnight and 01:00 in Lagos under the day before. The
+     * column is shifted by the offset first. A fixed offset rather than
+     * CONVERT_TZ, which needs MySQL's timezone tables loaded and does not exist
+     * in SQLite; Lagos keeps no daylight saving, so the offset never moves.
+     */
+    public static function sqlDate(string $column): string
+    {
+        $now     = CarbonImmutable::now();
+        $seconds = $now->setTimezone(self::timezone())->getOffset()
+            - $now->setTimezone(config('app.timezone', 'UTC'))->getOffset();
+
+        return DB::connection()->getDriverName() === 'sqlite'
+            ? sprintf("DATE(%s, '%+d seconds')", $column, $seconds)
+            : sprintf('DATE(%s + INTERVAL %d SECOND)', $column, $seconds);
     }
 
     /** Whether a business date is still the day in progress. */

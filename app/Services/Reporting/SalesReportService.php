@@ -73,6 +73,10 @@ class SalesReportService
 
     private const POS_REVENUE_SQL = 'COALESCE(SUM(subtotal - discount_amount), 0)';
 
+    // How a shop sale can be settled once split sales are broken into their legs.
+    // 'debt' is goods out on credit, not money in; the views say so.
+    public const SALE_TENDERS = ['cash', 'card', 'bank_transfer', 'debt'];
+
     private const POS_COST_SQL = 'COALESCE(SUM(pos_sale_items.quantity * COALESCE(pos_sale_items.unit_cost, products.cost_price)), 0)';
 
     public function summary(int $vendorId, CarbonInterface $from, CarbonInterface $to, ?int $storeId = null): array
@@ -127,8 +131,8 @@ class SalesReportService
             ->join('products', 'products.id', '=', 'order_items.product_id')
             ->where('order_items.vendor_id', $vendorId)
             ->tap(fn ($q) => self::recordedOnline($q, $from, $to))
-            ->groupBy(DB::raw('DATE(orders.revenue_recognized_at)'))
-            ->selectRaw('DATE(orders.revenue_recognized_at) as day')
+            ->groupBy(DB::raw($onlineDay = BusinessDate::sqlDate('orders.revenue_recognized_at')))
+            ->selectRaw($onlineDay.' as day')
             ->selectRaw(self::ONLINE_REVENUE_SQL.' as revenue')
             ->selectRaw(self::ONLINE_COST_SQL.' as cost')
             ->get()
@@ -138,8 +142,8 @@ class SalesReportService
             ->where('vendor_id', $vendorId)
             ->where('status', '!=', 'voided')
             ->whereBetween(DB::raw('COALESCE(completed_at, created_at)'), [$from, $to])
-            ->groupBy(DB::raw('DATE(COALESCE(completed_at, created_at))'))
-            ->selectRaw('DATE(COALESCE(completed_at, created_at)) as day')
+            ->groupBy(DB::raw($posDay = BusinessDate::sqlDate('COALESCE(completed_at, created_at)')))
+            ->selectRaw($posDay.' as day')
             ->selectRaw(self::POS_REVENUE_SQL.' as revenue')
             ->get()
             ->keyBy(fn ($row) => (string) $row->day);
@@ -150,8 +154,8 @@ class SalesReportService
             ->where('pos_sales.vendor_id', $vendorId)
             ->where('pos_sales.status', '!=', 'voided')
             ->whereBetween(DB::raw('COALESCE(pos_sales.completed_at, pos_sales.created_at)'), [$from, $to])
-            ->groupBy(DB::raw('DATE(COALESCE(pos_sales.completed_at, pos_sales.created_at))'))
-            ->selectRaw('DATE(COALESCE(pos_sales.completed_at, pos_sales.created_at)) as day')
+            ->groupBy(DB::raw($posCostDay = BusinessDate::sqlDate('COALESCE(pos_sales.completed_at, pos_sales.created_at)')))
+            ->selectRaw($posCostDay.' as day')
             ->selectRaw(self::POS_COST_SQL.' as cost')
             ->get()
             ->keyBy(fn ($row) => (string) $row->day);
@@ -159,8 +163,8 @@ class SalesReportService
         $refundsByDay = PosReturn::query()
             ->where('vendor_id', $vendorId)
             ->whereBetween('created_at', [$from, $to])
-            ->groupBy(DB::raw('DATE(created_at)'))
-            ->selectRaw('DATE(created_at) as day')
+            ->groupBy(DB::raw($refundDay = BusinessDate::sqlDate('created_at')))
+            ->selectRaw($refundDay.' as day')
             ->selectRaw('COALESCE(SUM(refund_amount), 0) as refunds')
             ->get()
             ->keyBy(fn ($row) => (string) $row->day);
@@ -169,7 +173,11 @@ class SalesReportService
         $revenueSeries = [];
         $profitSeries = [];
 
-        foreach (CarbonPeriod::create($from->copy()->startOfDay(), $to->copy()->startOfDay()) as $day) {
+        // Walked in Lagos, the days the rows above were grouped by. The bounds
+        // arrive in UTC, where today's midnight is still yesterday.
+        $tz = config('reporting.timezone', 'Africa/Lagos');
+
+        foreach (CarbonPeriod::create($from->copy()->setTimezone($tz)->startOfDay(), $to->copy()->setTimezone($tz)->startOfDay()) as $day) {
             $key = $day->format('Y-m-d');
 
             $revenue = (float) ($onlineByDay[$key]->revenue ?? 0)
@@ -239,18 +247,96 @@ class SalesReportService
      */
     public function paymentBreakdown(int $vendorId, CarbonInterface $from, CarbonInterface $to, ?int $storeId = null): array
     {
-        $completedAt = DB::raw('COALESCE(pos_sales.completed_at, pos_sales.created_at)');
+        $byMethod = fn (Collection $rows): Collection => $rows
+            ->groupBy('method')
+            ->map(fn (Collection $group) => round((float) $group->sum('amount'), 2));
+
+        $tendered = $byMethod($this->tenderRows($vendorId, $from, $to, $storeId));
+        $collected = $byMethod($this->repaymentRows($vendorId, $from, $to, $storeId));
+
+        $sales = [];
+
+        foreach (self::SALE_TENDERS as $method) {
+            $sales[$method] = (float) ($tendered[$method] ?? 0);
+        }
+
+        $refunds = $byMethod($this->refundRows($vendorId, $from, $to, $storeId))
+            ->filter(fn (float $amount) => $amount > 0)
+            ->all();
+
+        $repayments = [];
+
+        foreach (PosDebtPayment::METHODS as $method) {
+            $repayments[$method] = (float) ($collected[$method] ?? 0);
+        }
+
+        return ['sales' => $sales, 'refunds' => $refunds, 'repayments' => $repayments];
+    }
+
+    /**
+     * paymentBreakdown() one trading day at a time, oldest first, for the
+     * Payment Methods report. Built from the same rows, so the days always add
+     * up to the period total. Days with no shop money in or out are left out.
+     *
+     * @return Collection<int, array{
+     *     date: string,
+     *     sales: array{cash: float, card: float, bank_transfer: float, debt: float},
+     *     repayments: float,
+     *     refunds: float,
+     * }>
+     */
+    public function dailyPayments(int $vendorId, CarbonInterface $from, CarbonInterface $to, ?int $storeId = null): Collection
+    {
+        $tendered = $this->tenderRows($vendorId, $from, $to, $storeId)->groupBy('day');
+        $collected = $this->repaymentRows($vendorId, $from, $to, $storeId)->groupBy('day');
+        $refunded = $this->refundRows($vendorId, $from, $to, $storeId)->groupBy('day');
+
+        return $tendered->keys()
+            ->merge($collected->keys())
+            ->merge($refunded->keys())
+            ->unique()
+            ->sort()
+            ->values()
+            ->map(function (string $day) use ($tendered, $collected, $refunded): array {
+                $rows = $tendered->get($day, collect());
+                $sales = [];
+
+                foreach (self::SALE_TENDERS as $method) {
+                    $sales[$method] = round((float) $rows->where('method', $method)->sum('amount'), 2);
+                }
+
+                return [
+                    'date' => $day,
+                    'sales' => $sales,
+                    'repayments' => round((float) $collected->get($day, collect())->sum('amount'), 2),
+                    'refunds' => round((float) $refunded->get($day, collect())->sum('amount'), 2),
+                ];
+            });
+    }
+
+    /**
+     * Shop takings by trading day and tender. A split sale contributes one row
+     * per leg, with its change taken off the cash leg.
+     *
+     * @return Collection<int, object{day: string, method: string, amount: float}>
+     */
+    private function tenderRows(int $vendorId, CarbonInterface $from, CarbonInterface $to, ?int $storeId): Collection
+    {
+        $completedAt = 'COALESCE(pos_sales.completed_at, pos_sales.created_at)';
+        $day = BusinessDate::sqlDate($completedAt);
 
         $direct = PosSale::query()
             ->where('pos_sales.vendor_id', $vendorId)
             ->where('pos_sales.status', '!=', 'voided')
             ->where('pos_sales.payment_method', '!=', 'split')
             ->when($storeId, fn ($q) => $q->where('pos_sales.store_id', $storeId))
-            ->whereBetween($completedAt, [$from, $to])
-            ->groupBy('pos_sales.payment_method')
+            ->whereBetween(DB::raw($completedAt), [$from, $to])
+            ->groupBy(DB::raw($day), 'pos_sales.payment_method')
+            ->selectRaw($day.' as day')
             ->selectRaw('pos_sales.payment_method as method')
             ->selectRaw('COALESCE(SUM(pos_sales.total), 0) as amount')
-            ->pluck('amount', 'method');
+            ->toBase()
+            ->get();
 
         $split = PosSalePayment::query()
             ->join('pos_sales', 'pos_sales.id', '=', 'pos_sale_payments.pos_sale_id')
@@ -258,53 +344,62 @@ class SalesReportService
             ->where('pos_sales.status', '!=', 'voided')
             ->where('pos_sales.payment_method', 'split')
             ->when($storeId, fn ($q) => $q->where('pos_sales.store_id', $storeId))
-            ->whereBetween($completedAt, [$from, $to])
-            ->groupBy('pos_sale_payments.method')
+            ->whereBetween(DB::raw($completedAt), [$from, $to])
+            ->groupBy(DB::raw($day), 'pos_sale_payments.method')
+            ->selectRaw($day.' as day')
             ->selectRaw('pos_sale_payments.method as method')
             ->selectRaw("COALESCE(SUM(pos_sale_payments.amount - CASE WHEN pos_sale_payments.method = 'cash' THEN pos_sales.change_given ELSE 0 END), 0) as amount")
-            ->pluck('amount', 'method');
+            ->toBase()
+            ->get();
 
-        $sales = [];
+        return $direct->concat($split);
+    }
 
-        foreach (['cash', 'card', 'bank_transfer', 'debt'] as $method) {
-            $sales[$method] = round((float) ($direct[$method] ?? 0) + (float) ($split[$method] ?? 0), 2);
-        }
+    /**
+     * Refunds by trading day and refund method. Dated by when the money went
+     * back, and tied to a branch through the sale it reverses — the same rules
+     * posTotals() nets revenue by.
+     *
+     * @return Collection<int, object{day: string, method: string, amount: float}>
+     */
+    private function refundRows(int $vendorId, CarbonInterface $from, CarbonInterface $to, ?int $storeId): Collection
+    {
+        $day = BusinessDate::sqlDate('pos_returns.created_at');
 
-        // Dated by when the money went back, and tied to a branch through the
-        // sale it reverses — the same rules posTotals() nets revenue by.
-        $refunds = PosReturn::query()
+        return PosReturn::query()
             ->where('pos_returns.vendor_id', $vendorId)
             ->whereBetween('pos_returns.created_at', [$from, $to])
             ->when($storeId, fn ($q) => $q->whereIn(
                 'pos_returns.original_sale_id',
                 PosSale::query()->select('id')->where('store_id', $storeId),
             ))
-            ->groupBy('pos_returns.refund_method')
+            ->groupBy(DB::raw($day), 'pos_returns.refund_method')
+            ->selectRaw($day.' as day')
             ->selectRaw('pos_returns.refund_method as method')
             ->selectRaw('COALESCE(SUM(pos_returns.refund_amount), 0) as amount')
-            ->pluck('amount', 'method')
-            ->map(fn ($amount) => round((float) $amount, 2))
-            ->filter(fn (float $amount) => $amount > 0)
-            ->all();
+            ->toBase()
+            ->get();
+    }
 
-        // collected_at is a trading date, not a timestamp, so it is compared
-        // against the Lagos days the window covers.
-        $collected = PosDebtPayment::query()
+    /**
+     * Old debts paid back, by trading day and method. collected_at is already
+     * a trading date, not a timestamp, so it is compared against the Lagos days
+     * the window covers rather than shifted.
+     *
+     * @return Collection<int, object{day: string, method: string, amount: float}>
+     */
+    private function repaymentRows(int $vendorId, CarbonInterface $from, CarbonInterface $to, ?int $storeId): Collection
+    {
+        return PosDebtPayment::query()
             ->where('vendor_id', $vendorId)
             ->when($storeId, fn ($q) => $q->where('store_id', $storeId))
             ->whereBetween('collected_at', [BusinessDate::of($from), BusinessDate::of($to)])
-            ->groupBy('method')
+            ->groupBy(DB::raw('DATE(collected_at)'), 'method')
+            ->selectRaw('DATE(collected_at) as day')
             ->selectRaw('method')
             ->selectRaw('COALESCE(SUM(amount), 0) as amount')
-            ->pluck('amount', 'method');
-
-        $repayments = [];
-
-        foreach (PosDebtPayment::METHODS as $method) {
-            $repayments[$method] = round((float) ($collected[$method] ?? 0), 2);
-        }
-
-        return ['sales' => $sales, 'refunds' => $refunds, 'repayments' => $repayments];
+            ->toBase()
+            ->get();
     }
 
     /**

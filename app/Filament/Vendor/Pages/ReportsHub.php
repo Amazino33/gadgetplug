@@ -8,6 +8,7 @@ use App\Services\Reporting\Cards\AdEfficiencyCardProvider;
 use App\Services\Reporting\Cards\CardSummary;
 use App\Services\Reporting\Cards\DeadStockCardProvider;
 use App\Services\Reporting\Cards\MoneyPositionCardProvider;
+use App\Services\Reporting\Cards\PaymentMethodsCardProvider;
 use App\Services\Reporting\Cards\ReportCardProvider;
 use App\Services\Reporting\Cards\RestockCardProvider;
 use App\Services\Reporting\Cards\SalesPulseCardProvider;
@@ -42,6 +43,7 @@ class ReportsHub extends Page
         RestockCardProvider::class,
         MoneyPositionCardProvider::class,
         SalesPulseCardProvider::class,
+        PaymentMethodsCardProvider::class,
         AdEfficiencyCardProvider::class,
         DeadStockCardProvider::class,
     ];
