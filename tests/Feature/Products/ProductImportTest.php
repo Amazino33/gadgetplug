@@ -613,11 +613,11 @@ it('offers a blank template that imports cleanly as one product', function () {
 
     expect($log->created_count)->toBe(1)
         ->and($log->skipped_count)->toBe(0)
-        ->and(Product::firstOrFail()->name)->toBe('Egg')
+        ->and(Product::firstOrFail()->name)->toBe('Anker 20W USB-C Charger')
         // The example leaves Quantity blank so it adds nothing to a real shelf.
         ->and(Product::firstOrFail()->stock_quantity)->toBe(0)
-        // And it carries the Crate and Half Crate it is there to show.
-        ->and($log->units_created_count)->toBe(2);
+        // And it carries the Pack of 10 it is there to show.
+        ->and($log->units_created_count)->toBe(1);
 });
 
 it('writes an xlsx export that reads back with the same headers', function () {

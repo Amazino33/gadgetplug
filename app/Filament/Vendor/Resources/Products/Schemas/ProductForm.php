@@ -1035,13 +1035,6 @@ class ProductForm
                     ->label('This is a service, not a physical item')
                     ->helperText('Services hold no stock and are left out of inventory counts.')
                     ->default(false),
-
-                // Serial numbers and IMEIs: for shops that sell phones, not drinks.
-                Toggle::make('track_serial')
-                    ->label('Track serial / IMEI numbers')
-                    ->helperText('Receiving this product in Purchases then asks for one serial or IMEI per unit.')
-                    ->default(false)
-                    ->visible(fn () => self::usesGadgetFields()),
             ]),
         ];
     }

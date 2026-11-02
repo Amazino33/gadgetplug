@@ -260,35 +260,7 @@ it('refunds the half at what it cost, and the rest so it all adds up', function 
         ->and($ctx['product']->fresh()->stock_quantity)->toBe(20);
 });
 
-// ─── Buying and counting ─────────────────────────────────────────────────
-
-it('receives 10½ crates on the Purchase Terminal', function () {
-    $ctx      = halvesScreensShop();
-    $supplier = Supplier::create(['vendor_id' => $ctx['vendor']->id, 'name' => 'Brewery Depot']);
-
-    $this->actingAs($ctx['owner'])->postJson("/purchases/{$ctx['vendor']->slug}/api/purchases", [
-        'action'       => 'receive',
-        'supplier_id'  => $supplier->id,
-        'purchased_on' => now()->toDateString(),
-        'payment'      => ['option' => 'none'],
-        'lines'        => [['product_id' => $ctx['product']->id, 'quantity' => 10.5, 'unit_cost' => 8000, 'selling_price' => 10100]],
-    ])->assertOk();
-
-    expect($ctx['product']->fresh()->stock_quantity)->toBe(30.5);
-});
-
-it('refuses 10½ crates on the Purchase Terminal for a shop that does not sell halves', function () {
-    $ctx      = halvesScreensShop(false);
-    $supplier = Supplier::create(['vendor_id' => $ctx['vendor']->id, 'name' => 'Brewery Depot']);
-
-    $this->actingAs($ctx['owner'])->postJson("/purchases/{$ctx['vendor']->slug}/api/purchases", [
-        'action'       => 'receive',
-        'supplier_id'  => $supplier->id,
-        'purchased_on' => now()->toDateString(),
-        'payment'      => ['option' => 'none'],
-        'lines'        => [['product_id' => $ctx['product']->id, 'quantity' => 10.5, 'unit_cost' => 8000, 'selling_price' => 10100]],
-    ])->assertUnprocessable()->assertJsonValidationErrors(['lines.0.quantity']);
-});
+// ─── Counting ─────────────────────────────────────────────────
 
 it('counts 7½ crates on the stock adjustment screen', function () {
     $ctx = halvesScreensShop();

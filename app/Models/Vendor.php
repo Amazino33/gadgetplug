@@ -96,7 +96,7 @@ class Vendor extends Model
             ->join('procurements', 'procurements.id', '=', 'procurement_items.procurement_id')
             ->join('products', 'products.id', '=', 'procurement_items.product_id')
             ->where('procurements.vendor_id', $this->id)
-            ->whereIn('procurements.status', [Procurement::STATUS_DRAFT, Procurement::STATUS_PENDING, Procurement::STATUS_CHANGES_REQUESTED])
+            ->whereIn('procurements.status', [Procurement::STATUS_PENDING, Procurement::STATUS_CHANGES_REQUESTED])
             ->where(fn ($q) => $q
                 ->whereRaw($fractional('procurement_items.quantity'))
                 ->orWhereRaw($fractional('COALESCE(procurement_items.unit_qty, 0)')))

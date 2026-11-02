@@ -96,7 +96,13 @@ it('maps every new column by its exact header, after the original eighteen', fun
         ->and($mapping['Price'])->toBe('price')
         ->and($mapping['Wholesale Price'])->toBe('wholesale_price')
         ->and($mapping['Unit'])->toBe('measurement_unit')
-        ->and(collect(ProductField::exportColumns())->map->label()->all())->toBe($headers);
+        // The export carries GadgetPlug's Online Name and Meta Description too.
+        ->and(collect(ProductField::exportColumns())->map->label()->all())->toBe(array_values(array_merge(
+            ['Name', 'Online Name'],
+            array_slice($headers, 1, 5),
+            ['Meta Description'],
+            array_slice($headers, 6),
+        )));
 });
 
 it('imports the Egg row with its Crate and Half Crate at their own prices', function () {

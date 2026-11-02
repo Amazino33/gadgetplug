@@ -291,14 +291,13 @@ test('the default unit chosen in the form is saved on the product', function () 
 
 // ── Gadget fields ───────────────────────────────────────────────────────────
 
-test('specifications and serial tracking are hidden for a shop that is not a gadget shop, and what they hold survives a save', function () {
-    [$owner, $vendor] = skuShop();
+test('specifications are hidden for a shop with gadget fields switched off, and what they hold survives a save', function () {
+    [$owner, $vendor] = skuShop('Castile', ['enable_gadget_fields' => false]);
     skuPanel($owner, $vendor);
-    $product = skuProduct($vendor, ['specifications' => ['RAM' => '8GB'], 'track_serial' => true]);
+    $product = skuProduct($vendor, ['specifications' => ['RAM' => '8GB']]);
 
     Livewire::test(EditProduct::class, ['record' => $product->getRouteKey()])
         ->assertFormFieldIsHidden('specifications')
-        ->assertFormFieldIsHidden('track_serial')
         ->fillForm(['name' => 'Castile lite 2'])
         ->call('save')
         ->assertHasNoFormErrors();
@@ -306,18 +305,18 @@ test('specifications and serial tracking are hidden for a shop that is not a gad
     $fresh = $product->fresh();
 
     expect($fresh->name)->toBe('Castile lite 2')
-        ->and($fresh->specifications)->toBe(['RAM' => '8GB'])
-        ->and($fresh->track_serial)->toBeTrue();
+        ->and($fresh->specifications)->toBe(['RAM' => '8GB']);
 });
 
-test('a gadget shop sees both fields', function () {
-    [$owner, $vendor] = skuShop('Gadget', ['enable_gadget_fields' => true]);
+test('a gadget shop sees specifications, and every new vendor is one', function () {
+    [$owner, $vendor] = skuShop('Gadget');
+    // Reloaded, as a request would load it, so the column's default is read.
+    $vendor = $vendor->fresh();
     skuPanel($owner, $vendor);
     $product = skuProduct($vendor);
 
     expect($vendor->usesGadgetFields())->toBeTrue();
 
     Livewire::test(EditProduct::class, ['record' => $product->getRouteKey()])
-        ->assertFormFieldIsVisible('specifications')
-        ->assertFormFieldIsVisible('track_serial');
+        ->assertFormFieldIsVisible('specifications');
 });

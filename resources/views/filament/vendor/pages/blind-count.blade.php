@@ -380,7 +380,7 @@
             this.persist();
         },
         clampCount() { this.setCount(this.entries[this.currentProductId]?.count); },
-        // "7½" for a shop that sells halves; the plain number for everyone else.
+        // '7½' for a shop that sells halves; the plain number for everyone else.
         fmtQty(v) {
             const n = Number(v ?? 0);
             if (! this.halves || Number.isInteger(n)) return String(n);
