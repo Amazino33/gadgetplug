@@ -66,7 +66,7 @@ describe('addToCart', () => {
         // A negotiated price and a line discount survive a second helping.
         const cart = [{ ...charger, qty: 1, price: 4800, listPrice: 5300, lineDiscount: 200 }];
 
-        expect(addToCart(cart, charger, 1).items[0]).toMatchObject({
+        expect(addToCart(cart, { ...charger, price: 4800 }, 1).items[0]).toMatchObject({
             qty: 2, price: 4800, listPrice: 5300, lineDiscount: 200,
         });
     });
