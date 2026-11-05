@@ -317,7 +317,7 @@ it('does not count a delivered pay-on-delivery order until its payment is record
     $old->forceFill(['created_at' => now()->subDays(60)])->saveQuietly();
 
     $summary = app(SalesReportService::class)->summary($ctx['vendor']->id, $from, $to);
-    $series  = app(SalesReportService::class)->dailySeries($ctx['vendor']->id, $from, $to);
+    $series = app(SalesReportService::class)->dailySeries($ctx['vendor']->id, $from, $to);
 
     expect($summary['revenue'])->toEqualWithDelta(6000.0, 0.01)
         ->and(array_sum($series['revenue']))->toEqualWithDelta(6000.0, 0.01);

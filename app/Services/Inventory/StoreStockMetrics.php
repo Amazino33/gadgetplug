@@ -58,11 +58,11 @@ class StoreStockMetrics
             ->get()
             ->keyBy('store_id')
             ->map(fn ($row) => (object) [
-                'product_count'      => (int) $row->product_count,
-                'units'              => Quantity::of($row->units),
-                'cost_value'         => (float) $row->cost_value,
-                'retail_value'       => (float) $row->retail_value,
-                'low_stock_count'    => (int) $row->low_stock_count,
+                'product_count' => (int) $row->product_count,
+                'units' => Quantity::of($row->units),
+                'cost_value' => (float) $row->cost_value,
+                'retail_value' => (float) $row->retail_value,
+                'low_stock_count' => (int) $row->low_stock_count,
                 'missing_cost_count' => (int) $row->missing_cost_count,
             ]);
     }
@@ -70,11 +70,11 @@ class StoreStockMetrics
     public static function empty(): object
     {
         return (object) [
-            'product_count'      => 0,
-            'units'              => 0,
-            'cost_value'         => 0.0,
-            'retail_value'       => 0.0,
-            'low_stock_count'    => 0,
+            'product_count' => 0,
+            'units' => 0,
+            'cost_value' => 0.0,
+            'retail_value' => 0.0,
+            'low_stock_count' => 0,
             'missing_cost_count' => 0,
         ];
     }

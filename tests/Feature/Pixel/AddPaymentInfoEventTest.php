@@ -3,9 +3,9 @@
 use App\Jobs\SendMetaConversionEventJob;
 use App\Models\Category;
 use App\Models\Product;
-use Database\Factories\ProductFactory;
 use App\Models\User;
 use App\Models\Vendor;
+use Database\Factories\ProductFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Session;
@@ -16,19 +16,19 @@ uses(RefreshDatabase::class);
 function paymentInfoProduct(): Product
 {
     $vendor = Vendor::create([
-        'user_id'              => User::factory()->create()->id,
-        'name'                 => 'AddPaymentInfo Store',
+        'user_id' => User::factory()->create()->id,
+        'name' => 'AddPaymentInfo Store',
         'online_sales_enabled' => true,
     ]);
 
     return ProductFactory::new()->withPhoto()->create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => Category::create(['name' => 'AddPaymentInfo Category'])->id,
-        'name'           => 'AddPaymentInfo Product',
-        'price'          => 5000,
+        'vendor_id' => $vendor->id,
+        'category_id' => Category::create(['name' => 'AddPaymentInfo Category'])->id,
+        'name' => 'AddPaymentInfo Product',
+        'price' => 5000,
         'stock_quantity' => 10,
-        'status'         => 'published',
-        'show_online'    => true,
+        'status' => 'published',
+        'show_online' => true,
     ]);
 }
 

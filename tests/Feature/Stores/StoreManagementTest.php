@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Inventory\AdjustStockAction;
 use App\Filament\Vendor\Resources\Stores\Pages\CreateStore;
 use App\Filament\Vendor\Resources\Stores\Pages\ListStores;
 use App\Filament\Vendor\Resources\Stores\StoreResource;
@@ -9,10 +10,15 @@ use App\Models\ProductStoreStock;
 use App\Models\Store;
 use App\Models\User;
 use App\Models\Vendor;
+use App\Services\ActiveStore;
+use App\Services\Inventory\StoreAllocator;
+use App\Services\Inventory\StoreStockMetrics;
 use App\Services\VendorRoles;
+use Database\Seeders\VendorPermissionsSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Spatie\Permission\Models\Role;
 
 uses(RefreshDatabase::class);
 
@@ -20,7 +26,7 @@ function mgmtVendor(): Vendor
 {
     return Vendor::create([
         'user_id' => User::factory()->create()->id,
-        'name'    => 'Mgmt Vendor '.uniqid(),
+        'name' => 'Mgmt Vendor '.uniqid(),
     ]);
 }
 
@@ -60,7 +66,7 @@ test('the owner may manage stores', function () {
 });
 
 test('a non-owner member is refused every management action at the policy layer', function () {
-    (new Database\Seeders\VendorPermissionsSeeder)->run();
+    (new VendorPermissionsSeeder)->run();
 
     $vendor = mgmtVendor();
     VendorRoles::seedFor($vendor);
@@ -84,7 +90,7 @@ test('a super admin may manage stores they do not own', function () {
     $vendor = mgmtVendor();
     $admin = User::factory()->create();
     setPermissionsTeamId(null);
-    Spatie\Permission\Models\Role::findOrCreate('super_admin', 'web');
+    Role::findOrCreate('super_admin', 'web');
     $admin->assignRole('super_admin');
 
     actAsMgmt($vendor, $admin);
@@ -141,8 +147,8 @@ test('an empty new branch appears in the grid and can receive stock', function (
     $vendor = mgmtVendor();
     $branch = Store::create(['vendor_id' => $vendor->id, 'name' => 'Fresh Branch']);
 
-    $metrics = App\Services\Inventory\StoreStockMetrics::forStores([$branch->id]);
-    $empty = $metrics[$branch->id] ?? App\Services\Inventory\StoreStockMetrics::empty();
+    $metrics = StoreStockMetrics::forStores([$branch->id]);
+    $empty = $metrics[$branch->id] ?? StoreStockMetrics::empty();
 
     expect($empty->product_count)->toBe(0)
         ->and($empty->cost_value)->toBe(0.0);
@@ -154,7 +160,7 @@ test('an empty new branch appears in the grid and can receive stock', function (
         'stock_quantity' => 0, 'status' => 'published',
     ]);
 
-    app(App\Actions\Inventory\AdjustStockAction::class)->execute(
+    app(AdjustStockAction::class)->execute(
         productId: $product->id, quantityChanged: 7, transactionType: 'restock', store: $branch->id,
     );
 
@@ -255,17 +261,17 @@ test('a non-default branch closes and reopens, and closed stock stops being sell
 
     // Phase 4 already refuses to allocate from a closed branch; this proves the
     // button actually reaches that behaviour.
-    expect(App\Services\Inventory\StoreAllocator::combinedAvailable($vendor->id, $product->id))->toBe(2);
+    expect(StoreAllocator::combinedAvailable($vendor->id, $product->id))->toBe(2);
 
     Livewire::test(ListStores::class)->callTableAction('toggleActive', $branch->fresh());
     expect($branch->fresh()->is_active)->toBeTrue()
-        ->and(App\Services\Inventory\StoreAllocator::combinedAvailable($vendor->id, $product->id))->toBe(52);
+        ->and(StoreAllocator::combinedAvailable($vendor->id, $product->id))->toBe(52);
 });
 
 // ─── Staff assignment ───────────────────────────────────────────────
 
 test('assigning staff grants and revokes store access idempotently', function () {
-    (new Database\Seeders\VendorPermissionsSeeder)->run();
+    (new VendorPermissionsSeeder)->run();
 
     $vendor = mgmtVendor();
     VendorRoles::seedFor($vendor);
@@ -299,7 +305,7 @@ test('assigning staff grants and revokes store access idempotently', function ()
 });
 
 test('an assigned member can then reach that store, and only that store', function () {
-    (new Database\Seeders\VendorPermissionsSeeder)->run();
+    (new VendorPermissionsSeeder)->run();
 
     $vendor = mgmtVendor();
     VendorRoles::seedFor($vendor);
@@ -312,6 +318,6 @@ test('an assigned member can then reach that store, and only that store', functi
 
     actAsMgmt($vendor, $member);
 
-    expect(App\Services\ActiveStore::accessibleFor($vendor, $member)->pluck('id')->all())
+    expect(ActiveStore::accessibleFor($vendor, $member)->pluck('id')->all())
         ->toBe([$branch->id]);
 });

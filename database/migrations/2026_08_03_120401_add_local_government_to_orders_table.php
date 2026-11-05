@@ -21,7 +21,7 @@ return new class extends Migration
         // fixed prefix for every historical order (only 3 possible values are ever used).
         foreach (['Uyo', 'Mkpat Enin', 'Eket'] as $lga) {
             DB::table('orders')
-                ->where('shipping_address', 'like', $lga . ', Akwa Ibom State —%')
+                ->where('shipping_address', 'like', $lga.', Akwa Ibom State —%')
                 ->update(['local_government' => $lga]);
         }
     }

@@ -10,9 +10,9 @@ use App\Models\Store;
 use App\Services\Inventory\StockCostLayers;
 use App\Services\Inventory\StoreStock;
 use App\Support\Quantity;
+use Exception;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\DB;
-use Exception;
 
 class AdjustStockAction
 {
@@ -67,7 +67,7 @@ class AdjustStockAction
             // none must fail even when another store is full.
             if ($quantityChanged < 0 && $row->quantity < abs($quantityChanged)) {
                 if (! $allowNegative) {
-                    throw new Exception('Insufficient stock for product: ' . $product->name);
+                    throw new Exception('Insufficient stock for product: '.$product->name);
                 }
 
                 // Allowed below zero: the goods have left, so the row records
@@ -91,17 +91,17 @@ class AdjustStockAction
             // than through a changed return type so every existing caller of
             // this action keeps working untouched.
             $ledger = InventoryLedger::create([
-                'vendor_id'        => $product->vendor_id,
-                'store_id'         => $row->store_id,
-                'product_id'       => $product->id,
-                'user_id'          => $userId,
+                'vendor_id' => $product->vendor_id,
+                'store_id' => $row->store_id,
+                'product_id' => $product->id,
+                'user_id' => $userId,
                 'transaction_type' => $transactionType,
-                'quantity_change'  => $quantityChanged,
-                'cost_total'       => $movement['cost'] ?? null,
-                'reference'        => $reference,
-                'description'      => $description,
+                'quantity_change' => $quantityChanged,
+                'cost_total' => $movement['cost'] ?? null,
+                'reference' => $reference,
+                'description' => $description,
                 'audit_session_id' => $auditSessionId,
-                'reason_code'      => $reasonCode,
+                'reason_code' => $reasonCode,
             ]);
 
             // A cashier is deliberately allowed to sell into stock an online

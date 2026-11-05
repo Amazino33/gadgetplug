@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services\Inventory;
 
-use App\Support\Quantity;
 use App\Models\ProductStoreStock;
 use App\Models\Store;
+use App\Support\Quantity;
 use Illuminate\Support\Collection;
 
 // Decides which of a vendor's stores supply a line, and how many units each.
@@ -110,8 +110,8 @@ class StoreAllocator
             // whole: a branch holding 19½ can fill 19 of them, never 20. For
             // whole stock this is exactly quantity − reserved, as before.
             ->map(fn ($row) => [
-                'store_id'   => (int) $row->store_id,
-                'available'  => max(0, Quantity::wholeUnits(Quantity::sub($row->quantity, $row->reserved))),
+                'store_id' => (int) $row->store_id,
+                'available' => max(0, Quantity::wholeUnits(Quantity::sub($row->quantity, $row->reserved))),
                 'is_default' => (bool) $row->is_default,
             ])
             ->values();

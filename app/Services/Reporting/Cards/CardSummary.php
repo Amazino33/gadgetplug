@@ -11,7 +11,9 @@ namespace App\Services\Reporting\Cards;
 readonly class CardSummary
 {
     public const URGENCY_CALM = 'calm';
+
     public const URGENCY_ATTENTION = 'attention';
+
     public const URGENCY_URGENT = 'urgent';
 
     public function __construct(

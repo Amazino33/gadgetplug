@@ -2,11 +2,10 @@
 
 namespace App\Models;
 
+use App\Support\Quantity;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Collection;
-use App\Models\VendorPayout;
-use App\Support\Quantity;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Spatie\Sluggable\HasSlug;
@@ -29,19 +28,19 @@ class Vendor extends Model
     ];
 
     protected $casts = [
-        'pos_min_margin_percent'     => 'decimal:2',
-        'allow_negative_stock'      => 'boolean',
-        'enable_gadget_fields'      => 'boolean',
-        'pos_ask_quantity'          => 'boolean',
-        'pos_allow_price_change'    => 'boolean',
-        'allow_half_quantities'     => 'boolean',
+        'pos_min_margin_percent' => 'decimal:2',
+        'allow_negative_stock' => 'boolean',
+        'enable_gadget_fields' => 'boolean',
+        'pos_ask_quantity' => 'boolean',
+        'pos_allow_price_change' => 'boolean',
+        'allow_half_quantities' => 'boolean',
         'half_quantities_disabled_at' => 'datetime',
-        'online_sales_enabled'      => 'boolean',
-        'dashboard_blocked'         => 'boolean',
-        'dashboard_blocked_at'      => 'datetime',
-        'initial_capital'           => 'decimal:2',
-        'restock_window_days'       => 'integer',
-        'restock_lead_time_days'    => 'integer',
+        'online_sales_enabled' => 'boolean',
+        'dashboard_blocked' => 'boolean',
+        'dashboard_blocked_at' => 'datetime',
+        'initial_capital' => 'decimal:2',
+        'restock_window_days' => 'integer',
+        'restock_lead_time_days' => 'integer',
         'restock_target_cover_days' => 'integer',
         'restock_safety_buffer_days' => 'integer',
     ];
@@ -152,9 +151,9 @@ class Vendor extends Model
     public function restockSettings(): array
     {
         return [
-            'windowDays'       => $this->restock_window_days ?? 30,
-            'leadTimeDays'     => $this->restock_lead_time_days ?? 5,
-            'targetCoverDays'  => $this->restock_target_cover_days ?? 30,
+            'windowDays' => $this->restock_window_days ?? 30,
+            'leadTimeDays' => $this->restock_lead_time_days ?? 5,
+            'targetCoverDays' => $this->restock_target_cover_days ?? 30,
             'safetyBufferDays' => $this->restock_safety_buffer_days,
         ];
     }
@@ -279,7 +278,7 @@ class Vendor extends Model
         return $user->hasRole('super_admin') || $this->isOwner($user);
     }
 
-    public static function getTenantsForUser(\App\Models\User $user): Collection
+    public static function getTenantsForUser(User $user): Collection
     {
         if ($user->hasRole('super_admin')) {
             return static::all();
@@ -297,7 +296,8 @@ class Vendor extends Model
     public function hasOtherApprovers(int $excludeUserId): bool
     {
         $allUsers = collect([$this->user])->merge($this->users);
+
         return $allUsers->where('id', '!=', $excludeUserId)
-                 ->contains(fn (User $user) => $user->hasVendorPermission($this->id, 'approve_procurement'));
+            ->contains(fn (User $user) => $user->hasVendorPermission($this->id, 'approve_procurement'));
     }
 }

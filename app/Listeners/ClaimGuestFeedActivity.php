@@ -35,9 +35,7 @@ class ClaimGuestFeedActivity
     /** Where a guest's interrupted save waits while they sign in. */
     public const PENDING_SAVE = 'feed.pending_save';
 
-    public function __construct(private readonly ProductInteractions $interactions)
-    {
-    }
+    public function __construct(private readonly ProductInteractions $interactions) {}
 
     public function handle(Login $event): void
     {

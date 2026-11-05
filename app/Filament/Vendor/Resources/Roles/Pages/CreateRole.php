@@ -6,8 +6,8 @@ use App\Filament\Vendor\Resources\Roles\RoleResource;
 use BezhanSalleh\FilamentShield\Resources\Roles\Pages\CreateRole as BaseCreateRole;
 use BezhanSalleh\FilamentShield\Support\Utils;
 use Illuminate\Support\Arr;
-use Spatie\Permission\PermissionRegistrar;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\PermissionRegistrar;
 
 class CreateRole extends BaseCreateRole
 {
@@ -22,10 +22,11 @@ class CreateRole extends BaseCreateRole
         if ($teamId) {
             $result[Utils::getTenantModelForeignKey()] = $teamId;
         }
+
         return $result;
     }
 
-    protected function afterCreate(): void 
+    protected function afterCreate(): void
     {
         $permissionIds = $this->data['permissions'] ?? [];
         $permissions = Permission::whereIn('id', $permissionIds)->get();

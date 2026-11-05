@@ -34,6 +34,6 @@ class OrderNote extends Model
             ->logOnly(['body'])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
-            ->setDescriptionForEvent(fn (string $event) => 'Order note ' . $event);
+            ->setDescriptionForEvent(fn (string $event) => 'Order note '.$event);
     }
 }

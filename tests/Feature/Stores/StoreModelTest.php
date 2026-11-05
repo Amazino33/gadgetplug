@@ -13,7 +13,7 @@ function makeModelVendor(): Vendor
 {
     $vendor = Vendor::create([
         'user_id' => User::factory()->create()->id,
-        'name'    => 'Model Vendor '.uniqid(),
+        'name' => 'Model Vendor '.uniqid(),
     ]);
 
     // These tests are about Store's own behaviour — slugs, scopes, the
@@ -106,8 +106,8 @@ test('the same slug cannot be written twice for one vendor', function () {
 
     expect(fn () => Store::query()->insert([
         'vendor_id' => $vendor->id,
-        'name'      => 'Another',
-        'slug'      => 'main-store',
+        'name' => 'Another',
+        'slug' => 'main-store',
     ]))->toThrow(QueryException::class);
 });
 

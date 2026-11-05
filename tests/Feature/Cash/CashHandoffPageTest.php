@@ -1,11 +1,9 @@
 <?php
 
 use App\Models\CashSubmission;
-use App\Models\User;
-use App\Services\Cash\CashHandoffToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
-require_once __DIR__ . '/Helpers.php';
+require_once __DIR__.'/Helpers.php';
 
 uses(RefreshDatabase::class);
 
@@ -59,7 +57,7 @@ test('a dispute from the page keeps both figures', function () {
 
     $this->actingAs($ctx['collector'])
         ->post(route('cash.handoff.dispute', $token), [
-            'note'            => 'Envelope was light',
+            'note' => 'Envelope was light',
             'disputed_amount' => 45000,
         ])
         ->assertOk()

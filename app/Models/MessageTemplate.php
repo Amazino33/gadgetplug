@@ -92,12 +92,12 @@ class MessageTemplate extends Model
         }
 
         return new static([
-            'vendor_id'      => $vendorId,
-            'key'            => $default['key'],
+            'vendor_id' => $vendorId,
+            'key' => $default['key'],
             'recipient_type' => $default['recipient_type'],
-            'channel'        => $default['channel'],
-            'body'           => $default['body'],
-            'is_active'      => true,
+            'channel' => $default['channel'],
+            'body' => $default['body'],
+            'is_active' => true,
         ]);
     }
 }

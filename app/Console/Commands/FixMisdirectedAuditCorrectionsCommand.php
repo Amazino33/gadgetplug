@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Support\Quantity;
 use App\Actions\Inventory\AdjustStockAction;
 use App\Models\AuditSession;
 use App\Models\InventoryLedger;
 use App\Models\ProductStoreStock;
 use App\Models\Store;
 use App\Models\Vendor;
+use App\Support\Quantity;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -86,7 +86,7 @@ class FixMisdirectedAuditCorrectionsCommand extends Command
 
         foreach ($entries as $entry) {
             $auditId = (int) str_replace('Audit #', '', $entry->reference);
-            $audit   = AuditSession::find($auditId);
+            $audit = AuditSession::find($auditId);
 
             if (! $audit || ! in_array($audit->status, ['verified'], true)) {
                 continue;
@@ -109,9 +109,9 @@ class FixMisdirectedAuditCorrectionsCommand extends Command
             $correctDelta = Quantity::sub($audit->countedQuantity(), $currentAtBranch);
 
             $plan[] = [
-                'entry'         => $entry,
-                'audit'         => $audit,
-                'landed_store'  => $landedStore,
+                'entry' => $entry,
+                'audit' => $audit,
+                'landed_store' => $landedStore,
                 'reverse_delta' => -$entry->quantity_change,
                 'correct_delta' => $correctDelta,
             ];
@@ -145,7 +145,7 @@ class FixMisdirectedAuditCorrectionsCommand extends Command
             return self::SUCCESS;
         }
 
-        $fixed  = 0;
+        $fixed = 0;
         $failed = [];
 
         foreach ($plan as $p) {
@@ -212,7 +212,7 @@ class FixMisdirectedAuditCorrectionsCommand extends Command
 
     private function resolveStore(Vendor $vendor, string|int $term): ?Store
     {
-        $term  = (string) $term;
+        $term = (string) $term;
         $query = Store::where('vendor_id', $vendor->id);
 
         if (ctype_digit($term)) {

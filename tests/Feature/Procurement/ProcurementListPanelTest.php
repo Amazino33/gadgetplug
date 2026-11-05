@@ -2,6 +2,7 @@
 
 use App\Filament\Vendor\Resources\Procurements\Pages\ListProcurements;
 use App\Models\Procurement;
+use App\Services\Procurement\ProcurementReview;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 require_once __DIR__.'/ReviewHelpers.php';
@@ -52,7 +53,7 @@ test('a corrected line shows what it was as well as what it is', function () {
     $delivery = reviewDelivery($ctx, [[$product, 12, 5000]]);
 
     $this->actingAs($ctx['checker']);
-    app(App\Services\Procurement\ProcurementReview::class)
+    app(ProcurementReview::class)
         ->correct($delivery, $ctx['checker'], [$delivery->items->first()->id => ['quantity' => 10]]);
 
     $this->actingAs($ctx['keeper']);
@@ -103,7 +104,7 @@ test('approving from the list honours a correction', function () {
     $delivery = reviewDelivery($ctx, [[$product, 12, 5000]]);
 
     $this->actingAs($ctx['checker']);
-    app(App\Services\Procurement\ProcurementReview::class)
+    app(ProcurementReview::class)
         ->correct($delivery, $ctx['checker'], [$delivery->items->first()->id => ['quantity' => 10]]);
 
     // The recorder agrees from the list rather than from the record.

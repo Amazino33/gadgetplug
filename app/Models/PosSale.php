@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 use LogicException;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
@@ -38,15 +39,15 @@ class PosSale extends Model
     private const STAMPABLE_AFTER_SALE = ['loyalty_claimed_at'];
 
     protected $casts = [
-        'subtotal'        => 'decimal:2',
+        'subtotal' => 'decimal:2',
         'discount_amount' => 'decimal:2',
-        'vat_amount'      => 'decimal:2',
-        'total'           => 'decimal:2',
+        'vat_amount' => 'decimal:2',
+        'total' => 'decimal:2',
         'amount_tendered' => 'decimal:2',
-        'change_given'    => 'decimal:2',
-        'synced'          => 'boolean',
-        'synced_at'       => 'datetime',
-        'completed_at'    => 'datetime',
+        'change_given' => 'decimal:2',
+        'synced' => 'boolean',
+        'synced_at' => 'datetime',
+        'completed_at' => 'datetime',
         'loyalty_claimed_at' => 'datetime',
     ];
 
@@ -128,7 +129,7 @@ class PosSale extends Model
     public static function generatePublicToken(): string
     {
         do {
-            $token = \Illuminate\Support\Str::random(16);
+            $token = Str::random(16);
         } while (static::where('public_token', $token)->exists());
 
         return $token;
@@ -256,6 +257,6 @@ class PosSale extends Model
             ->logOnly(['reference', 'status', 'total', 'discount_amount', 'discount_type', 'discount_approved_by', 'payment_method', 'cashier_id', 'customer_id'])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
-            ->setDescriptionForEvent(fn (string $event) => 'Sale ' . $event);
+            ->setDescriptionForEvent(fn (string $event) => 'Sale '.$event);
     }
 }

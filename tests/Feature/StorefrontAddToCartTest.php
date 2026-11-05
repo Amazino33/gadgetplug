@@ -2,9 +2,9 @@
 
 use App\Models\Category;
 use App\Models\Product;
-use Database\Factories\ProductFactory;
 use App\Models\User;
 use App\Models\Vendor;
+use Database\Factories\ProductFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Session;
 use Livewire\Volt\Volt;
@@ -13,18 +13,18 @@ uses(RefreshDatabase::class);
 
 function addToCartTestProduct(int $stock): Product
 {
-    $owner    = User::factory()->create();
-    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Add To Cart Store', 'online_sales_enabled' => true]);
+    $owner = User::factory()->create();
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Add To Cart Store', 'online_sales_enabled' => true]);
     $category = Category::create(['name' => 'Add To Cart Category']);
 
     return ProductFactory::new()->withPhoto()->create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'name'           => 'Add To Cart Product',
-        'price'          => 2500,
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'Add To Cart Product',
+        'price' => 2500,
         'stock_quantity' => $stock,
-        'status'         => 'published',
-        'show_online'    => true,
+        'status' => 'published',
+        'show_online' => true,
     ]);
 }
 
@@ -33,7 +33,7 @@ test('the catalog page refuses to add an out-of-stock product and shows an error
 
     Volt::test('pages.product-catalog')
         ->call('addToCart', $product->id)
-        ->assertSet('cartError', "Sorry, \"Add To Cart Product\" is out of stock.");
+        ->assertSet('cartError', 'Sorry, "Add To Cart Product" is out of stock.');
 
     expect(Session::get('cart', []))->not->toHaveKey($product->id);
 });

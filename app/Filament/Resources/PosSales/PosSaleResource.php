@@ -9,7 +9,6 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use UnitEnum;
 
 // Read-only, cross-vendor oversight — mirrors the admin Orders resource, but
 // for POS sales, which previously had no admin-side visibility at all.
@@ -17,13 +16,15 @@ class PosSaleResource extends Resource
 {
     protected static ?string $model = PosSale::class;
 
-    protected static string|null|\BackedEnum $navigationIcon  = 'heroicon-o-receipt-percent';
-    protected static ?string                $navigationLabel = 'Shop Sales';
+    protected static string|null|\BackedEnum $navigationIcon = 'heroicon-o-receipt-percent';
 
-    protected static ?string                $modelLabel = 'shop sale';
+    protected static ?string $navigationLabel = 'Shop Sales';
 
-    protected static ?string                $pluralModelLabel = 'shop sales';
-    protected static ?int                   $navigationSort  = 4;
+    protected static ?string $modelLabel = 'shop sale';
+
+    protected static ?string $pluralModelLabel = 'shop sales';
+
+    protected static ?int $navigationSort = 4;
 
     public static function getNavigationGroup(): ?string
     {
@@ -35,9 +36,20 @@ class PosSaleResource extends Resource
         return auth()->user()?->hasRole('super_admin') ?? false;
     }
 
-    public static function canCreate(): bool   { return false; }
-    public static function canEdit($record): bool   { return false; }
-    public static function canDelete($record): bool { return false; }
+    public static function canCreate(): bool
+    {
+        return false;
+    }
+
+    public static function canEdit($record): bool
+    {
+        return false;
+    }
+
+    public static function canDelete($record): bool
+    {
+        return false;
+    }
 
     public static function getEloquentQuery(): Builder
     {
@@ -65,27 +77,27 @@ class PosSaleResource extends Resource
                     ->label('Payment')
                     ->badge()
                     ->formatStateUsing(fn ($state) => match ($state) {
-                        'cash'          => 'Cash',
-                        'card'          => 'Card',
+                        'cash' => 'Cash',
+                        'card' => 'Card',
                         'bank_transfer' => 'Bank Transfer',
-                        'split'         => 'Split',
-                        default         => ucfirst($state),
+                        'split' => 'Split',
+                        default => ucfirst($state),
                     }),
 
                 TextColumn::make('status')
                     ->badge()
                     ->formatStateUsing(fn ($state) => match ($state) {
-                        'completed'      => 'Completed',
-                        'voided'         => 'Voided',
-                        'refunded'       => 'Refunded',
+                        'completed' => 'Completed',
+                        'voided' => 'Voided',
+                        'refunded' => 'Refunded',
                         'partial_refund' => 'Partial Refund',
-                        default          => ucfirst($state),
+                        default => ucfirst($state),
                     })
                     ->color(fn ($state) => match ($state) {
-                        'completed'                  => 'success',
-                        'voided'                     => 'danger',
+                        'completed' => 'success',
+                        'voided' => 'danger',
                         'refunded', 'partial_refund' => 'warning',
-                        default                      => 'gray',
+                        default => 'gray',
                     }),
 
                 TextColumn::make('total')->label('Total')->money('NGN')->sortable(),
@@ -99,9 +111,9 @@ class PosSaleResource extends Resource
             ->filters([
                 SelectFilter::make('status')
                     ->options([
-                        'completed'      => 'Completed',
-                        'voided'         => 'Voided',
-                        'refunded'       => 'Refunded',
+                        'completed' => 'Completed',
+                        'voided' => 'Voided',
+                        'refunded' => 'Refunded',
                         'partial_refund' => 'Partial Refund',
                     ]),
                 SelectFilter::make('vendor_id')

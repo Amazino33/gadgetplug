@@ -14,7 +14,7 @@ class PosReturn extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'return_items'  => 'array',
+        'return_items' => 'array',
         'refund_amount' => 'decimal:2',
     ];
 
@@ -44,6 +44,6 @@ class PosReturn extends Model
             ->logOnly(['reference', 'refund_amount', 'refund_method', 'reason', 'original_sale_id', 'cashier_id'])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
-            ->setDescriptionForEvent(fn (string $event) => 'Return ' . $event);
+            ->setDescriptionForEvent(fn (string $event) => 'Return '.$event);
     }
 }

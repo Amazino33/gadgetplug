@@ -125,7 +125,7 @@ class VendorsTable
                         $record->update($record->dashboard_blocked
                             ? ['dashboard_blocked' => false]
                             : [
-                                'dashboard_blocked'        => true,
+                                'dashboard_blocked' => true,
                                 'dashboard_blocked_reason' => $data['dashboard_blocked_reason'] ?? null,
                             ]);
                     }),

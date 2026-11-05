@@ -14,17 +14,17 @@ class Expense extends Model
     use LogsActivity;
 
     public const CATEGORIES = [
-        'advertising'      => 'Advertising',
-        'logistics_other'  => 'Logistics (Other)',
-        'other'            => 'Other',
+        'advertising' => 'Advertising',
+        'logistics_other' => 'Logistics (Other)',
+        'other' => 'Other',
     ];
 
     protected $guarded = [];
 
     protected $casts = [
-        'amount'      => 'decimal:2',
+        'amount' => 'decimal:2',
         'incurred_at' => 'date',
-        'posted_at'   => 'datetime',
+        'posted_at' => 'datetime',
     ];
 
     public function getActivitylogOptions(): LogOptions

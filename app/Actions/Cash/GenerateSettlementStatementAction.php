@@ -36,17 +36,17 @@ class GenerateSettlementStatementAction
             $figures['stock'] = $this->stock($store, $to);
 
             return StoreSettlementStatement::create([
-                'vendor_id'      => $store->vendor_id,
-                'store_id'       => $store->id,
-                'period_start'   => $from,
-                'period_end'     => $to,
-                'generated_by'   => $generatedBy->id,
-                'generated_at'   => now(),
-                'payload'        => $figures,
+                'vendor_id' => $store->vendor_id,
+                'store_id' => $store->id,
+                'period_start' => $from,
+                'period_end' => $to,
+                'generated_by' => $generatedBy->id,
+                'generated_at' => now(),
+                'payload' => $figures,
 
-                'expected_cash'  => $figures['cash']['expected'],
+                'expected_cash' => $figures['cash']['expected'],
                 'confirmed_cash' => $figures['cash']['confirmed'],
-                'true_shortage'  => $figures['outstanding']['true_shortage'],
+                'true_shortage' => $figures['outstanding']['true_shortage'],
             ]);
         });
     }
@@ -72,11 +72,11 @@ class GenerateSettlementStatementAction
         }
 
         return [
-            'counted'     => true,
-            'count_id'    => $count->id,
-            'counted_at'  => $count->counted_at?->toDateTimeString(),
-            'counted_by'  => $count->countedBy?->name,
-            'variance'    => $count->variance(),
+            'counted' => true,
+            'count_id' => $count->id,
+            'counted_at' => $count->counted_at?->toDateTimeString(),
+            'counted_by' => $count->countedBy?->name,
+            'variance' => $count->variance(),
             // Frozen with the rest: which products were short, and by how much.
             // A total tells the person signing there is a problem; this tells
             // them which shelf it is on.

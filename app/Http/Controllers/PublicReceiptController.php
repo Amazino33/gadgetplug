@@ -8,6 +8,7 @@ use App\Models\PosCustomer;
 use App\Models\PosSale;
 use App\Models\VendorReceiptSetting;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\View\View;
@@ -53,7 +54,7 @@ class PublicReceiptController extends Controller
         $pdf = Pdf::loadView('receipt.public-pdf', $this->payload($sale))
             ->setPaper('a4', 'portrait');
 
-        return $pdf->download('receipt-' . $sale->reference . '.pdf');
+        return $pdf->download('receipt-'.$sale->reference.'.pdf');
     }
 
     /**
@@ -64,9 +65,9 @@ class PublicReceiptController extends Controller
      * own transaction count rather than a separate tally, so the number shown is
      * one the store can stand behind.
      */
-    public function claimLoyalty(Request $request, string $token): \Illuminate\Http\JsonResponse
+    public function claimLoyalty(Request $request, string $token): JsonResponse
     {
-        $sale     = $this->resolve($token);
+        $sale = $this->resolve($token);
         $settings = VendorReceiptSetting::forVendor($sale->vendor);
 
         if (! $settings->loyalty_enabled) {
@@ -76,9 +77,9 @@ class PublicReceiptController extends Controller
         // A walk-in has no record to count against — that is the nudge.
         if (! $sale->customer_id) {
             return response()->json([
-                'claimed'  => false,
+                'claimed' => false,
                 'anonymous' => true,
-                'message'  => 'Ask the cashier to save your phone number next time, and every visit starts counting.',
+                'message' => 'Ask the cashier to save your phone number next time, and every visit starts counting.',
             ]);
         }
 
@@ -87,19 +88,19 @@ class PublicReceiptController extends Controller
         }
 
         $customer = PosCustomer::find($sale->customer_id);
-        $visits   = (int) ($customer?->total_transactions ?? 0);
-        $goal     = max(1, (int) $settings->loyalty_goal);
+        $visits = (int) ($customer?->total_transactions ?? 0);
+        $goal = max(1, (int) $settings->loyalty_goal);
         $position = $visits % $goal;
-        $toGo     = $position === 0 && $visits > 0 ? 0 : $goal - $position;
+        $toGo = $position === 0 && $visits > 0 ? 0 : $goal - $position;
 
         return response()->json([
-            'claimed'  => true,
-            'visits'   => $visits,
-            'goal'     => $goal,
+            'claimed' => true,
+            'visits' => $visits,
+            'goal' => $goal,
             'position' => $position === 0 && $visits > 0 ? $goal : $position,
-            'to_go'    => $toGo,
-            'reward'   => $settings->loyalty_reward_text ?: 'a reward from us',
-            'earned'   => $toGo === 0,
+            'to_go' => $toGo,
+            'reward' => $settings->loyalty_reward_text ?: 'a reward from us',
+            'earned' => $toGo === 0,
         ]);
     }
 
@@ -122,26 +123,26 @@ class PublicReceiptController extends Controller
     /** @return array<string, mixed> */
     private function payload(PosSale $sale): array
     {
-        $vendor   = $sale->vendor;
+        $vendor = $sale->vendor;
         $settings = VendorReceiptSetting::forVendor($vendor);
 
         return [
-            'sale'     => $sale,
-            'vendor'   => $vendor,
+            'sale' => $sale,
+            'vendor' => $vendor,
             'settings' => $settings,
-            'soldAt'   => $sale->completed_at ?? $sale->created_at,
-            'items'    => $sale->items->map(fn ($item) => [
-                'name'       => $item->product_name,
+            'soldAt' => $sale->completed_at ?? $sale->created_at,
+            'items' => $sale->items->map(fn ($item) => [
+                'name' => $item->product_name,
                 // "1 Crate × ₦9,700" and "1½ Crate × ₦10,100" — see
                 // PosSaleItem::receiptLine(). Unchanged for a base-unit line.
                 ...$item->receiptLine(),
-                'total'      => $item->total,
+                'total' => $item->total,
             ]),
-            'payments'   => $sale->payments,
+            'payments' => $sale->payments,
             'vatEnabled' => (bool) ($vendor->pos_vat_enabled ?? true),
-            'vatRate'    => $vendor->pos_vat_rate ?? 7.5,
-            'bannerUrl'  => $settings->banner_image ? asset('storage/' . $settings->banner_image) : null,
-            'logoUrl'    => $vendor->logo ? asset('storage/' . $vendor->logo) : null,
+            'vatRate' => $vendor->pos_vat_rate ?? 7.5,
+            'bannerUrl' => $settings->banner_image ? asset('storage/'.$settings->banner_image) : null,
+            'logoUrl' => $vendor->logo ? asset('storage/'.$vendor->logo) : null,
             // Never the customer's name or phone — see the class docblock.
         ];
     }

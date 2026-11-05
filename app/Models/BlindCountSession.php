@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Carbon\CarbonInterval;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 
 class BlindCountSession extends Model
 {
@@ -29,10 +30,10 @@ class BlindCountSession extends Model
     ];
 
     protected $casts = [
-        'product_order'   => 'array',
-        'by_category'     => 'boolean',
-        'a_submitted_at'  => 'datetime',
-        'b_submitted_at'  => 'datetime',
+        'product_order' => 'array',
+        'by_category' => 'boolean',
+        'a_submitted_at' => 'datetime',
+        'b_submitted_at' => 'datetime',
     ];
 
     /**
@@ -48,7 +49,7 @@ class BlindCountSession extends Model
     }
 
     /** Lines where what was counted differs from what the system expected. */
-    public function varianceLines(): \Illuminate\Support\Collection
+    public function varianceLines(): Collection
     {
         return $this->auditLines
             ->filter(fn (AuditSession $line) => ($line->countedVariance() ?? 0) !== 0)
@@ -64,7 +65,7 @@ class BlindCountSession extends Model
      * reports zero variances while still flagging lines as needing attention,
      * which reads as a contradiction unless the difference is stated.
      */
-    public function unmeasurableLines(): \Illuminate\Support\Collection
+    public function unmeasurableLines(): Collection
     {
         return $this->auditLines
             ->filter(fn (AuditSession $line) => $line->countedVariance() === null)
@@ -173,11 +174,11 @@ class BlindCountSession extends Model
     public static function cadencePeriodFor(Vendor $vendor): ?CarbonInterval
     {
         return match ($vendor->pos_blind_count_frequency ?? 'daily') {
-            'none'    => null,
-            'weekly'  => CarbonInterval::week(),
+            'none' => null,
+            'weekly' => CarbonInterval::week(),
             'monthly' => CarbonInterval::month(),
-            'custom'  => CarbonInterval::days(max(1, (int) ($vendor->pos_blind_count_custom_days ?? 1))),
-            default   => CarbonInterval::day(),
+            'custom' => CarbonInterval::days(max(1, (int) ($vendor->pos_blind_count_custom_days ?? 1))),
+            default => CarbonInterval::day(),
         };
     }
 
@@ -214,10 +215,14 @@ class BlindCountSession extends Model
     public static function nextCountDueFor(int $userId, Vendor $vendor, ?int $storeId = null): ?CarbonInterface
     {
         $period = static::cadencePeriodFor($vendor);
-        if ($period === null) return null;
+        if ($period === null) {
+            return null;
+        }
 
         $last = static::lastCompletedFor($userId, $vendor, $storeId);
-        if (! $last?->b_submitted_at) return null;
+        if (! $last?->b_submitted_at) {
+            return null;
+        }
 
         $due = $last->b_submitted_at->copy()->add($period);
 
@@ -229,7 +234,9 @@ class BlindCountSession extends Model
     // starts, so merely viewing the page does not burn it.
     public static function isBlockedFor(int $userId, Vendor $vendor, ?int $storeId = null): bool
     {
-        if (static::nextCountDueFor($userId, $vendor, $storeId) === null) return false;
+        if (static::nextCountDueFor($userId, $vendor, $storeId) === null) {
+            return false;
+        }
 
         return BlindCountAuthorization::unusedFor($userId, $vendor->id) === null;
     }

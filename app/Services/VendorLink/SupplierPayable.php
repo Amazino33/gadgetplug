@@ -63,14 +63,14 @@ class SupplierPayable
 
         try {
             return SupplierPayableEntry::create([
-                'vendor_id'        => $link->reseller_vendor_id,
+                'vendor_id' => $link->reseller_vendor_id,
                 'supplier_link_id' => $link->id,
-                'entry_type'       => SupplierPayableEntry::TYPE_CHARGE,
-                'order_item_id'    => $orderItem->id,
-                'quantity'         => $quantity,
-                'unit_cost'        => round($unitCost, 2),
-                'amount'           => round($quantity * $unitCost, 2),
-                'idempotency_key'  => $key,
+                'entry_type' => SupplierPayableEntry::TYPE_CHARGE,
+                'order_item_id' => $orderItem->id,
+                'quantity' => $quantity,
+                'unit_cost' => round($unitCost, 2),
+                'amount' => round($quantity * $unitCost, 2),
+                'idempotency_key' => $key,
             ]);
         } catch (UniqueConstraintViolationException) {
             // Lost the race. The other call's row is the real entry, not an
@@ -105,16 +105,16 @@ class SupplierPayable
 
         try {
             return SupplierPayableEntry::create([
-                'vendor_id'        => $charge->vendor_id,
+                'vendor_id' => $charge->vendor_id,
                 'supplier_link_id' => $charge->supplier_link_id,
-                'entry_type'       => SupplierPayableEntry::TYPE_REVERSAL,
-                'order_item_id'    => $orderItem->id,
-                'quantity'         => $charge->quantity,
-                'unit_cost'        => $charge->unit_cost,
-                'amount'           => $charge->amount,
-                'user_id'          => $user?->id,
-                'note'             => $note,
-                'idempotency_key'  => $key,
+                'entry_type' => SupplierPayableEntry::TYPE_REVERSAL,
+                'order_item_id' => $orderItem->id,
+                'quantity' => $charge->quantity,
+                'unit_cost' => $charge->unit_cost,
+                'amount' => $charge->amount,
+                'user_id' => $user?->id,
+                'note' => $note,
+                'idempotency_key' => $key,
             ]);
         } catch (UniqueConstraintViolationException) {
             return SupplierPayableEntry::where('idempotency_key', $key)->firstOrFail();
@@ -133,16 +133,16 @@ class SupplierPayable
         }
 
         return SupplierPayableEntry::create([
-            'vendor_id'        => $link->reseller_vendor_id,
+            'vendor_id' => $link->reseller_vendor_id,
             'supplier_link_id' => $link->id,
-            'entry_type'       => SupplierPayableEntry::TYPE_PAYMENT,
-            'amount'           => round($amount, 2),
-            'user_id'          => $user?->id,
-            'note'             => $note,
+            'entry_type' => SupplierPayableEntry::TYPE_PAYMENT,
+            'amount' => round($amount, 2),
+            'user_id' => $user?->id,
+            'note' => $note,
             // Payments have no natural key — the same supplier can genuinely be
             // paid the same amount twice in a day. Left null, which the unique
             // index exempts under standard SQL NULL semantics.
-            'idempotency_key'  => null,
+            'idempotency_key' => null,
         ]);
     }
 
@@ -161,14 +161,14 @@ class SupplierPayable
     public function summary(SupplierLink $link): array
     {
         $row = SupplierPayableEntry::where('supplier_link_id', $link->id)
-            ->selectRaw("COALESCE(SUM(CASE WHEN entry_type = ? THEN amount ELSE 0 END), 0) as charged", [SupplierPayableEntry::TYPE_CHARGE])
-            ->selectRaw("COALESCE(SUM(CASE WHEN entry_type = ? THEN amount ELSE 0 END), 0) as reversed", [SupplierPayableEntry::TYPE_REVERSAL])
-            ->selectRaw("COALESCE(SUM(CASE WHEN entry_type = ? THEN amount ELSE 0 END), 0) as paid", [SupplierPayableEntry::TYPE_PAYMENT])
+            ->selectRaw('COALESCE(SUM(CASE WHEN entry_type = ? THEN amount ELSE 0 END), 0) as charged', [SupplierPayableEntry::TYPE_CHARGE])
+            ->selectRaw('COALESCE(SUM(CASE WHEN entry_type = ? THEN amount ELSE 0 END), 0) as reversed', [SupplierPayableEntry::TYPE_REVERSAL])
+            ->selectRaw('COALESCE(SUM(CASE WHEN entry_type = ? THEN amount ELSE 0 END), 0) as paid', [SupplierPayableEntry::TYPE_PAYMENT])
             ->first();
 
         $reversed = round((float) $row->reversed, 2);
-        $charged  = round((float) $row->charged - $reversed, 2);
-        $paid     = round((float) $row->paid, 2);
+        $charged = round((float) $row->charged - $reversed, 2);
+        $paid = round((float) $row->paid, 2);
 
         return ['charged' => $charged, 'reversed' => $reversed, 'paid' => $paid, 'balance' => round($charged - $paid, 2)];
     }
@@ -180,9 +180,9 @@ class SupplierPayable
             ->with('supplier')
             ->get()
             ->map(fn (SupplierLink $link) => [
-                'link'          => $link,
+                'link' => $link,
                 'supplier_name' => $link->supplierName(),
-                'balance'       => $this->balance($link),
+                'balance' => $this->balance($link),
             ])
             ->filter(fn (array $row) => abs($row['balance']) > 0.009)
             ->sortByDesc('balance')

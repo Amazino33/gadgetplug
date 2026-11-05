@@ -20,23 +20,23 @@ uses(RefreshDatabase::class);
 
 function sellingUnitsFormContext(): array
 {
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
 
-    $owner  = User::factory()->create();
+    $owner = User::factory()->create();
     $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Units Form Store']);
     VendorRoles::seedFor($vendor);
     $category = Category::create(['name' => 'Drinks']);
 
     $product = Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'name'           => 'Coke 50cl',
-        'sku'            => 'COKE-50',
-        'barcode'        => '6001',
-        'price'          => 450,
-        'cost_price'     => 350,
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'Coke 50cl',
+        'sku' => 'COKE-50',
+        'barcode' => '6001',
+        'price' => 450,
+        'cost_price' => 350,
         'stock_quantity' => 60,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
     test()->actingAs($owner);
@@ -52,15 +52,15 @@ test('a vendor adds a crate with its own price, wholesale price and barcode', fu
 
     Livewire::test(EditProduct::class, ['record' => $ctx['product']->getRouteKey()])
         ->fillForm([
-            'base_unit'       => 'Bottle',
+            'base_unit' => 'Bottle',
             'wholesale_price' => 420,
-            'extraUnits'      => [[
-                'name'              => 'Crate',
+            'extraUnits' => [[
+                'name' => 'Crate',
                 'conversion_factor' => 24,
-                'price'             => 9700,
-                'wholesale_price'   => 9400,
-                'is_active'         => true,
-                'barcodes'          => [['barcode' => '6024']],
+                'price' => 9700,
+                'wholesale_price' => 9400,
+                'is_active' => true,
+                'barcodes' => [['barcode' => '6024']],
             ]],
             'extraBaseBarcodes' => [['barcode' => '6001-B']],
         ])
@@ -70,8 +70,8 @@ test('a vendor adds a crate with its own price, wholesale price and barcode', fu
     $undoRepeaterFake();
 
     $product = $ctx['product']->fresh();
-    $crate   = ProductUnit::where('product_id', $product->id)->where('name', 'Crate')->first();
-    $base    = ProductUnit::where('product_id', $product->id)->where('is_base', true)->first();
+    $crate = ProductUnit::where('product_id', $product->id)->where('name', 'Crate')->first();
+    $base = ProductUnit::where('product_id', $product->id)->where('is_base', true)->first();
 
     expect($crate)->not->toBeNull()
         ->and($crate->vendor_id)->toBe($ctx['vendor']->id)

@@ -1,14 +1,16 @@
 <?php
 
 use App\Actions\Pickings\ReleaseToPickerAction;
+use App\Models\Picking;
 use App\Models\PosSale;
 use App\Models\Store;
 use App\Models\User;
+use App\Services\Inventory\TillStore;
 use App\Services\Pickings\PickingLedger;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 
-require_once __DIR__ . '/Helpers.php';
+require_once __DIR__.'/Helpers.php';
 
 uses(RefreshDatabase::class);
 
@@ -23,7 +25,7 @@ test('the till lists what is still out at its own branch, grouped by picker', fu
 
     Sanctum::actingAs(User::find($vendor->user_id));
 
-    $response = $this->getJson('/api/pos/pickings?vendor_id=' . $vendor->id)->assertOk();
+    $response = $this->getJson('/api/pos/pickings?vendor_id='.$vendor->id)->assertOk();
 
     expect($response->json('pickers.0.name'))->toBe('Musa Bala')
         ->and($response->json('pickers.0.lines.0.held'))->toBe(3)
@@ -43,9 +45,9 @@ test('another branch pickings are not on this till', function () {
 
     // The owner's till is signed in at the main store, so the branch trip is
     // somebody else's business.
-    Sanctum::actingAs(User::find($vendor->user_id), ['pos', \App\Services\Inventory\TillStore::ability($main->id)]);
+    Sanctum::actingAs(User::find($vendor->user_id), ['pos', TillStore::ability($main->id)]);
 
-    $response = $this->getJson('/api/pos/pickings?vendor_id=' . $vendor->id)->assertOk();
+    $response = $this->getJson('/api/pos/pickings?vendor_id='.$vendor->id)->assertOk();
 
     expect($response->json('store_id'))->toBe($main->id)
         ->and($response->json('pickers'))->toBeEmpty();
@@ -67,13 +69,13 @@ test('a settled line disappears from the till list', function () {
     $this->postJson('/api/pos/pickings/payment', [
         'vendor_id' => $vendor->id,
         'picker_id' => $picker->id,
-        'amount'    => 2000,
-        'item_ids'  => [$line->id],
+        'amount' => 2000,
+        'item_ids' => [$line->id],
     ])->assertOk()->assertJson(['settled_units' => 2, 'change' => 0]);
 
     // assertOk matters: without it a 500 returns null for pickers, and an
     // empty expectation would pass on a broken endpoint.
-    $after = $this->getJson('/api/pos/pickings?vendor_id=' . $vendor->id)->assertOk();
+    $after = $this->getJson('/api/pos/pickings?vendor_id='.$vendor->id)->assertOk();
 
     expect($after->json('pickers'))->toBeEmpty();
 });
@@ -93,8 +95,8 @@ test('the till is told what to hand back when the money overshoots', function ()
     $this->postJson('/api/pos/pickings/payment', [
         'vendor_id' => $vendor->id,
         'picker_id' => $picker->id,
-        'amount'    => 5000,
-        'item_ids'  => [$picking->items->first()->id],
+        'amount' => 5000,
+        'item_ids' => [$picking->items->first()->id],
     ])->assertOk()->assertJson(['allocated' => 1000, 'change' => 4000, 'settled_units' => 1]);
 });
 
@@ -114,8 +116,8 @@ test('a queued payment replayed twice settles once', function () {
     $payload = [
         'vendor_id' => $vendor->id,
         'picker_id' => $picker->id,
-        'amount'    => 2000,
-        'item_ids'  => [$line->id],
+        'amount' => 2000,
+        'item_ids' => [$line->id],
         'reference' => 'till-off-1',
     ];
 
@@ -139,8 +141,8 @@ test('a picker from another vendor is refused', function () {
     $this->postJson('/api/pos/pickings/payment', [
         'vendor_id' => $vendor->id,
         'picker_id' => $foreign->id,
-        'amount'    => 1000,
-        'item_ids'  => [1],
+        'amount' => 1000,
+        'item_ids' => [1],
     ])->assertNotFound();
 });
 
@@ -155,13 +157,13 @@ test('the till can hand the cart over as a trip', function () {
     $this->postJson('/api/pos/pickings/release', [
         'vendor_id' => $vendor->id,
         'picker_id' => $picker->id,
-        'items'     => [['product_id' => $product->id, 'quantity' => 3]],
+        'items' => [['product_id' => $product->id, 'quantity' => 3]],
     ])->assertOk()->assertJson(['picker' => 'Musa Bala', 'lines' => 1]);
 
     // Off the shelf, and now listed for payment on this same till.
     expect(shelfQuantity($product, $store))->toBe(7);
 
-    $listed = $this->getJson('/api/pos/pickings?vendor_id=' . $vendor->id)->assertOk();
+    $listed = $this->getJson('/api/pos/pickings?vendor_id='.$vendor->id)->assertOk();
 
     expect($listed->json('pickers.0.lines.0.held'))->toBe(3);
 });
@@ -177,11 +179,11 @@ test('a release the branch cannot cover leaves the shelf untouched', function ()
     $this->postJson('/api/pos/pickings/release', [
         'vendor_id' => $vendor->id,
         'picker_id' => $picker->id,
-        'items'     => [['product_id' => $product->id, 'quantity' => 5]],
+        'items' => [['product_id' => $product->id, 'quantity' => 5]],
     ])->assertStatus(422);
 
     expect(shelfQuantity($product, $store))->toBe(2)
-        ->and(App\Models\Picking::count())->toBe(0);
+        ->and(Picking::count())->toBe(0);
 });
 
 test('a picker holding nothing can still be given goods from the till', function () {
@@ -195,14 +197,14 @@ test('a picker holding nothing can still be given goods from the till', function
 
     Sanctum::actingAs(User::find($vendor->user_id));
 
-    $response = $this->getJson('/api/pos/pickings?vendor_id=' . $vendor->id)->assertOk();
+    $response = $this->getJson('/api/pos/pickings?vendor_id='.$vendor->id)->assertOk();
 
     // Nobody is holding goods, so the payment list is empty — but both are
     // offered for a first trip, which is the whole point of the release list.
     expect($response->json('pickers'))->toBeEmpty()
         ->and($response->json('available_pickers'))->toHaveCount(2)
         ->and(collect($response->json('available_pickers'))->pluck('name')->all())
-            ->toContain('Chibuike', 'Normal');
+        ->toContain('Chibuike', 'Normal');
 });
 
 test('a picker who has stopped trading is not offered goods', function () {
@@ -212,7 +214,7 @@ test('a picker who has stopped trading is not offered goods', function () {
 
     Sanctum::actingAs(User::find($vendor->user_id));
 
-    $names = collect($this->getJson('/api/pos/pickings?vendor_id=' . $vendor->id)
+    $names = collect($this->getJson('/api/pos/pickings?vendor_id='.$vendor->id)
         ->assertOk()
         ->json('available_pickers'))
         ->pluck('name')

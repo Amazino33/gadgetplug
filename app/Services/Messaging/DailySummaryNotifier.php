@@ -54,17 +54,17 @@ class DailySummaryNotifier
         }
 
         $message = DeliveryMessage::create([
-            'vendor_id'      => $vendor->id,
-            'order_id'       => null,
+            'vendor_id' => $vendor->id,
+            'order_id' => null,
             'recipient_type' => 'owner',
-            'channel'        => $template->channel,
-            'to_number'      => $settings->owner_whatsapp,
-            'body'           => app(TemplateRenderer::class)->render(
+            'channel' => $template->channel,
+            'to_number' => $settings->owner_whatsapp,
+            'body' => app(TemplateRenderer::class)->render(
                 $template->body,
                 $this->context($data),
             ),
-            'status'         => 'queued',
-            'template_key'   => self::TEMPLATE_KEY,
+            'status' => 'queued',
+            'template_key' => self::TEMPLATE_KEY,
         ]);
 
         return $this->messaging->dispatch($message);
@@ -79,34 +79,34 @@ class DailySummaryNotifier
         $pnl = $data['pnl'];
 
         return [
-            'store_name'            => $data['vendor']->name,
-            'summary_date'          => $data['date']->format('D, j M Y'),
+            'store_name' => $data['vendor']->name,
+            'summary_date' => $data['date']->format('D, j M Y'),
 
-            'store_lines'           => $this->storeLines($data),
-            'total_orders'          => (string) $data['totals']['orders'],
-            'total_units'           => (string) $data['totals']['units'],
+            'store_lines' => $this->storeLines($data),
+            'total_orders' => (string) $data['totals']['orders'],
+            'total_units' => (string) $data['totals']['units'],
 
-            'cash_taken'            => self::naira($data['payments']['cash']),
-            'card_taken'            => self::naira($data['payments']['card']),
-            'transfer_taken'        => self::naira($data['payments']['bank_transfer']),
-            'pos_taken'             => self::naira($data['payments']['total']),
+            'cash_taken' => self::naira($data['payments']['cash']),
+            'card_taken' => self::naira($data['payments']['card']),
+            'transfer_taken' => self::naira($data['payments']['bank_transfer']),
+            'pos_taken' => self::naira($data['payments']['total']),
 
-            'revenue'               => self::naira($pnl['revenue']),
-            'product_cost'          => self::naira($pnl['product_cost']),
-            'net_profit'            => self::naira($pnl['net_profit']),
+            'revenue' => self::naira($pnl['revenue']),
+            'product_cost' => self::naira($pnl['product_cost']),
+            'net_profit' => self::naira($pnl['net_profit']),
             // The P&L leans on today's cost price when a sold line predates cost
             // snapshotting. Saying so beats presenting an estimate as exact.
-            'profit_note'           => $pnl['cost_is_estimated']
+            'profit_note' => $pnl['cost_is_estimated']
                 ? "\n_Profit is approximate — some sold items have no recorded cost price._"
                 : '',
 
-            'expense_lines'         => $this->expenseLines($data['expenses']),
-            'expenses_total'        => self::naira($data['expenses']['total']),
+            'expense_lines' => $this->expenseLines($data['expenses']),
+            'expenses_total' => self::naira($data['expenses']['total']),
 
-            'procurement_count'     => (string) $data['procurement']['count'],
-            'procurement_total'     => self::naira($data['procurement']['total_cost']),
-            'procurement_paid'      => self::naira($data['procurement']['amount_paid']),
-            'procurement_owing'     => self::naira($data['procurement']['outstanding']),
+            'procurement_count' => (string) $data['procurement']['count'],
+            'procurement_total' => self::naira($data['procurement']['total_cost']),
+            'procurement_paid' => self::naira($data['procurement']['amount_paid']),
+            'procurement_owing' => self::naira($data['procurement']['outstanding']),
         ];
     }
 
@@ -144,9 +144,9 @@ class DailySummaryNotifier
         }
 
         $labels = [
-            'advertising'     => 'Advertising',
+            'advertising' => 'Advertising',
             'logistics_other' => 'Logistics (other)',
-            'other'           => 'Other',
+            'other' => 'Other',
         ];
 
         $lines = [];

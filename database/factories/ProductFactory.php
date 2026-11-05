@@ -29,12 +29,12 @@ class ProductFactory extends Factory
     public function definition(): array
     {
         return [
-            'vendor_id'      => Vendor::factory()->onlineSalesEnabled(),
-            'category_id'    => fn () => Category::firstOrCreate(['name' => 'Factory Category'])->id,
-            'name'           => 'Factory Product '.Str::random(6),
-            'price'          => 10000,
+            'vendor_id' => Vendor::factory()->onlineSalesEnabled(),
+            'category_id' => fn () => Category::firstOrCreate(['name' => 'Factory Category'])->id,
+            'name' => 'Factory Product '.Str::random(6),
+            'price' => 10000,
             'stock_quantity' => 5,
-            'status'         => 'published',
+            'status' => 'published',
         ];
     }
 
@@ -60,19 +60,19 @@ class ProductFactory extends Factory
         $order = (int) $product->media()->where('collection_name', 'product-images')->max('order_column');
 
         return $product->media()->create([
-            'uuid'                  => (string) Str::uuid(),
-            'collection_name'       => 'product-images',
-            'name'                  => 'test-photo',
-            'file_name'             => 'test-photo.jpg',
-            'mime_type'             => 'image/jpeg',
-            'disk'                  => 'public',
-            'conversions_disk'      => 'public',
-            'size'                  => 1024,
-            'manipulations'         => [],
-            'custom_properties'     => [],
+            'uuid' => (string) Str::uuid(),
+            'collection_name' => 'product-images',
+            'name' => 'test-photo',
+            'file_name' => 'test-photo.jpg',
+            'mime_type' => 'image/jpeg',
+            'disk' => 'public',
+            'conversions_disk' => 'public',
+            'size' => 1024,
+            'manipulations' => [],
+            'custom_properties' => [],
             'generated_conversions' => [],
-            'responsive_images'     => [],
-            'order_column'          => $order + 1,
+            'responsive_images' => [],
+            'order_column' => $order + 1,
         ]);
     }
 }

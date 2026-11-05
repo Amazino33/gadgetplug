@@ -22,11 +22,11 @@ uses(RefreshDatabase::class);
 
 function oversellContext(int $stock, int $reserved): array
 {
-    $owner    = User::factory()->create();
-    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Oversell Store '.uniqid()]);
-    $store    = Store::create(['vendor_id' => $vendor->id, 'name' => 'Main', 'is_default' => true]);
+    $owner = User::factory()->create();
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Oversell Store '.uniqid()]);
+    $store = Store::create(['vendor_id' => $vendor->id, 'name' => 'Main', 'is_default' => true]);
     $category = Category::create(['name' => 'Oversell Category '.uniqid()]);
-    $product  = Product::create([
+    $product = Product::create([
         'vendor_id' => $vendor->id, 'category_id' => $category->id,
         'name' => 'Contested Widget', 'price' => 2000, 'store_id' => $store->id,
         'stock_quantity' => $stock, 'status' => 'published',

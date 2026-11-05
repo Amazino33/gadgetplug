@@ -29,15 +29,18 @@ class ExpenseResource extends Resource
 
     protected static ?string $tenantOwnershipRelationshipName = 'vendor';
 
-    protected static string|null|\BackedEnum $navigationIcon  = Heroicon::OutlinedReceiptPercent;
-    protected static string|null|UnitEnum   $navigationGroup = 'Money';
-    protected static ?string                $navigationLabel = 'Expenses';
+    protected static string|null|\BackedEnum $navigationIcon = Heroicon::OutlinedReceiptPercent;
+
+    protected static string|null|UnitEnum $navigationGroup = 'Money';
+
+    protected static ?string $navigationLabel = 'Expenses';
+
     protected static ?int $navigationSort = 2;
 
     public static function canAccess(): bool
     {
         $vendor = filament()->getTenant();
-        $user   = auth()->user();
+        $user = auth()->user();
 
         return $vendor && (
             $user->isSuperAdmin() ||
@@ -65,8 +68,8 @@ class ExpenseResource extends Resource
                         ->required()
                         ->disabled(fn (?Expense $record) => $record?->isPosted() ?? false)
                         ->helperText(
-                            '• Advertising — Facebook/Instagram boosts, influencer pay, any marketing spend. ' .
-                            '• Logistics (Other) — a bike repair, a rider\'s monthly retainer, fuel not tied to one specific supplier trip. Do NOT use this for stock-collection costs (record those as a "Logistics" stage when creating the procurement) or for a customer\'s delivery cost (record that on the order itself, under "Assign & Notify Rider") — both of those are already tracked elsewhere and would be counted twice if entered here too. ' .
+                            '• Advertising — Facebook/Instagram boosts, influencer pay, any marketing spend. '.
+                            '• Logistics (Other) — a bike repair, a rider\'s monthly retainer, fuel not tied to one specific supplier trip. Do NOT use this for stock-collection costs (record those as a "Logistics" stage when creating the procurement) or for a customer\'s delivery cost (record that on the order itself, under "Assign & Notify Rider") — both of those are already tracked elsewhere and would be counted twice if entered here too. '.
                             '• Other — rent, airtime, electricity, anything that doesn\'t fit above.'
                         )
                         ->columnSpanFull(),
@@ -163,9 +166,9 @@ class ExpenseResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index'  => ListExpenses::route('/'),
+            'index' => ListExpenses::route('/'),
             'create' => CreateExpense::route('/create'),
-            'edit'   => EditExpense::route('/{record}/edit'),
+            'edit' => EditExpense::route('/{record}/edit'),
         ];
     }
 }

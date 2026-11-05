@@ -33,8 +33,8 @@ class SupplierPriceAtSale
 
     /**
      * @return array{cost: ?float, source: string, today: ?float, listing: ?float}
-     *   cost: what to book per unit (null when nothing at all is known);
-     *   today: his price now; listing: the listing's last recorded cost_price.
+     *                                                                             cost: what to book per unit (null when nothing at all is known);
+     *                                                                             today: his price now; listing: the listing's last recorded cost_price.
      */
     public function resolve(OrderItem $item, CarbonInterface $soldAt): array
     {

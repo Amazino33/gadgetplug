@@ -29,7 +29,7 @@ function setUpReportsHubStore(): array
     ]);
 
     $order = Order::create([
-        'reference' => 'ORD-HUB-' . uniqid(), 'customer_name' => 'Buyer', 'customer_email' => 'b@example.com',
+        'reference' => 'ORD-HUB-'.uniqid(), 'customer_name' => 'Buyer', 'customer_email' => 'b@example.com',
         'customer_phone' => '0804', 'shipping_address' => 'Uyo', 'total_amount' => $product->price * 30,
         'status' => 'delivered', 'payment_method' => 'pay_on_delivery', 'revenue_recognized_at' => now()->subDays(10),
     ]);
@@ -99,10 +99,11 @@ it('the dead-stock card has no link and shows a coming-soon note', function () {
 it('one failing card does not blank the whole page', function () {
     $data = setUpReportsHubStore();
 
-    app()->bind(RestockCardProvider::class, fn () => new class implements ReportCardProvider {
+    app()->bind(RestockCardProvider::class, fn () => new class implements ReportCardProvider
+    {
         public function summarize(int $vendorId, ?int $storeId = null): CardSummary
         {
-            throw new \RuntimeException('simulated failure');
+            throw new RuntimeException('simulated failure');
         }
     });
 

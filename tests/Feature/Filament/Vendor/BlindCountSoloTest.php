@@ -1,8 +1,10 @@
 <?php
 
 use App\Filament\Vendor\Pages\BlindCount;
+use App\Filament\Vendor\Resources\AuditSessions\Pages\ManageAuditSessions;
 use App\Models\AuditSession;
 use App\Models\BlindCountEntry;
+use App\Models\BlindCountSession;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\User;
@@ -26,7 +28,7 @@ uses(RefreshDatabase::class);
 
 function setUpSoloVendor(): array
 {
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
 
     $owner = User::factory()->create();
     $vendor = Vendor::create([
@@ -73,7 +75,7 @@ function setFilamentTenant(Vendor $vendor): void
 // position from the session itself.
 function productAtPosition(Vendor $vendor, int $position): Product
 {
-    $session = \App\Models\BlindCountSession::where('vendor_id', $vendor->id)->latest()->first();
+    $session = BlindCountSession::where('vendor_id', $vendor->id)->latest()->first();
 
     return Product::find($session->product_order[$position - 1]);
 }
@@ -83,7 +85,7 @@ function countAllAndSubmit(array $counts)
 {
     $component = Livewire::test(BlindCount::class)->call('startSession');
 
-    $session = \App\Models\BlindCountSession::find($component->get('sessionId'));
+    $session = BlindCountSession::find($component->get('sessionId'));
     $entries = [];
     foreach ($session->product_order as $i => $productId) {
         $entries[$productId] = ['count' => $counts[$i] ?? 0, 'note' => null];
@@ -160,7 +162,7 @@ test('manager override resolves a solo discrepancy correctly, including overages
     $this->actingAs($manager);
     setFilamentTenant($data['vendor']);
 
-    Livewire::test(\App\Filament\Vendor\Resources\AuditSessions\Pages\ManageAuditSessions::class)
+    Livewire::test(ManageAuditSessions::class)
         ->callTableAction('manager_override', $audit, data: [
             'manager_override_count' => 15,
             'reason_code' => 'Data Entry Error',
@@ -201,13 +203,13 @@ test('a product missing from the payload entirely blocks submission as incomplet
     setFilamentTenant($data['vendor']);
 
     $component = Livewire::test(BlindCount::class)->call('startSession');
-    $session = \App\Models\BlindCountSession::find($component->get('sessionId'));
+    $session = BlindCountSession::find($component->get('sessionId'));
     $firstProductId = $session->product_order[0];
 
     // Only one of the two products is in the payload.
     $component->call('finishCounting', [$firstProductId => ['count' => 5, 'note' => null]]);
 
-    expect(\App\Models\BlindCountSession::find($session->id)->status)->toBe('a_counting')
+    expect(BlindCountSession::find($session->id)->status)->toBe('a_counting')
         ->and(AuditSession::where('vendor_id', $data['vendor']->id)->count())->toBe(0);
 });
 
@@ -217,7 +219,7 @@ test('a note submitted with an entry is saved against it', function () {
     setFilamentTenant($data['vendor']);
 
     $component = Livewire::test(BlindCount::class)->call('startSession');
-    $session = \App\Models\BlindCountSession::find($component->get('sessionId'));
+    $session = BlindCountSession::find($component->get('sessionId'));
 
     $entries = [];
     foreach ($session->product_order as $i => $productId) {
@@ -271,7 +273,7 @@ test('a non-participant observer cannot write count entries via direct component
     // Livewire's Testable can't reliably drive a second instance of the same
     // component class within one test process; this still exercises the real
     // isParticipant() guard on the real component.
-    $page = new BlindCount();
+    $page = new BlindCount;
     $page->mount();
     $page->finishCounting([]);
 
@@ -344,14 +346,14 @@ test('cancelling a session deletes it and frees the store for another counter', 
 
     $component->call('cancelSession');
 
-    expect(\App\Models\BlindCountSession::find($sessionId))->toBeNull()
+    expect(BlindCountSession::find($sessionId))->toBeNull()
         ->and(BlindCountEntry::where('blind_count_session_id', $sessionId)->count())->toBe(0)
         ->and($component->get('sessionId'))->toBeNull();
 
     // The store is free: a fresh session can be started straight away
     Livewire::test(BlindCount::class)->call('startSession');
 
-    expect(\App\Models\BlindCountSession::whereIn('status', ['a_counting', 'b_counting'])->count())->toBe(1);
+    expect(BlindCountSession::whereIn('status', ['a_counting', 'b_counting'])->count())->toBe(1);
 });
 
 test('a completed session cannot be cancelled', function () {
@@ -362,12 +364,12 @@ test('a completed session cannot be cancelled', function () {
     $component = countAllAndSubmit([10, 10]);
     $sessionId = $component->get('sessionId');
 
-    expect(\App\Models\BlindCountSession::find($sessionId)->status)->toBe('completed');
+    expect(BlindCountSession::find($sessionId)->status)->toBe('completed');
 
     $component->call('cancelSession');
 
     // Still there — a completed count is an audit record, not disposable
-    expect(\App\Models\BlindCountSession::find($sessionId))->not->toBeNull()
+    expect(BlindCountSession::find($sessionId))->not->toBeNull()
         ->and(AuditSession::where('vendor_id', $data['vendor']->id)->count())->toBe(2);
 });
 
@@ -385,11 +387,11 @@ test('a non-participant cannot cancel someone else\'s session', function () {
     $this->actingAs($observer);
     setFilamentTenant($data['vendor']);
     // Instantiated directly for the same reason as the observer test above.
-    $page = new BlindCount();
+    $page = new BlindCount;
     $page->mount();
     $page->cancelSession();
 
-    expect(\App\Models\BlindCountSession::find($sessionId))->not->toBeNull();
+    expect(BlindCountSession::find($sessionId))->not->toBeNull();
 });
 
 // Counter A must not be able to destroy their own submitted count while B is
@@ -407,20 +409,20 @@ test('counter A cannot cancel once B is verifying', function () {
     $verifier->assignRole('storekeeper');
 
     // A has submitted; B is now counting
-    \App\Models\BlindCountSession::find($sessionId)->update([
-        'status'           => 'b_counting',
+    BlindCountSession::find($sessionId)->update([
+        'status' => 'b_counting',
         'storekeeper_b_id' => $verifier->id,
-        'a_submitted_at'   => now(),
+        'a_submitted_at' => now(),
     ]);
 
-    $page = new BlindCount();
+    $page = new BlindCount;
     $page->mount();
 
     expect($page->canCancel())->toBeFalse();
 
     $page->cancelSession();
 
-    expect(\App\Models\BlindCountSession::find($sessionId))->not->toBeNull();
+    expect(BlindCountSession::find($sessionId))->not->toBeNull();
 });
 
 test('a manager can cancel a session they are not part of', function () {
@@ -438,5 +440,5 @@ test('a manager can cancel a session they are not part of', function () {
     setFilamentTenant($data['vendor']);
     Livewire::test(BlindCount::class)->call('cancelSession');
 
-    expect(\App\Models\BlindCountSession::find($sessionId))->toBeNull();
+    expect(BlindCountSession::find($sessionId))->toBeNull();
 });

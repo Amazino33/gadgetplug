@@ -3,6 +3,7 @@
 namespace App\Filament\Vendor\Resources\PosSales\Pages;
 
 use App\Filament\Vendor\Resources\PosSales\PosSaleResource;
+use App\Models\PosSale;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Schemas\Components\Tabs\Tab;
 use Illuminate\Database\Eloquent\Builder;
@@ -75,7 +76,7 @@ class ListPosSales extends ListRecords
     {
         [$from, $until] = $this->activePeriod();
 
-        $total = \App\Models\PosSale::query()
+        $total = PosSale::query()
             ->where('pos_sales.vendor_id', filament()->getTenant()->id)
             ->where('pos_sales.status', '!=', 'voided')
             ->when($storeId, fn (Builder $q) => $q->where('pos_sales.store_id', $storeId))

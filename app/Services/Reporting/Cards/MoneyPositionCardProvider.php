@@ -34,13 +34,13 @@ class MoneyPositionCardProvider implements ReportCardProvider
         $profit = $thisMonth['net_profit'];
         $previousProfit = $lastMonth['net_profit'];
 
-        $headline = 'Bank ₦' . number_format($bank, 2) . ' · Cash ₦' . number_format($cash, 2);
+        $headline = 'Bank ₦'.number_format($bank, 2).' · Cash ₦'.number_format($cash, 2);
 
         return new CardSummary(
             key: 'money_position',
             title: 'Money Position',
             headline: $headline,
-            comparison: 'Net profit ₦' . number_format($profit, 2) . ' this month — ' . $this->profitComparison($profit, $previousProfit),
+            comparison: 'Net profit ₦'.number_format($profit, 2).' this month — '.$this->profitComparison($profit, $previousProfit),
             comparisonDirection: $profit > $previousProfit ? 'up' : ($profit < $previousProfit ? 'down' : 'flat'),
             urgency: match (true) {
                 $profit < 0 => CardSummary::URGENCY_URGENT,
@@ -64,6 +64,6 @@ class MoneyPositionCardProvider implements ReportCardProvider
 
         $change = (($current - $previous) / abs($previous)) * 100;
 
-        return ($change >= 0 ? '+' : '') . number_format($change, 1) . '% vs last month';
+        return ($change >= 0 ? '+' : '').number_format($change, 1).'% vs last month';
     }
 }

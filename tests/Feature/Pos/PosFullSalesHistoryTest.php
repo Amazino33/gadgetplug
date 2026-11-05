@@ -15,20 +15,21 @@ use Database\Seeders\VendorPermissionsSeeder;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 // The till's full sales history: a cashier's own sales over any window, with
 // totals for the window and for each trading day.
 
 function fullHistoryContext(): array
 {
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
 
-    $owner  = User::factory()->create();
+    $owner = User::factory()->create();
     $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Full History Store']);
     VendorRoles::seedFor($vendor);
 
     $cashier = User::factory()->create();
-    $other   = User::factory()->create();
+    $other = User::factory()->create();
     $vendor->users()->syncWithoutDetaching([$cashier->id, $other->id]);
 
     setPermissionsTeamId($vendor->id);
@@ -52,19 +53,19 @@ function historySale(Vendor $vendor, User $cashier, string $at, array $over = []
     $total = $over['total'] ?? 10750;
 
     $sale = PosSale::create(array_merge([
-        'reference'       => 'POS-H' . $n,
-        'vendor_id'       => $vendor->id,
-        'cashier_id'      => $cashier->id,
-        'subtotal'        => 10000,
+        'reference' => 'POS-H'.$n,
+        'vendor_id' => $vendor->id,
+        'cashier_id' => $cashier->id,
+        'subtotal' => 10000,
         'discount_amount' => 0,
-        'vat_amount'      => 750,
-        'total'           => $total,
-        'payment_method'  => 'cash',
+        'vat_amount' => 750,
+        'total' => $total,
+        'payment_method' => 'cash',
         'amount_tendered' => $total,
-        'change_given'    => 0,
-        'status'          => 'completed',
-        'synced'          => true,
-        'completed_at'    => CarbonImmutable::parse($at, 'Africa/Lagos')->utc(),
+        'change_given' => 0,
+        'status' => 'completed',
+        'synced' => true,
+        'completed_at' => CarbonImmutable::parse($at, 'Africa/Lagos')->utc(),
     ], $over));
 
     $item = Product::firstOrCreate(
@@ -73,12 +74,12 @@ function historySale(Vendor $vendor, User $cashier, string $at, array $over = []
     );
 
     PosSaleItem::create([
-        'pos_sale_id'  => $sale->id,
-        'product_id'   => $item->id,
+        'pos_sale_id' => $sale->id,
+        'product_id' => $item->id,
         'product_name' => $product,
-        'unit_price'   => $sale->subtotal,
-        'quantity'     => 1,
-        'total'        => $sale->subtotal,
+        'unit_price' => $sale->subtotal,
+        'quantity' => 1,
+        'total' => $sale->subtotal,
     ]);
 
     foreach ($legs as [$method, $amount]) {
@@ -94,13 +95,13 @@ function historyRefund(PosSale $sale, User $cashier, float $amount, string $meth
     $n++;
 
     $return = PosReturn::create([
-        'reference'        => 'RET-H' . $n,
-        'vendor_id'        => $sale->vendor_id,
+        'reference' => 'RET-H'.$n,
+        'vendor_id' => $sale->vendor_id,
         'original_sale_id' => $sale->id,
-        'cashier_id'       => $cashier->id,
-        'return_items'     => [],
-        'refund_amount'    => $amount,
-        'refund_method'    => $method,
+        'cashier_id' => $cashier->id,
+        'return_items' => [],
+        'refund_amount' => $amount,
+        'refund_method' => $method,
     ]);
 
     // created_at is what dates a refund, so it is set rather than left to now().
@@ -111,7 +112,7 @@ function historyRefund(PosSale $sale, User $cashier, float $amount, string $meth
 
 function historyUrl(Vendor $vendor, array $params = []): string
 {
-    return '/api/pos/sales/history?' . http_build_query(array_merge(['vendor_id' => $vendor->id], $params));
+    return '/api/pos/sales/history?'.http_build_query(array_merge(['vendor_id' => $vendor->id], $params));
 }
 
 it('refuses a cashier whose role does not carry the permission', function () {
@@ -142,8 +143,8 @@ it('only lists the signed-in cashier\'s own sales at this vendor', function () {
     $ctx = fullHistoryContext();
     $elsewhere = Vendor::create(['user_id' => User::factory()->create()->id, 'name' => 'Elsewhere']);
 
-    $mine     = historySale($ctx['vendor'], $ctx['cashier'], '2026-10-20 10:00');
-    $theirs   = historySale($ctx['vendor'], $ctx['other'], '2026-10-20 10:00');
+    $mine = historySale($ctx['vendor'], $ctx['cashier'], '2026-10-20 10:00');
+    $theirs = historySale($ctx['vendor'], $ctx['other'], '2026-10-20 10:00');
     $otherBiz = historySale($elsewhere, $ctx['cashier'], '2026-10-20 10:00');
 
     Sanctum::actingAs($ctx['cashier']);
@@ -211,10 +212,10 @@ it('adds up what was collected the way the cash-up does', function () {
 
     expect($summary['sales_count'])->toBe(5)
         ->and($summary['tenders'])->toEqual([
-            'cash'          => 10750 + 10750 + 6000 - 1000,
-            'card'          => 10750,
+            'cash' => 10750 + 10750 + 6000 - 1000,
+            'card' => 10750,
             'bank_transfer' => 5750,
-            'debt'          => 10750,
+            'debt' => 10750,
         ])
         ->and($summary['collected'])->toEqual(26500 + 10750 + 5750)
         ->and($summary['credit'])->toEqual(10750)
@@ -257,12 +258,12 @@ it('finds a sale by reference or by product name', function () {
     $this->travelTo(CarbonImmutable::parse('2026-10-22 12:00', 'Africa/Lagos'));
 
     $charger = historySale($v, $c, '2026-10-20 09:00', [], [], 'Fast Charger');
-    $case    = historySale($v, $c, '2026-10-20 10:00', [], [], 'Phone Case');
+    $case = historySale($v, $c, '2026-10-20 10:00', [], [], 'Phone Case');
 
     Sanctum::actingAs($c);
 
     $byProduct = $this->getJson(historyUrl($v, ['preset' => 'this_year', 'q' => 'charger']))->json();
-    $byRef     = $this->getJson(historyUrl($v, ['preset' => 'this_year', 'q' => $case->reference]))->json();
+    $byRef = $this->getJson(historyUrl($v, ['preset' => 'this_year', 'q' => $case->reference]))->json();
 
     expect(collect($byProduct['data'])->pluck('reference')->all())->toBe([$charger->reference])
         ->and(collect($byRef['data'])->pluck('reference')->all())->toBe([$case->reference])
@@ -275,9 +276,9 @@ it('filters by status, with refunded covering part refunds', function () {
     [$v, $c] = [$ctx['vendor'], $ctx['cashier']];
 
     historySale($v, $c, '2026-10-20 09:00');
-    $voided  = historySale($v, $c, '2026-10-20 10:00', ['status' => 'voided']);
+    $voided = historySale($v, $c, '2026-10-20 10:00', ['status' => 'voided']);
     $partial = historySale($v, $c, '2026-10-20 11:00', ['status' => 'partial_refund']);
-    $full    = historySale($v, $c, '2026-10-20 12:00', ['status' => 'refunded']);
+    $full = historySale($v, $c, '2026-10-20 12:00', ['status' => 'refunded']);
 
     Sanctum::actingAs($c);
 
@@ -324,7 +325,7 @@ it('pages through a long history and sends the range summary once', function () 
 
     $range = ['preset' => 'custom', 'from' => '2026-01-01', 'to' => '2026-10-31'];
 
-    $first  = $this->getJson(historyUrl($v, $range))->json();
+    $first = $this->getJson(historyUrl($v, $range))->json();
     $second = $this->getJson(historyUrl($v, $range + ['page' => 2]))->json();
 
     expect($first['data'])->toHaveCount(25)
@@ -342,13 +343,13 @@ it('tells the till whether to offer the full history', function () {
 
     Role::where('name', 'storekeeper')->where('team_id', $ctx['vendor']->id)->first()
         ->revokePermissionTo('view_sales_history');
-    app(Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
 
     expect(TillProfile::for($ctx['cashier']->fresh(), $ctx['vendor'])['can']['view_sales_history'])->toBeFalse();
 });
 
 it('grants the permission on deploy to every role and person who can already use the till', function () {
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
     $vendor = Vendor::create(['user_id' => User::factory()->create()->id, 'name' => 'Deploy Store']);
 
     setPermissionsTeamId($vendor->id);
@@ -364,7 +365,7 @@ it('grants the permission on deploy to every role and person who can already use
 
     // As production will be: the permission does not exist yet.
     DB::table('permissions')->where('name', 'view_sales_history')->delete();
-    app(Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+    app(PermissionRegistrar::class)->forgetCachedPermissions();
 
     $migration = require database_path('migrations/2026_10_27_100000_grant_view_sales_history_permission.php');
     $migration->up();

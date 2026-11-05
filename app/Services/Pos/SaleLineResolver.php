@@ -34,9 +34,9 @@ final class SaleLineResolver
 
     /**
      * @param  array<int|string, array<string, mixed>>  $items
-     * @return array<int|string, array<string, mixed>>  Same keys as $items. Each line carries
-     *         quantity (base units), unit_price (per base unit, for the existing column),
-     *         line_gross (money before the line discount) and the unit snapshot fields.
+     * @return array<int|string, array<string, mixed>> Same keys as $items. Each line carries
+     *                                                 quantity (base units), unit_price (per base unit, for the existing column),
+     *                                                 line_gross (money before the line discount) and the unit snapshot fields.
      *
      * @throws ValidationException
      */
@@ -87,35 +87,35 @@ final class SaleLineResolver
         }
 
         if ($line['product_unit_id']) {
-            $unit  = $product->units->firstWhere('id', (int) $line['product_unit_id']);
+            $unit = $product->units->firstWhere('id', (int) $line['product_unit_id']);
             $price = HalfPricing::unitListPrice($product, $unit, $line['price_type']);
-            $half  = Quantity::hasHalf($line['unit_qty'])
+            $half = Quantity::hasHalf($line['unit_qty'])
                 ? HalfPricing::listHalfPrice($product, $unit, $line['price_type'])
                 : null;
 
-            $gross  = HalfPricing::lineTotal($price, $half, $line['unit_qty']);
+            $gross = HalfPricing::lineTotal($price, $half, $line['unit_qty']);
             $forced = abs($price - (float) $line['sold_unit_price']) > 0.004
                 || abs($gross - (float) $line['line_gross']) > 0.004;
 
             return array_merge($line, [
                 'sold_unit_price' => $price,
                 'half_unit_price' => $half,
-                'unit_price'      => round($gross / $line['quantity'], 2),
-                'line_gross'      => $gross,
-                'price_forced'    => $forced,
+                'unit_price' => round($gross / $line['quantity'], 2),
+                'line_gross' => $gross,
+                'price_forced' => $forced,
             ]);
         }
 
         // A line from a till without units sells in the base unit at retail.
-        $price  = (float) $product->price;
-        $half   = Quantity::hasHalf($line['quantity']) ? HalfPricing::listHalfPrice($product, null, 'retail') : null;
+        $price = (float) $product->price;
+        $half = Quantity::hasHalf($line['quantity']) ? HalfPricing::listHalfPrice($product, null, 'retail') : null;
         $forced = abs($price - (float) $line['unit_price']) > 0.004;
 
         return array_merge($line, [
-            'unit_price'      => $price,
+            'unit_price' => $price,
             'half_unit_price' => $half,
-            'line_gross'      => HalfPricing::lineTotal($price, $half, $line['quantity']),
-            'price_forced'    => $forced,
+            'line_gross' => HalfPricing::lineTotal($price, $half, $line['quantity']),
+            'price_forced' => $forced,
         ]);
     }
 
@@ -127,9 +127,9 @@ final class SaleLineResolver
 
     private function legacyLine(array $item): array
     {
-        $product  = $this->products->get((int) $item['product_id']);
+        $product = $this->products->get((int) $item['product_id']);
         $quantity = $this->quantityOf($item['quantity'] ?? null, $product?->name ?? ($item['product_name'] ?? 'A product'));
-        $price    = (float) $item['unit_price'];
+        $price = (float) $item['unit_price'];
 
         // Only a shop that sells halves gets here with one; the half is priced
         // like the base unit's half, from what the till charged per unit.
@@ -138,14 +138,14 @@ final class SaleLineResolver
             : null;
 
         return array_merge($item, [
-            'quantity'        => $quantity,
-            'line_gross'      => HalfPricing::lineTotal($price, $half, $quantity),
+            'quantity' => $quantity,
+            'line_gross' => HalfPricing::lineTotal($price, $half, $quantity),
             'product_unit_id' => null,
-            'unit_name'       => null,
-            'unit_qty'        => null,
+            'unit_name' => null,
+            'unit_qty' => null,
             'sold_unit_price' => null,
             'half_unit_price' => $half,
-            'price_type'      => 'retail',
+            'price_type' => 'retail',
             'conversion_factor' => 1,
         ]);
     }
@@ -188,8 +188,8 @@ final class SaleLineResolver
 
         $unitQty = $this->quantityOf($item['unit_qty'] ?? $item['quantity'] ?? null, $product->name);
 
-        $factor    = max(1, (int) $unit->conversion_factor);
-        $base      = Quantity::mul($unitQty, $factor);
+        $factor = max(1, (int) $unit->conversion_factor);
+        $base = Quantity::mul($unitQty, $factor);
         $soldPrice = (float) $item['unit_price'];
 
         // A wholesale price the unit does not have is retail — the till shows
@@ -212,17 +212,17 @@ final class SaleLineResolver
         $gross = HalfPricing::lineTotal($soldPrice, $half, $unitQty);
 
         return array_merge($item, [
-            'quantity'          => $base,
+            'quantity' => $base,
             // The existing column means "per base unit". Rounded to kobo; the
             // line's own total and line_gross are the exact figures.
-            'unit_price'        => round($gross / $base, 2),
-            'line_gross'        => $gross,
-            'product_unit_id'   => $unit->id,
-            'unit_name'         => $unit->name,
-            'unit_qty'          => $unitQty,
-            'sold_unit_price'   => $soldPrice,
-            'half_unit_price'   => $half,
-            'price_type'        => $priceType,
+            'unit_price' => round($gross / $base, 2),
+            'line_gross' => $gross,
+            'product_unit_id' => $unit->id,
+            'unit_name' => $unit->name,
+            'unit_qty' => $unitQty,
+            'sold_unit_price' => $soldPrice,
+            'half_unit_price' => $half,
+            'price_type' => $priceType,
             'conversion_factor' => $factor,
         ]);
     }

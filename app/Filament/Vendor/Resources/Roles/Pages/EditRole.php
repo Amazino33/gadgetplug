@@ -5,8 +5,8 @@ namespace App\Filament\Vendor\Resources\Roles\Pages;
 use App\Filament\Vendor\Resources\Roles\RoleResource;
 use BezhanSalleh\FilamentShield\Resources\Roles\Pages\EditRole as BaseEditRole;
 use Illuminate\Support\Arr;
-use Spatie\Permission\PermissionRegistrar;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\PermissionRegistrar;
 
 class EditRole extends BaseEditRole
 {

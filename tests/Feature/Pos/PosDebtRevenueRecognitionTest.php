@@ -46,7 +46,7 @@ it('recognises the full amount on an ordinary cash sale, unchanged', function ()
     Sanctum::actingAs($ctx['owner']);
 
     $this->postJson('/api/pos/sales', debtSalePayload($ctx, [
-        'payment_method'  => 'cash',
+        'payment_method' => 'cash',
         'amount_tendered' => 10000.0,
     ]))->assertSuccessful();
 
@@ -68,9 +68,9 @@ it('recognises only the collected slice of a part-paid sale', function () {
     Sanctum::actingAs($ctx['owner']);
 
     $this->postJson('/api/pos/sales', debtSalePayload($ctx, [
-        'payment_method'  => 'split',
+        'payment_method' => 'split',
         'amount_tendered' => 4000.0,
-        'payments'        => [
+        'payments' => [
             ['method' => 'cash', 'amount' => 4000.0],
             ['method' => 'debt', 'amount' => 6000.0],
         ],
@@ -86,9 +86,9 @@ it('never routes a debt slice into the bank account', function () {
     Sanctum::actingAs($ctx['owner']);
 
     $this->postJson('/api/pos/sales', debtSalePayload($ctx, [
-        'payment_method'  => 'split',
+        'payment_method' => 'split',
         'amount_tendered' => 4000.0,
-        'payments'        => [
+        'payments' => [
             ['method' => 'cash', 'amount' => 4000.0],
             ['method' => 'debt', 'amount' => 6000.0],
         ],
@@ -107,9 +107,9 @@ it('recognises a card and debt split as card only', function () {
     Sanctum::actingAs($ctx['owner']);
 
     $this->postJson('/api/pos/sales', debtSalePayload($ctx, [
-        'payment_method'  => 'split',
+        'payment_method' => 'split',
         'amount_tendered' => 0.0,
-        'payments'        => [
+        'payments' => [
             ['method' => 'card', 'amount' => 2500.0],
             ['method' => 'debt', 'amount' => 7500.0],
         ],
@@ -147,9 +147,9 @@ it('books the same cost whether the sale was paid, part-paid or wholly owed', fu
     $this->postJson('/api/pos/sales', debtSalePayload($ctx))->assertSuccessful();
 
     $this->postJson('/api/pos/sales', debtSalePayload($ctx, [
-        'payment_method'  => 'split',
+        'payment_method' => 'split',
         'amount_tendered' => 4000.0,
-        'payments'        => [
+        'payments' => [
             ['method' => 'cash', 'amount' => 4000.0],
             ['method' => 'debt', 'amount' => 6000.0],
         ],

@@ -28,7 +28,7 @@ class AffiliateForm
 
                     Placeholder::make('user_display')
                         ->label('User')
-                        ->content(fn (?Affiliate $record) => $record?->user?->name . ' (' . $record?->user?->email . ')')
+                        ->content(fn (?Affiliate $record) => $record?->user?->name.' ('.$record?->user?->email.')')
                         ->visible(fn (string $operation) => $operation === 'edit'),
 
                     Placeholder::make('code_display')

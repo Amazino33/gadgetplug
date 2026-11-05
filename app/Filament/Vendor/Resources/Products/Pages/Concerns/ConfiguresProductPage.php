@@ -19,7 +19,7 @@ trait ConfiguresProductPage
     // available, which wrapped the selects onto two lines and pushed the
     // page well past one screen. Full width is what makes the pairings in
     // ProductForm actually sit side by side.
-    public function getMaxContentWidth(): Width | string | null
+    public function getMaxContentWidth(): Width|string|null
     {
         return Width::Full;
     }
@@ -48,7 +48,7 @@ trait ConfiguresProductPage
         $product = $this->getRecord()->fresh(['units']);
 
         $choice = $this->data['default_unit_choice'] ?? null;
-        $base   = $product->units->firstWhere('is_base', true);
+        $base = $product->units->firstWhere('is_base', true);
 
         $unit = null;
 

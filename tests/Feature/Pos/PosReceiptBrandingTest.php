@@ -12,18 +12,18 @@ uses(RefreshDatabase::class);
 function brandingSale(array $ctx, ?Store $store = null): PosSale
 {
     $sale = PosSale::create([
-        'reference'       => 'POS-' . strtoupper(uniqid()),
-        'vendor_id'       => $ctx['vendor']->id,
-        'store_id'        => ($store ?? $ctx['store'])->id,
-        'cashier_id'      => $ctx['owner']->id,
-        'subtotal'        => 13400,
-        'vat_amount'      => 0,
-        'total'           => 13400,
-        'payment_method'  => 'cash',
+        'reference' => 'POS-'.strtoupper(uniqid()),
+        'vendor_id' => $ctx['vendor']->id,
+        'store_id' => ($store ?? $ctx['store'])->id,
+        'cashier_id' => $ctx['owner']->id,
+        'subtotal' => 13400,
+        'vat_amount' => 0,
+        'total' => 13400,
+        'payment_method' => 'cash',
         'amount_tendered' => 13400,
-        'status'          => 'completed',
-        'synced'          => true,
-        'completed_at'    => now(),
+        'status' => 'completed',
+        'synced' => true,
+        'completed_at' => now(),
     ]);
 
     PosSaleItem::create([
@@ -35,7 +35,7 @@ function brandingSale(array $ctx, ?Store $store = null): PosSale
 }
 
 it('names the branch when the vendor has more than one store', function () {
-    $ctx    = debtTenderContext();
+    $ctx = debtTenderContext();
     $oraimo = Store::create([
         'vendor_id' => $ctx['vendor']->id, 'name' => 'Oraimo Store',
         'address' => '12 Allen Avenue, Ikeja', 'phone' => '08031234567',
@@ -69,7 +69,7 @@ it('says nothing about a branch when there is only one store', function () {
 });
 
 it('falls back to the vendor address when the branch has none', function () {
-    $ctx    = debtTenderContext();
+    $ctx = debtTenderContext();
     $branch = Store::create(['vendor_id' => $ctx['vendor']->id, 'name' => 'Itel Home']);
 
     VendorReceiptSetting::updateOrCreate(

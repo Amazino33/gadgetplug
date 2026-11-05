@@ -3,10 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Order;
+use App\Services\Messaging\TemplateRenderer;
 use App\Services\Orders\DispatchMessages;
 use App\Services\Orders\OrderLocation;
 use App\Services\Orders\OrderStatusService;
-use App\Services\Messaging\TemplateRenderer;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -45,17 +45,17 @@ class DispatchPageController extends Controller
         $order->loadMissing('items.product', 'checkout.lga', 'logisticsCompany');
 
         return view('dispatch.show', [
-            'order'    => $order,
-            'stale'    => $this->stale($order, $v),
-            'outcome'  => $outcome,
-            'pickups'  => DispatchMessages::pickupStores($order),
-            'collect'  => $order->amountToCollect(),
+            'order' => $order,
+            'stale' => $this->stale($order, $v),
+            'outcome' => $outcome,
+            'pickups' => DispatchMessages::pickupStores($order),
+            'collect' => $order->amountToCollect(),
             // The signed link is the assigned rider's alone, so it may carry
             // the customer's exact pin; /track never does.
-            'directions'       => app(OrderLocation::class)->directionsUrl($order),
+            'directions' => app(OrderLocation::class)->directionsUrl($order),
             'destinationExact' => (app(OrderLocation::class)->customer($order)['precision'] ?? null) === OrderLocation::EXACT,
-            'items'    => $order->items->map(fn ($item) => [
-                'name'     => TemplateRenderer::riderName($item),
+            'items' => $order->items->map(fn ($item) => [
+                'name' => TemplateRenderer::riderName($item),
                 'quantity' => (int) $item->quantity,
             ]),
         ]);

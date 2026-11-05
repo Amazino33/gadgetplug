@@ -3,6 +3,7 @@
 use App\Models\Affiliate;
 use App\Models\AffiliateCommission;
 use App\Models\Category;
+use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
 use App\Models\Vendor;
@@ -18,9 +19,9 @@ function makeResellerAffiliate(float $startingBalance = 0.0, ?string $phone = '0
     if ($startingBalance != 0.0) {
         WalletTransaction::create([
             'affiliate_id' => $affiliate->id,
-            'type'         => 'credit',
-            'amount'       => $startingBalance,
-            'description'  => 'Test seed credit',
+            'type' => 'credit',
+            'amount' => $startingBalance,
+            'description' => 'Test seed credit',
         ]);
     }
 
@@ -29,24 +30,24 @@ function makeResellerAffiliate(float $startingBalance = 0.0, ?string $phone = '0
 
 function makeResellerProduct(array $attrs = []): Product
 {
-    $owner    = User::factory()->create();
-    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Reseller Checkout Store ' . uniqid()]);
-    $category = Category::create(['name' => 'Reseller Checkout Category ' . uniqid()]);
+    $owner = User::factory()->create();
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Reseller Checkout Store '.uniqid()]);
+    $category = Category::create(['name' => 'Reseller Checkout Category '.uniqid()]);
 
     return Product::create(array_merge([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'name'           => 'Reseller Checkout Product',
-        'price'          => 1000,
-        'cost_price'     => 600,
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'Reseller Checkout Product',
+        'price' => 1000,
+        'cost_price' => 600,
         'stock_quantity' => 50,
-        'status'         => 'published',
+        'status' => 'published',
     ], $attrs));
 }
 
 test('the discount is applied to the subtotal and the order total reflects it', function () {
     $affiliate = makeResellerAffiliate(1000);
-    $product   = makeResellerProduct(['reseller_discount' => 20.0, 'price' => 1000]);
+    $product = makeResellerProduct(['reseller_discount' => 20.0, 'price' => 1000]);
 
     $order = app(ResellerCheckoutService::class)->purchase(
         $affiliate,
@@ -63,7 +64,7 @@ test('the discount is applied to the subtotal and the order total reflects it', 
 
 test('the wallet is debited exactly the discounted total', function () {
     $affiliate = makeResellerAffiliate(1000);
-    $product   = makeResellerProduct(['reseller_discount' => 20.0, 'price' => 1000]);
+    $product = makeResellerProduct(['reseller_discount' => 20.0, 'price' => 1000]);
 
     app(ResellerCheckoutService::class)->purchase(
         $affiliate,
@@ -76,7 +77,7 @@ test('the wallet is debited exactly the discounted total', function () {
 
 test('a purchase is blocked when available balance is insufficient, and nothing is debited or created', function () {
     $affiliate = makeResellerAffiliate(100);
-    $product   = makeResellerProduct(['reseller_discount' => 0.0, 'price' => 1000]);
+    $product = makeResellerProduct(['reseller_discount' => 0.0, 'price' => 1000]);
 
     expect(fn () => app(ResellerCheckoutService::class)->purchase(
         $affiliate,
@@ -85,12 +86,12 @@ test('a purchase is blocked when available balance is insufficient, and nothing 
     ))->toThrow(RuntimeException::class);
 
     expect(app(WalletService::class)->availableBalance($affiliate->id))->toBe(100.0)
-        ->and(\App\Models\Order::where('payment_method', 'wallet')->count())->toBe(0);
+        ->and(Order::where('payment_method', 'wallet')->count())->toBe(0);
 });
 
 test('a second purchase that would overdraw the balance is blocked even though the first one succeeded', function () {
     $affiliate = makeResellerAffiliate(1000);
-    $product   = makeResellerProduct(['reseller_discount' => 0.0, 'price' => 700]);
+    $product = makeResellerProduct(['reseller_discount' => 0.0, 'price' => 700]);
 
     $service = app(ResellerCheckoutService::class);
 
@@ -108,7 +109,7 @@ test('a second purchase that would overdraw the balance is blocked even though t
 
 test('a reseller purchase creates no affiliate commission', function () {
     $affiliate = makeResellerAffiliate(1000);
-    $product   = makeResellerProduct(['reseller_discount' => 10.0]);
+    $product = makeResellerProduct(['reseller_discount' => 10.0]);
 
     $order = app(ResellerCheckoutService::class)->purchase(
         $affiliate,
@@ -121,7 +122,7 @@ test('a reseller purchase creates no affiliate commission', function () {
 
 test('a reseller purchase reserves stock through the existing inventory pipeline', function () {
     $affiliate = makeResellerAffiliate(3000);
-    $product   = makeResellerProduct(['reseller_discount' => 0.0, 'price' => 1000, 'stock_quantity' => 10]);
+    $product = makeResellerProduct(['reseller_discount' => 0.0, 'price' => 1000, 'stock_quantity' => 10]);
 
     app(ResellerCheckoutService::class)->purchase(
         $affiliate,
@@ -135,7 +136,7 @@ test('a reseller purchase reserves stock through the existing inventory pipeline
 
 test('pending balance is untouched by a reseller purchase — only available balance moves', function () {
     $affiliate = makeResellerAffiliate(1000);
-    $product   = makeResellerProduct(['reseller_discount' => 0.0, 'price' => 400]);
+    $product = makeResellerProduct(['reseller_discount' => 0.0, 'price' => 400]);
 
     app(ResellerCheckoutService::class)->purchase(
         $affiliate,
@@ -156,7 +157,7 @@ test('purchasing with no line items throws', function () {
 
 test('an affiliate with no phone number on file cannot check out', function () {
     $affiliate = makeResellerAffiliate(1000, phone: null);
-    $product   = makeResellerProduct();
+    $product = makeResellerProduct();
 
     expect(fn () => app(ResellerCheckoutService::class)->purchase(
         $affiliate,

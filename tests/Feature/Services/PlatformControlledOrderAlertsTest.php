@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Models\Vendor;
 use App\Models\VendorNotificationSetting;
 use Database\Seeders\MessageTemplateSeeder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -58,7 +59,7 @@ function placeOnlineOrder(array $data, string $status = 'pending'): Order
     return $order;
 }
 
-function alertsFor(Order $order, string $recipientType): \Illuminate\Database\Eloquent\Collection
+function alertsFor(Order $order, string $recipientType): Collection
 {
     return DeliveryMessage::where('order_id', $order->id)
         ->where('recipient_type', $recipientType)

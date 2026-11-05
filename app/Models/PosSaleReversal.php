@@ -36,8 +36,8 @@ class PosSaleReversal extends Model
 
     /** What each type leaves on the sale it mirrors. */
     public const STATUS_FOR_TYPE = [
-        self::TYPE_VOID           => 'voided',
-        self::TYPE_RETURN_FULL    => 'refunded',
+        self::TYPE_VOID => 'voided',
+        self::TYPE_RETURN_FULL => 'refunded',
         self::TYPE_RETURN_PARTIAL => 'partial_refund',
     ];
 

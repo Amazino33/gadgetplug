@@ -30,14 +30,14 @@ class ApproveProcurementAction
         }
 
         DB::transaction(function () use ($procurement, $store) {
-            $approverId  = auth()->id();
+            $approverId = auth()->id();
             $destination = $procurement->store_id ?? $store;
 
             // Items that cannot be received here, collected rather than thrown
             // on sight: approving is a single decision, so the approver should
             // see everything wrong with the order at once instead of fixing it
             // one item per attempt.
-            $blocked       = [];
+            $blocked = [];
             $destinationId = null;
 
             foreach ($procurement->items()->with(['product', 'corrections'])->get() as $item) {
@@ -54,7 +54,7 @@ class ApproveProcurementAction
                 // the stock mirror be recomputed without racing.
                 $product = Product::where('id', $item->product_id)->lockForUpdate()->firstOrFail();
 
-                $row       = StoreStock::lockedRow($product, $destination);
+                $row = StoreStock::lockedRow($product, $destination);
                 $rehomedTo = null;
 
                 // Every item resolves to the same branch, so the first one
@@ -81,6 +81,7 @@ class ApproveProcurementAction
                     // branch be stocked by procurement at all.
                     if ($heldElsewhere) {
                         $blocked[] = $product->name;
+
                         continue;
                     }
 
@@ -105,7 +106,7 @@ class ApproveProcurementAction
 
                 $changes = [
                     'cost_price' => $unitCost,
-                    'price'      => $item->selling_price,
+                    'price' => $item->selling_price,
                 ];
 
                 if ($rehomedTo !== null) {
@@ -115,14 +116,14 @@ class ApproveProcurementAction
                 $product->update($changes);
 
                 InventoryLedger::create([
-                    'vendor_id'        => $procurement->vendor_id,
-                    'store_id'         => $row->store_id,
-                    'product_id'       => $item->product_id,
-                    'user_id'          => $approverId,
+                    'vendor_id' => $procurement->vendor_id,
+                    'store_id' => $row->store_id,
+                    'product_id' => $item->product_id,
+                    'user_id' => $approverId,
                     'transaction_type' => 'restock',
-                    'quantity_change'  => $quantity,
-                    'reference'        => $procurement->reference,
-                    'description'      => "Procurement approved: {$procurement->reference}",
+                    'quantity_change' => $quantity,
+                    'reference' => $procurement->reference,
+                    'description' => "Procurement approved: {$procurement->reference}",
                 ]);
             }
 
@@ -140,7 +141,7 @@ class ApproveProcurementAction
             }
 
             $procurement->update([
-                'status'      => Procurement::STATUS_APPROVED,
+                'status' => Procurement::STATUS_APPROVED,
                 'approved_by' => $approverId,
                 'approved_at' => now(),
             ]);

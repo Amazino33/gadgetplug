@@ -88,16 +88,16 @@ return new class extends Migration
 
                 foreach ($rows as $row) {
                     $payload[] = [
-                        'product_id'         => $row->product_id,
-                        'store_id'           => $row->store_id,
-                        'unit_cost'          => $row->cost_price,
-                        'quantity_received'  => $row->quantity,
+                        'product_id' => $row->product_id,
+                        'store_id' => $row->store_id,
+                        'unit_cost' => $row->cost_price,
+                        'quantity_received' => $row->quantity,
                         'quantity_remaining' => $row->quantity,
-                        'source_type'        => null,
-                        'source_id'          => null,
-                        'received_at'        => $now,
-                        'created_at'         => $now,
-                        'updated_at'         => $now,
+                        'source_type' => null,
+                        'source_id' => null,
+                        'received_at' => $now,
+                        'created_at' => $now,
+                        'updated_at' => $now,
                     ];
                 }
 

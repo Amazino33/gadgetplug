@@ -1,6 +1,7 @@
 <?php
 
 use App\Filament\Vendor\Resources\Orders\Pages\ListOrders;
+use App\Filament\Vendor\Resources\Orders\Pages\ViewOrder;
 use App\Models\Category;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -16,7 +17,7 @@ uses(RefreshDatabase::class);
 
 function setUpOrdersListVendor(): array
 {
-    $owner  = User::factory()->create();
+    $owner = User::factory()->create();
     $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Orders List Store', 'online_sales_enabled' => true]);
 
     return compact('owner', 'vendor');
@@ -32,33 +33,33 @@ function actAsOrdersListVendor(array $data): void
 
 function makeOrdersListOrder(Vendor $vendor, string $status, string $reference): Order
 {
-    $category = Category::create(['name' => 'Orders List Category ' . uniqid()]);
-    $product  = Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'name'           => 'Orders List Product',
-        'price'          => 3000,
+    $category = Category::create(['name' => 'Orders List Category '.uniqid()]);
+    $product = Product::create([
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'Orders List Product',
+        'price' => 3000,
         'stock_quantity' => 10,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
     $order = Order::create([
-        'reference'        => $reference,
-        'customer_name'    => 'Jane Customer',
-        'customer_email'   => 'jane@example.com',
-        'customer_phone'   => '08040000000',
+        'reference' => $reference,
+        'customer_name' => 'Jane Customer',
+        'customer_email' => 'jane@example.com',
+        'customer_phone' => '08040000000',
         'shipping_address' => 'Uyo, Akwa Ibom State — 1 Test Street',
         'local_government' => 'Uyo',
-        'total_amount'     => 3000,
-        'status'           => $status,
-        'payment_method'   => 'paystack',
+        'total_amount' => 3000,
+        'status' => $status,
+        'payment_method' => 'paystack',
     ]);
 
     OrderItem::create([
-        'order_id'   => $order->id,
+        'order_id' => $order->id,
         'product_id' => $product->id,
-        'vendor_id'  => $vendor->id,
-        'quantity'   => 1,
+        'vendor_id' => $vendor->id,
+        'quantity' => 1,
         'unit_price' => 3000,
     ]);
 
@@ -121,7 +122,7 @@ test('searching by reference finds the matching order', function () {
 });
 
 test('updateOrderStatus applies an allowed transition', function () {
-    $data  = setUpOrdersListVendor();
+    $data = setUpOrdersListVendor();
     // Confirmed, not pending: an unpaid Paystack order is never handed over.
     $order = makeOrdersListOrder($data['vendor'], 'confirmed', 'ORD-TRANSITION');
 
@@ -134,7 +135,7 @@ test('updateOrderStatus applies an allowed transition', function () {
 });
 
 test('updateOrderStatus rejects a transition that is not offered for the current status', function () {
-    $data  = setUpOrdersListVendor();
+    $data = setUpOrdersListVendor();
     $order = makeOrdersListOrder($data['vendor'], 'pending', 'ORD-INVALID');
 
     actAsOrdersListVendor($data);
@@ -146,7 +147,7 @@ test('updateOrderStatus rejects a transition that is not offered for the current
 });
 
 test('updateOrderStatus will not hand over an order that has not been paid for', function () {
-    $data  = setUpOrdersListVendor();
+    $data = setUpOrdersListVendor();
     $order = makeOrdersListOrder($data['vendor'], 'pending', 'ORD-UNPAID');
 
     actAsOrdersListVendor($data);
@@ -169,7 +170,7 @@ test('the order tile/row shows its local government area', function () {
 });
 
 test('a note can be added from the orders list without changing status', function () {
-    $data  = setUpOrdersListVendor();
+    $data = setUpOrdersListVendor();
     $order = makeOrdersListOrder($data['vendor'], 'pending', 'ORD-NOTE-ONLY');
 
     actAsOrdersListVendor($data);
@@ -188,7 +189,7 @@ test('a note can be added from the orders list without changing status', functio
 });
 
 test('a note can be added together with a status change in the same call', function () {
-    $data  = setUpOrdersListVendor();
+    $data = setUpOrdersListVendor();
     $order = makeOrdersListOrder($data['vendor'], 'confirmed', 'ORD-NOTE-AND-STATUS');
 
     actAsOrdersListVendor($data);
@@ -201,7 +202,7 @@ test('a note can be added together with a status change in the same call', funct
 });
 
 test('multiple notes on the same order accumulate rather than overwrite', function () {
-    $data  = setUpOrdersListVendor();
+    $data = setUpOrdersListVendor();
     $order = makeOrdersListOrder($data['vendor'], 'pending', 'ORD-NOTE-HISTORY');
 
     actAsOrdersListVendor($data);
@@ -214,7 +215,7 @@ test('multiple notes on the same order accumulate rather than overwrite', functi
 });
 
 test('submitting neither a status nor a note does nothing', function () {
-    $data  = setUpOrdersListVendor();
+    $data = setUpOrdersListVendor();
     $order = makeOrdersListOrder($data['vendor'], 'pending', 'ORD-NOTHING');
 
     actAsOrdersListVendor($data);
@@ -236,13 +237,13 @@ test('the order row and tile include a call link', function () {
 });
 
 test('notes added from the orders list are visible on the order detail page', function () {
-    $data  = setUpOrdersListVendor();
+    $data = setUpOrdersListVendor();
     $order = makeOrdersListOrder($data['vendor'], 'pending', 'ORD-DETAIL-NOTES');
 
     actAsOrdersListVendor($data);
 
     Livewire::test(ListOrders::class)->call('updateOrderStatus', $order->id, null, 'Rescheduled to evening delivery.');
 
-    Livewire::test(\App\Filament\Vendor\Resources\Orders\Pages\ViewOrder::class, ['record' => $order->getRouteKey()])
+    Livewire::test(ViewOrder::class, ['record' => $order->getRouteKey()])
         ->assertSee('Rescheduled to evening delivery.');
 });

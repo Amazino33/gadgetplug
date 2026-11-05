@@ -28,13 +28,13 @@ class FeedCursor
     public static function start(int $seedBucket): array
     {
         return [
-            'bucket'       => $seedBucket,
+            'bucket' => $seedBucket,
             // Far future, so the first read takes the newest post in the bucket
             // rather than excluding it on a "published before" comparison.
             'published_at' => CarbonImmutable::now()->addCentury()->toDateTimeString(),
-            'id'           => PHP_INT_MAX,
-            'seed'         => $seedBucket,
-            'wrapped'      => false,
+            'id' => PHP_INT_MAX,
+            'seed' => $seedBucket,
+            'wrapped' => false,
         ];
     }
 
@@ -42,25 +42,25 @@ class FeedCursor
     public static function wrapPoint(int $seedBucket): array
     {
         return [
-            'bucket'       => -1,
+            'bucket' => -1,
             'published_at' => CarbonImmutable::now()->addCentury()->toDateTimeString(),
-            'id'           => PHP_INT_MAX,
-            'seed'         => $seedBucket,
-            'wrapped'      => true,
+            'id' => PHP_INT_MAX,
+            'seed' => $seedBucket,
+            'wrapped' => true,
         ];
     }
 
     public static function encode(Product $last, int $seedBucket): string
     {
         return Crypt::encryptString(json_encode([
-            'bucket'       => (int) $last->feed_bucket,
+            'bucket' => (int) $last->feed_bucket,
             'published_at' => optional($last->published_at)->toDateTimeString()
                 ?? CarbonImmutable::now()->toDateTimeString(),
-            'id'           => (int) $last->id,
-            'seed'         => $seedBucket,
+            'id' => (int) $last->id,
+            'seed' => $seedBucket,
             // Once past the seed on the wrapped pass, stay wrapped — otherwise
             // the reader would loop the catalogue forever.
-            'wrapped'      => (int) $last->feed_bucket < $seedBucket,
+            'wrapped' => (int) $last->feed_bucket < $seedBucket,
         ]));
     }
 
@@ -82,11 +82,11 @@ class FeedCursor
         }
 
         return [
-            'bucket'       => (int) $data['bucket'],
+            'bucket' => (int) $data['bucket'],
             'published_at' => $data['published_at'] ?? CarbonImmutable::now()->toDateTimeString(),
-            'id'           => (int) $data['id'],
-            'seed'         => (int) $data['seed'],
-            'wrapped'      => (bool) ($data['wrapped'] ?? false),
+            'id' => (int) $data['id'],
+            'seed' => (int) $data['seed'],
+            'wrapped' => (bool) ($data['wrapped'] ?? false),
         ];
     }
 

@@ -5,7 +5,6 @@ use App\Filament\Vendor\Resources\Orders\RelationManagers\DeliveryMessagesRelati
 use App\Models\Category;
 use App\Models\DeliveryMessage;
 use App\Models\DeliveryPerson;
-use App\Models\LogisticsCompany;
 use App\Models\MessageTemplate;
 use App\Models\Order;
 use App\Models\OrderItem;

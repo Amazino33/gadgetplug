@@ -26,15 +26,15 @@ class StoreAccountClose extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'payload'             => 'array',
-        'period_from'         => 'datetime',
-        'period_to'           => 'datetime',
-        'closed_at'           => 'datetime',
-        'value_sold'          => 'decimal:2',
-        'submitted_total'     => 'decimal:2',
-        'till_expenses'       => 'decimal:2',
-        'period_debt'         => 'decimal:2',
-        'shortage'            => 'decimal:2',
+        'payload' => 'array',
+        'period_from' => 'datetime',
+        'period_to' => 'datetime',
+        'closed_at' => 'datetime',
+        'value_sold' => 'decimal:2',
+        'submitted_total' => 'decimal:2',
+        'till_expenses' => 'decimal:2',
+        'period_debt' => 'decimal:2',
+        'shortage' => 'decimal:2',
         'variance_at_selling' => 'decimal:2',
     ];
 
@@ -48,7 +48,7 @@ class StoreAccountClose extends Model
     {
         static::created(function (self $close) {
             $close->updateQuietly([
-                'reference' => 'GP-CLOSE-' . str_pad((string) $close->id, 6, '0', STR_PAD_LEFT),
+                'reference' => 'GP-CLOSE-'.str_pad((string) $close->id, 6, '0', STR_PAD_LEFT),
             ]);
         });
 

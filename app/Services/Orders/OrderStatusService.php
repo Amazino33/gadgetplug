@@ -3,11 +3,14 @@
 namespace App\Services\Orders;
 
 use App\Actions\Finance\RecognizeOrderRevenueAction;
+use App\Actions\Inventory\AdjustStockAction;
 use App\Actions\Inventory\DispatchStockAction;
 use App\Actions\Inventory\ReleaseReservationAction;
 use App\Actions\VendorLink\BookSupplierPayableAction;
 use App\Models\FinancialLedgerEntry;
+use App\Models\InventoryLedger;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\User;
 use App\Models\WalletTransaction;
 use App\Services\Affiliate\CommissionService;
@@ -48,31 +51,31 @@ class OrderStatusService
 {
     /** @var array<string, array<int, string>> target status => statuses it may come from */
     public const TRANSITIONS = [
-        'confirmed'             => ['pending'],
-        'paid'                  => ['pending'],
+        'confirmed' => ['pending'],
+        'paid' => ['pending'],
         'paid_but_failed_stock' => ['pending'],
-        'packed'                => ['confirmed', 'paid'],
-        'shipped'               => ['confirmed', 'paid', 'packed'],
-        'delivered'             => ['shipped'],
-        'returned'              => ['shipped'],
+        'packed' => ['confirmed', 'paid'],
+        'shipped' => ['confirmed', 'paid', 'packed'],
+        'delivered' => ['shipped'],
+        'returned' => ['shipped'],
         // A returned order's goods are already back on the shelf: cancelling it
         // settles the money (revenue reversal, wallet refund) and moves no stock.
-        'cancelled'             => ['pending', 'confirmed', 'paid', 'packed', 'paid_but_failed_stock', 'returned'],
+        'cancelled' => ['pending', 'confirmed', 'paid', 'packed', 'paid_but_failed_stock', 'returned'],
     ];
 
     public const STATUSES = ['pending', 'confirmed', 'paid', 'paid_but_failed_stock', 'packed', 'shipped', 'delivered', 'returned', 'cancelled'];
 
     /** Staff-facing names. Customers see their own wording on /track. */
     public const LABELS = [
-        'pending'               => 'Pending payment',
-        'confirmed'             => 'Confirmed',
-        'paid'                  => 'Paid',
+        'pending' => 'Pending payment',
+        'confirmed' => 'Confirmed',
+        'paid' => 'Paid',
         'paid_but_failed_stock' => 'Stock issue',
-        'packed'                => 'Packed',
-        'shipped'               => 'Handed to rider',
-        'delivered'             => 'Delivered',
-        'returned'              => 'Returned to store',
-        'cancelled'             => 'Cancelled',
+        'packed' => 'Packed',
+        'shipped' => 'Handed to rider',
+        'delivered' => 'Delivered',
+        'returned' => 'Returned to store',
+        'cancelled' => 'Cancelled',
     ];
 
     public static function canMove(Order $order, string $to): bool
@@ -98,9 +101,9 @@ class OrderStatusService
     public static function applyStoreStep(Order $order, User $actor, string $to, bool $notifyCustomer = true): Order
     {
         return match ($to) {
-            'packed'  => app(self::class)->pack($order, $actor),
+            'packed' => app(self::class)->pack($order, $actor),
             'shipped' => app(self::class)->handOver($order, $actor, $notifyCustomer),
-            default   => throw new InvalidOrderTransition('The store can only mark an order packed or handed to the rider.'),
+            default => throw new InvalidOrderTransition('The store can only mark an order packed or handed to the rider.'),
         };
     }
 
@@ -183,10 +186,10 @@ class OrderStatusService
 
                     try {
                         app(DispatchStockAction::class)->execute(
-                            productId:   $item->product_id,
-                            quantity:    $item->quantity,
-                            userId:      $actor->id,
-                            reference:   $order->reference,
+                            productId: $item->product_id,
+                            quantity: $item->quantity,
+                            userId: $actor->id,
+                            reference: $order->reference,
                             description: 'Handed to rider — online order.',
                             orderItemId: $item->id,
                         );
@@ -237,7 +240,7 @@ class OrderStatusService
      * GadgetPlug is alerted, and only a new code (admin) unlocks it.
      *
      * @return array{result: string, remaining?: int}
-     *   result: delivered | wrong_code | locked | already_delivered | not_with_rider
+     *                                                result: delivered | wrong_code | locked | already_delivered | not_with_rider
      */
     public function confirmDeliveryWithCode(Order $order, string $code): array
     {
@@ -261,7 +264,7 @@ class OrderStatusService
                 $lockNow = $attempts >= Order::DELIVERY_CODE_MAX_ATTEMPTS;
 
                 $locked->updateQuietly([
-                    'delivery_code_attempts'  => $attempts,
+                    'delivery_code_attempts' => $attempts,
                     'delivery_code_locked_at' => $lockNow ? now() : null,
                 ]);
 
@@ -315,10 +318,10 @@ class OrderStatusService
             'returned',
             $actor,
             [
-                'returned_at'           => now(),
-                'returned_by'           => $actor->id,
-                'return_reason'         => $reason,
-                'delivery_code_hash'    => null,
+                'returned_at' => now(),
+                'returned_by' => $actor->id,
+                'return_reason' => $reason,
+                'delivery_code_hash' => null,
                 'dispatch_link_version' => (int) $order->dispatch_link_version + 1,
             ],
             function (Order $order) use ($actor) {
@@ -343,9 +346,9 @@ class OrderStatusService
      * One line's units back to the branches they left, read from its own
      * 'dispatched' movements — never re-derived — at the cost each carried.
      */
-    private function returnLineToStore(Order $order, \App\Models\OrderItem $item, User $actor): void
+    private function returnLineToStore(Order $order, OrderItem $item, User $actor): void
     {
-        $dispatched = \App\Models\InventoryLedger::query()
+        $dispatched = InventoryLedger::query()
             ->where('product_id', $item->product_id)
             ->where('reference', $order->reference)
             ->where('transaction_type', 'dispatched')
@@ -362,7 +365,7 @@ class OrderStatusService
                 ? round((float) $rows->sum('cost_total') / $units, 2)
                 : null;
 
-            app(\App\Actions\Inventory\AdjustStockAction::class)->execute(
+            app(AdjustStockAction::class)->execute(
                 productId: $item->product_id,
                 quantityChanged: $units,
                 transactionType: 'online_return',
@@ -428,17 +431,17 @@ class OrderStatusService
             $locked->updateQuietly([
                 'payment_collected_at' => now(),
                 'payment_collected_by' => $actor->id,
-                'payment_channel'      => $channel,
+                'payment_channel' => $channel,
             ]);
 
             $reason = $this->recogniseRevenue($locked, $channel, $collectedByVendor);
 
             activity()->performedOn($locked)->causedBy($actor)->event('payment_received')
                 ->withProperties([
-                    'channel'      => $channel,
+                    'channel' => $channel,
                     'collected_by' => $collectedByVendor ? 'vendor_legacy' : 'gadgetplug',
-                    'amount'       => (float) $locked->total_amount,
-                    'result'       => $reason ?? 'recognised',
+                    'amount' => (float) $locked->total_amount,
+                    'result' => $reason ?? 'recognised',
                 ])
                 ->log($collectedByVendor ? 'Payment received recorded — collected by vendor (legacy)' : 'Payment received recorded');
 
@@ -475,10 +478,10 @@ class OrderStatusService
 
                     try {
                         app(ReleaseReservationAction::class)->execute(
-                            productId:   $item->product_id,
-                            quantity:    $item->quantity,
-                            userId:      $actor->id,
-                            reference:   $order->reference,
+                            productId: $item->product_id,
+                            quantity: $item->quantity,
+                            userId: $actor->id,
+                            reference: $order->reference,
                             description: 'Reservation released — order cancelled.',
                             orderItemId: $item->id,
                         );
@@ -583,10 +586,10 @@ class OrderStatusService
 
         WalletTransaction::create([
             'affiliate_id' => $debit->affiliate_id,
-            'order_id'     => $order->id,
-            'type'         => 'credit',
-            'amount'       => abs((float) $debit->amount),
-            'description'  => "Refund — order #{$order->reference} cancelled.",
+            'order_id' => $order->id,
+            'type' => 'credit',
+            'amount' => abs((float) $debit->amount),
+            'description' => "Refund — order #{$order->reference} cancelled.",
         ]);
     }
 

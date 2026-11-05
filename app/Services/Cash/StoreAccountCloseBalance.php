@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services\Cash;
 
-use App\Support\Quantity;
 use App\Models\CashSubmission;
 use App\Models\InventoryLedger;
 use App\Models\PhysicalStockCount;
@@ -14,6 +13,7 @@ use App\Models\PosSale;
 use App\Models\PosSalePayment;
 use App\Models\Procurement;
 use App\Models\Store;
+use App\Support\Quantity;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -93,35 +93,35 @@ class StoreAccountCloseBalance
         ?PhysicalStockCount $openingCount = null,
     ): array {
         $checkmate = $this->reconciliation->forStore($store, $from, $to);
-        $baseline  = OpeningBaseline::resolve($store, $openingCount);
-        $balance   = $this->balance($store, $from, $to, $checkmate);
+        $baseline = OpeningBaseline::resolve($store, $openingCount);
+        $balance = $this->balance($store, $from, $to, $checkmate);
 
         return [
-            'store'  => ['id' => $store->id, 'name' => $store->name],
+            'store' => ['id' => $store->id, 'name' => $store->name],
             'period' => ['from' => $from->toDateTimeString(), 'to' => $to->toDateTimeString()],
 
             'opening' => [
-                'source'     => $baseline->source,
-                'carried'    => $baseline->isCarriedForward(),
-                'count_id'   => $baseline->count?->id,
+                'source' => $baseline->source,
+                'carried' => $baseline->isCarriedForward(),
+                'count_id' => $baseline->count?->id,
                 'counted_at' => $baseline->count?->counted_at?->toDateTimeString(),
-                'products'   => $baseline->quantities()->count(),
-                'units'      => Quantity::of($baseline->quantities()->sum()),
+                'products' => $baseline->quantities()->count(),
+                'units' => Quantity::of($baseline->quantities()->sum()),
             ],
 
             'closing' => $closingCount ? [
-                'count_id'   => $closingCount->id,
+                'count_id' => $closingCount->id,
                 'counted_at' => $closingCount->counted_at?->toDateTimeString(),
                 'counted_by' => $closingCount->countedBy?->name,
-                'status'     => $closingCount->status,
+                'status' => $closingCount->status,
             ] : null,
 
-            'balance'        => $balance,
-            'checkmate'      => $this->agreement($balance, $checkmate),
-            'debt_check'     => $this->debtCheck($store, $from, $to, $balance),
-            'submissions'    => $this->submissions($checkmate, $this->submissionRows($store, $from, $to)),
+            'balance' => $balance,
+            'checkmate' => $this->agreement($balance, $checkmate),
+            'debt_check' => $this->debtCheck($store, $from, $to, $balance),
+            'submissions' => $this->submissions($checkmate, $this->submissionRows($store, $from, $to)),
             'count_variance' => $this->countVariance($store, $from, $to, $baseline, $closingCount),
-            'procurement'    => $this->procurement($store, $from, $to),
+            'procurement' => $this->procurement($store, $from, $to),
             'stock_movement' => $this->stockMovement($store, $from, $to, $baseline, $closingCount),
         ];
     }
@@ -160,12 +160,12 @@ class StoreAccountCloseBalance
         $confirmed = (float) $checkmate['cash']['confirmed'];
         $tillExpenses = (float) $checkmate['cash']['till_expenses'];
 
-        $card     = round($tenders['card'] - $refunds['card'], 2);
+        $card = round($tenders['card'] - $refunds['card'], 2);
         $transfer = round($tenders['bank_transfer'] - $refunds['bank_transfer'], 2);
         // Store credit nets against the credit side for the same reason a cash
         // refund nets against cash: it is value handed back to the customer as
         // a claim on the business rather than as money.
-        $debt     = round($tenders['debt'] - $refunds['store_credit'], 2);
+        $debt = round($tenders['debt'] - $refunds['store_credit'], 2);
 
         $valueSold = round($gross - $refunds['total'], 2);
 
@@ -173,28 +173,28 @@ class StoreAccountCloseBalance
 
         return [
             // LEFT — what customers were charged, less what went back to them.
-            'value_sold'   => $valueSold,
-            'gross_sales'  => $gross,
-            'refunds'      => $refunds['total'],
+            'value_sold' => $valueSold,
+            'gross_sales' => $gross,
+            'refunds' => $refunds['total'],
             'refunds_by_method' => [
-                'cash'          => $refunds['cash'],
-                'card'          => $refunds['card'],
+                'cash' => $refunds['cash'],
+                'card' => $refunds['card'],
                 'bank_transfer' => $refunds['bank_transfer'],
-                'store_credit'  => $refunds['store_credit'],
+                'store_credit' => $refunds['store_credit'],
             ],
 
             // RIGHT — every place that value could legitimately have gone.
             'submitted_total' => round($confirmed, 2),
-            'till_expenses'   => round($tillExpenses, 2),
-            'card'            => $card,
-            'bank_transfer'   => $transfer,
-            'period_debt'     => $debt,
-            'right_total'     => $right,
+            'till_expenses' => round($tillExpenses, 2),
+            'card' => $card,
+            'bank_transfer' => $transfer,
+            'period_debt' => $debt,
+            'right_total' => $right,
 
             // Positive is short, negative is over — the same sign convention
             // StoreReconciliation uses, so the two never read opposite.
             'shortage' => round($valueSold - $right, 2),
-            'overage'  => $valueSold - $right < 0 ? round(abs($valueSold - $right), 2) : 0.0,
+            'overage' => $valueSold - $right < 0 ? round(abs($valueSold - $right), 2) : 0.0,
 
             // Shown so the cash line on the right is readable: what the tills
             // took, against how much of it has been acknowledged back.
@@ -230,8 +230,8 @@ class StoreAccountCloseBalance
             // What is left once cash in transit and the grace window have had
             // their say. Shown beside the balancing figure, never instead of it.
             'true_shortage' => (float) $checkmate['outstanding']['true_shortage'],
-            'agrees'        => abs($difference) < 0.01,
-            'difference'    => $difference,
+            'agrees' => abs($difference) < 0.01,
+            'difference' => $difference,
         ];
     }
 
@@ -301,23 +301,23 @@ class StoreAccountCloseBalance
                 'approver.name as approved_by',
             ])
             ->map(fn ($p) => [
-                'id'        => $p->id,
+                'id' => $p->id,
                 // When the goods landed, which is the date this block is about.
-                'date'      => $p->approved_at?->format('d M Y'),
+                'date' => $p->approved_at?->format('d M Y'),
                 // Kept beside it: a delivery approved long after it was raised
                 // is worth seeing, and the gap is invisible from one date.
-                'raised'    => $p->created_at?->format('d M Y'),
+                'raised' => $p->created_at?->format('d M Y'),
                 'reference' => $p->reference,
-                'supplier'  => $p->supplier ?? 'No supplier recorded',
+                'supplier' => $p->supplier ?? 'No supplier recorded',
                 // Two names, never one. A delivery is recorded by one person and
                 // approved by another precisely so the person who can create
                 // stock out of nothing is not the person who can wave it
                 // through — a row showing only a total says neither.
                 'recorded_by' => $p->recorded_by ?? 'Unknown',
                 'approved_by' => $p->approved_by ?? 'Not recorded',
-                'amount'    => round((float) $p->total_cost, 2),
-                'selling'   => round((float) ($retailByProcurement[$p->id] ?? 0), 2),
-                'status'    => $p->status,
+                'amount' => round((float) $p->total_cost, 2),
+                'selling' => round((float) ($retailByProcurement[$p->id] ?? 0), 2),
+                'status' => $p->status,
                 // Surfaced rather than buried. Stock is normally paid for from
                 // the business account; one paid in cash is the case that could
                 // legitimately have come out of the till, and if it did it
@@ -327,9 +327,9 @@ class StoreAccountCloseBalance
                 'paid_cash' => $p->payment_method === 'cash',
             ]);
 
-        $purchasesValue   = round((float) $purchases->sum('amount'), 2);
+        $purchasesValue = round((float) $purchases->sum('amount'), 2);
         $purchasesSelling = round((float) $purchases->sum('selling'), 2);
-        $availableValue   = round($opening['cost'] + $purchasesValue, 2);
+        $availableValue = round($opening['cost'] + $purchasesValue, 2);
         $availableSelling = round($opening['selling'] + $purchasesSelling, 2);
 
         return [
@@ -337,24 +337,24 @@ class StoreAccountCloseBalance
             // no closing figure, "what left" would just be everything.
             'available' => $baseline->count !== null && $closingCount !== null,
 
-            'opening_value'   => $opening['cost'],
+            'opening_value' => $opening['cost'],
             'opening_selling' => $opening['selling'],
-            'opening_units'   => $opening['units'],
+            'opening_units' => $opening['units'],
 
-            'purchases_value'   => $purchasesValue,
+            'purchases_value' => $purchasesValue,
             'purchases_selling' => $purchasesSelling,
-            'purchases_count'   => $purchases->count(),
-            'purchases'         => $purchases->all(),
+            'purchases_count' => $purchases->count(),
+            'purchases' => $purchases->all(),
 
-            'available_value'   => $availableValue,
+            'available_value' => $availableValue,
             'available_selling' => $availableSelling,
 
-            'closing_value'   => $closing['cost'],
+            'closing_value' => $closing['cost'],
             'closing_selling' => $closing['selling'],
-            'closing_units'   => $closing['units'],
+            'closing_units' => $closing['units'],
 
             // Opening plus what came in, less what is still there.
-            'left_at_cost'    => round($availableValue - $closing['cost'], 2),
+            'left_at_cost' => round($availableValue - $closing['cost'], 2),
             'left_at_selling' => round($availableSelling - $closing['selling'], 2),
 
             // Units with no cost or no selling price recorded are left out of
@@ -375,10 +375,10 @@ class StoreAccountCloseBalance
             'on_record' => $this->onRecord($store),
 
             'basis' => 'Two columns because they answer different questions. Cost is what the goods were '
-                . 'bought for; retail is what they are expected to sell for. Retail on the counts is each '
-                . "product's price frozen at counting, and on a delivery it is the selling price recorded "
-                . 'on its lines — so retail is an expectation, not money anybody has received. Neither '
-                . 'column should be compared with the value sold above: the difference is not profit.',
+                .'bought for; retail is what they are expected to sell for. Retail on the counts is each '
+                ."product's price frozen at counting, and on a delivery it is the selling price recorded "
+                .'on its lines — so retail is an expectation, not money anybody has received. Neither '
+                .'column should be compared with the value sold above: the difference is not profit.',
         ];
     }
 
@@ -406,9 +406,9 @@ class StoreAccountCloseBalance
 
         return [
             'products' => (int) ($row->products ?? 0),
-            'units'    => Quantity::of($row->units ?? 0),
-            'cost'     => round((float) ($row->cost ?? 0), 2),
-            'selling'  => round((float) ($row->selling ?? 0), 2),
+            'units' => Quantity::of($row->units ?? 0),
+            'cost' => round((float) ($row->cost ?? 0), 2),
+            'selling' => round((float) ($row->selling ?? 0), 2),
         ];
     }
 
@@ -431,8 +431,8 @@ class StoreAccountCloseBalance
         $lines = $count->relationLoaded('lines') ? $count->lines : $count->lines()->get();
 
         return [
-            'units'   => (int) $lines->sum('counted_quantity'),
-            'cost'    => round((float) $lines->sum(
+            'units' => (int) $lines->sum('counted_quantity'),
+            'cost' => round((float) $lines->sum(
                 fn ($l) => Quantity::of($l->counted_quantity) * (float) ($l->unit_cost ?? 0),
             ), 2),
             'selling' => round((float) $lines->sum(
@@ -461,17 +461,17 @@ class StoreAccountCloseBalance
             ->orderBy('created_at')
             ->get()
             ->map(fn (CashSubmission $s) => [
-                'id'        => $s->id,
-                'date'      => $s->created_at?->format('d M Y'),
+                'id' => $s->id,
+                'date' => $s->created_at?->format('d M Y'),
                 'reference' => $s->reference,
-                'from'      => $s->submitter?->name ?? 'Unknown',
-                'to'        => $s->receiver?->name ?? 'Not yet received',
-                'amount'    => round((float) $s->amount, 2),
-                'status'    => $s->status,
+                'from' => $s->submitter?->name ?? 'Unknown',
+                'to' => $s->receiver?->name ?? 'Not yet received',
+                'amount' => round((float) $s->amount, 2),
+                'status' => $s->status,
                 // Only a confirmed or settled handover counts on the right of
                 // the balance. One still pending is real money that has moved
                 // and is nonetheless still sitting inside the shortage.
-                'counts'    => in_array($s->status, [
+                'counts' => in_array($s->status, [
                     CashSubmission::STATUS_CONFIRMED,
                     CashSubmission::STATUS_RESOLVED,
                 ], true),
@@ -482,14 +482,14 @@ class StoreAccountCloseBalance
     private function submissions(array $checkmate, ?Collection $rows = null): array
     {
         return [
-            'rows'      => $rows?->all() ?? [],
-            'count'     => $rows?->count() ?? 0,
+            'rows' => $rows?->all() ?? [],
+            'count' => $rows?->count() ?? 0,
             'confirmed' => (float) $checkmate['cash']['confirmed'],
             // Warned about rather than blocked on. Money waiting on a receiver
             // is nobody's problem yet, but closing without seeing it is how a
             // period gets signed off blind.
-            'pending'   => (float) $checkmate['cash']['pending'],
-            'disputed'  => (float) $checkmate['cash']['disputed_claimed'],
+            'pending' => (float) $checkmate['cash']['pending'],
+            'disputed' => (float) $checkmate['cash']['disputed_claimed'],
             'unsubmitted' => (float) $checkmate['outstanding']['unsubmitted'],
         ];
     }
@@ -531,9 +531,9 @@ class StoreAccountCloseBalance
             ->pluck('amount', 'method');
 
         return [
-            'card'          => round((float) ($plain['card'] ?? 0) + (float) ($legs['card'] ?? 0), 2),
+            'card' => round((float) ($plain['card'] ?? 0) + (float) ($legs['card'] ?? 0), 2),
             'bank_transfer' => round((float) ($plain['bank_transfer'] ?? 0) + (float) ($legs['bank_transfer'] ?? 0), 2),
-            'debt'          => round((float) ($legs['debt'] ?? 0), 2),
+            'debt' => round((float) ($legs['debt'] ?? 0), 2),
         ];
     }
 
@@ -557,10 +557,10 @@ class StoreAccountCloseBalance
             ->pluck('amount', 'refund_method');
 
         $by = [
-            'cash'          => round((float) ($rows['cash'] ?? 0), 2),
-            'card'          => round((float) ($rows['card'] ?? 0), 2),
+            'cash' => round((float) ($rows['cash'] ?? 0), 2),
+            'card' => round((float) ($rows['card'] ?? 0), 2),
             'bank_transfer' => round((float) ($rows['bank_transfer'] ?? 0), 2),
-            'store_credit'  => round((float) ($rows['store_credit'] ?? 0), 2),
+            'store_credit' => round((float) ($rows['store_credit'] ?? 0), 2),
         ];
 
         $by['total'] = round(array_sum($by), 2);
@@ -593,15 +593,15 @@ class StoreAccountCloseBalance
         ?PhysicalStockCount $closingCount,
     ): array {
         $blank = [
-            'available'   => false,
+            'available' => false,
             'approximate' => true,
-            'basis'       => $this->valuationBasis(),
-            'units'       => 0,
-            'at_selling'  => 0.0,
+            'basis' => $this->valuationBasis(),
+            'units' => 0,
+            'at_selling' => 0.0,
             'unexplained_units' => 0,
             'unexplained_at_selling' => 0.0,
             'lines_short' => 0,
-            'lines_over'  => 0,
+            'lines_over' => 0,
             'top_offenders' => [],
             'snapshot_variance' => null,
             'reason' => null,
@@ -623,8 +623,8 @@ class StoreAccountCloseBalance
         }
 
         $opening = $baseline->quantities();
-        $moves   = $this->movements($store, $from, $to);
-        $lines   = $closingCount->lines()->with('product:id,name')->get();
+        $moves = $this->movements($store, $from, $to);
+        $lines = $closingCount->lines()->with('product:id,name')->get();
 
         $rows = $lines->map(function ($line) use ($opening, $moves) {
             $productId = (int) $line->product_id;
@@ -645,43 +645,43 @@ class StoreAccountCloseBalance
             $price = (float) ($line->unit_price ?? 0);
 
             return [
-                'product_id'  => $productId,
-                'product'     => $line->product?->name ?? ('Product #' . $productId),
-                'opening'     => $openingUnits,
-                'in_opening'  => $inOpening,
-                'received'    => $move['received'],
-                'sold'        => $move['sold'],
+                'product_id' => $productId,
+                'product' => $line->product?->name ?? ('Product #'.$productId),
+                'opening' => $openingUnits,
+                'in_opening' => $inOpening,
+                'received' => $move['received'],
+                'sold' => $move['sold'],
                 'other_moves' => $move['other'],
-                'expected'    => $expected,
-                'counted'     => Quantity::of($line->counted_quantity),
-                'variance'    => $variance,
+                'expected' => $expected,
+                'counted' => Quantity::of($line->counted_quantity),
+                'variance' => $variance,
                 'unexplained' => $unexplained,
-                'unit_price'  => $price,
-                'at_selling'  => round(max(0, $variance) * $price, 2),
+                'unit_price' => $price,
+                'at_selling' => round(max(0, $variance) * $price, 2),
                 'unexplained_at_selling' => round(max(0, $unexplained) * $price, 2),
             ];
         });
 
         return [
-            'available'   => true,
+            'available' => true,
             // Said out loud everywhere this figure appears. Discounts and
             // mid-period price changes make it an estimate, and the recorded
             // sales beside it are the exact number.
             'approximate' => true,
-            'basis'       => $this->valuationBasis(),
+            'basis' => $this->valuationBasis(),
 
-            'units'      => (int) $rows->sum('variance'),
+            'units' => (int) $rows->sum('variance'),
             // Only what is MISSING is valued, never netted against an overage.
             // Finding extra of one product does not mean another was rung up,
             // and netting would quietly shrink the figure that is supposed to
             // explain a cash gap. Same rule PhysicalStockCount::variance uses.
             'at_selling' => round((float) $rows->sum('at_selling'), 2),
 
-            'unexplained_units'      => (int) $rows->sum('unexplained'),
+            'unexplained_units' => (int) $rows->sum('unexplained'),
             'unexplained_at_selling' => round((float) $rows->sum('unexplained_at_selling'), 2),
 
             'lines_short' => $rows->where('variance', '>', 0)->count(),
-            'lines_over'  => $rows->where('variance', '<', 0)->count(),
+            'lines_over' => $rows->where('variance', '<', 0)->count(),
             'products_counted' => $rows->count(),
             'reason' => null,
 
@@ -723,7 +723,7 @@ class StoreAccountCloseBalance
             ->groupBy('product_id')
             ->map(function (Collection $rows) {
                 $sales = $rows->whereIn('transaction_type', self::SALE_TYPES);
-                $rest  = $rows->whereNotIn('transaction_type', self::SALE_TYPES);
+                $rest = $rows->whereNotIn('transaction_type', self::SALE_TYPES);
 
                 return [
                     // Anything arriving counts as received, whatever brought it:
@@ -731,10 +731,10 @@ class StoreAccountCloseBalance
                     // the shelf. All of them are stock the branch now has to
                     // account for.
                     'received' => Quantity::of($rest->where('quantity_change', '>', 0)->sum('quantity_change')),
-                    'sold'     => Quantity::of(abs($sales->where('quantity_change', '<', 0)->sum('quantity_change'))),
+                    'sold' => Quantity::of(abs($sales->where('quantity_change', '<', 0)->sum('quantity_change'))),
                     // Negative. Movements out that were neither a sale nor a
                     // return of stock — transfers away, pickings, adjustments.
-                    'other'    => Quantity::of($rest->where('quantity_change', '<', 0)->sum('quantity_change')),
+                    'other' => Quantity::of($rest->where('quantity_change', '<', 0)->sum('quantity_change')),
                 ];
             });
     }
@@ -793,10 +793,10 @@ class StoreAccountCloseBalance
         $difference = round((float) $balance['period_debt'] - $ledger, 2);
 
         return [
-            'tender'         => (float) $balance['period_debt'],
+            'tender' => (float) $balance['period_debt'],
             'ledger_charges' => $ledger,
-            'agrees'         => abs($difference) < 0.01,
-            'difference'     => $difference,
+            'agrees' => abs($difference) < 0.01,
+            'difference' => $difference,
             // The ledger dates charges to a day, the tills to a second, so a
             // period boundary that falls mid-day can legitimately split a
             // charge from the sale that raised it. Worth seeing, not alarming.
@@ -816,7 +816,7 @@ class StoreAccountCloseBalance
     private function valuationBasis(): string
     {
         return 'Approximate. Valued at each product\'s selling price as frozen on the count, '
-            . 'not at the price any particular unit would have sold for — discounts and '
-            . 'mid-period price changes make it an estimate. Recorded sales is the exact figure.';
+            .'not at the price any particular unit would have sold for — discounts and '
+            .'mid-period price changes make it an estimate. Recorded sales is the exact figure.';
     }
 }

@@ -17,15 +17,15 @@ uses(RefreshDatabase::class);
 
 function setUpCadenceVendor(string $frequency = 'daily', ?int $customDays = null): array
 {
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
 
-    $owner  = User::factory()->create();
+    $owner = User::factory()->create();
     $vendor = Vendor::create([
-        'user_id'                      => $owner->id,
-        'name'                         => 'Cadence Test Store',
+        'user_id' => $owner->id,
+        'name' => 'Cadence Test Store',
         'pos_blind_count_participants' => 1,
-        'pos_blind_count_frequency'    => $frequency,
-        'pos_blind_count_custom_days'  => $customDays,
+        'pos_blind_count_frequency' => $frequency,
+        'pos_blind_count_custom_days' => $customDays,
     ]);
 
     VendorRoles::seedFor($vendor);
@@ -40,15 +40,15 @@ function setUpCadenceVendor(string $frequency = 'daily', ?int $customDays = null
     $category = Category::create(['name' => 'Cadence Category']);
 
     collect(range(1, 2))->each(fn (int $i) => Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'name'           => "Cadence Product {$i}",
-        'sku'            => "CAD-{$i}",
-        'price'          => 1000,
-        'cost_price'     => 500,
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => "Cadence Product {$i}",
+        'sku' => "CAD-{$i}",
+        'price' => 1000,
+        'cost_price' => 500,
         'stock_quantity' => 10,
-        'status'         => 'published',
-        'published_at'   => now(),
+        'status' => 'published',
+        'published_at' => now(),
     ]));
 
     return compact('owner', 'vendor', 'storekeeper');

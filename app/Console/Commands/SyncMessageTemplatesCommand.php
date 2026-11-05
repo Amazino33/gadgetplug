@@ -58,8 +58,8 @@ class SyncMessageTemplatesCommand extends Command
                     // meant it, and a wording refresh is no reason to turn it back on.
                     $existing->update([
                         'recipient_type' => $default['recipient_type'],
-                        'channel'        => $default['channel'],
-                        'body'           => $default['body'],
+                        'channel' => $default['channel'],
+                        'body' => $default['body'],
                     ]);
                     $updated++;
 
@@ -67,11 +67,11 @@ class SyncMessageTemplatesCommand extends Command
                 }
 
                 MessageTemplate::create([
-                    'vendor_id'      => $vendor->id,
-                    'key'            => $default['key'],
+                    'vendor_id' => $vendor->id,
+                    'key' => $default['key'],
                     'recipient_type' => $default['recipient_type'],
-                    'channel'        => $default['channel'],
-                    'body'           => $default['body'],
+                    'channel' => $default['channel'],
+                    'body' => $default['body'],
                 ]);
                 $created++;
             }

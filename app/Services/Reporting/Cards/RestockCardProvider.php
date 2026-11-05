@@ -39,8 +39,8 @@ class RestockCardProvider implements ReportCardProvider
 
         $headline = $needsRestock->isEmpty()
             ? 'Nothing needs restocking right now'
-            : $needsRestock->count() . ' product' . ($needsRestock->count() === 1 ? ' needs' : 's need') . ' restocking, '
-                . $urgent->count() . ' urgent';
+            : $needsRestock->count().' product'.($needsRestock->count() === 1 ? ' needs' : 's need').' restocking, '
+                .$urgent->count().' urgent';
 
         if ($urgent->isNotEmpty()) {
             $names = Product::whereIn('id', $urgent->keys())
@@ -51,7 +51,7 @@ class RestockCardProvider implements ReportCardProvider
             $shown = $names->take(self::MAX_NAMES_SHOWN);
             $extra = $urgent->count() - $shown->count();
 
-            $headline .= ': ' . $shown->implode(', ') . ($extra > 0 ? " +{$extra} more" : '');
+            $headline .= ': '.$shown->implode(', ').($extra > 0 ? " +{$extra} more" : '');
         }
 
         return new CardSummary(

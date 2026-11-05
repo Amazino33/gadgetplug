@@ -2,10 +2,10 @@
 
 namespace App\Services;
 
-use App\Support\Quantity;
 use App\Models\AuditSession;
 use App\Models\StockAccountabilityEntry;
 use App\Models\User;
+use App\Support\Quantity;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use RuntimeException;
@@ -81,18 +81,18 @@ class StockAccountabilityLedger
                 : abs($variance) * $unitCost;
 
             return StockAccountabilityEntry::create([
-                'vendor_id'         => $audit->vendor_id,
-                'product_id'        => $audit->product_id,
-                'audit_session_id'  => $audit->id,
-                'storekeeper_id'    => $storekeeperId,
+                'vendor_id' => $audit->vendor_id,
+                'product_id' => $audit->product_id,
+                'audit_session_id' => $audit->id,
+                'storekeeper_id' => $storekeeperId,
                 'quantity_variance' => $variance,
-                'unit_cost'         => $unitCost,
-                'amount'            => $amount,
-                'disposition'       => $disposition,
-                'reason_code'       => $reasonCode,
-                'note'              => $note,
-                'resolved_by'       => $resolvedBy,
-                'occurred_at'       => now()->toDateString(),
+                'unit_cost' => $unitCost,
+                'amount' => $amount,
+                'disposition' => $disposition,
+                'reason_code' => $reasonCode,
+                'note' => $note,
+                'resolved_by' => $resolvedBy,
+                'occurred_at' => now()->toDateString(),
             ]);
         });
     }
@@ -117,19 +117,19 @@ class StockAccountabilityLedger
             }
 
             return StockAccountabilityEntry::create([
-                'vendor_id'         => $entry->vendor_id,
-                'product_id'        => $entry->product_id,
-                'audit_session_id'  => $entry->audit_session_id,
-                'storekeeper_id'    => $entry->storekeeper_id,
+                'vendor_id' => $entry->vendor_id,
+                'product_id' => $entry->product_id,
+                'audit_session_id' => $entry->audit_session_id,
+                'storekeeper_id' => $entry->storekeeper_id,
                 'quantity_variance' => -$entry->quantity_variance,
-                'unit_cost'         => $entry->unit_cost,
-                'amount'            => $entry->amount,
-                'disposition'       => 'reversal',
-                'reason_code'       => $entry->reason_code,
-                'note'              => $note,
+                'unit_cost' => $entry->unit_cost,
+                'amount' => $entry->amount,
+                'disposition' => 'reversal',
+                'reason_code' => $entry->reason_code,
+                'note' => $note,
                 'reverses_entry_id' => $entry->id,
-                'resolved_by'       => $resolvedBy,
-                'occurred_at'       => now()->toDateString(),
+                'resolved_by' => $resolvedBy,
+                'occurred_at' => now()->toDateString(),
             ]);
         });
     }

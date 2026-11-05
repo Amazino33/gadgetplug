@@ -28,7 +28,7 @@ class VendorPayout extends Model
 
     protected $casts = [
         'settled_at' => 'datetime',
-        'amount'     => 'float',
+        'amount' => 'float',
     ];
 
     public function vendor()
@@ -75,9 +75,9 @@ class VendorPayout extends Model
     {
         DB::transaction(function () use ($note, $userId) {
             $this->update([
-                'status'      => 'paid',
+                'status' => 'paid',
                 'admin_notes' => $note,
-                'settled_at'  => now(),
+                'settled_at' => now(),
             ]);
 
             if ($this->funded_from !== self::FUNDED_GADGETPLUG_DUE) {
@@ -122,6 +122,6 @@ class VendorPayout extends Model
             ->logOnly(['amount', 'funded_from', 'status', 'bank_name', 'account_number', 'account_name', 'admin_notes', 'settled_at'])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
-            ->setDescriptionForEvent(fn (string $event) => 'Payout ' . $event);
+            ->setDescriptionForEvent(fn (string $event) => 'Payout '.$event);
     }
 }

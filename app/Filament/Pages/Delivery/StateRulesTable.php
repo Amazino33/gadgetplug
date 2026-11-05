@@ -111,8 +111,8 @@ class StateRulesTable extends TableWidget
                         ->modalDescription('Applies to every LGA in the state that has no override.')
                         ->modalWidth('md')
                         ->fillForm(fn (State $record): array => DeliveryRuleForm::fill([
-                            'mode'          => $record->defaultRule?->mode ?? DeliveryRule::NOT_DELIVERED,
-                            'fee'           => (float) ($record->defaultRule?->fee ?? 0),
+                            'mode' => $record->defaultRule?->mode ?? DeliveryRule::NOT_DELIVERED,
+                            'fee' => (float) ($record->defaultRule?->fee ?? 0),
                             'expected_cost' => $record->defaultRule?->expected_cost !== null ? (float) $record->defaultRule->expected_cost : null,
                             'delivery_days' => $record->defaultRule?->delivery_days,
                         ]))

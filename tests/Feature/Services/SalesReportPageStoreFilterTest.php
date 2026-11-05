@@ -23,15 +23,15 @@ function reportPanelVendor(): array
     $branch = Store::create(['vendor_id' => $vendor->id, 'name' => 'Uyo Branch']);
 
     $product = Product::create([
-        'vendor_id'      => $vendor->id,
-        'store_id'       => $vendor->defaultStore->id,
-        'category_id'    => Category::firstOrCreate(['name' => 'Report Panel Cat'])->id,
-        'name'           => 'Panel Widget',
-        'sku'            => 'SKU-'.Str::random(6),
-        'price'          => 1000,
-        'cost_price'     => 600,
+        'vendor_id' => $vendor->id,
+        'store_id' => $vendor->defaultStore->id,
+        'category_id' => Category::firstOrCreate(['name' => 'Report Panel Cat'])->id,
+        'name' => 'Panel Widget',
+        'sku' => 'SKU-'.Str::random(6),
+        'price' => 1000,
+        'cost_price' => 600,
         'stock_quantity' => 50,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
     test()->actingAs($owner);
@@ -45,27 +45,27 @@ function reportPanelVendor(): array
 function panelSale(array $ctx, Store $store, int $qty): void
 {
     $sale = PosSale::create([
-        'reference'       => 'POS-'.Str::random(10),
-        'vendor_id'       => $ctx['vendor']->id,
-        'store_id'        => $store->id,
-        'cashier_id'      => $ctx['owner']->id,
-        'subtotal'        => 1000 * $qty,
+        'reference' => 'POS-'.Str::random(10),
+        'vendor_id' => $ctx['vendor']->id,
+        'store_id' => $store->id,
+        'cashier_id' => $ctx['owner']->id,
+        'subtotal' => 1000 * $qty,
         'discount_amount' => 0,
-        'vat_amount'      => 0,
-        'total'           => 1000 * $qty,
-        'payment_method'  => 'cash',
-        'status'          => 'completed',
-        'completed_at'    => CarbonImmutable::now(),
+        'vat_amount' => 0,
+        'total' => 1000 * $qty,
+        'payment_method' => 'cash',
+        'status' => 'completed',
+        'completed_at' => CarbonImmutable::now(),
     ]);
 
     PosSaleItem::create([
-        'pos_sale_id'  => $sale->id,
-        'product_id'   => $ctx['product']->id,
+        'pos_sale_id' => $sale->id,
+        'product_id' => $ctx['product']->id,
         'product_name' => $ctx['product']->name,
-        'unit_price'   => 1000,
-        'unit_cost'    => 600,
-        'quantity'     => $qty,
-        'total'        => 1000 * $qty,
+        'unit_price' => 1000,
+        'unit_cost' => 600,
+        'quantity' => $qty,
+        'total' => 1000 * $qty,
     ]);
 }
 
@@ -100,7 +100,7 @@ test('a branch the user cannot reach is ignored rather than honoured', function 
     // test is about.
     $foreign = Store::create([
         'vendor_id' => Vendor::create(['user_id' => User::factory()->create()->id, 'name' => 'Other'])->id,
-        'name'      => 'Foreign Branch',
+        'name' => 'Foreign Branch',
     ]);
 
     $ctx = reportPanelVendor();

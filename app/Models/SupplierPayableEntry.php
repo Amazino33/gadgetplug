@@ -26,9 +26,9 @@ class SupplierPayableEntry extends Model
     public const UPDATED_AT = null;
 
     protected $casts = [
-        'quantity'   => 'integer',
-        'unit_cost'  => 'decimal:2',
-        'amount'     => 'decimal:2',
+        'quantity' => 'integer',
+        'unit_cost' => 'decimal:2',
+        'amount' => 'decimal:2',
         'created_at' => 'datetime',
     ];
 

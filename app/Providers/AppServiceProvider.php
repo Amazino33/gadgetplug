@@ -2,24 +2,29 @@
 
 namespace App\Providers;
 
-use Carbon\CarbonImmutable;
-use Illuminate\Support\Facades\Date;
-use Illuminate\Support\Facades\DB;
+use App\Listeners\ClaimGuestFeedActivity;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\ProductStoreStock;
+use App\Models\Store;
 use App\Models\Vendor;
 use App\Observers\OrderObserver;
 use App\Observers\ProductObserver;
 use App\Observers\ProductStoreStockObserver;
+use App\Observers\StoreObserver;
 use App\Observers\VendorObserver;
-use App\Listeners\ClaimGuestFeedActivity;
+use Carbon\CarbonImmutable;
+use Filament\Support\Facades\FilamentView;
+use Filament\View\PanelsRenderHook;
 use Illuminate\Auth\Events\Login;
+use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
-use Illuminate\Support\ServiceProvider;
-use Illuminate\Validation\Rules\Password;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\ServiceProvider;
+use Illuminate\Validation\Rules\Password;
 use Spatie\Permission\Models\Role;
 
 class AppServiceProvider extends ServiceProvider
@@ -42,15 +47,16 @@ class AppServiceProvider extends ServiceProvider
         Vendor::observe(VendorObserver::class);
         Product::observe(ProductObserver::class);
         ProductStoreStock::observe(ProductStoreStockObserver::class);
+        Store::observe(StoreObserver::class);
 
         // Hands a guest's feed likes to the account they just signed into, and
         // replays a save the login gate interrupted.
         Event::listen(Login::class, ClaimGuestFeedActivity::class);
 
         // Register Global System Announcement Modal for all Filament panels
-        \Filament\Support\Facades\FilamentView::registerRenderHook(
-            \Filament\View\PanelsRenderHook::BODY_END,
-            fn (): string => \Illuminate\Support\Facades\Blade::render('<livewire:system-announcement-modal />')
+        FilamentView::registerRenderHook(
+            PanelsRenderHook::BODY_END,
+            fn (): string => Blade::render('<livewire:system-announcement-modal />')
         );
         // Your existing HTTPS force code
         if (config('app.env') === 'production') {

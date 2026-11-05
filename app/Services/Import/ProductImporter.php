@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services\Import;
 
-use App\Support\Quantity;
 use App\Actions\Inventory\AdjustStockAction;
 use App\Models\Category;
 use App\Models\ImportLog;
@@ -15,6 +14,7 @@ use App\Models\Supplier;
 use App\Models\Vendor;
 use App\Services\Export\ProductExporter;
 use App\Support\Import\ProductField;
+use App\Support\Quantity;
 use Closure;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -43,8 +43,7 @@ class ProductImporter
 
     public function __construct(
         private readonly ProductExporter $exporter,
-    ) {
-    }
+    ) {}
 
     /**
      * @param  Collection<int, ParsedRow>  $rows
@@ -79,21 +78,21 @@ class ProductImporter
         });
 
         $importable = $rows->filter(fn (ParsedRow $row) => $row->isImportable())->values();
-        $skipped    = $rows->reject(fn (ParsedRow $row) => $row->isImportable())->values();
+        $skipped = $rows->reject(fn (ParsedRow $row) => $row->isImportable())->values();
 
         $log = ImportLog::create([
             'vendor_id' => $vendor->id,
-            'user_id'   => $userId,
+            'user_id' => $userId,
             // Carried by the caller rather than inferred here: this service is
             // driven by the panel, the console and tests alike, and only the
             // caller knows whose hand was on it.
             'performed_by_admin' => $performedByAdmin,
-            'store_id'           => $storeId,
-            'file_name'          => $fileName,
-            'total_rows'    => $rows->count(),
+            'store_id' => $storeId,
+            'file_name' => $fileName,
+            'total_rows' => $rows->count(),
             'skipped_count' => $skipped->count(),
-            'status'        => 'running',
-            'errors'        => $this->errorPayload($skipped),
+            'status' => 'running',
+            'errors' => $this->errorPayload($skipped),
         ]);
 
         // Only when something existing is about to change. A first import that
@@ -105,8 +104,8 @@ class ProductImporter
 
         $created = 0;
         $updated = 0;
-        $done    = 0;
-        $extra   = ['units_created' => 0, 'units_updated' => 0, 'barcodes_added' => 0, 'opening_stock' => 0];
+        $done = 0;
+        $extra = ['units_created' => 0, 'units_updated' => 0, 'barcodes_added' => 0, 'opening_stock' => 0];
         $warnings = $this->warningPayload($importable);
 
         try {
@@ -124,7 +123,7 @@ class ProductImporter
 
                     $created += $counts['created'];
                     $updated += $counts['updated'];
-                    $done    += $chunk->count();
+                    $done += $chunk->count();
 
                     foreach (array_keys($extra) as $key) {
                         $extra[$key] += $counts[$key];
@@ -150,14 +149,14 @@ class ProductImporter
         }
 
         $log->update([
-            'status'        => 'completed',
+            'status' => 'completed',
             'created_count' => $created,
             'updated_count' => $updated,
-            'units_created_count'  => $extra['units_created'],
-            'units_updated_count'  => $extra['units_updated'],
+            'units_created_count' => $extra['units_created'],
+            'units_updated_count' => $extra['units_updated'],
             'barcodes_added_count' => $extra['barcodes_added'],
-            'opening_stock_count'  => $extra['opening_stock'],
-            'warnings'      => $warnings,
+            'opening_stock_count' => $extra['opening_stock'],
+            'warnings' => $warnings,
         ]);
 
         return $log->refresh();
@@ -184,22 +183,22 @@ class ProductImporter
     {
         return DB::transaction(function () use ($rows, $vendor, $userId) {
             $totals = [
-                'created'        => 0,
-                'updated'        => 0,
-                'units_created'  => 0,
-                'units_updated'  => 0,
+                'created' => 0,
+                'updated' => 0,
+                'units_created' => 0,
+                'units_updated' => 0,
                 'barcodes_added' => 0,
-                'opening_stock'  => 0,
+                'opening_stock' => 0,
                 // [{line, name, message}] — the row went in, minus what is named.
-                'warnings'       => [],
+                'warnings' => [],
                 // [{line, name, errors: [..]}] — the row did not go in at all.
-                'failures'       => [],
+                'failures' => [],
             ];
 
             // Resolved once per batch: a file naming 12 categories should ask
             // about 12, not once per row.
             $categories = new NameResolver(fn (string $name) => $this->resolveCategory($name));
-            $suppliers  = new NameResolver(fn (string $name) => $this->resolveSupplier($name, $vendor));
+            $suppliers = new NameResolver(fn (string $name) => $this->resolveSupplier($name, $vendor));
 
             foreach ($rows as $row) {
                 // Each row in its own savepoint. One bad row used to take its
@@ -209,8 +208,8 @@ class ProductImporter
                     $counts = DB::transaction(fn () => $this->applyRow($row, $vendor, $userId, $categories, $suppliers));
                 } catch (Throwable $e) {
                     $totals['failures'][] = [
-                        'line'   => $row->line,
-                        'name'   => $row->name(),
+                        'line' => $row->line,
+                        'name' => $row->name(),
                         'errors' => [$this->reasonFor($e)],
                     ];
 
@@ -320,7 +319,7 @@ class ProductImporter
             // A blank price leaves an existing unit's price as it was; a new
             // unit with none, or any unit priced 0, is saved switched off.
             if ($u['price'] !== null) {
-                $values['price']     = $u['price'];
+                $values['price'] = $u['price'];
                 $values['is_active'] = $u['active'];
             }
 
@@ -334,9 +333,9 @@ class ProductImporter
             } else {
                 $unit = ProductUnit::create($values + [
                     'product_id' => $product->id,
-                    'vendor_id'  => $vendor->id,
-                    'price'      => 0,
-                    'is_active'  => false,
+                    'vendor_id' => $vendor->id,
+                    'price' => 0,
+                    'is_active' => false,
                     'sort_order' => $u['slot'],
                 ]);
                 $counts['units_created']++;
@@ -391,10 +390,10 @@ class ProductImporter
         }
 
         ProductBarcode::create([
-            'vendor_id'       => $product->vendor_id,
-            'product_id'      => $product->id,
+            'vendor_id' => $product->vendor_id,
+            'product_id' => $product->id,
             'product_unit_id' => $unitId,
-            'barcode'         => $code,
+            'barcode' => $code,
         ]);
     }
 
@@ -425,7 +424,7 @@ class ProductImporter
     private function defaultsForNewProduct(): array
     {
         return [
-            'status'      => 'draft',
+            'status' => 'draft',
             'show_online' => true,
             'show_in_pos' => true,
         ];
@@ -446,11 +445,11 @@ class ProductImporter
             $attributes[match ($field) {
                 ProductField::Category->value => 'category_id',
                 ProductField::Supplier->value => 'supplier_id',
-                default                       => $field,
+                default => $field,
             }] = match ($field) {
                 ProductField::Category->value => $categories->resolve((string) $value),
                 ProductField::Supplier->value => $suppliers->resolve((string) $value),
-                default                       => $value,
+                default => $value,
             };
         }
 
@@ -500,8 +499,8 @@ class ProductImporter
         }
 
         return Category::create([
-            'name'      => $name,
-            'slug'      => $this->uniqueCategorySlug($name),
+            'name' => $name,
+            'slug' => $this->uniqueCategorySlug($name),
             'is_active' => true,
         ])->id;
     }
@@ -511,7 +510,7 @@ class ProductImporter
     {
         $base = Str::slug($name) ?: 'category';
         $slug = $base;
-        $n    = 2;
+        $n = 2;
 
         while (Category::where('slug', $slug)->exists()) {
             $slug = $base.'-'.$n++;
@@ -535,7 +534,7 @@ class ProductImporter
 
         return Supplier::create([
             'vendor_id' => $vendor->id,
-            'name'      => $name,
+            'name' => $name,
         ])->id;
     }
 
@@ -603,8 +602,8 @@ class ProductImporter
         // and a list that stops at 200 leaves them guessing about the rest.
         return $skipped
             ->map(fn (ParsedRow $row) => [
-                'line'   => $row->line,
-                'name'   => $row->name(),
+                'line' => $row->line,
+                'name' => $row->name(),
                 'errors' => $row->errors,
             ])
             ->values()

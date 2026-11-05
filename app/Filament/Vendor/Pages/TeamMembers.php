@@ -2,32 +2,38 @@
 
 namespace App\Filament\Vendor\Pages;
 
+use App\Mail\VendorInviteMail;
 use App\Models\User;
-use Filament\Pages\Page;
+use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
-use Spatie\Permission\Models\Role;
-use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
-use BackedEnum;
+use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
+use Spatie\Permission\Models\Role;
 
 class TeamMembers extends Page
 {
     protected static ?int $navigationSort = 6;
+
     protected static string|null|\UnitEnum $navigationGroup = 'Settings';
+
     protected static ?string $navigationLabel = 'Team Members';
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedUsers;
+
     protected static ?string $title = 'Team Members';
+
     protected string $view = 'filament.vendor.pages.team-members';
 
     public static function canAccess(): bool
     {
         $vendor = filament()->getTenant();
-        $user   = auth()->user();
+        $user = auth()->user();
 
         return $vendor && (
             $user->isSuperAdmin() ||
@@ -42,7 +48,7 @@ class TeamMembers extends Page
         setPermissionsTeamId($vendor->id);
 
         return [
-            'owner'   => $vendor->user,
+            'owner' => $vendor->user,
             'members' => $vendor->users()->get(),
         ];
     }
@@ -92,7 +98,7 @@ class TeamMembers extends Page
                     $user = User::find($data['user_id']);
                     if ($user) {
                         $user->update(['pos_pin' => Hash::make($data['pin'])]);
-                        Notification::make()->title('Sales Point PIN set for ' . $user->name)->success()->send();
+                        Notification::make()->title('Sales Point PIN set for '.$user->name)->success()->send();
                     }
                 }),
 
@@ -107,11 +113,15 @@ class TeamMembers extends Page
                         ->required()
                         ->live()
                         ->afterStateUpdated(function (callable $set, $state) {
-                            if (!$state) return;
+                            if (! $state) {
+                                return;
+                            }
                             $vendor = filament()->getTenant();
                             setPermissionsTeamId($vendor->id);
                             $user = User::find($state);
-                            if (!$user) return;
+                            if (! $user) {
+                                return;
+                            }
                             $set('role_id', $user->roles->first()?->id);
                         }),
 
@@ -141,10 +151,10 @@ class TeamMembers extends Page
     protected function inviteMember(string $email, ?int $roleId): void
     {
         $vendor = filament()->getTenant();
-        $user   = User::where('email', $email)->first();
+        $user = User::where('email', $email)->first();
 
         if ($user) {
-            if (!$vendor->users()->where('user_id', $user->id)->exists()) {
+            if (! $vendor->users()->where('user_id', $user->id)->exists()) {
                 $vendor->users()->attach($user->id);
             }
 
@@ -165,18 +175,18 @@ class TeamMembers extends Page
 
             cache()->put("vendor_invite_{$token}", [
                 'vendor_id' => $vendor->id,
-                'email'     => $email,
-                'role_id'   => $roleId,
+                'email' => $email,
+                'role_id' => $roleId,
             ], now()->addDays(7));
 
-            Mail::to($email)->send(new \App\Mail\VendorInviteMail($vendor, $token, $email));
+            Mail::to($email)->send(new VendorInviteMail($vendor, $token, $email));
 
             activity()->causedBy(auth()->user())
                 ->withProperties(['email' => $email])
                 ->tap(fn ($a) => $a->vendor_id = $vendor->id)
                 ->log("Invited {$email} to the team");
 
-            Notification::make()->title('Invite sent to ' . $email)->success()->send();
+            Notification::make()->title('Invite sent to '.$email)->success()->send();
         }
     }
 
@@ -184,7 +194,9 @@ class TeamMembers extends Page
     {
         $vendor = filament()->getTenant();
         $member = User::find($userId);
-        if (!$member) return;
+        if (! $member) {
+            return;
+        }
 
         setPermissionsTeamId($vendor->id);
         $member->unsetRelation('roles');
@@ -197,24 +209,25 @@ class TeamMembers extends Page
             $member->syncPermissions([]);
         }
 
-        $roleName = $roleId ? \Spatie\Permission\Models\Role::find($roleId)?->name : 'none';
+        $roleName = $roleId ? Role::find($roleId)?->name : 'none';
         activity()->causedBy(auth()->user())
             ->performedOn($member)
             ->withProperties(['role' => $roleName])
             ->tap(fn ($a) => $a->vendor_id = $vendor->id)
             ->log("Assigned role \"{$roleName}\" to {$member->name}");
 
-        Notification::make()->title('Role assigned to ' . $member->name)->success()->send();
+        Notification::make()->title('Role assigned to '.$member->name)->success()->send();
         $this->dispatch('$refresh');
     }
 
     public function removeMember(int $userId): void
     {
         $vendor = filament()->getTenant();
-        $user   = auth()->user();
+        $user = auth()->user();
 
-        if (!$vendor->isOwner($user) && !$user->isSuperAdmin()) {
+        if (! $vendor->isOwner($user) && ! $user->isSuperAdmin()) {
             Notification::make()->title('Unauthorized')->danger()->send();
+
             return;
         }
 

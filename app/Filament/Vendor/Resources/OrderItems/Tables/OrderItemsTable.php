@@ -2,8 +2,8 @@
 
 namespace App\Filament\Vendor\Resources\OrderItems\Tables;
 
-use App\Services\Orders\OrderStatusService;
 use App\Filament\Vendor\Resources\Orders\OrderResource;
+use App\Services\Orders\OrderStatusService;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
@@ -30,11 +30,11 @@ class OrderItemsTable
                     ->badge()
                     ->formatStateUsing(fn ($state) => OrderStatusService::LABELS[$state] ?? ucfirst((string) $state))
                     ->color(fn ($state) => match ($state) {
-                        'confirmed', 'packed'                => 'info',
-                        'paid', 'delivered'                  => 'success',
-                        'shipped'                            => 'warning',
+                        'confirmed', 'packed' => 'info',
+                        'paid', 'delivered' => 'success',
+                        'shipped' => 'warning',
                         'cancelled', 'paid_but_failed_stock' => 'danger',
-                        default                              => 'gray',
+                        default => 'gray',
                     }),
 
                 TextColumn::make('product.name')
@@ -62,11 +62,11 @@ class OrderItemsTable
                     // midnight, so today is already "past" by mid-morning and
                     // would otherwise never reach its own branch.
                     ->color(fn ($state, $record) => match (true) {
-                        $record->order?->preferred_delivery_date === null     => 'gray',
-                        $record->order->preferred_delivery_date->isToday()    => 'danger',
-                        $record->order->preferred_delivery_date->isPast()     => 'danger',
+                        $record->order?->preferred_delivery_date === null => 'gray',
+                        $record->order->preferred_delivery_date->isToday() => 'danger',
+                        $record->order->preferred_delivery_date->isPast() => 'danger',
                         $record->order->preferred_delivery_date->isTomorrow() => 'warning',
-                        default                                               => 'success',
+                        default => 'success',
                     }),
 
                 TextColumn::make('order.customer_name')

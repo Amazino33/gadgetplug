@@ -20,9 +20,7 @@ class NameResolver
     private array $cache = [];
 
     /** @param  Closure(string): int  $resolver */
-    public function __construct(private readonly Closure $resolver)
-    {
-    }
+    public function __construct(private readonly Closure $resolver) {}
 
     public function resolve(string $name): ?int
     {

@@ -130,6 +130,7 @@ class ListProducts extends ListRecords
 
         if (! ProductResource::canDelete($product)) {
             Notification::make()->title('You are not authorized to delete this product.')->danger()->send();
+
             return;
         }
 
@@ -212,8 +213,8 @@ class ListProducts extends ListRecords
                         filament()->getTenant(),
                         $data['format'] ?? 'csv',
                         [
-                            'category_id'    => $data['category_id'] ?? null,
-                            'status'         => $data['status'] ?? null,
+                            'category_id' => $data['category_id'] ?? null,
+                            'status' => $data['status'] ?? null,
                             'low_stock_only' => (bool) ($data['low_stock_only'] ?? false),
                         ],
                     );
@@ -246,7 +247,7 @@ class ListProducts extends ListRecords
     protected static function canBulkMove(string $permission): bool
     {
         $vendor = filament()->getTenant();
-        $user   = auth()->user();
+        $user = auth()->user();
 
         if ($vendor === null || $user === null) {
             return false;

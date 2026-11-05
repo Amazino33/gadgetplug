@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 use App\Models\Category;
 use App\Models\PosReturn;
@@ -22,15 +22,15 @@ function salesScopeVendor(): array
     $branch = Store::create(['vendor_id' => $vendor->id, 'name' => 'Uyo Branch']);
 
     $product = Product::create([
-        'vendor_id'      => $vendor->id,
-        'store_id'       => $vendor->defaultStore->id,
-        'category_id'    => Category::firstOrCreate(['name' => 'Scope Cat'])->id,
-        'name'           => 'Scoped Widget',
-        'sku'            => 'SKU-'.Str::random(6),
-        'price'          => 1000,
-        'cost_price'     => 600,
+        'vendor_id' => $vendor->id,
+        'store_id' => $vendor->defaultStore->id,
+        'category_id' => Category::firstOrCreate(['name' => 'Scope Cat'])->id,
+        'name' => 'Scoped Widget',
+        'sku' => 'SKU-'.Str::random(6),
+        'price' => 1000,
+        'cost_price' => 600,
         'stock_quantity' => 100,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
     return compact('owner', 'vendor', 'branch', 'product');
@@ -41,27 +41,27 @@ function reportTillSale(array $ctx, Store $store, float $unitPrice, int $qty): P
     $subtotal = $unitPrice * $qty;
 
     $sale = PosSale::create([
-        'reference'       => 'POS-'.Str::random(10),
-        'vendor_id'       => $ctx['vendor']->id,
-        'store_id'        => $store->id,
-        'cashier_id'      => $ctx['owner']->id,
-        'subtotal'        => $subtotal,
+        'reference' => 'POS-'.Str::random(10),
+        'vendor_id' => $ctx['vendor']->id,
+        'store_id' => $store->id,
+        'cashier_id' => $ctx['owner']->id,
+        'subtotal' => $subtotal,
         'discount_amount' => 0,
-        'vat_amount'      => round($subtotal * 0.075, 2),
-        'total'           => $subtotal + round($subtotal * 0.075, 2),
-        'payment_method'  => 'cash',
-        'status'          => 'completed',
-        'completed_at'    => CarbonImmutable::now(),
+        'vat_amount' => round($subtotal * 0.075, 2),
+        'total' => $subtotal + round($subtotal * 0.075, 2),
+        'payment_method' => 'cash',
+        'status' => 'completed',
+        'completed_at' => CarbonImmutable::now(),
     ]);
 
     PosSaleItem::create([
-        'pos_sale_id'  => $sale->id,
-        'product_id'   => $ctx['product']->id,
+        'pos_sale_id' => $sale->id,
+        'product_id' => $ctx['product']->id,
         'product_name' => $ctx['product']->name,
-        'unit_price'   => $unitPrice,
-        'unit_cost'    => 600,
-        'quantity'     => $qty,
-        'total'        => $subtotal,
+        'unit_price' => $unitPrice,
+        'unit_cost' => 600,
+        'quantity' => $qty,
+        'total' => $subtotal,
     ]);
 
     return $sale;
@@ -99,13 +99,13 @@ test('a refund is netted off the branch that made the sale, not spread across al
     $sale = reportTillSale($ctx, $ctx['branch'], 1000, 2);
 
     PosReturn::create([
-        'reference'        => 'RET-'.Str::random(6),
-        'vendor_id'        => $ctx['vendor']->id,
+        'reference' => 'RET-'.Str::random(6),
+        'vendor_id' => $ctx['vendor']->id,
         'original_sale_id' => $sale->id,
-        'cashier_id'       => $ctx['owner']->id,
-        'return_items'     => [],
-        'refund_amount'    => 500,
-        'refund_method'    => 'cash',
+        'cashier_id' => $ctx['owner']->id,
+        'return_items' => [],
+        'refund_amount' => 500,
+        'refund_method' => 'cash',
     ]);
 
     [$from, $to] = reportRange();

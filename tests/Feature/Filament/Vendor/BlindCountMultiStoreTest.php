@@ -23,14 +23,14 @@ uses(RefreshDatabase::class);
  */
 function twoBranchVendor(string $frequency = 'daily'): array
 {
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
 
     $owner = User::factory()->create();
     $vendor = Vendor::create([
-        'user_id'                      => $owner->id,
-        'name'                         => 'Two Branch Store',
+        'user_id' => $owner->id,
+        'name' => 'Two Branch Store',
         'pos_blind_count_participants' => 1,
-        'pos_blind_count_frequency'    => $frequency,
+        'pos_blind_count_frequency' => $frequency,
     ]);
 
     VendorRoles::seedFor($vendor);
@@ -63,16 +63,16 @@ function twoBranchVendor(string $frequency = 'daily'): array
 function branchProduct(Vendor $vendor, Category $category, Store $store, int $i): Product
 {
     return Product::create([
-        'vendor_id'      => $vendor->id,
-        'store_id'       => $store->id,
-        'category_id'    => $category->id,
-        'name'           => "{$store->name} Item {$i}",
-        'sku'            => 'BR-'.$store->id."-{$i}",
-        'price'          => 1000,
-        'cost_price'     => 500,
+        'vendor_id' => $vendor->id,
+        'store_id' => $store->id,
+        'category_id' => $category->id,
+        'name' => "{$store->name} Item {$i}",
+        'sku' => 'BR-'.$store->id."-{$i}",
+        'price' => 1000,
+        'cost_price' => 500,
         'stock_quantity' => 10,
-        'status'         => 'published',
-        'published_at'   => now(),
+        'status' => 'published',
+        'published_at' => now(),
     ]);
 }
 

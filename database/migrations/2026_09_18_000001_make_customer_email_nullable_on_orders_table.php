@@ -32,7 +32,7 @@ return new class extends Migration
     {
         // Existing NULLs would refuse a NOT NULL column, so they are given the
         // empty string first — the shape this column held before nullable.
-        \DB::table('orders')->whereNull('customer_email')->update(['customer_email' => '']);
+        DB::table('orders')->whereNull('customer_email')->update(['customer_email' => '']);
 
         Schema::table('orders', function (Blueprint $table) {
             $table->string('customer_email')->nullable(false)->change();

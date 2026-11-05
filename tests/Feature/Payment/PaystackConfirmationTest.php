@@ -24,27 +24,27 @@ const PAYSTACK_TEST_SECRET = 'sk_test_confirmation_secret';
 function paystackOrder(bool $withLinkedLine = false): array
 {
     config([
-        'services.paystack.secret_key'        => PAYSTACK_TEST_SECRET,
-        'services.messaging.whatsapp_driver'  => 'log_null',
-        'services.messaging.sms_driver'       => 'log_null',
+        'services.paystack.secret_key' => PAYSTACK_TEST_SECRET,
+        'services.messaging.whatsapp_driver' => 'log_null',
+        'services.messaging.sms_driver' => 'log_null',
     ]);
 
     // So the storekeeper's new-order alert has somewhere to go and counts
     // toward "one set of messages".
     PlatformMessagingSetting::current()->update(['fallback_storekeeper_whatsapp' => '08011112222']);
 
-    $vendor  = linkVendor('Paystack Seller');
+    $vendor = linkVendor('Paystack Seller');
     $product = linkProduct($vendor, price: 10000, stock: 5);
 
     $order = Order::create([
-        'reference'        => 'GP-PS-'.uniqid(),
-        'customer_name'    => 'Pay Online',
-        'customer_email'   => 'pay@example.com',
-        'customer_phone'   => '08050000000',
+        'reference' => 'GP-PS-'.uniqid(),
+        'customer_name' => 'Pay Online',
+        'customer_email' => 'pay@example.com',
+        'customer_phone' => '08050000000',
         'shipping_address' => 'Uyo',
-        'total_amount'     => 20000,
-        'status'           => 'pending',
-        'payment_method'   => 'paystack',
+        'total_amount' => 20000,
+        'status' => 'pending',
+        'payment_method' => 'paystack',
     ]);
 
     OrderItem::create([
@@ -56,20 +56,20 @@ function paystackOrder(bool $withLinkedLine = false): array
 
     if ($withLinkedLine) {
         $supplier = linkVendor('Paystack Supplier');
-        $source   = linkProduct($supplier, price: 8000, stock: 9);
-        $link     = makeLink($vendor, $supplier);
+        $source = linkProduct($supplier, price: 8000, stock: 9);
+        $link = makeLink($vendor, $supplier);
 
         // A resold listing: points at the supplier's product and holds no stock.
         $listing = Product::create([
-            'vendor_id'         => $vendor->id,
-            'store_id'          => $vendor->defaultStore->id,
-            'category_id'       => $source->category_id,
+            'vendor_id' => $vendor->id,
+            'store_id' => $vendor->defaultStore->id,
+            'category_id' => $source->category_id,
             'source_product_id' => $source->id,
-            'supplier_link_id'  => $link->id,
-            'name'              => 'Resold Widget',
-            'price'             => 11200,
-            'stock_quantity'    => 0,
-            'status'            => 'published',
+            'supplier_link_id' => $link->id,
+            'name' => 'Resold Widget',
+            'price' => 11200,
+            'stock_quantity' => 0,
+            'status' => 'published',
         ]);
 
         OrderItem::create([
@@ -88,11 +88,11 @@ function fakePaystackVerify(Order $order, ?int $amountKobo = null, string $curre
     Http::fake([
         'api.paystack.co/transaction/verify/*' => Http::response([
             'status' => true,
-            'data'   => [
-                'status'    => 'success',
+            'data' => [
+                'status' => 'success',
                 'reference' => $order->reference,
-                'amount'    => $amountKobo ?? (int) round((float) $order->total_amount * 100),
-                'currency'  => $currency,
+                'amount' => $amountKobo ?? (int) round((float) $order->total_amount * 100),
+                'currency' => $currency,
             ],
         ]),
     ]);
@@ -103,8 +103,8 @@ function postPaystackWebhook(Order $order, ?string $signature = null, string $ev
     $raw = json_encode(['event' => $event, 'data' => ['reference' => $order->reference]]);
 
     return test()->call('POST', '/paystack/webhook', [], [], [], [
-        'CONTENT_TYPE'               => 'application/json',
-        'HTTP_X_PAYSTACK_SIGNATURE'  => $signature ?? hash_hmac('sha512', $raw, PAYSTACK_TEST_SECRET),
+        'CONTENT_TYPE' => 'application/json',
+        'HTTP_X_PAYSTACK_SIGNATURE' => $signature ?? hash_hmac('sha512', $raw, PAYSTACK_TEST_SECRET),
     ], $raw);
 }
 

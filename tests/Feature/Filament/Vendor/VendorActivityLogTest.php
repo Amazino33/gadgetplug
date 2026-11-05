@@ -14,8 +14,8 @@ uses(RefreshDatabase::class);
 
 function logVendor(): Vendor
 {
-    (new VendorPermissionsSeeder())->run();
-    $vendor = Vendor::create(['user_id' => User::factory()->create()->id, 'name' => 'Log Store ' . uniqid()]);
+    (new VendorPermissionsSeeder)->run();
+    $vendor = Vendor::create(['user_id' => User::factory()->create()->id, 'name' => 'Log Store '.uniqid()]);
     VendorRoles::seedFor($vendor);
 
     return $vendor;
@@ -43,7 +43,7 @@ test('creating a supplier is recorded against the vendor', function () {
 });
 
 test('editing a supplier records what changed, not just that it changed', function () {
-    $vendor   = logVendor();
+    $vendor = logVendor();
     $supplier = Supplier::create(['vendor_id' => $vendor->id, 'name' => 'Ace Parts', 'phone' => '0800']);
 
     $supplier->update(['phone' => '0900']);
@@ -91,7 +91,7 @@ test('one vendor never sees another vendor activity', function () {
 
 test('a store admin can reach the activity log through the permission', function () {
     $vendor = logVendor();
-    $admin  = memberWithRole($vendor, 'store_admin');
+    $admin = memberWithRole($vendor, 'store_admin');
 
     $this->actingAs($admin);
     filament()->setTenant($vendor);
@@ -100,7 +100,7 @@ test('a store admin can reach the activity log through the permission', function
 });
 
 test('a storekeeper without the permission cannot', function () {
-    $vendor      = logVendor();
+    $vendor = logVendor();
     $storekeeper = memberWithRole($vendor, 'storekeeper');
 
     $this->actingAs($storekeeper);
@@ -120,13 +120,13 @@ test('the owner can always reach it', function () {
 
 test('the log is never creatable or editable — it is a record, not a document', function () {
     expect(ActivityLogResource::canCreate())->toBeFalse()
-        ->and(ActivityLogResource::canEdit(new VendorActivity()))->toBeFalse()
-        ->and(ActivityLogResource::canDelete(new VendorActivity()))->toBeFalse();
+        ->and(ActivityLogResource::canEdit(new VendorActivity))->toBeFalse()
+        ->and(ActivityLogResource::canDelete(new VendorActivity))->toBeFalse();
 });
 
 test('a store-assigned member sees their own store plus vendor-wide entries, not other branches', function () {
     $vendor = logVendor();
-    $mine   = Store::create(['vendor_id' => $vendor->id, 'name' => 'My Branch']);
+    $mine = Store::create(['vendor_id' => $vendor->id, 'name' => 'My Branch']);
     $theirs = Store::create(['vendor_id' => $vendor->id, 'name' => 'Other Branch']);
 
     $member = memberWithRole($vendor, 'store_admin');

@@ -1,8 +1,9 @@
 <?php
 
-use App\Models\Product;
 use App\Models\Category;
+use App\Models\Product;
 use App\Models\Store;
+use App\Models\Supplier;
 use App\Models\User;
 use App\Models\Vendor;
 use App\Models\VendorActivity;
@@ -12,17 +13,17 @@ uses(RefreshDatabase::class);
 
 function activityVendor(): Vendor
 {
-    return Vendor::create(['user_id' => User::factory()->create()->id, 'name' => 'Activity Store ' . uniqid()]);
+    return Vendor::create(['user_id' => User::factory()->create()->id, 'name' => 'Activity Store '.uniqid()]);
 }
 
 function activityProduct(Vendor $vendor): Product
 {
     return Product::create([
-        'vendor_id'   => $vendor->id,
-        'category_id' => Category::create(['name' => 'Cat ' . uniqid()])->id,
-        'name'        => 'Logged Widget',
-        'price'       => 1000,
-        'status'      => 'published',
+        'vendor_id' => $vendor->id,
+        'category_id' => Category::create(['name' => 'Cat '.uniqid()])->id,
+        'name' => 'Logged Widget',
+        'price' => 1000,
+        'status' => 'published',
     ]);
 }
 
@@ -41,13 +42,13 @@ test('a log call that names no vendor still lands in that vendor feed, via the s
 
 test('an explicit vendor on the call still wins over the resolver', function () {
     $vendor = activityVendor();
-    $other  = activityVendor();
+    $other = activityVendor();
 
     // Supplier is vendor-owned but defines no tapActivity of its own, so the
     // only thing competing with the explicit tap is the resolver. (A model that
     // does define tapActivity overrides explicit taps — Spatie applies the
     // subject's tap last — which predates this resolver.)
-    $supplier = \App\Models\Supplier::create(['vendor_id' => $vendor->id, 'name' => 'Tap Test Supplier']);
+    $supplier = Supplier::create(['vendor_id' => $vendor->id, 'name' => 'Tap Test Supplier']);
 
     activity()->performedOn($supplier)
         ->tap(fn ($a) => $a->vendor_id = $other->id)
@@ -67,7 +68,7 @@ test('an action on the vendor itself is filed under that vendor', function () {
 
 test('a store-specific subject also stamps the store', function () {
     $vendor = activityVendor();
-    $store  = Store::create(['vendor_id' => $vendor->id, 'name' => 'Branch A']);
+    $store = Store::create(['vendor_id' => $vendor->id, 'name' => 'Branch A']);
 
     activity()->performedOn($store)->log('Store touched');
 
@@ -87,8 +88,8 @@ test('a vendor-level action records no store rather than inventing one', functio
 });
 
 test('a product edit is attributed to the store that product belongs to', function () {
-    $vendor  = activityVendor();
-    $store   = Store::create(['vendor_id' => $vendor->id, 'name' => 'Branch B']);
+    $vendor = activityVendor();
+    $store = Store::create(['vendor_id' => $vendor->id, 'name' => 'Branch B']);
     $product = activityProduct($vendor);
     $product->forceFill(['store_id' => $store->id])->saveQuietly();
 
@@ -121,7 +122,7 @@ test('a causer in two vendors is left unscoped rather than filed under a guess',
 });
 
 test('model logging still stamps the vendor as it did before', function () {
-    $vendor  = activityVendor();
+    $vendor = activityVendor();
     $product = activityProduct($vendor);
 
     $product->update(['price' => 2500]);

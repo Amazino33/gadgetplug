@@ -17,7 +17,7 @@ uses(RefreshDatabase::class);
 
 function moveStoreContext(): array
 {
-    $owner  = User::factory()->create();
+    $owner = User::factory()->create();
     $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Zelink Tech']);
 
     $storeA = Store::create(['vendor_id' => $vendor->id, 'name' => 'Itel Home', 'is_default' => true]);
@@ -43,8 +43,8 @@ it('moves matching products to the destination store', function () {
 
     $this->artisan('products:move-store', [
         'vendor' => $c['vendor']->id,
-        'from'   => $c['storeA']->id,
-        'to'     => $c['storeB']->id,
+        'from' => $c['storeA']->id,
+        'to' => $c['storeB']->id,
         '--brand' => 'Oraimo',
         '--force' => true,
     ])->assertSuccessful();
@@ -122,8 +122,8 @@ it('skips a product with reserved stock and reports why, without failing the res
 });
 
 it('never touches another vendor\'s products even with the same store ids', function () {
-    $c      = moveStoreContext();
-    $other  = moveStoreContext();
+    $c = moveStoreContext();
+    $other = moveStoreContext();
 
     $mine = Product::create([
         'vendor_id' => $c['vendor']->id, 'category_id' => $c['category']->id,

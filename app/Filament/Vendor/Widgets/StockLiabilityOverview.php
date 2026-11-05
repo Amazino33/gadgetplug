@@ -6,7 +6,6 @@ namespace App\Filament\Vendor\Widgets;
 
 use App\Filament\Vendor\Resources\Products\Schemas\ProductForm;
 use App\Models\StockAccountabilityEntry;
-use App\Models\User;
 use App\Services\StockAccountabilityLedger;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;

@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services\Inventory;
 
-use App\Support\Quantity;
 use App\Models\ProductStoreStock;
 use App\Models\StockCostLayer;
-use Illuminate\Support\Facades\DB;
+use App\Support\Quantity;
 
 // What the stock on hand is worth, from the batches it actually arrived in.
 //
@@ -47,7 +46,7 @@ class StockValuation
         // differently, and this runs on MySQL in production and SQLite in the
         // test suite.
         $shortfall = "CASE WHEN {$stock}.quantity > COALESCE(l.layer_qty, 0)"
-            . " THEN {$stock}.quantity - COALESCE(l.layer_qty, 0) ELSE 0 END";
+            ." THEN {$stock}.quantity - COALESCE(l.layer_qty, 0) ELSE 0 END";
 
         $row = ProductStoreStock::query()
             ->join('products', 'products.id', '=', "{$stock}.product_id")
@@ -63,8 +62,8 @@ class StockValuation
             ->first();
 
         return [
-            'value'                  => round((float) $row->value, 2),
-            'uncosted_units'         => Quantity::of($row->uncosted_units),
+            'value' => round((float) $row->value, 2),
+            'uncosted_units' => Quantity::of($row->uncosted_units),
             'uncosted_product_count' => (int) $row->uncosted_products,
         ];
     }

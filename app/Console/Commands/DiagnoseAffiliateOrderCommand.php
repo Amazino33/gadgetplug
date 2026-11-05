@@ -62,7 +62,7 @@ class DiagnoseAffiliateOrderCommand extends Command
         $this->line('  1. The customer did not arrive through /r/{code}, or lost the cookie before checking out');
         $this->line('     (different browser, incognito closed, cleared cookies, or more than the cookie window ago),');
         $this->line('     and did not type the code into the referral box at checkout.');
-        $this->line("     Cookie window is currently ".AffiliateSetting::current()->cookie_window_days.' days.');
+        $this->line('     Cookie window is currently '.AffiliateSetting::current()->cookie_window_days.' days.');
         $this->line('  2. A later affiliate link overwrote the cookie — attribution is last-click, not first-click.');
         $this->line('  3. The affiliate is deactivated (is_active = false); an inactive code attributes nothing.');
         $this->line('  4. Self-referral — the affiliate\'s own account or email placed the order. Checked below.');
@@ -119,11 +119,11 @@ class DiagnoseAffiliateOrderCommand extends Command
         }
 
         match ($commission->status) {
-            'pending'       => $this->explainPending($order),
+            'pending' => $this->explainPending($order),
             'return_window' => $this->explainReturnWindow($commission, (int) $settings->return_window_days),
-            'available'     => $this->explainAvailable($commission),
-            'rejected'      => $this->explainRejected($commission),
-            default         => $this->warn("  Unrecognized status '{$commission->status}'."),
+            'available' => $this->explainAvailable($commission),
+            'rejected' => $this->explainRejected($commission),
+            default => $this->warn("  Unrecognized status '{$commission->status}'."),
         };
 
         $this->newLine();

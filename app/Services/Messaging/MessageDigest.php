@@ -64,12 +64,12 @@ class MessageDigest
                 .$parts->pluck('body')->implode("\n\n────────\n\n");
 
             $fresh->update([
-                'body'              => $body,
+                'body' => $body,
                 'provider_response' => array_merge((array) $fresh->provider_response, ['digest_of' => $parts->pluck('id')->all()]),
             ]);
 
             DeliveryMessage::whereIn('id', $members->pluck('id'))->update([
-                'status'         => DeliveryMessage::STATUS_MERGED,
+                'status' => DeliveryMessage::STATUS_MERGED,
                 'merged_into_id' => $fresh->id,
             ]);
 

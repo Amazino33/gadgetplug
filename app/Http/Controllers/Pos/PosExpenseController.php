@@ -58,17 +58,17 @@ class PosExpenseController extends Controller
             'categories' => collect(self::TILL_CATEGORIES)
                 ->mapWithKeys(fn ($key) => [$key => $this->label($key)])
                 ->all(),
-            'expenses'   => $expenses,
-            'total'      => round((float) $expenses->sum('amount'), 2),
+            'expenses' => $expenses,
+            'total' => round((float) $expenses->sum('amount'), 2),
         ]);
     }
 
     public function store(Request $request, RecordExpenseAction $record): JsonResponse
     {
         $request->validate([
-            'vendor_id'   => 'required|integer',
-            'amount'      => 'required|numeric|min:0.01',
-            'category'    => 'required|string|in:'.implode(',', self::TILL_CATEGORIES),
+            'vendor_id' => 'required|integer',
+            'amount' => 'required|numeric|min:0.01',
+            'category' => 'required|string|in:'.implode(',', self::TILL_CATEGORIES),
             'description' => 'nullable|string|max:255',
         ]);
 
@@ -110,7 +110,7 @@ class PosExpenseController extends Controller
     {
         return match ($key) {
             'logistics_other' => 'Transport / delivery',
-            default           => 'Something else',
+            default => 'Something else',
         };
     }
 }

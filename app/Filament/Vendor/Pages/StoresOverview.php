@@ -25,11 +25,16 @@ use UnitEnum;
 // on it. The data layer is scoped independently regardless — see rows().
 class StoresOverview extends Page
 {
-    protected static null|string|BackedEnum $navigationIcon  = 'heroicon-o-building-office-2';
-    protected static string|null|UnitEnum   $navigationGroup = 'Settings';
+    protected static null|string|BackedEnum $navigationIcon = 'heroicon-o-building-office-2';
+
+    protected static string|null|UnitEnum $navigationGroup = 'Settings';
+
     protected static ?string $navigationLabel = 'All Stores';
-    protected static ?string $title           = 'All Stores';
+
+    protected static ?string $title = 'All Stores';
+
     protected static ?int $navigationSort = 4;
+
     protected string $view = 'filament.vendor.pages.stores-overview';
 
     // Days of sales the comparison covers. Fixed rather than configurable:
@@ -85,15 +90,15 @@ class StoresOverview extends Page
             $sales = StoreSalesQuery::totals($vendorId, $store->id, $from, $to);
 
             return [
-                'store'              => $store,
-                'product_count'      => $m->product_count,
-                'units'              => $m->units,
-                'cost_value'         => $m->cost_value,
-                'retail_value'       => $m->retail_value,
-                'low_stock_count'    => $m->low_stock_count,
+                'store' => $store,
+                'product_count' => $m->product_count,
+                'units' => $m->units,
+                'cost_value' => $m->cost_value,
+                'retail_value' => $m->retail_value,
+                'low_stock_count' => $m->low_stock_count,
                 'missing_cost_count' => $m->missing_cost_count,
-                'sales_revenue'      => $sales['revenue'],
-                'sales_units'        => $sales['units'],
+                'sales_revenue' => $sales['revenue'],
+                'sales_units' => $sales['units'],
             ];
         })
             // Heaviest capital first: the branch holding the most stock is the
@@ -105,14 +110,14 @@ class StoresOverview extends Page
         return [
             'rows' => $rows,
             'totals' => [
-                'product_count'      => array_sum(array_column($rows, 'product_count')),
-                'units'              => array_sum(array_column($rows, 'units')),
-                'cost_value'         => array_sum(array_column($rows, 'cost_value')),
-                'retail_value'       => array_sum(array_column($rows, 'retail_value')),
-                'low_stock_count'    => array_sum(array_column($rows, 'low_stock_count')),
+                'product_count' => array_sum(array_column($rows, 'product_count')),
+                'units' => array_sum(array_column($rows, 'units')),
+                'cost_value' => array_sum(array_column($rows, 'cost_value')),
+                'retail_value' => array_sum(array_column($rows, 'retail_value')),
+                'low_stock_count' => array_sum(array_column($rows, 'low_stock_count')),
                 'missing_cost_count' => array_sum(array_column($rows, 'missing_cost_count')),
-                'sales_revenue'      => array_sum(array_column($rows, 'sales_revenue')),
-                'sales_units'        => array_sum(array_column($rows, 'sales_units')),
+                'sales_revenue' => array_sum(array_column($rows, 'sales_revenue')),
+                'sales_units' => array_sum(array_column($rows, 'sales_units')),
             ],
         ];
     }

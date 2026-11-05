@@ -22,12 +22,12 @@ function seoProduct(array $attributes = []): Product
     $vendor = Vendor::factory()->onlineSalesEnabled()->create();
 
     return ProductFactory::new()->withPhoto()->create(array_merge([
-        'vendor_id'      => $vendor->id,
-        'store_id'       => $vendor->defaultStore->id,
-        'name'           => 'ITEL 2160 OLD ONE',
-        'brand'          => 'itel',
-        'sku'            => 'IT-2160',
-        'price'          => 9500,
+        'vendor_id' => $vendor->id,
+        'store_id' => $vendor->defaultStore->id,
+        'name' => 'ITEL 2160 OLD ONE',
+        'brand' => 'itel',
+        'sku' => 'IT-2160',
+        'price' => 9500,
         'stock_quantity' => 4,
     ], $attributes));
 }
@@ -127,7 +127,7 @@ describe('slugs follow the online name', function () {
 describe('the product page speaks to search engines', function () {
     test('title, meta description and canonical on the storefront host', function () {
         $product = seoProduct([
-            'online_name'      => 'itel 2160 Dual SIM Keypad Phone – Black',
+            'online_name' => 'itel 2160 Dual SIM Keypad Phone – Black',
             'meta_description' => 'Tough dual SIM keypad phone with a week of battery.',
         ]);
 
@@ -176,7 +176,7 @@ describe('/sitemap.xml', function () {
         $draft = ProductFactory::new()->withPhoto()->create(['vendor_id' => $visible->vendor_id, 'name' => 'Draft Phone', 'status' => 'draft']);
         $hiddenVendor = ProductFactory::new()->withPhoto()->create([
             'vendor_id' => Vendor::factory()->create(['online_sales_enabled' => false])->id,
-            'name'      => 'Switched Off Phone',
+            'name' => 'Switched Off Phone',
         ]);
 
         $response = $this->get('/sitemap.xml')->assertOk()->assertHeader('Content-Type', 'application/xml; charset=UTF-8');

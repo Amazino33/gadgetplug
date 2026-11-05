@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use App\Support\Quantity;
 use App\Casts\AsQuantity;
+use App\Support\Quantity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -18,7 +18,7 @@ class ProcurementItem extends Model
     ];
 
     protected $casts = [
-        'unit_cost'     => 'decimal:2',
+        'unit_cost' => 'decimal:2',
         'selling_price' => 'decimal:2',
         'cost_per_unit' => 'decimal:2',
         'quantity' => AsQuantity::class,
@@ -120,13 +120,17 @@ class ProcurementItem extends Model
     public function costVariancePct(): ?float
     {
         $historical = (float) ($this->product?->cost_price ?? 0);
-        if ($historical <= 0) return null;
+        if ($historical <= 0) {
+            return null;
+        }
+
         return (($this->unit_cost - $historical) / $historical) * 100;
     }
 
     public function hasCostVariance(): bool
     {
         $pct = $this->costVariancePct();
+
         return $pct !== null && abs($pct) > 10;
     }
 }

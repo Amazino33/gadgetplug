@@ -3,9 +3,11 @@
 use App\Actions\Cash\GenerateSettlementStatementAction;
 use App\Filament\Vendor\Pages\StoreSettlement;
 use App\Models\User;
+use App\Models\Vendor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\Permission\Models\Role;
 
-require_once __DIR__ . '/Helpers.php';
+require_once __DIR__.'/Helpers.php';
 
 uses(RefreshDatabase::class);
 
@@ -25,9 +27,9 @@ function accessContext(): array
 
     $ctx['statement'] = app(GenerateSettlementStatementAction::class)->execute(
         generatedBy: $ctx['owner'],
-        store:       $ctx['store'],
-        from:        now()->subMonth(),
-        to:          now()->addDay(),
+        store: $ctx['store'],
+        from: now()->subMonth(),
+        to: now()->addDay(),
     );
 
     return $ctx;
@@ -103,7 +105,7 @@ test('somebody from another business cannot read it at all', function () {
     $ctx = accessContext();
 
     $outsider = User::factory()->create();
-    App\Models\Vendor::create(['user_id' => $outsider->id, 'name' => 'Rival Ltd '.uniqid()]);
+    Vendor::create(['user_id' => $outsider->id, 'name' => 'Rival Ltd '.uniqid()]);
 
     $response = $this->actingAs($outsider)->get(route('settlement.show', $ctx['statement']));
 
@@ -118,11 +120,11 @@ test('the storekeeper role is not granted settlement visibility by default', fun
 
     // The default roles have to get this right on their own — most vendors will
     // never revisit them.
-    expect(Spatie\Permission\Models\Role::where('name', 'storekeeper')
+    expect(Role::where('name', 'storekeeper')
         ->where('team_id', $ctx['vendor']->id)->first()
         ->hasPermissionTo('view_store_settlement'))->toBeFalse();
 
-    expect(Spatie\Permission\Models\Role::where('name', 'store_admin')
+    expect(Role::where('name', 'store_admin')
         ->where('team_id', $ctx['vendor']->id)->first()
         ->hasPermissionTo('view_store_settlement'))->toBeTrue();
 });

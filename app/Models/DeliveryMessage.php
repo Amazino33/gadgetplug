@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\Messaging\PhoneNumber;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -28,7 +29,7 @@ class DeliveryMessage extends Model
 
     protected $casts = [
         'provider_response' => 'array',
-        'sent_at'           => 'datetime',
+        'sent_at' => 'datetime',
     ];
 
     protected static function booted(): void
@@ -44,7 +45,7 @@ class DeliveryMessage extends Model
             // so "the same recipient" means the same row value — the throttle
             // and the digest both match on it.
             if (filled($message->to_number) && ! str_contains((string) $message->to_number, '@')) {
-                $message->to_number = \App\Services\Messaging\PhoneNumber::toNigerianInternational($message->to_number);
+                $message->to_number = PhoneNumber::toNigerianInternational($message->to_number);
             }
         });
     }

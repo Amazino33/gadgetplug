@@ -15,7 +15,7 @@ test('a super admin can set a reseller discount on a category', function () {
 
     $this->actingAs($admin);
 
-    $category = Category::create(['name' => 'Discount Category Test ' . uniqid()]);
+    $category = Category::create(['name' => 'Discount Category Test '.uniqid()]);
 
     Livewire::test(EditCategory::class, ['record' => $category->getRouteKey()])
         ->fillForm(['reseller_discount' => 12.5])

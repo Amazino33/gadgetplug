@@ -30,12 +30,12 @@ class ProductForm
 
                         Placeholder::make('price_display')
                             ->label('Price')
-                            ->content(fn ($record) => '₦' . number_format((float) $record->price, 2)),
+                            ->content(fn ($record) => '₦'.number_format((float) $record->price, 2)),
 
                         Placeholder::make('category_rate_display')
                             ->label('Category Rate (fallback)')
                             ->content(fn ($record) => $record->category?->commission_rate !== null
-                                ? number_format((float) $record->category->commission_rate, 2) . '%'
+                                ? number_format((float) $record->category->commission_rate, 2).'%'
                                 : 'No category rate set'),
                     ]),
                 ]),

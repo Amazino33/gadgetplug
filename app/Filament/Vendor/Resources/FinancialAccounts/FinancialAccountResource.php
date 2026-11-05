@@ -26,15 +26,18 @@ class FinancialAccountResource extends Resource
 
     protected static ?string $tenantOwnershipRelationshipName = 'vendor';
 
-    protected static string|null|\BackedEnum $navigationIcon  = Heroicon::OutlinedBanknotes;
-    protected static string|null|UnitEnum   $navigationGroup = 'Money';
-    protected static ?string                $navigationLabel = 'Financial Accounts';
+    protected static string|null|\BackedEnum $navigationIcon = Heroicon::OutlinedBanknotes;
+
+    protected static string|null|UnitEnum $navigationGroup = 'Money';
+
+    protected static ?string $navigationLabel = 'Financial Accounts';
+
     protected static ?int $navigationSort = 1;
 
     public static function canAccess(): bool
     {
         $vendor = filament()->getTenant();
-        $user   = auth()->user();
+        $user = auth()->user();
 
         return $vendor && (
             $user->isSuperAdmin() ||
@@ -88,7 +91,7 @@ class FinancialAccountResource extends Resource
                     ->label('Current Balance')
                     ->weight('bold')
                     ->getStateUsing(fn (FinancialAccount $record) => $record->balance())
-                    ->formatStateUsing(fn ($state) => '₦' . number_format((float) $state, 2)),
+                    ->formatStateUsing(fn ($state) => '₦'.number_format((float) $state, 2)),
 
                 IconColumn::make('is_active')
                     ->boolean()
@@ -111,7 +114,7 @@ class FinancialAccountResource extends Resource
     {
         return [
             'index' => ListFinancialAccounts::route('/'),
-            'edit'  => EditFinancialAccount::route('/{record}/edit'),
+            'edit' => EditFinancialAccount::route('/{record}/edit'),
         ];
     }
 }

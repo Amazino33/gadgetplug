@@ -8,14 +8,15 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
+use Spatie\MediaLibrary\Conversions\FileManipulator;
 
 uses(RefreshDatabase::class);
 
 function imageVendor(): Vendor
 {
     return Vendor::create([
-        'user_id'              => User::factory()->create()->id,
-        'name'                 => 'Image Shop '.uniqid(),
+        'user_id' => User::factory()->create()->id,
+        'name' => 'Image Shop '.uniqid(),
         'online_sales_enabled' => true,
     ]);
 }
@@ -25,14 +26,14 @@ function imageProduct(): Product
     $vendor = imageVendor();
 
     return Product::create([
-        'vendor_id'      => $vendor->id,
-        'store_id'       => $vendor->defaultStore->id,
-        'category_id'    => Category::firstOrCreate(['name' => 'Image Cat'])->id,
-        'name'           => 'Photographed Thing '.Str::random(5),
-        'price'          => 10000,
+        'vendor_id' => $vendor->id,
+        'store_id' => $vendor->defaultStore->id,
+        'category_id' => Category::firstOrCreate(['name' => 'Image Cat'])->id,
+        'name' => 'Photographed Thing '.Str::random(5),
+        'price' => 10000,
         'stock_quantity' => 5,
-        'status'         => 'published',
-        'published_at'   => now(),
+        'status' => 'published',
+        'published_at' => now(),
     ]);
 }
 
@@ -73,7 +74,7 @@ describe('the light conversion', function () {
 
         // Generated inline here so the assertion measures real bytes rather
         // than trusting the config.
-        app(\Spatie\MediaLibrary\Conversions\FileManipulator::class)
+        app(FileManipulator::class)
             ->createDerivedFiles($media, ['feed', 'feed_small'], onlyMissing: true);
 
         $media->refresh();
@@ -91,10 +92,10 @@ describe('the light conversion', function () {
 
         // Reported so the saving is visible in the run, not just asserted.
         dump([
-            'preview bytes'    => $preview,
-            'feed bytes'       => $feed,
+            'preview bytes' => $preview,
+            'feed bytes' => $feed,
             'feed_small bytes' => $small,
-            'saving'           => round((1 - $feed / $preview) * 100).'% lighter than preview',
+            'saving' => round((1 - $feed / $preview) * 100).'% lighter than preview',
         ]);
     });
 
@@ -104,7 +105,7 @@ describe('the light conversion', function () {
             ->toMediaCollection('product-images');
 
         $media = $product->fresh()->getFirstMedia('product-images');
-        app(\Spatie\MediaLibrary\Conversions\FileManipulator::class)
+        app(FileManipulator::class)
             ->createDerivedFiles($media, ['feed', 'feed_small'], onlyMissing: true);
 
         $image = $product->fresh()->feedImage();

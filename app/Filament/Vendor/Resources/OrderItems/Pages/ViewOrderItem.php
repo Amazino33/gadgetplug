@@ -14,10 +14,10 @@ use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Model;
 
-
 class ViewOrderItem extends ViewRecord
 {
     protected static string $resource = OrderItemResource::class;
+
     protected string $view = 'filament.vendor.pages.view-order-item';
 
     protected function resolveRecord(int|string $key): Model
@@ -42,7 +42,7 @@ class ViewOrderItem extends ViewRecord
                 ->label('Call Customer')
                 ->icon('heroicon-o-phone')
                 ->color('info')
-                ->url(fn () => 'tel:' . $this->record->order->customer_phone),
+                ->url(fn () => 'tel:'.$this->record->order->customer_phone),
 
             // Sends the vendor to the order page's Send Message action rather than
             // opening a blank WhatsApp chat — that path renders the vendor's

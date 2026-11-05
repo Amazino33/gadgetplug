@@ -42,8 +42,8 @@ class MarketingMaterialService
         $media = $material->getFirstMedia('artwork');
 
         return [
-            'material'  => $material,
-            'caption'   => $material->captionFor($affiliate, $link),
+            'material' => $material,
+            'caption' => $material->captionFor($affiliate, $link),
             'image_url' => $media?->getUrl(),
             'thumb_url' => $media ? $media->getUrl('thumb') : null,
         ];

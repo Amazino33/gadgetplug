@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers\Pos;
 
-use App\Models\Vendor;
-use App\Rules\QuantityStep;
-use App\Support\Quantity;
 use App\Http\Controllers\Controller;
 use App\Models\Procurement;
+use App\Models\Vendor;
+use App\Rules\QuantityStep;
 use App\Services\Inventory\TillStore;
 use App\Services\Procurement\ProcurementReview;
+use App\Support\Quantity;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\UnauthorizedException;
@@ -27,7 +27,7 @@ class PosProcurementController extends Controller
             ->where('vendor_id', $vendorId)
             ->where(function ($q) use ($storeId) {
                 $q->where('store_id', $storeId)
-                  ->orWhereNull('store_id');
+                    ->orWhereNull('store_id');
             })
             // Anything still open that this person can do something about:
             // deliveries nobody has picked up, and ones handed back to them
@@ -36,9 +36,9 @@ class PosProcurementController extends Controller
             // refuses.
             ->where(function ($q) use ($request) {
                 $q->where('status', Procurement::STATUS_PENDING)
-                  ->orWhere(fn ($r) => $r
-                      ->where('status', Procurement::STATUS_CHANGES_REQUESTED)
-                      ->where('awaiting_user_id', $request->user()->id));
+                    ->orWhere(fn ($r) => $r
+                        ->where('status', Procurement::STATUS_CHANGES_REQUESTED)
+                        ->where('awaiting_user_id', $request->user()->id));
             })
             ->orderBy('created_at', 'desc')
             ->get()
@@ -109,13 +109,13 @@ class PosProcurementController extends Controller
     public function correct(Request $request, Procurement $procurement, ProcurementReview $review): JsonResponse
     {
         $data = $request->validate([
-            'vendor_id'         => 'required|integer',
-            'lines'             => 'required|array|min:1',
+            'vendor_id' => 'required|integer',
+            'lines' => 'required|array|min:1',
             // Zero is a real answer here (nothing arrived); a half only for a
             // shop that sells halves.
-            'lines.*.quantity'  => ['nullable', 'numeric', 'min:0', new QuantityStep(Vendor::find($request->input('vendor_id')), allowZero: true)],
+            'lines.*.quantity' => ['nullable', 'numeric', 'min:0', new QuantityStep(Vendor::find($request->input('vendor_id')), allowZero: true)],
             'lines.*.unit_cost' => 'nullable|numeric|min:0',
-            'note'              => 'nullable|string|max:1000',
+            'note' => 'nullable|string|max:1000',
         ]);
 
         $storeId = $this->guardBranch($request, $procurement);
@@ -138,8 +138,8 @@ class PosProcurementController extends Controller
         }
 
         return response()->json([
-            'message'          => 'Sent back for re-check.',
-            'status'           => $updated->status,
+            'message' => 'Sent back for re-check.',
+            'status' => $updated->status,
             'awaiting_user_id' => $updated->awaiting_user_id,
         ]);
     }
@@ -152,7 +152,7 @@ class PosProcurementController extends Controller
     private function guardBranch(Request $request, Procurement $procurement): int|JsonResponse
     {
         $vendorId = (int) $request->vendor_id;
-        $storeId  = TillStore::resolve($request->user(), $vendorId);
+        $storeId = TillStore::resolve($request->user(), $vendorId);
 
         if ((int) $procurement->vendor_id !== $vendorId) {
             return response()->json(['message' => 'Procurement not found or does not belong to you.'], 404);

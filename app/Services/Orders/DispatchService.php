@@ -34,9 +34,9 @@ class DispatchService
     public static function codeColumns(string $code): array
     {
         return [
-            'delivery_code_hash'      => Hash::make($code),
-            'delivery_code_set_at'    => now(),
-            'delivery_code_attempts'  => 0,
+            'delivery_code_hash' => Hash::make($code),
+            'delivery_code_set_at' => now(),
+            'delivery_code_attempts' => 0,
             'delivery_code_locked_at' => null,
         ];
     }
@@ -113,13 +113,13 @@ class DispatchService
             $before = $locked->only(['logistics_company_id', 'rider_name', 'rider_phone', 'company_cost']);
 
             $locked->updateQuietly([
-                'logistics_company_id'  => $company->id,
+                'logistics_company_id' => $company->id,
                 // Platform orders never use a vendor's own rider records.
-                'delivery_person_id'    => null,
-                'rider_name'            => filled($riderName) ? trim($riderName) : null,
-                'rider_phone'           => filled($riderPhone) ? trim($riderPhone) : null,
-                'dispatch_assigned_at'  => now(),
-                'dispatch_assigned_by'  => $actor->id,
+                'delivery_person_id' => null,
+                'rider_name' => filled($riderName) ? trim($riderName) : null,
+                'rider_phone' => filled($riderPhone) ? trim($riderPhone) : null,
+                'dispatch_assigned_at' => now(),
+                'dispatch_assigned_by' => $actor->id,
                 'dispatch_link_version' => (int) $locked->dispatch_link_version + 1,
                 // What we pay is fixed once paid.
                 ...($locked->company_paid_at === null ? ['company_cost' => $cost] : []),

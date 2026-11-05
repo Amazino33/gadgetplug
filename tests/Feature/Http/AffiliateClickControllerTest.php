@@ -10,17 +10,17 @@ use App\Services\Affiliate\AttributionService;
 
 function makeClickTestProduct(): Product
 {
-    $owner    = User::factory()->create();
-    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Click Test Store ' . uniqid()]);
-    $category = Category::create(['name' => 'Click Test Category ' . uniqid()]);
+    $owner = User::factory()->create();
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Click Test Store '.uniqid()]);
+    $category = Category::create(['name' => 'Click Test Category '.uniqid()]);
 
     return Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'name'           => 'Click Test Product',
-        'price'          => 1000,
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'Click Test Product',
+        'price' => 1000,
         'stock_quantity' => 10,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 }
 
@@ -37,7 +37,7 @@ test('visiting the plain referral link logs a click, sets the cookie, and redire
 
 test('visiting a product deep-link logs a click, sets the cookie, and redirects to that product page', function () {
     $affiliate = Affiliate::findOrCreateForUser(User::factory()->create());
-    $product   = makeClickTestProduct();
+    $product = makeClickTestProduct();
 
     $response = $this->get("/r/{$affiliate->code}?to={$product->slug}");
 

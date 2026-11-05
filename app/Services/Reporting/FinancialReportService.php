@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services\Reporting;
 
-use App\Support\Quantity;
 use App\Models\Expense;
 use App\Models\FinancialAccount;
 use App\Models\FinancialLedgerEntry;
@@ -18,10 +17,10 @@ use App\Models\ProcurementLogisticsLeg;
 use App\Models\Product;
 use App\Models\Vendor;
 use App\Services\Inventory\StockValuation;
+use App\Support\Quantity;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
 
 // Cash-basis P&L: every cost line counts in the period it was actually PAID
 // (posted_at), never when it was incurred/recorded — matching the honesty
@@ -78,16 +77,16 @@ class FinancialReportService
             - $expenses['other'];
 
         return [
-            'revenue'           => $sales['revenue'],
+            'revenue' => $sales['revenue'],
             // Already netted off revenue above; reported so the page can say so.
             'cancelled_online_revenue' => $sales['cancelled_online_revenue'],
-            'product_cost'      => $sales['product_cost'],
+            'product_cost' => $sales['product_cost'],
             'inbound_logistics' => $inboundLogistics,
             'outbound_delivery' => $outboundDelivery,
-            'advertising'       => $expenses['advertising'],
-            'other_logistics'   => $expenses['logistics_other'],
-            'other_expenses'    => $expenses['other'],
-            'net_profit'        => $netProfit,
+            'advertising' => $expenses['advertising'],
+            'other_logistics' => $expenses['logistics_other'],
+            'other_expenses' => $expenses['other'],
+            'net_profit' => $netProfit,
             // True when any sold line in range had no recorded unit_cost, so
             // product_cost (and therefore net_profit) leans partly on today's
             // cost_price rather than what that unit actually cost at sale time.
@@ -176,10 +175,10 @@ class FinancialReportService
         $cancelled = $this->onlineCancellations($vendorId, $from, $to);
 
         return [
-            'revenue'      => (float) $online->revenue + $posRevenue - $returns['revenue'] - $cancelled['revenue'],
+            'revenue' => (float) $online->revenue + $posRevenue - $returns['revenue'] - $cancelled['revenue'],
             'product_cost' => (float) $online->product_cost + (float) $pos->product_cost - $returns['product_cost'] - $cancelled['product_cost'],
             'cancelled_online_revenue' => $cancelled['revenue'],
-            'estimated'    => ((int) $online->estimated_lines) > 0
+            'estimated' => ((int) $online->estimated_lines) > 0
                 || ((int) $pos->estimated_lines) > 0
                 || $returns['estimated'],
         ];
@@ -257,7 +256,7 @@ class FinancialReportService
             ->first();
 
         return [
-            'revenue'      => round((float) $row->revenue, 2),
+            'revenue' => round((float) $row->revenue, 2),
             'product_cost' => round((float) $row->product_cost, 2),
         ];
     }
@@ -293,7 +292,7 @@ class FinancialReportService
         $saleCosts = PosSaleItem::query()
             ->whereIn('pos_sale_id', $returns->pluck('original_sale_id')->filter()->unique())
             ->get(['pos_sale_id', 'product_id', 'unit_cost', 'quantity', 'cost_total'])
-            ->keyBy(fn (PosSaleItem $item) => $item->pos_sale_id . ':' . $item->product_id);
+            ->keyBy(fn (PosSaleItem $item) => $item->pos_sale_id.':'.$item->product_id);
 
         $revenue = 0.0;
         $productCost = 0.0;
@@ -306,7 +305,7 @@ class FinancialReportService
                 // What was actually refunded for these units.
                 $revenue += (float) ($line['total'] ?? 0);
 
-                $soldLine = $saleCosts->get($return->original_sale_id . ':' . ($line['product_id'] ?? 0));
+                $soldLine = $saleCosts->get($return->original_sale_id.':'.($line['product_id'] ?? 0));
 
                 // Reversed at the rate the sale itself booked. Where the sale
                 // was costed from its batches, cost_total covers the whole line
@@ -331,9 +330,9 @@ class FinancialReportService
         }
 
         return [
-            'revenue'      => round($revenue, 2),
+            'revenue' => round($revenue, 2),
             'product_cost' => round($productCost, 2),
-            'estimated'    => $estimated,
+            'estimated' => $estimated,
         ];
     }
 
@@ -366,9 +365,9 @@ class FinancialReportService
             ->pluck('total', 'category');
 
         return [
-            'advertising'     => (float) ($totals['advertising'] ?? 0),
+            'advertising' => (float) ($totals['advertising'] ?? 0),
             'logistics_other' => (float) ($totals['logistics_other'] ?? 0),
-            'other'           => (float) ($totals['other'] ?? 0),
+            'other' => (float) ($totals['other'] ?? 0),
         ];
     }
 
@@ -415,22 +414,22 @@ class FinancialReportService
         $initialCapital = (float) (Vendor::find($vendorId)?->initial_capital ?? 0);
 
         return [
-            'bank'               => $bankBalance,
-            'cash'               => $cashBalance,
-            'total_liquid'       => $bankBalance + $cashBalance,
-            'gadgetplug_due'     => round($dueBalance, 2),
-            'inventory_value'    => $inventoryValue,
+            'bank' => $bankBalance,
+            'cash' => $cashBalance,
+            'total_liquid' => $bankBalance + $cashBalance,
+            'gadgetplug_due' => round($dueBalance, 2),
+            'inventory_value' => $inventoryValue,
             // True when inventory_value is understated because some stocked
             // products have no cost recorded at all.
-            'inventory_cost_is_partial'   => $inventory['uncosted_product_count'] > 0,
+            'inventory_cost_is_partial' => $inventory['uncosted_product_count'] > 0,
             'inventory_missing_cost_count' => $inventory['uncosted_product_count'],
             'inventory_missing_cost_units' => $inventory['uncosted_units'],
             // Never negative in practice; an overpayment would show as a credit
             // owed back to the customer, which is worth seeing rather than
             // clamping away.
-            'customer_debt'      => round($customerDebt, 2),
-            'initial_capital'    => $initialCapital,
-            'cumulative_profit'  => $this->cumulativeProfit($vendorId, $asOf),
+            'customer_debt' => round($customerDebt, 2),
+            'initial_capital' => $initialCapital,
+            'cumulative_profit' => $this->cumulativeProfit($vendorId, $asOf),
         ];
     }
 

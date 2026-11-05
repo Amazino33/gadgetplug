@@ -11,10 +11,10 @@ class PlatformMessagingSetting extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'whatsapp_paused_at'       => 'datetime',
+        'whatsapp_paused_at' => 'datetime',
         'whatsapp_last_success_at' => 'datetime',
         'whatsapp_last_failure_at' => 'datetime',
-        'packed_reminder_sent_at'  => 'datetime',
+        'packed_reminder_sent_at' => 'datetime',
     ];
 
     public static function current(): self

@@ -33,7 +33,7 @@ return new class extends Migration
         DB::table('affiliate_tasks')->orderBy('id')->chunkById(200, function ($tasks) {
             foreach ($tasks as $task) {
                 DB::table('affiliate_tasks')->where('id', $task->id)->update([
-                    'task_type'     => $task->verification_type,
+                    'task_type' => $task->verification_type,
                     'points_reward' => (int) round((float) $task->reward_amount),
                 ]);
             }

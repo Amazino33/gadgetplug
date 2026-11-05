@@ -24,7 +24,7 @@ class WawpDriver implements MessagingDriver
 
     public function send(DeliveryMessage $message): DriverSendResult
     {
-        $instanceId  = config('services.wawp.instance_id');
+        $instanceId = config('services.wawp.instance_id');
         $accessToken = config('services.wawp.access_token');
 
         if (! $instanceId || ! $accessToken) {
@@ -34,10 +34,10 @@ class WawpDriver implements MessagingDriver
         $response = Http::timeout(15)
             ->asJson()
             ->post(self::ENDPOINT, [
-                'instance_id'  => $instanceId,
+                'instance_id' => $instanceId,
                 'access_token' => $accessToken,
-                'chatId'       => self::toChatId($message->to_number),
-                'message'      => $message->body,
+                'chatId' => self::toChatId($message->to_number),
+                'message' => $message->body,
             ])
             ->throw()
             ->json();
@@ -49,8 +49,8 @@ class WawpDriver implements MessagingDriver
         if (! self::looksSuccessful($response)) {
             return DriverSendResult::failed([
                 'driver' => 'wawp',
-                'error'  => 'Wawp returned HTTP 200 with a non-success body.',
-                'body'   => $response,
+                'error' => 'Wawp returned HTTP 200 with a non-success body.',
+                'body' => $response,
             ]);
         }
 

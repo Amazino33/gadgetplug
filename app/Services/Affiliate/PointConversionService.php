@@ -36,7 +36,7 @@ class PointConversionService
     public function convert(Affiliate $affiliate, int $points, string $idempotencyKey): AffiliatePointConversion
     {
         $settings = AffiliateSetting::current();
-        $minimum  = (int) $settings->min_points_conversion;
+        $minimum = (int) $settings->min_points_conversion;
 
         if ($points <= 0) {
             throw new RuntimeException('Enter how many points you want to convert.');
@@ -69,31 +69,31 @@ class PointConversionService
                     throw new RuntimeException("You only have {$balance} points available.");
                 }
 
-                $rate   = (float) $settings->naira_per_point;
+                $rate = (float) $settings->naira_per_point;
                 $amount = round($points * $rate, 2);
 
                 $conversion = AffiliatePointConversion::create([
-                    'affiliate_id'    => $locked->id,
-                    'points_spent'    => $points,
+                    'affiliate_id' => $locked->id,
+                    'points_spent' => $points,
                     'naira_per_point' => $rate,
-                    'amount'          => $amount,
+                    'amount' => $amount,
                     'idempotency_key' => $idempotencyKey,
                 ]);
 
                 // Points leave the points ledger...
                 $locked->plugPointTransactions()->create([
-                    'type'        => 'debit',
-                    'points'      => -$points,
-                    'source'      => 'conversion',
-                    'description' => "Converted {$points} points to ₦" . number_format($amount, 2) . " (conversion #{$conversion->id}).",
+                    'type' => 'debit',
+                    'points' => -$points,
+                    'source' => 'conversion',
+                    'description' => "Converted {$points} points to ₦".number_format($amount, 2)." (conversion #{$conversion->id}).",
                 ]);
 
                 // ...and arrive as cash through the existing wallet primitive.
                 // Straight to available: these points were already earned and
                 // settled, so there is nothing left to hold against.
                 $locked->walletTransactions()->create([
-                    'type'        => 'credit',
-                    'amount'      => $amount,
+                    'type' => 'credit',
+                    'amount' => $amount,
                     'description' => "Plug Points conversion — {$points} points (conversion #{$conversion->id}).",
                 ]);
 

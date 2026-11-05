@@ -4,12 +4,10 @@ use App\Models\Affiliate;
 use App\Models\AffiliateCommission;
 use App\Models\AffiliateLevel;
 use App\Models\AffiliateTask;
-use App\Models\Category;
 use App\Models\Order;
-use App\Models\Product;
 use App\Models\User;
-use App\Models\Vendor;
 use App\Models\WalletTransaction;
+use App\Services\Affiliate\AffiliateTaskService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Volt\Volt;
@@ -21,9 +19,9 @@ function makeDashboardAffiliate(float $availableBalance = 0.0): Affiliate
     if ($availableBalance != 0.0) {
         WalletTransaction::create([
             'affiliate_id' => $affiliate->id,
-            'type'         => 'credit',
-            'amount'       => $availableBalance,
-            'description'  => 'Seed credit',
+            'type' => 'credit',
+            'amount' => $availableBalance,
+            'description' => 'Seed credit',
         ]);
     }
 
@@ -33,21 +31,21 @@ function makeDashboardAffiliate(float $availableBalance = 0.0): Affiliate
 function makeDashboardCommission(Affiliate $affiliate, string $status, float $amount = 500): AffiliateCommission
 {
     $order = Order::create([
-        'reference'        => 'GP-' . uniqid(),
-        'customer_name'    => 'Dashboard Buyer',
-        'customer_email'   => 'buyer@example.com',
-        'customer_phone'   => '08040000000',
+        'reference' => 'GP-'.uniqid(),
+        'customer_name' => 'Dashboard Buyer',
+        'customer_email' => 'buyer@example.com',
+        'customer_phone' => '08040000000',
         'shipping_address' => 'Uyo, Akwa Ibom State — Test',
-        'total_amount'     => 5000,
-        'status'           => 'pending',
-        'payment_method'   => 'pay_on_delivery',
+        'total_amount' => 5000,
+        'status' => 'pending',
+        'payment_method' => 'pay_on_delivery',
     ]);
 
     return AffiliateCommission::create([
         'affiliate_id' => $affiliate->id,
-        'order_id'     => $order->id,
-        'amount'       => $amount,
-        'status'       => $status,
+        'order_id' => $order->id,
+        'amount' => $amount,
+        'status' => $status,
     ]);
 }
 
@@ -87,10 +85,10 @@ test('an eligible manual task shows a Submit button', function () {
     $this->actingAs($affiliate->user);
 
     AffiliateTask::create([
-        'name'               => 'Post to Instagram',
-        'verification_type'  => 'manual',
-        'reward_amount'      => 300,
-        'is_active'          => true,
+        'name' => 'Post to Instagram',
+        'verification_type' => 'manual',
+        'reward_amount' => 300,
+        'is_active' => true,
     ]);
 
     Volt::test('pages.account.affiliate')
@@ -103,12 +101,12 @@ test('an auto task shows as automatic, with no submit button', function () {
     $this->actingAs($affiliate->user);
 
     AffiliateTask::create([
-        'name'               => 'Reach ₦50,000 in sales',
-        'verification_type'  => 'auto',
-        'auto_metric'        => 'cleared_sales_value',
-        'auto_target'        => 50000,
-        'reward_amount'      => 1000,
-        'is_active'          => true,
+        'name' => 'Reach ₦50,000 in sales',
+        'verification_type' => 'auto',
+        'auto_metric' => 'cleared_sales_value',
+        'auto_target' => 50000,
+        'reward_amount' => 1000,
+        'is_active' => true,
     ]);
 
     Volt::test('pages.account.affiliate')
@@ -122,10 +120,10 @@ test('submitting a manual task with a proof screenshot creates a submission and 
     $this->actingAs($affiliate->user);
 
     $task = AffiliateTask::create([
-        'name'               => 'Post to Instagram',
-        'verification_type'  => 'manual',
-        'reward_amount'      => 300,
-        'is_active'          => true,
+        'name' => 'Post to Instagram',
+        'verification_type' => 'manual',
+        'reward_amount' => 300,
+        'is_active' => true,
     ]);
 
     Volt::test('pages.account.affiliate')
@@ -196,15 +194,15 @@ test('a task with no remaining eligibility shows a not-eligible message instead 
     $this->actingAs($affiliate->user);
 
     $task = AffiliateTask::create([
-        'name'                          => 'One-time bonus',
-        'verification_type'             => 'manual',
-        'reward_amount'                 => 300,
+        'name' => 'One-time bonus',
+        'verification_type' => 'manual',
+        'reward_amount' => 300,
         'max_completions_per_affiliate' => 1,
-        'is_active'                     => true,
+        'is_active' => true,
     ]);
 
     // Already has a pending submission — not eligible for another right now.
-    app(\App\Services\Affiliate\AffiliateTaskService::class)->submit($task, $affiliate);
+    app(AffiliateTaskService::class)->submit($task, $affiliate);
 
     Volt::test('pages.account.affiliate')
         ->assertSee('Not eligible right now');

@@ -18,8 +18,8 @@ uses(RefreshDatabase::class);
 function velocityVendor(): array
 {
     $owner = User::factory()->create();
-    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Velocity Store ' . uniqid()]);
-    $category = Category::create(['name' => 'Velocity Category ' . uniqid()]);
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Velocity Store '.uniqid()]);
+    $category = Category::create(['name' => 'Velocity Category '.uniqid()]);
 
     return compact('owner', 'vendor', 'category');
 }
@@ -27,25 +27,25 @@ function velocityVendor(): array
 function velocityProduct(array $data, array $overrides = []): Product
 {
     return Product::create(array_merge([
-        'vendor_id'      => $data['vendor']->id,
-        'category_id'    => $data['category']->id,
-        'name'           => 'Velocity Widget ' . uniqid(),
-        'price'          => 1000,
-        'cost_price'     => 500,
+        'vendor_id' => $data['vendor']->id,
+        'category_id' => $data['category']->id,
+        'name' => 'Velocity Widget '.uniqid(),
+        'price' => 1000,
+        'cost_price' => 500,
         'stock_quantity' => 0,
-        'status'         => 'published',
-        'created_at'     => now()->subYear(), // long-established unless overridden
+        'status' => 'published',
+        'created_at' => now()->subYear(), // long-established unless overridden
     ], $overrides));
 }
 
 function deliverOnline(array $data, Product $product, int $quantity, $recognizedAt): void
 {
     $order = Order::create([
-        'reference'             => 'ORD-VEL-' . uniqid(),
-        'customer_name'         => 'Buyer', 'customer_email' => 'buyer@example.com',
-        'customer_phone'        => '08040000000', 'shipping_address' => 'Uyo',
-        'total_amount'          => $product->price * $quantity,
-        'status'                => 'delivered', 'payment_method' => 'pay_on_delivery',
+        'reference' => 'ORD-VEL-'.uniqid(),
+        'customer_name' => 'Buyer', 'customer_email' => 'buyer@example.com',
+        'customer_phone' => '08040000000', 'shipping_address' => 'Uyo',
+        'total_amount' => $product->price * $quantity,
+        'status' => 'delivered', 'payment_method' => 'pay_on_delivery',
         'revenue_recognized_at' => $recognizedAt,
     ]);
 
@@ -58,13 +58,13 @@ function deliverOnline(array $data, Product $product, int $quantity, $recognized
 function deliverPos(array $data, Product $product, int $quantity, $completedAt, string $status = 'completed'): void
 {
     $sale = PosSale::create([
-        'reference'    => 'POS-VEL-' . uniqid(),
-        'vendor_id'    => $data['vendor']->id,
-        'cashier_id'   => $data['owner']->id,
-        'subtotal'     => $product->price * $quantity,
-        'total'        => $product->price * $quantity,
+        'reference' => 'POS-VEL-'.uniqid(),
+        'vendor_id' => $data['vendor']->id,
+        'cashier_id' => $data['owner']->id,
+        'subtotal' => $product->price * $quantity,
+        'total' => $product->price * $quantity,
         'payment_method' => 'cash',
-        'status'       => $status,
+        'status' => $status,
         'completed_at' => $completedAt,
     ]);
 
@@ -281,7 +281,7 @@ test('each vendor only sees its own products and sales', function () {
 
 test('forVendor can be scoped to a single category', function () {
     $data = velocityVendor();
-    $otherCategory = Category::create(['name' => 'Other Category ' . uniqid()]);
+    $otherCategory = Category::create(['name' => 'Other Category '.uniqid()]);
     $inCategory = velocityProduct($data, ['stock_quantity' => 5]);
     $outOfCategory = velocityProduct($data, ['stock_quantity' => 5, 'category_id' => $otherCategory->id]);
 

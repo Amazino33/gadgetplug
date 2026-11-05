@@ -1,10 +1,14 @@
 <?php
 
 use App\Filament\Vendor\Pages\ImportProducts;
+use App\Filament\Vendor\Resources\Products\ProductResource;
+use App\Models\ImportLog;
 use App\Models\ImportMappingTemplate;
 use App\Models\Product;
+use App\Models\Store;
 use App\Models\User;
 use App\Models\Vendor;
+use App\Services\ActiveStore;
 use App\Services\VendorRoles;
 use Database\Seeders\VendorPermissionsSeeder;
 use Filament\Facades\Filament;
@@ -17,7 +21,7 @@ uses(RefreshDatabase::class);
 
 function importScreenContext(): array
 {
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
 
     $owner = User::factory()->create();
     $staff = User::factory()->create();
@@ -179,11 +183,11 @@ it('saves a mapping and applies it to the next file', function () {
 
     expect($template->name)->toBe('Aronium export')
         ->and($template->mapping)->toBe([
-            'Name'         => 'name',
+            'Name' => 'name',
             'ProductGroup' => 'category',
-            'SKU'          => 'sku',
-            'Cost'         => 'cost_price',
-            'Price'        => 'price',
+            'SKU' => 'sku',
+            'Cost' => 'cost_price',
+            'Price' => 'price',
         ]);
 
     // A fresh upload, mapped from the saved template rather than the guess.
@@ -254,7 +258,7 @@ it('homes imported products in a branch, so they are visible in the products lis
     expect($product->store_id)->not->toBeNull()
         ->and($product->storeStocks()->count())->toBe(1)
         ->and(
-            \App\Filament\Vendor\Resources\Products\ProductResource::getEloquentQuery()
+            ProductResource::getEloquentQuery()
                 ->whereKey($product->id)
                 ->exists()
         )->toBeTrue();
@@ -292,7 +296,7 @@ it('imports a catalogue too large for one request, a batch at a time', function 
 
     expect(Product::count())->toBe(130);
 
-    $log = \App\Models\ImportLog::latest('id')->firstOrFail();
+    $log = ImportLog::latest('id')->firstOrFail();
 
     expect($log->status)->toBe('completed')
         ->and($log->created_count)->toBe(130)
@@ -472,7 +476,7 @@ it('shows which store new products will land in, on every step', function () {
 
     enterVendorPanelAs($c['owner'], $c['vendor']);
 
-    $defaultStore = \App\Services\ActiveStore::get($c['vendor'], $c['owner']);
+    $defaultStore = ActiveStore::get($c['vendor'], $c['owner']);
 
     Livewire::test(ImportProducts::class)
         ->assertSee($defaultStore->name)
@@ -483,11 +487,11 @@ it('reflects a switched store immediately, without leaving the page', function (
     $c = importScreenContext();
     Storage::fake('local');
 
-    $second = \App\Models\Store::create(['vendor_id' => $c['vendor']->id, 'name' => 'Second Branch']);
+    $second = Store::create(['vendor_id' => $c['vendor']->id, 'name' => 'Second Branch']);
 
     enterVendorPanelAs($c['owner'], $c['vendor']);
 
-    \App\Services\ActiveStore::set($c['vendor'], $c['owner'], $second->id);
+    ActiveStore::set($c['vendor'], $c['owner'], $second->id);
 
     Livewire::test(ImportProducts::class)->assertSee('Second Branch');
 });

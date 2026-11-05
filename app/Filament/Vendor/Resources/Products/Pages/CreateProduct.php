@@ -5,6 +5,7 @@ namespace App\Filament\Vendor\Resources\Products\Pages;
 use App\Filament\Vendor\Resources\Products\Pages\Concerns\ConfiguresProductPage;
 use App\Filament\Vendor\Resources\Products\ProductResource;
 use App\Filament\Vendor\Resources\Products\Schemas\ProductForm;
+use App\Services\ActiveStore;
 use Filament\Resources\Pages\CreateRecord;
 
 class CreateProduct extends CreateRecord
@@ -31,7 +32,7 @@ class CreateProduct extends CreateRecord
         // The home-store field is only shown to the owner. For anyone else the
         // product is homed in the branch they are working in — never left
         // without one, since ProductObserver opens its stock row there.
-        $data['store_id'] ??= \App\Services\ActiveStore::currentId();
+        $data['store_id'] ??= ActiveStore::currentId();
 
         return $data;
     }

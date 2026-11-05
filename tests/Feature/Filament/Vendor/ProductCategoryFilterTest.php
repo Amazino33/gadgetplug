@@ -17,12 +17,12 @@ uses(RefreshDatabase::class);
 
 function categoryFilterContext(): array
 {
-    $owner  = User::factory()->create();
-    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Filter Store ' . uniqid()]);
-    $store  = Store::where('vendor_id', $vendor->id)->where('is_default', true)->first();
+    $owner = User::factory()->create();
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Filter Store '.uniqid()]);
+    $store = Store::where('vendor_id', $vendor->id)->where('is_default', true)->first();
 
-    $phones = Category::create(['name' => 'Phones ' . uniqid()]);
-    $audio  = Category::create(['name' => 'Audio ' . uniqid()]);
+    $phones = Category::create(['name' => 'Phones '.uniqid()]);
+    $audio = Category::create(['name' => 'Audio '.uniqid()]);
 
     $make = fn (string $name, Category $category) => Product::create([
         'vendor_id' => $vendor->id, 'store_id' => $store->id,
@@ -33,7 +33,7 @@ function categoryFilterContext(): array
 
     $iphone = $make('Filter iPhone', $phones);
     $galaxy = $make('Filter Galaxy', $phones);
-    $buds   = $make('Filter Earbuds', $audio);
+    $buds = $make('Filter Earbuds', $audio);
 
     $owner->stores()->syncWithoutDetaching([$store->id]);
 
@@ -102,9 +102,9 @@ test('the filter offers only categories this shop actually stocks', function () 
     $ctx = categoryFilterContext();
 
     // Another vendor's category, on the same shared platform table.
-    $foreign = Category::create(['name' => 'Groceries ' . uniqid()]);
+    $foreign = Category::create(['name' => 'Groceries '.uniqid()]);
     $otherOwner = User::factory()->create();
-    $otherVendor = Vendor::create(['user_id' => $otherOwner->id, 'name' => 'Other Store ' . uniqid()]);
+    $otherVendor = Vendor::create(['user_id' => $otherOwner->id, 'name' => 'Other Store '.uniqid()]);
     Product::create([
         'vendor_id' => $otherVendor->id,
         'store_id' => Store::where('vendor_id', $otherVendor->id)->value('id'),

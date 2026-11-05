@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Auth;
 
 use App\Models\User;
+use Illuminate\Auth\Access\AuthorizationException;
 
 /**
  * Does this person hold this permission at THIS branch.
@@ -46,12 +47,12 @@ class StorePermission
     /**
      * The same question, phrased for a guard clause.
      *
-     * @throws \Illuminate\Auth\Access\AuthorizationException
+     * @throws AuthorizationException
      */
     public static function authorize(User $user, int $vendorId, int $storeId, string|array $permission): void
     {
         if (! self::allows($user, $vendorId, $storeId, $permission)) {
-            throw new \Illuminate\Auth\Access\AuthorizationException(
+            throw new AuthorizationException(
                 'You are not permitted to do that at this branch.'
             );
         }

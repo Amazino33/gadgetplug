@@ -33,10 +33,10 @@ class DefaultStore
         }
 
         return Store::create([
-            'vendor_id'  => $vendor->id,
-            'name'       => self::NAME,
+            'vendor_id' => $vendor->id,
+            'name' => self::NAME,
             'is_default' => true,
-            'is_active'  => true,
+            'is_active' => true,
         ]);
     }
 }

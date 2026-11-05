@@ -15,13 +15,13 @@ function tokenSyncBody(array $ctx, string $offlineId, array $extra = []): array
 {
     return [
         'vendor_id' => $ctx['vendor']->id,
-        'sales'     => [array_merge(debtSalePayload($ctx, [
-            'customer_id'     => null,
-            'payment_method'  => 'cash',
+        'sales' => [array_merge(debtSalePayload($ctx, [
+            'customer_id' => null,
+            'payment_method' => 'cash',
             'amount_tendered' => 10000,
-            'total'           => 10000,
+            'total' => 10000,
         ]), [
-            'offline_id'   => $offlineId,
+            'offline_id' => $offlineId,
             'completed_at' => now()->toIso8601String(),
         ], $extra)],
     ];
@@ -80,7 +80,7 @@ it('stays idempotent when the same sale is synced twice, and never rewrites the 
 
     $body = tokenSyncBody($ctx, 'till-twice', ['public_token' => 'Qq1wWw2eEe3rRr4T']);
 
-    $first  = $this->postJson('/api/pos/sync', $body)->assertOk()->json('results.0');
+    $first = $this->postJson('/api/pos/sync', $body)->assertOk()->json('results.0');
     $second = $this->postJson('/api/pos/sync', $body)->assertOk()->json('results.0');
 
     expect($second['status'])->toBe('duplicate')
@@ -108,7 +108,7 @@ it('rejects a token that already opens a different sale, rather than overwriting
     expect($clash['status'])->toBe('rejected')
         ->and($clash['message'])->toContain('different sale')
         ->and(PosSale::count())->toBe(1)
-        ->and(PosSale::sole()->reference)->toBe('POS-' . strtoupper(substr(md5('till-first'), 0, 8)));
+        ->and(PosSale::sole()->reference)->toBe('POS-'.strtoupper(substr(md5('till-first'), 0, 8)));
 });
 
 it('also accepts the token on the direct online path', function () {
@@ -171,7 +171,7 @@ it('hands the till the cashier and customer name in its history, for a matching 
         'payment_method' => 'cash', 'amount_tendered' => 10000,
     ]), ['offline_id' => 'till-history', 'public_token' => 'Xx1cCc2vVv3bBb4N']))->assertCreated();
 
-    $row = $this->getJson('/api/pos/sales/my-history?vendor_id=' . $ctx['vendor']->id)->assertOk()->json('data.0');
+    $row = $this->getJson('/api/pos/sales/my-history?vendor_id='.$ctx['vendor']->id)->assertOk()->json('data.0');
 
     expect($row['public_token'])->toBe('Xx1cCc2vVv3bBb4N')
         ->and($row['cashier_name'])->toBe($ctx['owner']->name)

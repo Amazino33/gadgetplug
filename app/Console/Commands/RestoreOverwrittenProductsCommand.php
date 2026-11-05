@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Support\Quantity;
 use App\Actions\Inventory\AdjustStockAction;
 use App\Models\AuditSession;
 use App\Models\Product;
 use App\Models\ProductStoreStock;
+use App\Support\Quantity;
 use Illuminate\Console\Command;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use LogicException;
 use Spatie\Activitylog\Models\Activity;
@@ -52,13 +53,13 @@ class RestoreOverwrittenProductsCommand extends Command
     public function handle(): int
     {
         $vendorId = (int) $this->argument('vendor');
-        $storeId  = $this->option('store');
-        $brand    = $this->option('brand');
-        $toStore  = $this->option('to-store');
-        $toBrand  = $this->option('to-brand');
-        $countId  = $this->option('stock-from-count');
+        $storeId = $this->option('store');
+        $brand = $this->option('brand');
+        $toStore = $this->option('to-store');
+        $toBrand = $this->option('to-brand');
+        $countId = $this->option('stock-from-count');
 
-        $around = \Illuminate\Support\Carbon::parse($this->argument('around'));
+        $around = Carbon::parse($this->argument('around'));
         $within = (int) $this->option('within');
 
         $products = Product::where('vendor_id', $vendorId)
@@ -96,9 +97,9 @@ class RestoreOverwrittenProductsCommand extends Command
             }
 
             $plan[] = [
-                'product'    => $product,
-                'restore'    => $restore,
-                'overwrite'  => $overwrite,
+                'product' => $product,
+                'restore' => $restore,
+                'overwrite' => $overwrite,
             ];
         }
 
@@ -137,10 +138,10 @@ class RestoreOverwrittenProductsCommand extends Command
             return self::SUCCESS;
         }
 
-        $restored   = 0;
+        $restored = 0;
         $stockFixed = 0;
-        $noLine     = 0;
-        $failed     = [];
+        $noLine = 0;
+        $failed = [];
 
         foreach ($plan as $p) {
             /** @var Product $product */
@@ -215,7 +216,7 @@ class RestoreOverwrittenProductsCommand extends Command
      * explicitly rather than assumed, because only the caller knows which
      * count was taken at the store this product is actually being restored to.
      *
-     * @return bool  whether a line existed in that count for this product
+     * @return bool whether a line existed in that count for this product
      */
     private function applyCountedStock(Product $product, int $countSessionId, int $storeId): bool
     {
@@ -227,7 +228,7 @@ class RestoreOverwrittenProductsCommand extends Command
             return false;
         }
 
-        $target  = $line->countedQuantity();
+        $target = $line->countedQuantity();
         $current = Quantity::of(ProductStoreStock::where('product_id', $product->id)
             ->where('store_id', $storeId)
             ->value('quantity') ?? 0);
@@ -261,7 +262,7 @@ class RestoreOverwrittenProductsCommand extends Command
      * every affected row was touched within seconds of that one timestamp,
      * confirmed from the import log itself.
      */
-    private function findOverwriteEvent(Product $product, \Illuminate\Support\Carbon $around, int $withinSeconds): ?Activity
+    private function findOverwriteEvent(Product $product, Carbon $around, int $withinSeconds): ?Activity
     {
         return Activity::where('subject_type', Product::class)
             ->where('subject_id', $product->id)

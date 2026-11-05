@@ -48,6 +48,7 @@ return new class extends Migration
 
             if (! $match) {
                 $unmapped[$name] = DB::table('checkouts')->whereNull('lga_id')->where('local_government', $name)->count();
+
                 continue;
             }
 

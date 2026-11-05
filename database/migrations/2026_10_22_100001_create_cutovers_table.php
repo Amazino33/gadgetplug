@@ -25,10 +25,10 @@ return new class extends Migration
         });
 
         DB::table('cutovers')->insert([
-            'key'         => 'order_status_service',
+            'key' => 'order_status_service',
             'happened_at' => now(),
-            'created_at'  => now(),
-            'updated_at'  => now(),
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
     }
 

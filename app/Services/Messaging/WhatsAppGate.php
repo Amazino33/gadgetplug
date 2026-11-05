@@ -84,9 +84,9 @@ class WhatsAppGate
 
                 if ($wait > 0) {
                     return [
-                        'action'  => 'wait',
+                        'action' => 'wait',
                         'seconds' => $wait + random_int(0, 2),
-                        'reason'  => $waitNumber >= $waitGlobal ? 'per_recipient_gap' : 'lane_gap',
+                        'reason' => $waitNumber >= $waitGlobal ? 'per_recipient_gap' : 'lane_gap',
                     ];
                 }
 
@@ -197,7 +197,7 @@ class WhatsAppGate
     {
         PlatformMessagingSetting::current()->update([
             'whatsapp_consecutive_failures' => 0,
-            'whatsapp_last_success_at'      => now(),
+            'whatsapp_last_success_at' => now(),
         ]);
     }
 
@@ -209,7 +209,7 @@ class WhatsAppGate
 
         $settings->update([
             'whatsapp_consecutive_failures' => $failures,
-            'whatsapp_last_failure_at'      => now(),
+            'whatsapp_last_failure_at' => now(),
         ]);
 
         if ($settings->whatsapp_paused_at !== null) {
@@ -280,8 +280,8 @@ class WhatsAppGate
     public function resume(?User $by = null): int
     {
         PlatformMessagingSetting::current()->update([
-            'whatsapp_paused_at'            => null,
-            'whatsapp_pause_reason'         => null,
+            'whatsapp_paused_at' => null,
+            'whatsapp_pause_reason' => null,
             'whatsapp_consecutive_failures' => 0,
         ]);
 
@@ -309,14 +309,14 @@ class WhatsAppGate
 
         try {
             $message = DeliveryMessage::create([
-                'vendor_id'      => null,
+                'vendor_id' => null,
                 'recipient_type' => 'ops',
-                'channel'        => 'sms',
-                'to_number'      => $to,
-                'body'           => $text,
-                'status'         => 'queued',
-                'template_key'   => 'ops_whatsapp_paused',
-                'priority'       => DeliveryMessage::P1,
+                'channel' => 'sms',
+                'to_number' => $to,
+                'body' => $text,
+                'status' => 'queued',
+                'template_key' => 'ops_whatsapp_paused',
+                'priority' => DeliveryMessage::P1,
             ]);
 
             app(MessagingService::class)->send($message);
@@ -334,17 +334,17 @@ class WhatsAppGate
         $todayStart = now()->setTimezone($this->timezone())->startOfDay();
 
         return [
-            'paused'        => $settings->whatsapp_paused_at !== null,
-            'paused_at'     => $settings->whatsapp_paused_at,
-            'pause_reason'  => $settings->whatsapp_pause_reason,
-            'last_success'  => $settings->whatsapp_last_success_at,
-            'failures_row'  => (int) $settings->whatsapp_consecutive_failures,
+            'paused' => $settings->whatsapp_paused_at !== null,
+            'paused_at' => $settings->whatsapp_paused_at,
+            'pause_reason' => $settings->whatsapp_pause_reason,
+            'last_success' => $settings->whatsapp_last_success_at,
+            'failures_row' => (int) $settings->whatsapp_consecutive_failures,
             'failures_today' => DeliveryMessage::where('channel', 'whatsapp')->where('status', 'failed')
                 ->where('updated_at', '>=', $todayStart->copy()->setTimezone(config('app.timezone')))->count(),
-            'sent_today'    => $this->sentSince($todayStart),
-            'daily_cap'     => $this->dailyCap(),
-            'warmup'        => (bool) config('messaging.throttle.warmup'),
-            'held'          => DeliveryMessage::where('status', DeliveryMessage::STATUS_HELD)->count(),
+            'sent_today' => $this->sentSince($todayStart),
+            'daily_cap' => $this->dailyCap(),
+            'warmup' => (bool) config('messaging.throttle.warmup'),
+            'held' => DeliveryMessage::where('status', DeliveryMessage::STATUS_HELD)->count(),
         ];
     }
 }

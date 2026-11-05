@@ -11,15 +11,16 @@ use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
-use UnitEnum;
 
 class AffiliateApplicationResource extends Resource
 {
     protected static ?string $model = AffiliateApplication::class;
 
-    protected static string|null|BackedEnum $navigationIcon  = 'heroicon-o-user-plus';
-    protected static ?string                $navigationLabel = 'Applications';
-    protected static ?int                   $navigationSort  = 1;
+    protected static string|null|BackedEnum $navigationIcon = 'heroicon-o-user-plus';
+
+    protected static ?string $navigationLabel = 'Applications';
+
+    protected static ?int $navigationSort = 1;
 
     public static function getNavigationGroup(): ?string
     {
@@ -62,7 +63,7 @@ class AffiliateApplicationResource extends Resource
     {
         return [
             'index' => ListAffiliateApplications::route('/'),
-            'view'  => ViewAffiliateApplication::route('/{record}'),
+            'view' => ViewAffiliateApplication::route('/{record}'),
         ];
     }
 }

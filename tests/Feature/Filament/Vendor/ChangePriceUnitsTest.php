@@ -15,21 +15,21 @@ use Spatie\Activitylog\Models\Activity;
 
 function changePriceShop(bool $halves = false): array
 {
-    $owner  = User::factory()->create();
+    $owner = User::factory()->create();
     $vendor = Vendor::create([
-        'user_id'               => $owner->id,
-        'name'                  => 'Change Price Shop '.uniqid(),
+        'user_id' => $owner->id,
+        'name' => 'Change Price Shop '.uniqid(),
         'allow_half_quantities' => $halves,
     ]);
 
     $product = Product::create([
-        'vendor_id'   => $vendor->id,
+        'vendor_id' => $vendor->id,
         'category_id' => Category::create(['name' => 'Drinks '.uniqid()])->id,
-        'name'        => 'Coke 50cl',
-        'base_unit'   => 'Bottle',
-        'price'       => 450,
-        'cost_price'  => 350,
-        'status'      => 'published',
+        'name' => 'Coke 50cl',
+        'base_unit' => 'Bottle',
+        'price' => 450,
+        'cost_price' => 350,
+        'status' => 'published',
     ]);
 
     $crate = ProductUnit::create([

@@ -18,9 +18,9 @@ uses(RefreshDatabase::class);
 
 function receiptSettingsAsOwner(): Vendor
 {
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
 
-    $owner  = User::factory()->create();
+    $owner = User::factory()->create();
     $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Receipt Store']);
     VendorRoles::seedFor($vendor);
 

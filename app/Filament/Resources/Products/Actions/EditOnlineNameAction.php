@@ -38,7 +38,7 @@ class EditOnlineNameAction
             ->visible(fn (Product $record): bool => ! $record->isLinked())
             ->authorize(fn (Product $record): bool => ! $record->isLinked() && Gate::allows('updateOnlineName', $record))
             ->fillForm(fn (Product $record): array => [
-                'online_name'      => $record->online_name,
+                'online_name' => $record->online_name,
                 'meta_description' => $record->meta_description,
             ])
             ->schema([
@@ -76,7 +76,7 @@ class EditOnlineNameAction
             })
             ->action(function (array $data, Product $record): void {
                 $record->update([
-                    'online_name'      => filled($data['online_name'] ?? null) ? trim($data['online_name']) : null,
+                    'online_name' => filled($data['online_name'] ?? null) ? trim($data['online_name']) : null,
                     'meta_description' => filled($data['meta_description'] ?? null) ? trim($data['meta_description']) : null,
                 ]);
 

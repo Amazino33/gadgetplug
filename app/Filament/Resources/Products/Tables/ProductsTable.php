@@ -168,15 +168,15 @@ class ProductsTable
                 SelectFilter::make('vendorlink')
                     ->label('VendorLink')
                     ->options([
-                        'linked'   => 'Resold listing (linked)',
+                        'linked' => 'Resold listing (linked)',
                         'supplier' => 'Supplier product (has resellers)',
-                        'own'      => 'Own stock, not resold',
+                        'own' => 'Own stock, not resold',
                     ])
                     ->query(fn (Builder $query, array $data) => match ($data['value'] ?? null) {
-                        'linked'   => $query->linked(),
+                        'linked' => $query->linked(),
                         'supplier' => $query->has('resoldListings'),
-                        'own'      => $query->ownStock()->doesntHave('resoldListings'),
-                        default    => $query,
+                        'own' => $query->ownStock()->doesntHave('resoldListings'),
+                        default => $query,
                     }),
 
                 TernaryFilter::make('visible_online')

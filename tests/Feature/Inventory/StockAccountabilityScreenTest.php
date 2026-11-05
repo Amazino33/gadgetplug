@@ -17,7 +17,7 @@ use Livewire\Livewire;
 
 function screenContext(): array
 {
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
 
     $owner = User::factory()->create();
     $staff = User::factory()->create();
@@ -32,24 +32,24 @@ function screenContext(): array
     $category = Category::firstOrCreate(['name' => 'Chargers']);
 
     $product = Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'name'           => 'SHPLUS 60W Charger',
-        'price'          => 5300,
-        'cost_price'     => 2570,
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'SHPLUS 60W Charger',
+        'price' => 5300,
+        'cost_price' => 2570,
         'stock_quantity' => 10,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
     $audit = AuditSession::create([
-        'vendor_id'        => $vendor->id,
-        'product_id'       => $product->id,
-        'system_quantity'  => 10,
+        'vendor_id' => $vendor->id,
+        'product_id' => $product->id,
+        'system_quantity' => 10,
         'storekeeper_a_id' => $staff->id,
-        'count_a'          => 7,
+        'count_a' => 7,
         'storekeeper_b_id' => $owner->id,
-        'count_b'          => 7,
-        'status'           => 'verified',
+        'count_b' => 7,
+        'status' => 'verified',
     ]);
 
     return compact('owner', 'staff', 'vendor', 'product', 'audit');
@@ -90,7 +90,7 @@ it('lets the owner reverse an entry, leaving the original standing', function ()
     expect(StockAccountabilityEntry::count())->toBe(2)
         ->and(StockAccountabilityEntry::where('disposition', 'reversal')->exists())->toBeTrue()
         ->and(app(StockAccountabilityLedger::class)->outstandingFor($c['staff']->id, $c['vendor']->id))
-            ->toBe(0.0);
+        ->toBe(0.0);
 });
 
 it('does not offer reverse to staff who are not the owner', function () {
@@ -158,14 +158,14 @@ it('totals what is owed, what was absorbed, and what nobody was named for', func
 
     // A second count, written off with nobody named.
     $second = AuditSession::create([
-        'vendor_id'        => $c['vendor']->id,
-        'product_id'       => $c['product']->id,
-        'system_quantity'  => 10,
+        'vendor_id' => $c['vendor']->id,
+        'product_id' => $c['product']->id,
+        'system_quantity' => 10,
         'storekeeper_a_id' => $c['staff']->id,
-        'count_a'          => 8,
+        'count_a' => 8,
         'storekeeper_b_id' => $c['owner']->id,
-        'count_b'          => 8,
-        'status'           => 'verified',
+        'count_b' => 8,
+        'status' => 'verified',
     ]);
     $ledger->attribute($second, 'written_off', null, $c['owner']->id);
 

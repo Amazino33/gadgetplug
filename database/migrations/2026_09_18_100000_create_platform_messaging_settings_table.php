@@ -24,7 +24,7 @@ return new class extends Migration
         });
 
         DB::table('platform_messaging_settings')->insert([
-            'id'         => 1,
+            'id' => 1,
             'created_at' => now(),
             'updated_at' => now(),
         ]);

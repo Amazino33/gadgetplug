@@ -17,7 +17,9 @@ use Spatie\Activitylog\Models\Activity;
 class OrderProgress
 {
     public const DONE = 'done';
+
     public const CURRENT = 'current';
+
     public const UPCOMING = 'upcoming';
 
     /**
@@ -26,18 +28,18 @@ class OrderProgress
     public function steps(Order $order): array
     {
         $reached = [
-            'placed'    => ['at' => $order->created_at, 'by' => $order->customer_name ?: 'Customer'],
+            'placed' => ['at' => $order->created_at, 'by' => $order->customer_name ?: 'Customer'],
             'confirmed' => $this->confirmation($order),
-            'packed'    => $order->packed_at ? ['at' => $order->packed_at, 'by' => $order->packedBy?->name] : null,
-            'shipped'   => $order->handed_over_at ? ['at' => $order->handed_over_at, 'by' => $order->handedOverBy?->name] : null,
+            'packed' => $order->packed_at ? ['at' => $order->packed_at, 'by' => $order->packedBy?->name] : null,
+            'shipped' => $order->handed_over_at ? ['at' => $order->handed_over_at, 'by' => $order->handedOverBy?->name] : null,
             'delivered' => $order->delivered_at ? ['at' => $order->delivered_at, 'by' => $this->deliveredBy($order)] : null,
         ];
 
         $labels = [
-            'placed'    => 'Placed',
+            'placed' => 'Placed',
             'confirmed' => $order->payment_method === 'pay_on_delivery' ? 'Confirmed' : 'Paid',
-            'packed'    => 'Packed',
-            'shipped'   => 'With rider',
+            'packed' => 'Packed',
+            'shipped' => 'With rider',
             'delivered' => 'Delivered',
         ];
 
@@ -47,15 +49,15 @@ class OrderProgress
         $onBranch = $this->branch($order) !== null;
 
         return collect($labels)->map(fn (string $label, string $key) => [
-            'key'   => $key,
+            'key' => $key,
             'label' => $label,
             'state' => match (true) {
-                $reached[$key] === null             => self::UPCOMING,
-                $key === $last && ! $onBranch       => self::CURRENT,
-                default                             => self::DONE,
+                $reached[$key] === null => self::UPCOMING,
+                $key === $last && ! $onBranch => self::CURRENT,
+                default => self::DONE,
             },
-            'at'    => $reached[$key]['at'] ?? null,
-            'by'    => $reached[$key]['by'] ?? null,
+            'at' => $reached[$key]['at'] ?? null,
+            'by' => $reached[$key]['by'] ?? null,
         ])->values()->all();
     }
 
@@ -68,20 +70,20 @@ class OrderProgress
     {
         if ($order->status === 'cancelled' || $order->cancelled_at) {
             return [
-                'key'    => 'cancelled',
-                'label'  => 'Cancelled',
-                'at'     => $order->cancelled_at,
-                'by'     => $order->cancelledBy?->name,
+                'key' => 'cancelled',
+                'label' => 'Cancelled',
+                'at' => $order->cancelled_at,
+                'by' => $order->cancelledBy?->name,
                 'reason' => $order->cancel_reason,
             ];
         }
 
         if ($order->status === 'returned' || $order->returned_at) {
             return [
-                'key'    => 'returned',
-                'label'  => 'Returned to store',
-                'at'     => $order->returned_at,
-                'by'     => $order->returnedBy?->name,
+                'key' => 'returned',
+                'label' => 'Returned to store',
+                'at' => $order->returned_at,
+                'by' => $order->returnedBy?->name,
                 'reason' => $order->return_reason,
             ];
         }

@@ -26,11 +26,11 @@ class OrderItemInfolist
                         ->badge()
                         ->formatStateUsing(fn ($state) => OrderStatusService::LABELS[$state] ?? ucfirst((string) $state))
                         ->color(fn ($state) => match ($state) {
-                            'confirmed', 'packed'                => 'info',
-                            'paid', 'delivered'                  => 'success',
-                            'shipped'                            => 'warning',
+                            'confirmed', 'packed' => 'info',
+                            'paid', 'delivered' => 'success',
+                            'shipped' => 'warning',
                             'cancelled', 'paid_but_failed_stock' => 'danger',
-                            default                              => 'gray',
+                            default => 'gray',
                         }),
 
                     TextEntry::make('order.payment_method')
@@ -58,7 +58,7 @@ class OrderItemInfolist
 
                     TextEntry::make('order.customer_phone')
                         ->label('Phone')
-                        ->url(fn ($state) => 'tel:' . preg_replace('/\D/', '', $state))
+                        ->url(fn ($state) => 'tel:'.preg_replace('/\D/', '', $state))
                         ->color('info')
                         ->copyable(),
 

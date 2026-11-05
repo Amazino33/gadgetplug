@@ -20,15 +20,14 @@ class FeedController extends Controller
     public function __construct(
         private readonly FeedQuery $feed,
         private readonly FeedCategories $categories,
-    ) {
-    }
+    ) {}
 
     public function index(Request $request): JsonResponse
     {
         $request->validate([
-            'cursor'   => 'nullable|string',
+            'cursor' => 'nullable|string',
             'category' => 'nullable|integer|exists:categories,id',
-            'search'   => 'nullable|string|max:100',
+            'search' => 'nullable|string|max:100',
         ]);
 
         $page = $this->feed->page(

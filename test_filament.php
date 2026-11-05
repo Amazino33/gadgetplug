@@ -1,33 +1,39 @@
 <?php
+
+use App\Models\SupplierLink;
+use App\Models\Vendor;
+use Filament\Facades\Filament;
+use Illuminate\Contracts\Console\Kernel;
+
 require __DIR__.'/vendor/autoload.php';
 $app = require_once __DIR__.'/bootstrap/app.php';
-$kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
+$kernel = $app->make(Kernel::class);
 $kernel->bootstrap();
 
-\DB::enableQueryLog();
+DB::enableQueryLog();
 
-$vendor1 = \App\Models\Vendor::first();
-$vendor2 = \App\Models\Vendor::skip(1)->first();
+$vendor1 = Vendor::first();
+$vendor2 = Vendor::skip(1)->first();
 
-if (!$vendor1 || !$vendor2) {
-    die("Need 2 vendors.\n");
+if (! $vendor1 || ! $vendor2) {
+    exit("Need 2 vendors.\n");
 }
 
-$link = \App\Models\SupplierLink::firstOrCreate([
+$link = SupplierLink::firstOrCreate([
     'reseller_vendor_id' => $vendor1->id,
     'supplier_vendor_id' => $vendor2->id,
 ]);
 
 // Simulate Filament Panel Tenancy
 // We just need to trigger the global scope if there is any.
-$panel = \Filament\Facades\Filament::getPanel('vendor');
-\Filament\Facades\Filament::setCurrentPanel($panel);
-\Filament\Facades\Filament::setTenant($vendor1);
+$panel = Filament::getPanel('vendor');
+Filament::setCurrentPanel($panel);
+Filament::setTenant($vendor1);
 
-echo "Tenant set to: " . \Filament\Facades\Filament::getTenant()->name . "\n";
+echo 'Tenant set to: '.Filament::getTenant()->name."\n";
 
-$link = \App\Models\SupplierLink::with('supplier')->find($link->id);
+$link = SupplierLink::with('supplier')->find($link->id);
 
-echo "Eager loaded supplier: " . ($link->supplier ? $link->supplier->name : "NULL") . "\n";
+echo 'Eager loaded supplier: '.($link->supplier ? $link->supplier->name : 'NULL')."\n";
 
-print_r(\DB::getQueryLog());
+print_r(DB::getQueryLog());

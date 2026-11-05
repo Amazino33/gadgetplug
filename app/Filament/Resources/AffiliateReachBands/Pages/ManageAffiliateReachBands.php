@@ -30,7 +30,7 @@ class ManageAffiliateReachBands extends ManageRecords
                 TextColumn::make('min_reach')
                     ->label('Range')
                     ->formatStateUsing(fn ($state, AffiliateReachBand $record) => number_format($state)
-                        . ' – ' . ($record->max_reach === null ? '∞' : number_format($record->max_reach)))
+                        .' – '.($record->max_reach === null ? '∞' : number_format($record->max_reach)))
                     ->sortable(),
 
                 TextColumn::make('points')->label('Points')->alignCenter()->weight('bold')->sortable(),

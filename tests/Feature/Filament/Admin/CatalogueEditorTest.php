@@ -1,7 +1,6 @@
 <?php
 
 use App\Filament\Pages\Dashboard;
-use App\Filament\Resources\Products\Pages\EditProduct;
 use App\Filament\Resources\Products\Pages\ListProducts;
 use App\Filament\Resources\Products\ProductResource;
 use App\Filament\Resources\Products\Tables\ProductsTable;
@@ -67,14 +66,14 @@ function catalogueProduct(?Vendor $vendor = null, array $overrides = []): Produc
     ]);
 
     return Product::create(array_merge([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => Category::firstOrCreate(['name' => 'Catalogue Cat'])->id,
-        'name'           => 'ITEL 2160 OLD ONE '.uniqid(),
-        'brand'          => 'itel',
-        'price'          => 25000,
-        'cost_price'     => EDITOR_COST_MARKER,
+        'vendor_id' => $vendor->id,
+        'category_id' => Category::firstOrCreate(['name' => 'Catalogue Cat'])->id,
+        'name' => 'ITEL 2160 OLD ONE '.uniqid(),
+        'brand' => 'itel',
+        'price' => 25000,
+        'cost_price' => EDITOR_COST_MARKER,
         'stock_quantity' => 3,
-        'status'         => 'published',
+        'status' => 'published',
     ], $overrides));
 }
 
@@ -281,13 +280,13 @@ test('a linked listing offers no image action; its row points at the supplier pr
     $link = SupplierLink::create([
         'reseller_vendor_id' => $reseller->id,
         'supplier_vendor_id' => $supplierProduct->vendor_id,
-        'markup_percent'     => 20,
+        'markup_percent' => 20,
     ]);
     $listing = catalogueProduct($reseller, [
         'source_product_id' => $supplierProduct->id,
-        'supplier_link_id'  => $link->id,
-        'stock_quantity'    => 0,
-        'cost_price'        => null,
+        'supplier_link_id' => $link->id,
+        'stock_quantity' => 0,
+        'cost_price' => null,
     ]);
 
     Livewire::test(ListProducts::class)
@@ -402,12 +401,12 @@ test('a linked listing\'s phone card says so and points at the supplier product'
     $link = SupplierLink::create([
         'reseller_vendor_id' => $reseller->id,
         'supplier_vendor_id' => $supplierProduct->vendor_id,
-        'markup_percent'     => 20,
+        'markup_percent' => 20,
     ]);
     $listing = catalogueProduct($reseller, [
         'source_product_id' => $supplierProduct->id,
-        'supplier_link_id'  => $link->id,
-        'cost_price'        => null,
+        'supplier_link_id' => $link->id,
+        'cost_price' => null,
     ]);
 
     Livewire::test(ListProducts::class)

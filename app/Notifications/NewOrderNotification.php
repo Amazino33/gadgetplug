@@ -9,10 +9,10 @@ use Illuminate\Notifications\Notification;
 class NewOrderNotification extends Notification
 {
     public function __construct(
-        public readonly Order  $order,
+        public readonly Order $order,
         public readonly Vendor $vendor,
-        public readonly int    $itemCount,
-        public readonly float  $vendorTotal,
+        public readonly int $itemCount,
+        public readonly float $vendorTotal,
     ) {}
 
     public function via(object $notifiable): array
@@ -23,19 +23,19 @@ class NewOrderNotification extends Notification
     public function toDatabase(object $notifiable): array
     {
         return [
-            'title'        => 'New order received',
-            'body'         => 'Order #' . $this->order->reference . ' — ' . $this->itemCount . ' item(s) worth ₦' . number_format($this->vendorTotal, 2),
-            'order_id'     => $this->order->id,
-            'reference'    => $this->order->reference,
-            'vendor_id'    => $this->vendor->id,
+            'title' => 'New order received',
+            'body' => 'Order #'.$this->order->reference.' — '.$this->itemCount.' item(s) worth ₦'.number_format($this->vendorTotal, 2),
+            'order_id' => $this->order->id,
+            'reference' => $this->order->reference,
+            'vendor_id' => $this->vendor->id,
             'vendor_total' => $this->vendorTotal,
-            'icon'         => 'heroicon-o-shopping-bag',
-            'color'        => 'success',
-            'actions'      => [
+            'icon' => 'heroicon-o-shopping-bag',
+            'color' => 'success',
+            'actions' => [
                 [
-                    'name'  => 'view',
+                    'name' => 'view',
                     'label' => 'View Order',
-                    'url'   => '/plug/' . $this->vendor->id . '/orders/' . $this->order->id,
+                    'url' => '/plug/'.$this->vendor->id.'/orders/'.$this->order->id,
                 ],
             ],
         ];

@@ -2,9 +2,9 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
-use App\Services\VendorRoles;
 use App\Models\Vendor;
+use App\Services\VendorRoles;
+use Illuminate\Database\Seeder;
 
 class VendorRolesBackfillSeeder extends Seeder
 {

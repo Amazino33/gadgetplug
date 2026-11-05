@@ -1,5 +1,6 @@
 <?php
 
+use Database\Seeders\MessageTemplateSeeder;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -59,7 +60,7 @@ return new class extends Migration
         $updated = DB::table('message_templates')
             ->where('key', 'customer_delivery_code')
             ->where('body', self::OLD_CODE_BODY)
-            ->update(['body' => \Database\Seeders\MessageTemplateSeeder::defaultBody('customer_delivery_code'), 'updated_at' => now()]);
+            ->update(['body' => MessageTemplateSeeder::defaultBody('customer_delivery_code'), 'updated_at' => now()]);
 
         if ($updated > 0) {
             logger()->info("Handover message: {$updated} stored copies updated to the merged wording.");

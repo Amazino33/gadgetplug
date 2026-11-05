@@ -4,11 +4,14 @@ use App\Actions\Inventory\AdjustStockAction;
 use App\Actions\Inventory\DispatchStockAction;
 use App\Actions\Inventory\ReleaseReservationAction;
 use App\Actions\Inventory\ReserveStockAction;
+use App\Actions\Procurement\ApproveProcurementAction;
 use App\Models\Category;
 use App\Models\InventoryLedger;
+use App\Models\Procurement;
 use App\Models\Product;
 use App\Models\ProductStoreStock;
 use App\Models\Store;
+use App\Models\Supplier;
 use App\Models\User;
 use App\Models\Vendor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -21,21 +24,21 @@ function stockVendor(): Vendor
     // of these actions resolves to when no store is named.
     return Vendor::create([
         'user_id' => User::factory()->create()->id,
-        'name'    => 'Stock Actions Vendor '.uniqid(),
+        'name' => 'Stock Actions Vendor '.uniqid(),
     ]);
 }
 
 function stockProduct(Vendor $vendor, int $quantity = 0, int $reserved = 0): Product
 {
     $product = Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => Category::create(['name' => 'Cat '.uniqid()])->id,
-        'name'           => 'Stock Product '.uniqid(),
-        'price'          => 1000,
-        'cost_price'     => 600,
+        'vendor_id' => $vendor->id,
+        'category_id' => Category::create(['name' => 'Cat '.uniqid()])->id,
+        'name' => 'Stock Product '.uniqid(),
+        'price' => 1000,
+        'cost_price' => 600,
         'stock_quantity' => 0,
         'reserved_stock' => 0,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
     // ProductObserver already opened the default-store row at zero, so this
@@ -73,9 +76,9 @@ test('the mirror is the sum across every store the product sits in', function ()
     $second = Store::create(['vendor_id' => $vendor->id, 'name' => 'Second Branch']);
     ProductStoreStock::create([
         'product_id' => $product->id,
-        'store_id'   => $second->id,
-        'quantity'   => 25,
-        'reserved'   => 3,
+        'store_id' => $second->id,
+        'quantity' => 25,
+        'reserved' => 3,
     ]);
 
     expect($product->fresh()->stock_quantity)->toBe(35)
@@ -204,22 +207,22 @@ test('procurement approval adds to the store row and the mirror', function () {
     $vendor = stockVendor();
     $product = stockProduct($vendor, 5);
 
-    $supplier = App\Models\Supplier::create(['vendor_id' => $vendor->id, 'name' => 'Supplier '.uniqid()]);
-    $procurement = App\Models\Procurement::create([
-        'vendor_id'   => $vendor->id,
+    $supplier = Supplier::create(['vendor_id' => $vendor->id, 'name' => 'Supplier '.uniqid()]);
+    $procurement = Procurement::create([
+        'vendor_id' => $vendor->id,
         'supplier_id' => $supplier->id,
-        'reference'   => 'PO-'.uniqid(),
-        'status'      => 'pending',
-        'created_by'  => $vendor->user_id,
+        'reference' => 'PO-'.uniqid(),
+        'status' => 'pending',
+        'created_by' => $vendor->user_id,
     ]);
     $procurement->items()->create([
-        'product_id'    => $product->id,
-        'quantity'      => 12,
-        'unit_cost'     => 600,
+        'product_id' => $product->id,
+        'quantity' => 12,
+        'unit_cost' => 600,
         'selling_price' => 1000,
     ]);
 
-    app(App\Actions\Procurement\ApproveProcurementAction::class)->execute($procurement);
+    app(ApproveProcurementAction::class)->execute($procurement);
 
     expect(storeRow($product)->quantity)->toBe(17)
         ->and($product->fresh()->stock_quantity)->toBe(17);

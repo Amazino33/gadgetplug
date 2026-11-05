@@ -2,9 +2,9 @@
 
 use App\Models\Category;
 use App\Models\Product;
-use Database\Factories\ProductFactory;
 use App\Models\User;
 use App\Models\Vendor;
+use Database\Factories\ProductFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Livewire\Volt\Volt;
@@ -20,19 +20,19 @@ beforeEach(function () {
 function searchableProduct(string $name, array $attrs = [], ?Category $category = null): Product
 {
     $vendor = Vendor::create([
-        'user_id'              => User::factory()->create()->id,
-        'name'                 => 'Search Store ' . uniqid(),
+        'user_id' => User::factory()->create()->id,
+        'name' => 'Search Store '.uniqid(),
         'online_sales_enabled' => true,
     ]);
 
     return ProductFactory::new()->withPhoto()->create(array_merge([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => ($category ?? Category::create(['name' => 'Search Category ' . uniqid()]))->id,
-        'name'           => $name,
-        'price'          => 25000,
+        'vendor_id' => $vendor->id,
+        'category_id' => ($category ?? Category::create(['name' => 'Search Category '.uniqid()]))->id,
+        'name' => $name,
+        'price' => 25000,
         'stock_quantity' => 5,
-        'status'         => 'published',
-        'show_online'    => true,
+        'status' => 'published',
+        'show_online' => true,
     ], $attrs));
 }
 
@@ -67,7 +67,7 @@ test('the brand is searchable as well as the name', function () {
 
 test('a name that starts with the term is ranked above one that merely contains it', function () {
     $contains = searchableProduct('Car Adapter For Charger Stand');
-    $starts   = searchableProduct('Charger Cable 2m');
+    $starts = searchableProduct('Charger Cable 2m');
 
     $ids = Volt::test('components.search-overlay')
         ->set('q', 'charger')

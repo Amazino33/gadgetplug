@@ -35,14 +35,14 @@ class CartService
             $cart[$productId]['quantity'] += $quantity;
         } else {
             $cart[$productId] = [
-                'quantity'  => $quantity,
-                'max'       => $available,
+                'quantity' => $quantity,
+                'max' => $available,
             ];
         }
 
         // Cap at available stock (physical minus already reserved for other orders)
         $cart[$productId]['quantity'] = min($cart[$productId]['quantity'], $available);
-        $cart[$productId]['max']      = $available;
+        $cart[$productId]['max'] = $available;
 
         Session::put('cart', $cart);
 

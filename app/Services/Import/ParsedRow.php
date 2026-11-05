@@ -14,8 +14,10 @@ namespace App\Services\Import;
 class ParsedRow
 {
     public const ACTION_CREATE = 'create';
+
     public const ACTION_UPDATE = 'update';
-    public const ACTION_SKIP   = 'skip';
+
+    public const ACTION_SKIP = 'skip';
 
     /**
      * @param  int  $line  1-based line in the source file, header included, so it matches what the vendor sees in Excel
@@ -30,8 +32,7 @@ class ParsedRow
         public readonly array $warnings = [],
         public readonly ?int $matchedProductId = null,
         public readonly array $raw = [],
-    ) {
-    }
+    ) {}
 
     public function action(): string
     {

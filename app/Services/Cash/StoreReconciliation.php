@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services\Cash;
 
-use App\Support\Quantity;
 use App\Models\AccountabilityLedgerEntry;
 use App\Models\CashSubmission;
 use App\Models\Expense;
@@ -18,6 +17,7 @@ use App\Services\Inventory\StoreStockMetrics;
 use App\Services\Pickings\PickingLedger;
 use App\Services\Pos\CustomerDebtService;
 use App\Services\Reporting\SalesReportService;
+use App\Support\Quantity;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -71,19 +71,19 @@ class StoreReconciliation
                 $figures = $this->forStore($store, $from, $to);
 
                 return [
-                    'store_id'    => $store->id,
-                    'store_name'  => $store->name,
-                    'collected'   => $figures['cash']['takings'],
-                    'spent'       => $figures['cash']['till_expenses'],
-                    'expected'    => $figures['cash']['expected'],
-                    'confirmed'   => $figures['cash']['confirmed'],
-                    'pending'     => $figures['outstanding']['pending_confirmation'],
+                    'store_id' => $store->id,
+                    'store_name' => $store->name,
+                    'collected' => $figures['cash']['takings'],
+                    'spent' => $figures['cash']['till_expenses'],
+                    'expected' => $figures['cash']['expected'],
+                    'confirmed' => $figures['cash']['confirmed'],
+                    'pending' => $figures['outstanding']['pending_confirmation'],
                     'outstanding' => $figures['outstanding']['unsubmitted'],
-                    'disputed'    => $figures['outstanding']['disputed'],
+                    'disputed' => $figures['outstanding']['disputed'],
                     'unexplained' => $figures['outstanding']['true_shortage'],
                     // Already resolved by forStore(); taking it from there keeps
                     // this to one pass per branch.
-                    'cashiers'    => collect($figures['cashiers']),
+                    'cashiers' => collect($figures['cashiers']),
                 ];
             })
             // A branch that neither took nor owes anything in the window is
@@ -97,26 +97,26 @@ class StoreReconciliation
     public function forStore(Store $store, CarbonInterface $from, CarbonInterface $to): array
     {
         $profit = $this->sales->summary($store->vendor_id, $from, $to, $store->id);
-        $cash   = $this->cash($store, $from, $to);
+        $cash = $this->cash($store, $from, $to);
 
         $figures = [
-            'store'  => ['id' => $store->id, 'name' => $store->name],
+            'store' => ['id' => $store->id, 'name' => $store->name],
             'period' => ['from' => $from->toDateTimeString(), 'to' => $to->toDateTimeString()],
 
             'profit' => [
                 'revenue' => round((float) $profit['revenue'], 2),
-                'cogs'    => round((float) $profit['cost'], 2),
-                'profit'  => round((float) $profit['profit'], 2),
+                'cogs' => round((float) $profit['cost'], 2),
+                'profit' => round((float) $profit['profit'], 2),
             ],
 
-            'cash'        => $cash,
+            'cash' => $cash,
             'outstanding' => $this->outstanding($store, $cash, $to),
-            'reversals'   => $this->reversals($store, $from, $to),
+            'reversals' => $this->reversals($store, $from, $to),
 
             // Frozen into the statement alongside the totals, because the
             // signoff is a conversation with named people — "the branch is
             // short" is not something anybody can answer for.
-            'cashiers'    => CashDrawer::cashiersAt($store->vendor_id, $store->id, $from, $to)->all(),
+            'cashiers' => CashDrawer::cashiersAt($store->vendor_id, $store->id, $from, $to)->all(),
         ];
 
         // Built last because it reads the figures above rather than recomputing
@@ -176,26 +176,26 @@ class StoreReconciliation
         $debt = (float) $figures['outstanding']['unpaid_debt']['total'];
 
         return [
-            'stock_at_cost'     => round((float) $stock->cost_value, 2),
-            'stock_units'       => Quantity::of($stock->units),
+            'stock_at_cost' => round((float) $stock->cost_value, 2),
+            'stock_units' => Quantity::of($stock->units),
             // Stock with no cost price is left out of the value rather than
             // valued at nothing, so the total is visibly understated.
-            'stock_uncosted'    => (int) $stock->missing_cost_count,
+            'stock_uncosted' => (int) $stock->missing_cost_count,
 
-            'sold_in_range'     => (float) $figures['profit']['revenue'],
-            'cogs_in_range'     => (float) $figures['profit']['cogs'],
-            'profit_in_range'   => (float) $figures['profit']['profit'],
+            'sold_in_range' => (float) $figures['profit']['revenue'],
+            'cogs_in_range' => (float) $figures['profit']['cogs'],
+            'profit_in_range' => (float) $figures['profit']['profit'],
 
-            'purchases'         => round($purchases, 2),
-            'expenses'          => round($expenses + (float) $figures['cash']['till_expenses'], 2),
+            'purchases' => round($purchases, 2),
+            'expenses' => round($expenses + (float) $figures['cash']['till_expenses'], 2),
 
-            'cash_outstanding'  => $cashOutstanding,
-            'customer_debt'     => $debt,
-            'pickings_retail'   => round((float) $pickings['value'], 2),
-            'pickings_units'    => Quantity::of($pickings['units']),
-            'staff_debts'       => max(0.0, $staffDebts),
+            'cash_outstanding' => $cashOutstanding,
+            'customer_debt' => $debt,
+            'pickings_retail' => round((float) $pickings['value'], 2),
+            'pickings_units' => Quantity::of($pickings['units']),
+            'staff_debts' => max(0.0, $staffDebts),
 
-            'total_balance'     => round(
+            'total_balance' => round(
                 (float) $stock->cost_value
                 + $cashOutstanding
                 + $debt
@@ -229,7 +229,7 @@ class StoreReconciliation
             ->whereBetween('created_at', [$from, $to])
             ->get();
 
-        $pending  = $this->sum($submissions, CashSubmission::STATUS_PENDING);
+        $pending = $this->sum($submissions, CashSubmission::STATUS_PENDING);
         $disputed = $this->sum($submissions, CashSubmission::STATUS_DISPUTED);
 
         $settled = $submissions->where('status', CashSubmission::STATUS_RESOLVED);
@@ -254,21 +254,21 @@ class StoreReconciliation
             ->sum(fn (CashSubmission $s) => (float) ($s->disputed_amount ?? 0)), 2);
 
         return [
-            'takings'          => $takings,
-            'till_expenses'    => round($expenses, 2),
-            'expected'         => $expected,
+            'takings' => $takings,
+            'till_expenses' => round($expenses, 2),
+            'expected' => $expected,
 
-            'confirmed'        => $confirmed,
-            'pending'          => $pending,
+            'confirmed' => $confirmed,
+            'pending' => $pending,
             'disputed_claimed' => $disputed,
             'disputed_received' => $disputedReceived,
 
             'settled_disputes' => round((float) $settled->sum('amount'), 2),
 
-            'submitted_total'  => round($confirmed + $pending + $disputed, 2),
+            'submitted_total' => round($confirmed + $pending + $disputed, 2),
 
             // Positive means short: less came back than should have.
-            'shortage'         => round($expected - $confirmed, 2),
+            'shortage' => round($expected - $confirmed, 2),
         ];
     }
 
@@ -304,21 +304,21 @@ class StoreReconciliation
             // pay, because it is read from the debt ledger rather than copied.
             // Carries its own aging, so "owed" and "owed since March" are not
             // the same line on the statement.
-            'unpaid_debt'          => [
-                'total'   => $debt['total'],
+            'unpaid_debt' => [
+                'total' => $debt['total'],
                 'buckets' => $debt['buckets'],
                 'debtors' => $debt['debtors'],
             ],
 
-            'unsubmitted'          => max(0.0, $unsubmitted),
-            'overage'              => $unsubmitted < 0 ? abs($unsubmitted) : 0.0,
+            'unsubmitted' => max(0.0, $unsubmitted),
+            'overage' => $unsubmitted < 0 ? abs($unsubmitted) : 0.0,
             'pending_confirmation' => $cash['pending'],
-            'disputed'             => $disputedGap,
+            'disputed' => $disputedGap,
 
             // What is left once every other bucket has spoken for itself:
             // cash that is late with nobody claiming to have moved it, plus
             // amounts two people cannot agree on. This is the Checkmate number.
-            'true_shortage'        => round($overdue + $disputedGap, 2),
+            'true_shortage' => round($overdue + $disputedGap, 2),
         ];
     }
 
@@ -353,10 +353,10 @@ class StoreReconciliation
             : (float) $r->amount);
 
         return [
-            'count'            => $rows->count(),
-            'voided_cash'      => round((float) $voidedCashValue, 2),
+            'count' => $rows->count(),
+            'voided_cash' => round((float) $voidedCashValue, 2),
             'voided_cash_count' => $voidedCash->count(),
-            'unexplained'      => $rows->where('reason', 'No reason given')->count(),
+            'unexplained' => $rows->where('reason', 'No reason given')->count(),
         ];
     }
 

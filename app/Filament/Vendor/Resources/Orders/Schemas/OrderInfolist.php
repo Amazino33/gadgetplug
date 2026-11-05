@@ -2,13 +2,14 @@
 
 namespace App\Filament\Vendor\Resources\Orders\Schemas;
 
-use App\Services\Orders\OrderStatusService;
 use App\Models\Affiliate;
 use App\Models\Order;
+use App\Services\Orders\OrderStatusService;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Illuminate\Support\Str;
 
 class OrderInfolist
 {
@@ -27,11 +28,11 @@ class OrderInfolist
                         ->badge()
                         ->formatStateUsing(fn ($state) => OrderStatusService::LABELS[$state] ?? ucfirst((string) $state))
                         ->color(fn ($state) => match ($state) {
-                            'confirmed', 'packed'                => 'info',
-                            'paid', 'delivered'                  => 'success',
-                            'shipped'                            => 'warning',
+                            'confirmed', 'packed' => 'info',
+                            'paid', 'delivered' => 'success',
+                            'shipped' => 'warning',
                             'cancelled', 'paid_but_failed_stock' => 'danger',
-                            default                              => 'gray',
+                            default => 'gray',
                         }),
 
                     TextEntry::make('payment_method')
@@ -39,13 +40,13 @@ class OrderInfolist
                         ->badge()
                         ->formatStateUsing(fn ($state) => match ($state) {
                             'pay_on_delivery' => 'Pay on Delivery',
-                            'wallet'           => 'Reseller (Wallet)',
-                            default            => 'Paystack',
+                            'wallet' => 'Reseller (Wallet)',
+                            default => 'Paystack',
                         })
                         ->color(fn ($state) => match ($state) {
                             'pay_on_delivery' => 'warning',
-                            'wallet'           => 'info',
-                            default            => 'success',
+                            'wallet' => 'info',
+                            default => 'success',
                         }),
 
                     TextEntry::make('total_amount')
@@ -74,7 +75,7 @@ class OrderInfolist
                         ->label('Wallet Debited')
                         ->weight('bold')
                         ->color('danger')
-                        ->formatStateUsing(fn ($state) => $state !== null ? '₦' . number_format(abs((float) $state), 2) : '—'),
+                        ->formatStateUsing(fn ($state) => $state !== null ? '₦'.number_format(abs((float) $state), 2) : '—'),
                 ]),
 
             Section::make('Customer')
@@ -86,7 +87,7 @@ class OrderInfolist
 
                     TextEntry::make('customer_phone')
                         ->label('Phone')
-                        ->url(fn ($state) => 'tel:' . preg_replace('/\D/', '', $state))
+                        ->url(fn ($state) => 'tel:'.preg_replace('/\D/', '', $state))
                         ->color('info')
                         ->copyable(),
 
@@ -214,10 +215,10 @@ class OrderInfolist
                     TextEntry::make('delivery_code_state')
                         ->label('Delivery code')
                         ->getStateUsing(fn (Order $record) => match (true) {
-                            $record->delivered_via === 'code'      => 'Used — delivered with the code',
-                            $record->isDeliveryCodeLocked()        => 'Locked after '.$record->delivery_code_attempts.' wrong tries',
-                            $record->delivery_code_hash !== null   => 'Sent to the customer'.($record->delivery_code_attempts ? ' · '.$record->delivery_code_attempts.' wrong '.\Illuminate\Support\Str::plural('try', $record->delivery_code_attempts) : ''),
-                            default                                => 'None yet (sent at handover)',
+                            $record->delivered_via === 'code' => 'Used — delivered with the code',
+                            $record->isDeliveryCodeLocked() => 'Locked after '.$record->delivery_code_attempts.' wrong tries',
+                            $record->delivery_code_hash !== null => 'Sent to the customer'.($record->delivery_code_attempts ? ' · '.$record->delivery_code_attempts.' wrong '.Str::plural('try', $record->delivery_code_attempts) : ''),
+                            default => 'None yet (sent at handover)',
                         })
                         ->badge()
                         ->color(fn (Order $record) => $record->isDeliveryCodeLocked() ? 'danger' : 'gray'),
@@ -264,7 +265,7 @@ class OrderInfolist
                                     $attributes = $changes['attributes'] ?? [];
 
                                     if (array_key_exists('status', $attributes)) {
-                                        return 'Status changed to ' . ucfirst(str_replace('_', ' ', $attributes['status']));
+                                        return 'Status changed to '.ucfirst(str_replace('_', ' ', $attributes['status']));
                                     }
 
                                     if (array_key_exists('logistics_company_id', $attributes) || array_key_exists('delivery_person_id', $attributes)) {

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Actions\Pickings;
 
-use App\Support\Quantity;
 use App\Actions\Finance\RecognizePosSaleRevenueAction;
 use App\Models\Picker;
 use App\Models\PickingItem;
@@ -12,7 +11,9 @@ use App\Models\PickingLedgerEntry;
 use App\Models\PosSale;
 use App\Models\PosSaleItem;
 use App\Models\Store;
+use App\Models\User;
 use App\Services\Pickings\PickingLedger;
+use App\Support\Quantity;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -43,8 +44,7 @@ class RecordPickingPaymentAction
 {
     public function __construct(
         private readonly RecognizePosSaleRevenueAction $recognizeRevenue,
-    ) {
-    }
+    ) {}
 
     /**
      * @param  array<int, int>  $itemIds  Lines to settle, in the order to fill them.
@@ -85,17 +85,17 @@ class RecordPickingPaymentAction
                 ->lockForUpdate()
                 ->exists()) {
                 return [
-                    'sale'          => null,
-                    'allocated'     => 0.0,
-                    'unallocated'   => 0.0,
+                    'sale' => null,
+                    'allocated' => 0.0,
+                    'unallocated' => 0.0,
                     'settled_units' => 0,
-                    'duplicate'     => true,
+                    'duplicate' => true,
                 ];
             }
 
             $remaining = round($amount, 2);
-            $settled   = [];
-            $lines     = [];
+            $settled = [];
+            $lines = [];
 
             // Read every ticked line first: allocation runs over the set twice,
             // and both passes need the same locked rows and the same prices.
@@ -116,9 +116,9 @@ class RecordPickingPaymentAction
                 }
 
                 $lines[] = [
-                    'item'   => $item,
-                    'price'  => $price,
-                    'held'   => PickingLedger::heldQuantity($item),
+                    'item' => $item,
+                    'price' => $price,
+                    'held' => PickingLedger::heldQuantity($item),
                     'credit' => PickingLedger::creditOnItem($item),
                 ];
             }
@@ -156,8 +156,8 @@ class RecordPickingPaymentAction
                 $lines[$index]['credit'] = 0.0;
 
                 $settled[] = [
-                    'item'       => $line['item'],
-                    'units'      => $units,
+                    'item' => $line['item'],
+                    'units' => $units,
                     'unit_price' => $line['price'],
                 ];
             }
@@ -184,24 +184,24 @@ class RecordPickingPaymentAction
 
             activity()
                 ->performedOn($picker)
-                ->causedBy($userId ? \App\Models\User::find($userId) : null)
+                ->causedBy($userId ? User::find($userId) : null)
                 ->tap(fn ($activity) => $activity->store_id = $storeId)
                 ->event('picking_payment')
                 ->withProperties([
-                    'amount'         => $amount,
-                    'allocated'      => round($amount - $remaining, 2),
+                    'amount' => $amount,
+                    'allocated' => round($amount - $remaining, 2),
                     'payment_method' => $paymentMethod,
                 ])
-                ->log("Payment of ₦" . number_format($amount, 2) . " received");
+                ->log('Payment of ₦'.number_format($amount, 2).' received');
 
             return [
-                'sale'          => $sale,
-                'allocated'     => round($amount - $remaining, 2),
+                'sale' => $sale,
+                'allocated' => round($amount - $remaining, 2),
                 // Money the ticked lines had no use for. The cashier hands it
                 // back — it is not recorded, because nothing was sold for it.
-                'unallocated'   => max(0.0, $remaining),
+                'unallocated' => max(0.0, $remaining),
                 'settled_units' => array_sum(array_column($settled, 'units')),
-                'duplicate'     => false,
+                'duplicate' => false,
             ];
         });
     }
@@ -223,14 +223,14 @@ class RecordPickingPaymentAction
         ?string $reference,
     ): void {
         PickingLedgerEntry::create([
-            'vendor_id'       => $picker->vendor_id,
+            'vendor_id' => $picker->vendor_id,
             'picking_item_id' => $item->id,
-            'direction'       => PickingLedgerEntry::DIRECTION_PAYMENT,
-            'reference'       => $reference,
-            'quantity'        => $units,
-            'amount'          => $amount,
-            'unit_price'      => $price,
-            'user_id'         => $userId,
+            'direction' => PickingLedgerEntry::DIRECTION_PAYMENT,
+            'reference' => $reference,
+            'quantity' => $units,
+            'amount' => $amount,
+            'unit_price' => $price,
+            'user_id' => $userId,
         ]);
     }
 
@@ -256,24 +256,24 @@ class RecordPickingPaymentAction
         ), 2);
 
         $sale = PosSale::create([
-            'reference'       => 'PICK-'.strtoupper(Str::random(8)),
-            'vendor_id'       => $picker->vendor_id,
-            'store_id'        => $storeId,
-            'cashier_id'      => $userId,
-            'customer_id'     => null,
-            'subtotal'        => $total,
+            'reference' => 'PICK-'.strtoupper(Str::random(8)),
+            'vendor_id' => $picker->vendor_id,
+            'store_id' => $storeId,
+            'cashier_id' => $userId,
+            'customer_id' => null,
+            'subtotal' => $total,
             'discount_amount' => 0,
-            'vat_amount'      => 0,
-            'total'           => $total,
-            'payment_method'  => $paymentMethod,
+            'vat_amount' => 0,
+            'total' => $total,
+            'payment_method' => $paymentMethod,
             // The sale is worth what was settled, not what was handed over:
             // money beyond that completes no unit and is still the picker's.
             'amount_tendered' => $total,
-            'change_given'    => 0,
-            'status'          => 'completed',
-            'synced'          => true,
-            'synced_at'       => now(),
-            'completed_at'    => now(),
+            'change_given' => 0,
+            'status' => 'completed',
+            'synced' => true,
+            'synced_at' => now(),
+            'completed_at' => now(),
         ]);
 
         foreach ($settled as $row) {
@@ -282,18 +282,18 @@ class RecordPickingPaymentAction
             $product = $item->product()->first();
 
             PosSaleItem::create([
-                'pos_sale_id'     => $sale->id,
-                'product_id'      => $item->product_id,
-                'product_name'    => $product?->name ?? 'Product',
-                'product_sku'     => $product?->sku,
-                'unit_price'      => $row['unit_price'],
+                'pos_sale_id' => $sale->id,
+                'product_id' => $item->product_id,
+                'product_name' => $product?->name ?? 'Product',
+                'product_sku' => $product?->sku,
+                'unit_price' => $row['unit_price'],
                 // What these exact units cost when they left the shelf, kept on
                 // the picking line for this moment. The product's cost price
                 // today may be nothing like it.
-                'unit_cost'       => $item->unit_cost,
-                'quantity'        => $row['units'],
+                'unit_cost' => $item->unit_cost,
+                'quantity' => $row['units'],
                 'discount_amount' => 0,
-                'total'           => round($row['units'] * $row['unit_price'], 2),
+                'total' => round($row['units'] * $row['unit_price'], 2),
             ]);
         }
 

@@ -1,6 +1,8 @@
 <?php
 
 use App\Models\AccountabilityLedgerEntry;
+use App\Models\PosSession;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 require_once __DIR__.'/Helpers.php';
@@ -11,11 +13,11 @@ uses(RefreshDatabase::class);
 function ledgerRow(array $ctx, array $attrs): AccountabilityLedgerEntry
 {
     return AccountabilityLedgerEntry::create(array_merge([
-        'vendor_id'     => $ctx['vendor']->id,
-        'store_id'      => $ctx['store']->id,
+        'vendor_id' => $ctx['vendor']->id,
+        'store_id' => $ctx['store']->id,
         'storekeeper_id' => $ctx['cashier']->id,
-        'created_by'    => $ctx['owner']->id,
-        'created_at'    => now(),
+        'created_by' => $ctx['owner']->id,
+        'created_at' => now(),
     ], $attrs));
 }
 
@@ -92,14 +94,14 @@ test('a variance is traceable to the branch and the session that produced it', f
     $session = closeCashUp(openCashUp($ctx), ['cash_variance' => -5000]);
 
     $row = ledgerRow($ctx, [
-        'entry_type'  => 'cash_shortage',
-        'amount'      => 5000,
-        'source_type' => App\Models\PosSession::class,
-        'source_id'   => $session->id,
+        'entry_type' => 'cash_shortage',
+        'amount' => 5000,
+        'source_type' => PosSession::class,
+        'source_id' => $session->id,
     ]);
 
     expect($row->store->id)->toBe($ctx['store']->id)
-        ->and(AccountabilityLedgerEntry::forSource(App\Models\PosSession::class, $session->id)->count())
+        ->and(AccountabilityLedgerEntry::forSource(PosSession::class, $session->id)->count())
         ->toBe(1)
         ->and(AccountabilityLedgerEntry::query()->forStore($ctx['store']->id)->cashVariances()->count())
         ->toBe(1);
@@ -120,5 +122,5 @@ test('the idempotency key still guards against double-posting', function () {
 
     expect(fn () => ledgerRow($ctx, [
         'entry_type' => 'cash_shortage', 'amount' => 5000, 'idempotency_key' => 'cashup:41:cash',
-    ]))->toThrow(Illuminate\Database\QueryException::class);
+    ]))->toThrow(QueryException::class);
 });

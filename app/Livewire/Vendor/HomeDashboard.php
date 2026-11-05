@@ -2,13 +2,18 @@
 
 namespace App\Livewire\Vendor;
 
-use App\Support\Quantity;
-use App\Services\ActiveStore;
-use App\Services\Reporting\SalesReportService;
-use App\Models\Product;
+use App\Filament\Vendor\Pages\ChangePrice;
+use App\Filament\Vendor\Pages\SalesReport;
+use App\Filament\Vendor\Resources\CustomerDebts\CustomerDebtResource;
+use App\Filament\Vendor\Resources\Orders\OrderResource;
+use App\Filament\Vendor\Resources\Products\ProductResource;
 use App\Models\Order;
+use App\Models\Product;
+use App\Services\ActiveStore;
+use App\Services\Pos\CustomerDebtService;
+use App\Services\Reporting\SalesReportService;
+use App\Support\Quantity;
 use Carbon\Carbon;
-use Illuminate\Support\Collection;
 use Livewire\Component;
 
 class HomeDashboard extends Component
@@ -19,7 +24,7 @@ class HomeDashboard extends Component
     {
         $vendor = filament()->getTenant();
         $user = auth()->user();
-        
+
         if ($vendor && $user) {
             $this->storeId = ActiveStore::get($vendor, $user)?->id;
         }
@@ -43,14 +48,14 @@ class HomeDashboard extends Component
         $reports = app(SalesReportService::class);
         $todayStart = Carbon::now('Africa/Lagos')->startOfDay();
         $todayEnd = Carbon::now('Africa/Lagos')->endOfDay();
-        
+
         $summary = $reports->summary($vendor->id, $todayStart, $todayEnd, $storeId);
-        
+
         // Low stock count scoped to active store
         // We evaluate this by checking which products are low stock in the active store.
         $productsQuery = Product::where('vendor_id', $vendor->id)
             ->where('status', 'published');
-            
+
         // Because low stock threshold logic is dynamic in the model methods, we'll fetch products and count.
         // For performance, we can just fetch all products (or only those in stock) and count using isStoreLowStock()
         // Wait, loading all products could be heavy.
@@ -58,14 +63,14 @@ class HomeDashboard extends Component
         // Let's do a basic query to count low stock.
         // In this LEAN v1, we can just use the accessor or a simple query.
         $lowStockCount = 0;
-        
+
         if ($storeId) {
             $lowStockCount = Product::where('vendor_id', $vendor->id)
                 ->where('status', 'published')
                 ->where('low_stock_threshold', '>', 0)
                 ->leftJoin('product_store_stock', function ($join) use ($storeId) {
                     $join->on('products.id', '=', 'product_store_stock.product_id')
-                         ->where('product_store_stock.store_id', '=', $storeId);
+                        ->where('product_store_stock.store_id', '=', $storeId);
                 })
                 ->whereRaw('COALESCE(product_store_stock.quantity, products.stock_quantity) - COALESCE(product_store_stock.reserved, products.reserved_stock) > 0')
                 ->whereRaw('COALESCE(product_store_stock.quantity, products.stock_quantity) - COALESCE(product_store_stock.reserved, products.reserved_stock) < products.low_stock_threshold')
@@ -82,13 +87,13 @@ class HomeDashboard extends Component
 
         // New orders (pending, confirmed)
         $newOrdersCount = Order::whereHas('items', function ($q) use ($vendor, $storeId) {
-                $q->where('vendor_id', $vendor->id);
-                if ($storeId) {
-                    $q->whereHas('storeAllocations', function ($a) use ($storeId) {
-                        $a->where('store_id', $storeId);
-                    });
-                }
-            })
+            $q->where('vendor_id', $vendor->id);
+            if ($storeId) {
+                $q->whereHas('storeAllocations', function ($a) use ($storeId) {
+                    $a->where('store_id', $storeId);
+                });
+            }
+        })
             ->whereIn('status', ['pending', 'confirmed'])
             ->count();
 
@@ -100,7 +105,7 @@ class HomeDashboard extends Component
                 'id' => 'record_sale',
                 'label' => 'Record Sale',
                 'icon' => 'heroicon-o-computer-desktop',
-                'route' => url('/sales-point/' . $vendor->slug),
+                'route' => url('/sales-point/'.$vendor->slug),
                 'permission' => 'access_pos',
                 'owner_prominence' => 'secondary',
                 'staff_prominence' => 'hero',
@@ -111,8 +116,8 @@ class HomeDashboard extends Component
                 'label' => "Today's Sales",
                 'icon' => 'heroicon-o-banknotes',
                 'route' => null,
-                'value' => '₦' . number_format($summary['revenue']),
-                'subtext' => 'Profit: ₦' . number_format($summary['profit']),
+                'value' => '₦'.number_format($summary['revenue']),
+                'subtext' => 'Profit: ₦'.number_format($summary['profit']),
                 'permission' => 'view_inventory_reports',
                 'owner_prominence' => 'hidden',
                 'staff_prominence' => 'secondary',
@@ -122,7 +127,7 @@ class HomeDashboard extends Component
                 'id' => 'view_sales',
                 'label' => 'View Sales',
                 'icon' => 'heroicon-o-presentation-chart-line',
-                'route' => \App\Filament\Vendor\Pages\SalesReport::getUrl(),
+                'route' => SalesReport::getUrl(),
                 'permission' => 'view_inventory_reports',
                 'owner_prominence' => 'hero',
                 'staff_prominence' => 'hidden',
@@ -142,7 +147,7 @@ class HomeDashboard extends Component
                 'id' => 'change_price',
                 'label' => 'Change Price',
                 'icon' => 'heroicon-o-currency-dollar',
-                'route' => \App\Filament\Vendor\Pages\ChangePrice::getUrl(),
+                'route' => ChangePrice::getUrl(),
                 'permission' => 'edit_products',
                 'owner_prominence' => 'hero',
                 'staff_prominence' => 'hidden',
@@ -152,7 +157,7 @@ class HomeDashboard extends Component
                 'id' => 'add_product',
                 'label' => 'Add Product',
                 'icon' => 'heroicon-o-plus-circle',
-                'route' => \App\Filament\Vendor\Resources\Products\ProductResource::getUrl('create'),
+                'route' => ProductResource::getUrl('create'),
                 'permission' => 'create_products',
                 'owner_prominence' => 'hero',
                 'staff_prominence' => 'hidden',
@@ -162,8 +167,8 @@ class HomeDashboard extends Component
                 'id' => 'record_debt_payment',
                 'label' => 'Record Debt Payment',
                 'icon' => 'heroicon-o-banknotes',
-                'route' => \App\Filament\Vendor\Resources\CustomerDebts\CustomerDebtResource::getUrl('index'),
-                'subtext' => '₦' . number_format(app(\App\Services\Pos\CustomerDebtService::class)->vendorOutstanding($vendor->id)) . ' outstanding',
+                'route' => CustomerDebtResource::getUrl('index'),
+                'subtext' => '₦'.number_format(app(CustomerDebtService::class)->vendorOutstanding($vendor->id)).' outstanding',
                 'permission' => 'view_customer_debts',
                 'owner_prominence' => 'hero',
                 'staff_prominence' => 'hidden',
@@ -173,7 +178,7 @@ class HomeDashboard extends Component
                 'id' => 'customer_debts',
                 'label' => 'Customer Debts',
                 'icon' => 'heroicon-o-users',
-                'route' => \App\Filament\Vendor\Resources\CustomerDebts\CustomerDebtResource::getUrl('index'),
+                'route' => CustomerDebtResource::getUrl('index'),
                 'permission' => 'view_customer_debts',
                 'owner_prominence' => 'secondary',
                 'staff_prominence' => 'secondary',
@@ -183,7 +188,7 @@ class HomeDashboard extends Component
                 'id' => 'new_orders',
                 'label' => 'New Orders',
                 'icon' => 'heroicon-o-shopping-bag',
-                'route' => \App\Filament\Vendor\Resources\Orders\OrderResource::getUrl('index'),
+                'route' => OrderResource::getUrl('index'),
                 'value' => $newOrdersCount,
                 'permission' => 'view_any_order_items',
                 'owner_prominence' => 'secondary',
@@ -191,23 +196,25 @@ class HomeDashboard extends Component
                 'color' => 'bg-white text-gray-900 border border-gray-200',
             ],
         ])
-        ->map(function ($tile) use ($isOwner) {
-            $tile['prominence'] = $isOwner ? $tile['owner_prominence'] : $tile['staff_prominence'];
-            $tile['is_hero'] = $tile['prominence'] === 'hero';
-            return $tile;
-        })
-        ->filter(function ($tile) use ($vendor, $user, $isOwner) {
-            if ($tile['prominence'] === 'hidden') {
-                return false;
-            }
-            if ($tile['id'] === 'new_orders' && !$vendor->online_sales_enabled) {
-                return false;
-            }
-            if ($isOwner) {
-                return true;
-            }
-            return $user->hasVendorPermission($vendor->id, $tile['permission']);
-        });
+            ->map(function ($tile) use ($isOwner) {
+                $tile['prominence'] = $isOwner ? $tile['owner_prominence'] : $tile['staff_prominence'];
+                $tile['is_hero'] = $tile['prominence'] === 'hero';
+
+                return $tile;
+            })
+            ->filter(function ($tile) use ($vendor, $user, $isOwner) {
+                if ($tile['prominence'] === 'hidden') {
+                    return false;
+                }
+                if ($tile['id'] === 'new_orders' && ! $vendor->online_sales_enabled) {
+                    return false;
+                }
+                if ($isOwner) {
+                    return true;
+                }
+
+                return $user->hasVendorPermission($vendor->id, $tile['permission']);
+            });
 
         // Alerts
         $alerts = [];
@@ -217,17 +224,17 @@ class HomeDashboard extends Component
                 'label' => "{$lowStockCount} items running low on stock",
                 'icon' => 'heroicon-s-exclamation-triangle',
                 'color' => 'text-amber-600 bg-amber-50',
-                'route' => \App\Filament\Vendor\Resources\Products\ProductResource::getUrl('index', ['tableFilters' => ['low_stock' => ['isActive' => true]]]), // Adjust based on actual filter
+                'route' => ProductResource::getUrl('index', ['tableFilters' => ['low_stock' => ['isActive' => true]]]), // Adjust based on actual filter
             ];
         }
-        
+
         if ($newOrdersCount > 0 && ($user->isSuperAdmin() || $vendor->isOwner($user) || $user->hasVendorPermission($vendor->id, 'view_any_order_items'))) {
             $alerts[] = [
                 'id' => 'new_orders_alert',
                 'label' => "{$newOrdersCount} new orders need fulfillment",
                 'icon' => 'heroicon-s-shopping-bag',
                 'color' => 'text-blue-600 bg-blue-50',
-                'route' => \App\Filament\Vendor\Resources\Orders\OrderResource::getUrl('index', ['tableFilters' => ['status' => ['value' => 'pending']]]),
+                'route' => OrderResource::getUrl('index', ['tableFilters' => ['status' => ['value' => 'pending']]]),
             ];
         }
 
@@ -252,11 +259,11 @@ class HomeDashboard extends Component
             'stores' => ActiveStore::accessibleFor($vendor, $user),
         ]);
     }
-    
+
     public function switchStore($storeId)
     {
         $vendor = filament()->getTenant();
-        
+
         if (empty($storeId) || $storeId === 'all') {
             $this->storeId = null;
         } else {

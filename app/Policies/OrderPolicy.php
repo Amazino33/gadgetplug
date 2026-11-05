@@ -4,14 +4,16 @@ declare(strict_types=1);
 
 namespace App\Policies;
 
-use Illuminate\Foundation\Auth\User as AuthUser;
 use App\Models\Order;
+use App\Models\OrderItemStoreAllocation;
+use App\Models\Vendor;
 use Illuminate\Auth\Access\HandlesAuthorization;
+use Illuminate\Foundation\Auth\User as AuthUser;
 
 class OrderPolicy
 {
     use HandlesAuthorization;
-    
+
     public function viewAny(AuthUser $authUser): bool
     {
         return $authUser->can('ViewAny:Order');
@@ -86,7 +88,7 @@ class OrderPolicy
     public function fulfil(AuthUser $user, Order $order): bool
     {
         $vendorId = (int) $order->items()->value('vendor_id');
-        $vendor = $vendorId ? \App\Models\Vendor::find($vendorId) : null;
+        $vendor = $vendorId ? Vendor::find($vendorId) : null;
 
         if (! $vendor || ! method_exists($user, 'hasVendorPermission')) {
             return false;
@@ -106,7 +108,7 @@ class OrderPolicy
             return $user->hasVendorPermission($vendorId, 'edit_order_items');
         }
 
-        $orderStores = \App\Models\OrderItemStoreAllocation::query()
+        $orderStores = OrderItemStoreAllocation::query()
             ->whereIn('order_item_id', $order->items()->pluck('id'))
             ->pluck('store_id');
 
@@ -123,5 +125,4 @@ class OrderPolicy
     {
         return method_exists($user, 'hasGlobalPermission') && $user->hasGlobalPermission('manage_dispatch');
     }
-
 }

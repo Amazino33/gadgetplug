@@ -159,7 +159,7 @@ class SendDeliveryMessageJob implements ShouldQueue
 
         Log::warning('Delivery message gave up after retries.', [
             'delivery_message_id' => $this->deliveryMessageId,
-            'exception'           => $e->getMessage(),
+            'exception' => $e->getMessage(),
         ]);
     }
 }

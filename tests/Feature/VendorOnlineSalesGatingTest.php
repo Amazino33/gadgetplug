@@ -4,10 +4,10 @@ use App\Filament\Resources\Vendors\VendorResource;
 use App\Models\Category;
 use App\Models\Order;
 use App\Models\Product;
-use Database\Factories\ProductFactory;
 use App\Models\User;
 use App\Models\Vendor;
 use App\Services\CartService;
+use Database\Factories\ProductFactory;
 use Database\Seeders\VendorPermissionsSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -20,24 +20,24 @@ uses(RefreshDatabase::class);
 
 function gatingVendorProduct(bool $onlineSalesEnabled): array
 {
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
 
     $owner = User::factory()->create();
     $vendor = Vendor::create([
-        'user_id'               => $owner->id,
-        'name'                  => 'Gating Test Store ' . uniqid(),
-        'online_sales_enabled'  => $onlineSalesEnabled,
+        'user_id' => $owner->id,
+        'name' => 'Gating Test Store '.uniqid(),
+        'online_sales_enabled' => $onlineSalesEnabled,
     ]);
-    $category = Category::create(['name' => 'Gating Test Category ' . uniqid()]);
+    $category = Category::create(['name' => 'Gating Test Category '.uniqid()]);
     $product = ProductFactory::new()->withPhoto()->create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'name'           => 'Gated Widget ' . uniqid(),
-        'price'          => 5000,
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'Gated Widget '.uniqid(),
+        'price' => 5000,
         'stock_quantity' => 10,
-        'status'         => 'published',
-        'show_online'    => true,
-        'show_in_pos'    => true,
+        'status' => 'published',
+        'show_online' => true,
+        'show_in_pos' => true,
     ]);
 
     return compact('owner', 'vendor', 'category', 'product');
@@ -93,7 +93,7 @@ test('checkout drops a disabled vendor\'s item on load, before InitiateCheckout 
     $disabled = gatingVendorProduct(false);
 
     Session::put('cart', [
-        $enabled['product']->id  => ['quantity' => 1, 'max' => 10],
+        $enabled['product']->id => ['quantity' => 1, 'max' => 10],
         $disabled['product']->id => ['quantity' => 1, 'max' => 10],
     ]);
 

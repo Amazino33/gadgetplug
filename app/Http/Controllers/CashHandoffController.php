@@ -30,7 +30,7 @@ class CashHandoffController extends Controller
 
         return view('cash.handoff', [
             'submission' => $submission->load(['submitter', 'store']),
-            'token'      => $token,
+            'token' => $token,
         ]);
     }
 
@@ -44,7 +44,7 @@ class CashHandoffController extends Controller
 
         return view('cash.handoff-done', [
             'submission' => $submission->load('submitter'),
-            'disputed'   => false,
+            'disputed' => false,
         ]);
     }
 
@@ -53,7 +53,7 @@ class CashHandoffController extends Controller
         $data = Validator::make($request->all(), [
             // Required: a dispute with no account of it leaves two figures and
             // no way to tell which is wrong.
-            'note'            => ['required', 'string', 'max:500'],
+            'note' => ['required', 'string', 'max:500'],
             'disputed_amount' => ['nullable', 'numeric', 'min:0'],
         ])->validate();
 
@@ -70,7 +70,7 @@ class CashHandoffController extends Controller
 
         return view('cash.handoff-done', [
             'submission' => $submission->load('submitter'),
-            'disputed'   => true,
+            'disputed' => true,
         ]);
     }
 }

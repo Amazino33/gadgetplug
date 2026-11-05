@@ -16,7 +16,7 @@ class ListProducts extends ListRecords
      * filter panel always agree.
      */
     public const QUICK_FILTERS = [
-        'no_photo'       => 'No photo',
+        'no_photo' => 'No photo',
         'no_online_name' => 'No online name',
     ];
 

@@ -29,8 +29,8 @@ class SendTestWhatsAppCommand extends Command
     public function handle(): int
     {
         $normalized = PhoneNumber::toNigerianInternational($this->argument('phone'));
-        $body       = (string) $this->option('message');
-        $driverKey  = $this->option('driver') ?: config('services.messaging.whatsapp_driver') ?: 'wawp';
+        $body = (string) $this->option('message');
+        $driverKey = $this->option('driver') ?: config('services.messaging.whatsapp_driver') ?: 'wawp';
 
         $this->line("Driver:    <info>{$driverKey}</info>");
         $this->line("Recipient: <info>{$normalized}</info>");
@@ -58,9 +58,9 @@ class SendTestWhatsAppCommand extends Command
     {
         $this->newLine();
         $this->line('Status: '.match ($result->status) {
-            'sent'           => '<info>sent</info>',
+            'sent' => '<info>sent</info>',
             'link_generated' => '<comment>link_generated (needs a manual tap)</comment>',
-            default          => '<error>'.$result->status.'</error>',
+            default => '<error>'.$result->status.'</error>',
         });
 
         $this->line('Provider response:');
@@ -72,10 +72,10 @@ class SendTestWhatsAppCommand extends Command
     private function driverFor(string $key): MessagingDriver
     {
         return match ($key) {
-            'wawp'           => app(WawpDriver::class),
+            'wawp' => app(WawpDriver::class),
             'whatsapp_cloud' => app(WhatsAppCloudApiDriver::class),
-            'wa_link'        => app(WaLinkDriver::class),
-            default          => throw new InvalidArgumentException("Unknown WhatsApp driver [{$key}]."),
+            'wa_link' => app(WaLinkDriver::class),
+            default => throw new InvalidArgumentException("Unknown WhatsApp driver [{$key}]."),
         };
     }
 
@@ -85,7 +85,7 @@ class SendTestWhatsAppCommand extends Command
     {
         return new DeliveryMessage([
             'to_number' => $toNumber,
-            'body'      => $body,
+            'body' => $body,
         ]);
     }
 }

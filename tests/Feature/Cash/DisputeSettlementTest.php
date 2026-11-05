@@ -6,9 +6,10 @@ use App\Models\AccountabilityLedgerEntry;
 use App\Models\CashSubmission;
 use App\Models\User;
 use App\Services\Cash\CashDrawer;
+use App\Services\Cash\StoreReconciliation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
-require_once __DIR__ . '/Helpers.php';
+require_once __DIR__.'/Helpers.php';
 
 uses(RefreshDatabase::class);
 
@@ -153,7 +154,7 @@ test('a dispute cannot be settled twice, and nobody is charged twice', function 
 test('a settled dispute stops counting as contested on the settlement', function () {
     $ctx = disputedHandover(claimed: 50000, received: 42000);
 
-    $before = app(App\Services\Cash\StoreReconciliation::class)
+    $before = app(StoreReconciliation::class)
         ->forStore($ctx['store'], now()->subMonth(), now()->addDay());
 
     expect($before['outstanding']['disputed'])->toBe(8000.0)
@@ -163,7 +164,7 @@ test('a settled dispute stops counting as contested on the settlement', function
         $ctx['submission'], $ctx['owner'], CashSubmission::OUTCOME_CHARGED, 'Short by 8,000',
     );
 
-    $after = app(App\Services\Cash\StoreReconciliation::class)
+    $after = app(StoreReconciliation::class)
         ->forStore($ctx['store'], now()->subMonth(), now()->addDay());
 
     // No longer contested — it has an answer, and the 8,000 now sits on the

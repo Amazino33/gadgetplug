@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services\Pickings;
 
-use App\Support\Quantity;
 use App\Models\PickingItem;
 use App\Models\PickingLedgerEntry;
+use App\Support\Quantity;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 
 /**
  * What pickers are still holding, and what they still owe for it.
@@ -82,7 +81,7 @@ class PickingLedger
      * one at a time would be two queries per product instead of two total.
      *
      * @param  array<int, int>  $productIds
-     * @return array<int, int>  product id => units held
+     * @return array<int, int> product id => units held
      */
     public static function heldQuantitiesForProducts(array $productIds, ?int $storeId = null): array
     {
@@ -135,10 +134,10 @@ class PickingLedger
             ->orderByDesc('value')
             ->get()
             ->map(fn ($row) => [
-                'picker_id'   => (int) $row->picker_id,
+                'picker_id' => (int) $row->picker_id,
                 'picker_name' => $row->picker_name,
-                'units'       => Quantity::of($row->units),
-                'value'       => (float) $row->value,
+                'units' => Quantity::of($row->units),
+                'value' => (float) $row->value,
             ]);
     }
 
@@ -182,11 +181,11 @@ class PickingLedger
             ->orderBy('pickings.taken_at')
             ->get()
             ->map(fn ($row) => [
-                'picker_id'   => (int) $row->picker_id,
+                'picker_id' => (int) $row->picker_id,
                 'picker_name' => $row->picker_name,
-                'units'       => Quantity::of($row->units),
-                'taken_at'    => $row->taken_at,
-                'reference'   => $row->reference,
+                'units' => Quantity::of($row->units),
+                'taken_at' => $row->taken_at,
+                'reference' => $row->reference,
             ]);
     }
 

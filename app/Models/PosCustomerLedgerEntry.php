@@ -28,9 +28,9 @@ class PosCustomerLedgerEntry extends Model
     public const UPDATED_AT = null;
 
     protected $casts = [
-        'amount'      => 'decimal:2',
+        'amount' => 'decimal:2',
         'occurred_at' => 'date',
-        'created_at'  => 'datetime',
+        'created_at' => 'datetime',
     ];
 
     /** Adds to what is owed. */

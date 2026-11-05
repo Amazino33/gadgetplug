@@ -2,10 +2,10 @@
 
 namespace App\Services;
 
-use App\Support\Quantity;
 use App\Models\AccountabilityLedgerEntry;
 use App\Models\Product;
 use App\Support\Accountability\FrozenLossSnapshot;
+use App\Support\Quantity;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -76,17 +76,17 @@ class AccountabilityLedger
         return $this->post(
             naturalKey: $naturalKey,
             attributes: array_merge($snapshot->toLedgerColumns(), [
-                'vendor_id'      => $vendorId,
-                'store_id'       => $storeId,
-                'case_id'        => $caseId,
+                'vendor_id' => $vendorId,
+                'store_id' => $storeId,
+                'case_id' => $caseId,
                 'storekeeper_id' => $storekeeperId,
-                'entry_type'     => 'charge',
+                'entry_type' => 'charge',
                 // Positive: a charge increases what is owed.
-                'amount'         => $snapshot->chargeAmount,
-                'source_type'    => $sourceType,
-                'source_id'      => $sourceId,
-                'note'           => $note,
-                'created_by'     => $createdBy,
+                'amount' => $snapshot->chargeAmount,
+                'source_type' => $sourceType,
+                'source_id' => $sourceId,
+                'note' => $note,
+                'created_by' => $createdBy,
             ]),
         );
     }
@@ -116,16 +116,16 @@ class AccountabilityLedger
         return $this->post(
             naturalKey: $naturalKey,
             attributes: [
-                'vendor_id'      => $vendorId,
-                'case_id'        => $caseId,
+                'vendor_id' => $vendorId,
+                'case_id' => $caseId,
                 'storekeeper_id' => $storekeeperId,
-                'entry_type'     => $type,
+                'entry_type' => $type,
                 // Negative: recoveries reduce what is owed. Callers pass a
                 // positive figure and the sign is applied here, so no caller can
                 // accidentally post a recovery that increases a debt.
-                'amount'         => -1 * round($amount, 2),
-                'note'           => $note,
-                'created_by'     => $createdBy,
+                'amount' => -1 * round($amount, 2),
+                'note' => $note,
+                'created_by' => $createdBy,
             ],
         );
     }
@@ -157,13 +157,13 @@ class AccountabilityLedger
         return $this->post(
             naturalKey: $naturalKey,
             attributes: [
-                'vendor_id'      => $vendorId,
-                'case_id'        => $caseId,
+                'vendor_id' => $vendorId,
+                'case_id' => $caseId,
                 'storekeeper_id' => $storekeeperId,
-                'entry_type'     => 'writeoff_conversion',
-                'amount'         => -1 * $outstanding,
-                'note'           => $note,
-                'created_by'     => $createdBy,
+                'entry_type' => 'writeoff_conversion',
+                'amount' => -1 * $outstanding,
+                'note' => $note,
+                'created_by' => $createdBy,
             ],
         );
     }
@@ -206,17 +206,17 @@ class AccountabilityLedger
         return $this->post(
             naturalKey: $naturalKey,
             attributes: [
-                'vendor_id'      => $vendorId,
-                'store_id'       => $storeId,
+                'vendor_id' => $vendorId,
+                'store_id' => $storeId,
                 'storekeeper_id' => $cashierId,
-                'entry_type'     => $short ? 'cash_shortage' : 'cash_overage',
+                'entry_type' => $short ? 'cash_shortage' : 'cash_overage',
                 // A shortage increases what is owed, an overage reduces it. The
                 // model enforces both signs on the way in.
-                'amount'         => $short ? round(abs($variance), 2) : -1 * round($variance, 2),
-                'source_type'    => $sourceType,
-                'source_id'      => $sourceId,
-                'note'           => $note,
-                'created_by'     => $createdBy,
+                'amount' => $short ? round(abs($variance), 2) : -1 * round($variance, 2),
+                'source_type' => $sourceType,
+                'source_id' => $sourceId,
+                'note' => $note,
+                'created_by' => $createdBy,
             ],
         );
     }
@@ -240,7 +240,7 @@ class AccountabilityLedger
             try {
                 return AccountabilityLedgerEntry::create(array_merge($attributes, [
                     'idempotency_key' => $naturalKey,
-                    'created_at'      => now(),
+                    'created_at' => now(),
                 ]));
             } catch (QueryException $e) {
                 // Lost a race between the check above and the insert. The unique

@@ -37,9 +37,9 @@ class NigeriaLocationsSeeder extends Seeder
                 $lgas = $state['lgas'] ?? [];
 
                 $stateValues = [
-                    'code'       => $state['code'],
-                    'latitude'   => $lgas ? round(array_sum(array_column($lgas, 'lat')) / count($lgas), 6) : null,
-                    'longitude'  => $lgas ? round(array_sum(array_column($lgas, 'lng')) / count($lgas), 6) : null,
+                    'code' => $state['code'],
+                    'latitude' => $lgas ? round(array_sum(array_column($lgas, 'lat')) / count($lgas), 6) : null,
+                    'longitude' => $lgas ? round(array_sum(array_column($lgas, 'lng')) / count($lgas), 6) : null,
                     'updated_at' => $now,
                 ];
 
@@ -53,10 +53,10 @@ class NigeriaLocationsSeeder extends Seeder
 
                 foreach ($lgas as $lga) {
                     $values = [
-                        'latitude'    => $lga['lat'],
-                        'longitude'   => $lga['lng'],
+                        'latitude' => $lga['lat'],
+                        'longitude' => $lga['lng'],
                         'wikidata_id' => $lga['wikidata'] ?? null,
-                        'updated_at'  => $now,
+                        'updated_at' => $now,
                     ];
 
                     $exists = DB::table('lgas')->where('state_id', $stateId)->where('name', $lga['name'])->exists();

@@ -1,8 +1,11 @@
 <?php
 
+use App\Actions\Inventory\AdjustStockAction;
 use App\Filament\Vendor\Pages\BlindCount;
+use App\Filament\Vendor\Resources\AuditSessions\AuditSessionResource;
 use App\Filament\Vendor\Resources\CountSessions\Pages\ListCountSessions;
 use App\Filament\Vendor\Resources\CountSessions\Pages\ViewCountSession;
+use App\Filament\Vendor\Resources\CountSessions\RelationManagers\LinesRelationManager;
 use App\Models\AuditSession;
 use App\Models\BlindCountSession;
 use App\Models\Category;
@@ -17,14 +20,14 @@ use Livewire\Livewire;
 
 function countSessionContext(int $stock = 10): array
 {
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
 
     $owner = User::factory()->create();
     $staff = User::factory()->create();
 
     $vendor = Vendor::create([
-        'user_id'                      => $owner->id,
-        'name'                         => 'Leisure Hub',
+        'user_id' => $owner->id,
+        'name' => 'Leisure Hub',
         'pos_blind_count_participants' => 1,
     ]);
     $vendor->users()->attach($staff->id);
@@ -36,16 +39,16 @@ function countSessionContext(int $stock = 10): array
     $category = Category::firstOrCreate(['name' => 'Chargers']);
 
     $product = Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'name'           => 'SHPLUS 60W Charger',
-        'price'          => 5300,
-        'cost_price'     => 2570,
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'SHPLUS 60W Charger',
+        'price' => 5300,
+        'cost_price' => 2570,
         'stock_quantity' => $stock,
         'reserved_stock' => 0,
-        'status'         => 'published',
-        'show_online'    => true,
-        'show_in_pos'    => true,
+        'status' => 'published',
+        'show_online' => true,
+        'show_in_pos' => true,
     ]);
 
     return compact('owner', 'staff', 'vendor', 'product');
@@ -64,7 +67,7 @@ function runSoloCount(array $c, int $counted): BlindCountSession
     enterPanel($c['vendor']);
 
     $component = Livewire::test(BlindCount::class)->call('startSession');
-    $session   = BlindCountSession::find($component->get('sessionId'));
+    $session = BlindCountSession::find($component->get('sessionId'));
 
     $entries = collect($session->product_order)
         ->mapWithKeys(fn (int $productId) => [$productId => ['count' => $counted, 'note' => null]])
@@ -126,7 +129,7 @@ it('adjusts stock when a manager resolves the counted figure', function () {
     expect($line->status)->toBe('discrepancy')
         ->and($c['product']->fresh()->stock_quantity)->toBe(10);
 
-    app(\App\Actions\Inventory\AdjustStockAction::class)->execute(
+    app(AdjustStockAction::class)->execute(
         productId: $c['product']->id,
         quantityChanged: 7 - 10,
         transactionType: 'audit_correction',
@@ -141,7 +144,7 @@ it('leaves the frozen baseline alone when stock moves afterwards', function () {
     $c = countSessionContext();
 
     $session = runSoloCount($c, 7)->fresh();
-    $line    = $session->auditLines->first();
+    $line = $session->auditLines->first();
 
     $c['product']->update(['stock_quantity' => 2]);
 
@@ -211,11 +214,11 @@ it('says so plainly when a session predates the line link', function () {
 
     // A session from before audit_sessions carried the link.
     $orphan = BlindCountSession::create([
-        'vendor_id'        => $c['vendor']->id,
+        'vendor_id' => $c['vendor']->id,
         'storekeeper_a_id' => $c['staff']->id,
-        'status'           => 'completed',
-        'frequency'        => 'daily',
-        'product_order'    => [$c['product']->id],
+        'status' => 'completed',
+        'frequency' => 'daily',
+        'product_order' => [$c['product']->id],
     ]);
 
     $this->actingAs($c['owner']);
@@ -239,7 +242,7 @@ it('lets the owner resolve a disputed line from inside the count', function () {
     enterPanel($c['vendor']);
 
     Livewire::test(
-        \App\Filament\Vendor\Resources\CountSessions\RelationManagers\LinesRelationManager::class,
+        LinesRelationManager::class,
         ['ownerRecord' => $session, 'pageClass' => ViewCountSession::class],
     )
         ->assertOk()
@@ -257,11 +260,11 @@ it('applies the correction to stock when resolved from the drill-in', function (
     enterPanel($c['vendor']);
 
     Livewire::test(
-        \App\Filament\Vendor\Resources\CountSessions\RelationManagers\LinesRelationManager::class,
+        LinesRelationManager::class,
         ['ownerRecord' => $session, 'pageClass' => ViewCountSession::class],
     )->callTableAction('manager_override', $line, [
         'manager_override_count' => 7,
-        'reason_code'            => 'Suspected Theft',
+        'reason_code' => 'Suspected Theft',
     ]);
 
     // Stock corrected, line settled, and a case opened for the decision.
@@ -276,28 +279,28 @@ it('applies the correction to stock when resolved from the drill-in', function (
 function unmeasurableCount(array $c): BlindCountSession
 {
     $session = BlindCountSession::create([
-        'vendor_id'        => $c['vendor']->id,
+        'vendor_id' => $c['vendor']->id,
         'storekeeper_a_id' => $c['staff']->id,
-        'status'           => 'completed',
-        'frequency'        => 'daily',
-        'product_order'    => [$c['product']->id],
+        'status' => 'completed',
+        'frequency' => 'daily',
+        'product_order' => [$c['product']->id],
     ]);
 
     AuditSession::create([
-        'vendor_id'              => $c['vendor']->id,
+        'vendor_id' => $c['vendor']->id,
         'blind_count_session_id' => $session->id,
-        'product_id'             => $c['product']->id,
-        'storekeeper_a_id'       => $c['staff']->id,
-        'count_a'                => 7,
-        'system_quantity'        => null,
-        'status'                 => 'discrepancy',
+        'product_id' => $c['product']->id,
+        'storekeeper_a_id' => $c['staff']->id,
+        'count_a' => 7,
+        'system_quantity' => null,
+        'status' => 'discrepancy',
     ]);
 
     return $session->fresh();
 }
 
 it('separates "cannot tell" from "nothing missing" on a count with no baseline', function () {
-    $c       = countSessionContext();
+    $c = countSessionContext();
     $session = unmeasurableCount($c);
 
     expect($session->unmeasurableLines()->count())->toBe(1)
@@ -310,7 +313,7 @@ it('separates "cannot tell" from "nothing missing" on a count with no baseline',
 });
 
 it('says "not measurable" rather than reporting zero variance and zero cost', function () {
-    $c       = countSessionContext();
+    $c = countSessionContext();
     $session = unmeasurableCount($c);
 
     $this->actingAs($c['owner']);
@@ -325,7 +328,7 @@ it('says "not measurable" rather than reporting zero variance and zero cost', fu
 });
 
 it('does not call an unmeasurable line balanced', function () {
-    $c       = countSessionContext();
+    $c = countSessionContext();
     $session = unmeasurableCount($c);
 
     $this->actingAs($c['owner']);
@@ -350,7 +353,7 @@ it('flags the unmeasurable count in the list instead of showing a zero', functio
 });
 
 it('still reports a real variance as a number, not as unmeasurable', function () {
-    $c       = countSessionContext();
+    $c = countSessionContext();
     $session = runSoloCount($c, 7)->fresh();
 
     expect($session->isEntirelyUnmeasurable())->toBeFalse()
@@ -366,5 +369,5 @@ it('still reports a real variance as a number, not as unmeasurable', function ()
 });
 
 it('keeps the old flat line list off the menu', function () {
-    expect(\App\Filament\Vendor\Resources\AuditSessions\AuditSessionResource::shouldRegisterNavigation())->toBeFalse();
+    expect(AuditSessionResource::shouldRegisterNavigation())->toBeFalse();
 });

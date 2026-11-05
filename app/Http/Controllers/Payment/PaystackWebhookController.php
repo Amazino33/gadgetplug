@@ -23,7 +23,7 @@ class PaystackWebhookController extends Controller
         }
 
         $payload = json_decode($raw, true);
-        $event   = is_array($payload) ? ($payload['event'] ?? null) : null;
+        $event = is_array($payload) ? ($payload['event'] ?? null) : null;
 
         if ($event !== 'charge.success') {
             Log::info('Paystack webhook ignored.', ['event' => $event]);

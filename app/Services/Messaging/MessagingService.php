@@ -2,6 +2,7 @@
 
 namespace App\Services\Messaging;
 
+use App\Jobs\SendDeliveryMessageJob;
 use App\Models\DeliveryMessage;
 use App\Services\Messaging\Drivers\LogNullDriver;
 use App\Services\Messaging\Drivers\MessagingDriver;
@@ -9,7 +10,6 @@ use App\Services\Messaging\Drivers\TermiiSmsDriver;
 use App\Services\Messaging\Drivers\WaLinkDriver;
 use App\Services\Messaging\Drivers\WawpDriver;
 use App\Services\Messaging\Drivers\WhatsAppCloudApiDriver;
-use App\Jobs\SendDeliveryMessageJob;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use InvalidArgumentException;
@@ -32,14 +32,14 @@ class MessagingService
         // The row keeps the real recipient so order history stays truthful about
         // who the message was for; only the outbound copy is diverted.
         $intendedNumber = $message->to_number;
-        $intendedBody   = $message->body;
-        $onWawp         = $message->channel === 'whatsapp' && $this->usesWawp();
+        $intendedBody = $message->body;
+        $onWawp = $message->channel === 'whatsapp' && $this->usesWawp();
 
         if ($onWawp && ($refusal = $this->refusalOnWawp($message))) {
             return $refusal;
         }
 
-        $redirectedTo   = $this->applyTestRedirect($message);
+        $redirectedTo = $this->applyTestRedirect($message);
 
         try {
             // Resolution is inside the try on purpose. It throws on a misconfigured
@@ -60,7 +60,7 @@ class MessagingService
         }
 
         $message->to_number = $intendedNumber;
-        $message->body      = $intendedBody;
+        $message->body = $intendedBody;
 
         // The brake watches every Wawp send, automated or pressed by hand.
         if ($onWawp) {
@@ -124,8 +124,8 @@ class MessagingService
     public function sendAsSms(DeliveryMessage $message, string $reason): DeliveryMessage
     {
         $message->update([
-            'channel'           => 'sms',
-            'body'              => str_replace(['*', '_', '~'], '', (string) $message->body),
+            'channel' => 'sms',
+            'body' => str_replace(['*', '_', '~'], '', (string) $message->body),
             'provider_response' => ['fallback_from' => 'whatsapp', 'fallback_reason' => $reason],
         ]);
 
@@ -162,8 +162,8 @@ class MessagingService
     {
         $error = match (true) {
             $message->category === DeliveryMessage::CATEGORY_MARKETING => 'marketing_refused',
-            app(WhatsAppGate::class)->isPaused()                       => 'whatsapp_paused',
-            default                                                     => null,
+            app(WhatsAppGate::class)->isPaused() => 'whatsapp_paused',
+            default => null,
         };
 
         if ($error === null) {
@@ -173,12 +173,12 @@ class MessagingService
         Log::warning($error === 'marketing_refused'
             ? 'Refused a marketing/broadcast message on the Wawp WhatsApp driver.'
             : 'WhatsApp is paused — message not sent.', [
-            'delivery_message_id' => $message->id,
-            'template_key'        => $message->template_key,
-        ]);
+                'delivery_message_id' => $message->id,
+                'template_key' => $message->template_key,
+            ]);
 
         $message->update([
-            'status'            => 'failed',
+            'status' => 'failed',
             'provider_response' => ['driver' => 'wawp', 'error' => $error],
         ]);
 
@@ -224,7 +224,7 @@ class MessagingService
         // in provider_response.
         self::warnRedirectActiveOncePerDay();
 
-        $message->body      = "[TEST — intended for {$message->to_number}]\n\n".$message->body;
+        $message->body = "[TEST — intended for {$message->to_number}]\n\n".$message->body;
         $message->to_number = $target;
 
         return $target;
@@ -251,11 +251,9 @@ class MessagingService
             // phone session, so it's the pragmatic second choice, and wa_link (manual
             // tap) is the last resort when neither is configured.
             'whatsapp' => match (true) {
-                filled(config('services.whatsapp_cloud.token')) && filled(config('services.whatsapp_cloud.phone_number_id'))
-                    => 'whatsapp_cloud',
+                filled(config('services.whatsapp_cloud.token')) && filled(config('services.whatsapp_cloud.phone_number_id')) => 'whatsapp_cloud',
 
-                filled(config('services.wawp.instance_id')) && filled(config('services.wawp.access_token'))
-                    => 'wawp',
+                filled(config('services.wawp.instance_id')) && filled(config('services.wawp.access_token')) => 'wawp',
 
                 default => 'wa_link',
             },

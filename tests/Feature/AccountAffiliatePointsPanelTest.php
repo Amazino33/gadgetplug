@@ -86,7 +86,7 @@ test('a replayed convert request carrying the same nonce converts once', functio
     $this->actingAs($affiliate->user);
 
     $component = Volt::test('pages.account.affiliate');
-    $nonce     = $component->get('conversionNonce');
+    $nonce = $component->get('conversionNonce');
 
     $component->set('pointsToConvert', '100')->call('convertPoints');
 
@@ -174,9 +174,9 @@ test('marketing material is shown with the affiliate\'s own code in the caption'
     $affiliate = panelAffiliate();
 
     MarketingMaterial::create([
-        'name'             => 'June Flyer',
+        'name' => 'June Flyer',
         'caption_template' => 'Get yours at :link — code :code',
-        'is_active'        => true,
+        'is_active' => true,
     ]);
 
     $this->actingAs($affiliate->user);

@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\Product;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 /**
  * Rebuilds products.like_count / share_count from the interactions themselves.
@@ -63,7 +64,7 @@ class ReconcileFeedCountersCommand extends Command
                     $this->line(sprintf(
                         '  #%d %s — likes %d→%d, shares %d→%d',
                         $product->id,
-                        \Illuminate\Support\Str::limit($product->name, 40),
+                        Str::limit($product->name, 40),
                         $product->like_count, $likes,
                         $product->share_count, $shares,
                     ));

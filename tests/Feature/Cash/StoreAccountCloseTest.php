@@ -3,7 +3,7 @@
 use App\Models\StoreAccountClose;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
-require_once __DIR__ . '/CloseHelpers.php';
+require_once __DIR__.'/CloseHelpers.php';
 
 uses(RefreshDatabase::class);
 
@@ -15,7 +15,6 @@ uses(RefreshDatabase::class);
  * move after somebody signed them, and an opening stock baseline that carries
  * forward without anybody getting to choose it.
  */
-
 test('the first close opens on the count somebody chose', function () {
     $ctx = closeContext();
 
@@ -155,11 +154,11 @@ test('the lifted columns are copies of the payload, not a second calculation', f
 
     $close = closePeriod($ctx, closeCount($ctx, 7), figures: [
         'balance' => [
-            'value_sold'      => 250000.0,
+            'value_sold' => 250000.0,
             'submitted_total' => 200000.0,
-            'till_expenses'   => 15000.0,
-            'period_debt'     => 23000.0,
-            'shortage'        => 12000.0,
+            'till_expenses' => 15000.0,
+            'period_debt' => 23000.0,
+            'shortage' => 12000.0,
         ],
         'count_variance' => ['at_selling' => 300000.0],
     ]);

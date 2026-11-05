@@ -19,7 +19,7 @@ uses(RefreshDatabase::class);
 
 function setUpCostPriceVendor(): array
 {
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
 
     $owner = User::factory()->create();
     $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Cost Price Test Store']);
@@ -27,14 +27,14 @@ function setUpCostPriceVendor(): array
     $category = Category::create(['name' => 'Cost Price Category']);
 
     $product = Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'name'           => 'Costed Widget',
-        'sku'            => 'CW-001',
-        'price'          => 5000,
-        'cost_price'     => 3850,
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'Costed Widget',
+        'sku' => 'CW-001',
+        'price' => 5000,
+        'cost_price' => 3850,
         'stock_quantity' => 10,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
     return compact('owner', 'vendor', 'category', 'product');
@@ -161,8 +161,8 @@ test('a role without view_cost_price can create a new product with only a sellin
     Livewire::test(CreateProduct::class)
         ->fillForm([
             'category_id' => $data['category']->id,
-            'name'        => 'No Cost Data Widget',
-            'price'       => 4500,
+            'name' => 'No Cost Data Widget',
+            'price' => 4500,
         ])
         ->call('create')
         ->assertHasNoFormErrors();

@@ -25,7 +25,7 @@ function trendingImageVendor(): Vendor
     $owner = User::factory()->create();
 
     return Vendor::create([
-        'user_id' => $owner->id, 'name' => 'Trending Image Store ' . uniqid(), 'online_sales_enabled' => true,
+        'user_id' => $owner->id, 'name' => 'Trending Image Store '.uniqid(), 'online_sales_enabled' => true,
     ]);
 }
 
@@ -33,13 +33,13 @@ function trendingImageProduct(Vendor $vendor, Category $category, array $overrid
 {
     return Product::create(array_merge([
         'vendor_id' => $vendor->id, 'category_id' => $category->id,
-        'name' => 'Trending Image Product ' . uniqid(), 'price' => 1000,
+        'name' => 'Trending Image Product '.uniqid(), 'price' => 1000,
         'stock_quantity' => 5, 'status' => 'published', 'show_online' => true,
     ], $overrides));
 }
 
 test('a category with its own uploaded image shows that image on the trending grid', function () {
-    $category = Category::create(['name' => 'Own Image Category ' . uniqid()]);
+    $category = Category::create(['name' => 'Own Image Category '.uniqid()]);
     $category->addMedia(UploadedFile::fake()->image('category.jpg'))->toMediaCollection('category-image');
 
     $vendor = trendingImageVendor();
@@ -51,7 +51,7 @@ test('a category with its own uploaded image shows that image on the trending gr
 });
 
 test('a category with no image of its own borrows a photo from one of its products', function () {
-    $category = Category::create(['name' => 'Borrowed Image Category ' . uniqid()]);
+    $category = Category::create(['name' => 'Borrowed Image Category '.uniqid()]);
     $vendor = trendingImageVendor();
     $product = trendingImageProduct($vendor, $category);
     $product->addMedia(UploadedFile::fake()->image('product.jpg'))->toMediaCollection('product-images');
@@ -62,7 +62,7 @@ test('a category with no image of its own borrows a photo from one of its produc
 });
 
 test('a category with neither its own image nor a product photo falls back to the icon placeholder', function () {
-    Category::create(['name' => 'Empty Category ' . uniqid()]);
+    Category::create(['name' => 'Empty Category '.uniqid()]);
 
     // The gradient scrim only renders on the image branch — its absence
     // confirms the icon-placeholder path was taken, not a broken <img>.
@@ -72,7 +72,7 @@ test('a category with neither its own image nor a product photo falls back to th
 });
 
 test('a category is not offered an unpublished or offline product\'s photo', function () {
-    $category = Category::create(['name' => 'Hidden Product Category ' . uniqid()]);
+    $category = Category::create(['name' => 'Hidden Product Category '.uniqid()]);
     $vendor = trendingImageVendor();
     $hiddenProduct = trendingImageProduct($vendor, $category, ['status' => 'draft']);
     $hiddenProduct->addMedia(UploadedFile::fake()->image('hidden.jpg'))->toMediaCollection('product-images');

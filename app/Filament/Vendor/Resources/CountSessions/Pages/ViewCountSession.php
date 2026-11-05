@@ -6,12 +6,11 @@ namespace App\Filament\Vendor\Resources\CountSessions\Pages;
 
 use App\Filament\Vendor\Resources\CountSessions\CountSessionResource;
 use App\Filament\Vendor\Resources\Products\Schemas\ProductForm;
-use App\Models\AuditSession;
 use App\Models\BlindCountSession;
+use Filament\Forms\Components\Placeholder;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
-use Filament\Forms\Components\Placeholder;
 use Illuminate\Support\HtmlString;
 
 // One count, and everything that came of it.
@@ -46,8 +45,8 @@ class ViewCountSession extends ViewRecord
                     ->content(match ($session->status) {
                         'a_counting' => 'First count still in progress',
                         'b_counting' => 'Waiting for a second counter',
-                        'completed'  => 'Completed',
-                        default      => ucfirst($session->status),
+                        'completed' => 'Completed',
+                        default => ucfirst($session->status),
                     }),
 
                 Placeholder::make('products')->label('Products counted')
@@ -94,7 +93,7 @@ class ViewCountSession extends ViewRecord
     private function unmeasurableNote(BlindCountSession $session): string
     {
         $unmeasurable = $session->unmeasurableLines()->count();
-        $total        = $session->auditLines->count();
+        $total = $session->auditLines->count();
 
         $scope = $session->isEntirelyUnmeasurable()
             ? 'This count has no recorded system figure for any line'
@@ -124,7 +123,7 @@ class ViewCountSession extends ViewRecord
 
         foreach ($session->auditLines as $line) {
             $variance = $line->countedVariance();
-            $case     = $line->shortageCase;
+            $case = $line->shortageCase;
 
             $varianceLabel = $variance === null
                 ? '—'
@@ -132,23 +131,23 @@ class ViewCountSession extends ViewRecord
 
             $varianceColour = match (true) {
                 $variance === null => 'text-gray-400',
-                $variance < 0      => 'text-red-600 dark:text-red-400',
-                $variance > 0      => 'text-amber-600 dark:text-amber-400',
-                default            => 'text-green-600 dark:text-green-400',
+                $variance < 0 => 'text-red-600 dark:text-red-400',
+                $variance > 0 => 'text-amber-600 dark:text-amber-400',
+                default => 'text-green-600 dark:text-green-400',
             };
 
             // "Balanced" on a line the counter flagged as differing is simply
             // untrue — it only means no case could be opened for it.
             $caseLabel = match (true) {
                 $case?->status === 'pending_disposition' => 'Awaiting decision',
-                $case?->status === 'investigating'       => 'Investigating',
-                $case?->status === 'charged'             => 'Charged',
-                $case?->status === 'recovered'           => 'Recovered',
-                $case?->status === 'written_off'         => 'Written off',
-                $variance === null                       => 'No baseline',
-                $line->status === 'discrepancy'          => 'Review needed',
+                $case?->status === 'investigating' => 'Investigating',
+                $case?->status === 'charged' => 'Charged',
+                $case?->status === 'recovered' => 'Recovered',
+                $case?->status === 'written_off' => 'Written off',
+                $variance === null => 'No baseline',
+                $line->status === 'discrepancy' => 'Review needed',
                 $line->status === 'resolved_by_override' => 'Resolved',
-                default                                  => 'Balanced',
+                default => 'Balanced',
             };
 
             $costCell = $showCost && $case

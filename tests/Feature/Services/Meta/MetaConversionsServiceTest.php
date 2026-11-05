@@ -1,6 +1,8 @@
 <?php
 
 use App\Services\Meta\MetaConversionsService;
+use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Http;
 
 test('the built payload has the correct top-level event shape', function () {
     $service = app(MetaConversionsService::class);
@@ -50,9 +52,9 @@ test('fbp and fbc pass through unhashed, alongside client ip and user agent', fu
         eventId: 'evt-2',
         eventSourceUrl: 'https://gadgetplug.com.ng/product/x',
         userData: [
-            'fbp'        => 'fb.1.1690000000000.1234567890',
-            'fbc'        => 'fb.1.1690000000000.abcXYZ',
-            'client_ip'  => '105.112.20.1',
+            'fbp' => 'fb.1.1690000000000.1234567890',
+            'fbc' => 'fb.1.1690000000000.abcXYZ',
+            'client_ip' => '105.112.20.1',
             'user_agent' => 'Mozilla/5.0 Test Agent',
         ],
     );
@@ -108,13 +110,13 @@ test('custom_data is omitted entirely when none is given', function () {
 
 test('send posts to the correct Meta endpoint with the token as a query param and data as a form-encoded json string', function () {
     config([
-        'services.meta.pixel_id'          => '999888777',
+        'services.meta.pixel_id' => '999888777',
         'services.meta.capi_access_token' => 'test-token-abc',
-        'services.meta.graph_version'     => 'v26.0',
+        'services.meta.graph_version' => 'v26.0',
     ]);
 
-    Illuminate\Support\Facades\Http::fake([
-        'graph.facebook.com/*' => Illuminate\Support\Facades\Http::response(['events_received' => 1], 200),
+    Http::fake([
+        'graph.facebook.com/*' => Http::response(['events_received' => 1], 200),
     ]);
 
     $service = app(MetaConversionsService::class);
@@ -122,7 +124,7 @@ test('send posts to the correct Meta endpoint with the token as a query param an
 
     $service->send($payload);
 
-    Illuminate\Support\Facades\Http::assertSent(function (\Illuminate\Http\Client\Request $request) {
+    Http::assertSent(function (Request $request) {
         return str_starts_with($request->url(), 'https://graph.facebook.com/v26.0/999888777/events?access_token=test-token-abc')
             && json_decode($request['data'], true)[0]['event_id'] === 'GP-ABC';
     });
@@ -131,12 +133,12 @@ test('send posts to the correct Meta endpoint with the token as a query param an
 test('send does nothing and logs when pixel_id or token is missing', function () {
     config(['services.meta.pixel_id' => null, 'services.meta.capi_access_token' => null]);
 
-    Illuminate\Support\Facades\Http::fake();
+    Http::fake();
 
     $service = app(MetaConversionsService::class);
     $payload = $service->buildEventPayload('Purchase', 'GP-ABC', 'https://gadgetplug.com.ng/checkout');
 
     $service->send($payload);
 
-    Illuminate\Support\Facades\Http::assertNothingSent();
+    Http::assertNothingSent();
 });

@@ -4,9 +4,10 @@ use App\Actions\Pos\RecordSaleReversalAction;
 use App\Models\PosSale;
 use App\Models\PosSaleReversal;
 use App\Models\User;
+use App\Services\Cash\CashDrawer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
-require_once __DIR__ . '/../Cash/Helpers.php';
+require_once __DIR__.'/../Cash/Helpers.php';
 
 uses(RefreshDatabase::class);
 
@@ -20,15 +21,15 @@ uses(RefreshDatabase::class);
  */
 function immutabilityContext(): array
 {
-    $vendor  = cashVendor();
-    $store   = $vendor->defaultStore;
+    $vendor = cashVendor();
+    $store = $vendor->defaultStore;
     $cashier = User::factory()->create();
 
     return [
-        'vendor'  => $vendor,
-        'store'   => $store,
+        'vendor' => $vendor,
+        'store' => $store,
         'cashier' => $cashier,
-        'sale'    => cashSale($vendor, $store, $cashier->id, ['total' => 40000]),
+        'sale' => cashSale($vendor, $store, $cashier->id, ['total' => 40000]),
     ];
 }
 
@@ -65,8 +66,8 @@ test('voiding records who withdrew the sale, and why, before the status moves', 
     $ctx = immutabilityContext();
 
     $reversal = app(RecordSaleReversalAction::class)->void(
-        sale:   $ctx['sale'],
-        actor:  $ctx['cashier'],
+        sale: $ctx['sale'],
+        actor: $ctx['cashier'],
         reason: 'Rang it twice',
     );
 
@@ -129,7 +130,7 @@ test('a reversal is itself append-only', function () {
 test('a voided cash sale stops counting towards what the cashier owes', function () {
     $ctx = immutabilityContext();
 
-    expect(App\Services\Cash\CashDrawer::expectedFrom(
+    expect(CashDrawer::expectedFrom(
         $ctx['vendor']->id, $ctx['store']->id, $ctx['cashier']->id
     ))->toBe(40000.0);
 
@@ -138,7 +139,7 @@ test('a voided cash sale stops counting towards what the cashier owes', function
     // Correct, but it is exactly why the reversal row has to exist: this is the
     // shape of both an honest mistake and a theft, and only the journal beside
     // it can tell the settlement statement which one to show.
-    expect(App\Services\Cash\CashDrawer::expectedFrom(
+    expect(CashDrawer::expectedFrom(
         $ctx['vendor']->id, $ctx['store']->id, $ctx['cashier']->id
     ))->toBe(0.0);
 

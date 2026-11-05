@@ -17,6 +17,7 @@ class StockMovementChart extends ChartWidget
     public ?int $storeFilter = null;
 
     protected ?string $heading = 'Stock Movement — Last 14 Days';
+
     protected int|string|array $columnSpan = 'full';
 
     protected function getType(): string
@@ -27,7 +28,7 @@ class StockMovementChart extends ChartWidget
     protected function getData(): array
     {
         $vendorId = Filament::getTenant()?->id;
-        $start    = Carbon::today()->subDays(13)->startOfDay();
+        $start = Carbon::today()->subDays(13)->startOfDay();
 
         // Single query — filter by vendor and date range
         // The ledger carries the branch each movement happened in, so this
@@ -37,12 +38,12 @@ class StockMovementChart extends ChartWidget
             ->where('created_at', '>=', $start)
             ->get(['transaction_type', 'quantity_change', 'created_at']);
 
-        $labels  = [];
-        $sold    = [];
+        $labels = [];
+        $sold = [];
         $restock = [];
 
         foreach (range(13, 0) as $offset) {
-            $day      = Carbon::today()->subDays($offset);
+            $day = Carbon::today()->subDays($offset);
             $labels[] = $day->format('d M');
 
             $dayEntries = $entries->filter(
@@ -61,16 +62,16 @@ class StockMovementChart extends ChartWidget
         return [
             'datasets' => [
                 [
-                    'label'           => 'Units Sold',
-                    'data'            => $sold,
+                    'label' => 'Units Sold',
+                    'data' => $sold,
                     'backgroundColor' => '#f97316',
-                    'borderRadius'    => 4,
+                    'borderRadius' => 4,
                 ],
                 [
-                    'label'           => 'Units Restocked',
-                    'data'            => $restock,
+                    'label' => 'Units Restocked',
+                    'data' => $restock,
                     'backgroundColor' => '#068B03',
-                    'borderRadius'    => 4,
+                    'borderRadius' => 4,
                 ],
             ],
             'labels' => $labels,
@@ -83,8 +84,8 @@ class StockMovementChart extends ChartWidget
             'scales' => [
                 'y' => [
                     'beginAtZero' => true,
-                    'ticks'       => ['precision' => 0],
-                    'grid'        => ['color' => 'rgba(0,0,0,0.05)'],
+                    'ticks' => ['precision' => 0],
+                    'grid' => ['color' => 'rgba(0,0,0,0.05)'],
                 ],
                 'x' => [
                     'grid' => ['display' => false],

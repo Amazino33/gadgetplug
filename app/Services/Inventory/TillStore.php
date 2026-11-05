@@ -39,7 +39,7 @@ class TillStore
      */
     public static function resolve(User $cashier, int $vendorId): int
     {
-        $stores     = Store::where('vendor_id', $vendorId)->get();
+        $stores = Store::where('vendor_id', $vendorId)->get();
         $accessible = self::accessible($cashier, $vendorId);
 
         $bound = self::boundStore($cashier, $stores);
@@ -53,8 +53,8 @@ class TillStore
         }
 
         return match ($accessible->count()) {
-            1       => (int) $accessible->first()->id,
-            0       => throw TillBranchUnclear::noBranch(),
+            1 => (int) $accessible->first()->id,
+            0 => throw TillBranchUnclear::noBranch(),
             default => throw TillBranchUnclear::severalBranches(),
         };
     }

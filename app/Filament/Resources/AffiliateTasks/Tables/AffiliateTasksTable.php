@@ -21,14 +21,14 @@ class AffiliateTasksTable
                     ->label('Type')
                     ->badge()
                     ->formatStateUsing(fn ($state) => match ($state) {
-                        'auto'               => 'Auto',
+                        'auto' => 'Auto',
                         'daily_social_share' => 'Daily Share',
-                        default              => 'Manual',
+                        default => 'Manual',
                     })
                     ->color(fn ($state) => match ($state) {
-                        'auto'               => 'info',
+                        'auto' => 'info',
                         'daily_social_share' => 'success',
-                        default              => 'warning',
+                        default => 'warning',
                     }),
 
                 // Rewards are Plug Points, not cash. A daily share has no flat
@@ -37,7 +37,7 @@ class AffiliateTasksTable
                     ->label('Reward')
                     ->formatStateUsing(fn ($state, $record) => $record->task_type === 'daily_social_share'
                         ? 'By reach band'
-                        : number_format((int) $state) . ' pts'),
+                        : number_format((int) $state).' pts'),
 
                 IconColumn::make('counts_toward_level')->label('Level Progress')->boolean(),
 
@@ -52,8 +52,8 @@ class AffiliateTasksTable
             ->defaultSort('created_at', 'desc')
             ->filters([
                 SelectFilter::make('task_type')->label('Type')->options([
-                    'auto'               => 'Auto',
-                    'manual'             => 'Manual',
+                    'auto' => 'Auto',
+                    'manual' => 'Manual',
                     'daily_social_share' => 'Daily Share',
                 ]),
                 TernaryFilter::make('is_active')->label('Active'),

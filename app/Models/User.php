@@ -4,24 +4,27 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Notifications\Notifiable;
-use Illuminate\Support\Str;
-use Laravel\Fortify\TwoFactorAuthenticatable;
+use Filament\Models\Contracts\FilamentUser;
 use Filament\Models\Contracts\HasTenants;
 use Filament\Panel;
-use Illuminate\Support\Collection;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Spatie\Permission\Traits\HasRoles;
-use Filament\Models\Contracts\FilamentUser;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Sanctum\HasApiTokens;
+use Spatie\Permission\Traits\HasRoles;
 
-class User extends Authenticatable implements HasTenants, FilamentUser
+class User extends Authenticatable implements FilamentUser, HasTenants
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, TwoFactorAuthenticatable, HasRoles, HasApiTokens;
+    use HasApiTokens, HasFactory, HasRoles, Notifiable, TwoFactorAuthenticatable;
 
     /**
      * The attributes that are mass assignable.
@@ -71,7 +74,7 @@ class User extends Authenticatable implements HasTenants, FilamentUser
     // setPermissionsTeamId(null), so the only reliable way is a raw DB check.
     public function isSuperAdmin(): bool
     {
-        return \Illuminate\Support\Facades\DB::table('model_has_roles')
+        return DB::table('model_has_roles')
             ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
             ->where('model_has_roles.model_id', $this->id)
             ->where('model_has_roles.model_type', get_class($this))
@@ -86,7 +89,7 @@ class User extends Authenticatable implements HasTenants, FilamentUser
     // the resolver currently returns.
     public function isCatalogueEditor(): bool
     {
-        return \Illuminate\Support\Facades\DB::table('model_has_roles')
+        return DB::table('model_has_roles')
             ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
             ->where('model_has_roles.model_id', $this->id)
             ->where('model_has_roles.model_type', get_class($this))
@@ -141,6 +144,7 @@ class User extends Authenticatable implements HasTenants, FilamentUser
     {
         $owned = $this->ownedVendors()->get();
         $member = $this->memberVendors()->get();
+
         return $owned->merge($member)->unique('id');
     }
 
@@ -192,7 +196,7 @@ class User extends Authenticatable implements HasTenants, FilamentUser
         return $this->hasAnyRole($roles);
     }
 
-    public function hasVendorPermission(int $vendorId, string|array $permission): bool 
+    public function hasVendorPermission(int $vendorId, string|array $permission): bool
     {
         if ($this->ownedVendors()->where('id', $vendorId)->exists()) {
             return true;
@@ -222,6 +226,21 @@ class User extends Authenticatable implements HasTenants, FilamentUser
     public function vendorApplication()
     {
         return $this->hasOne(VendorApplication::class);
+    }
+
+    public function assistantSetting(): HasOne
+    {
+        return $this->hasOne(AssistantSetting::class);
+    }
+
+    public function assistantThreads(): HasMany
+    {
+        return $this->hasMany(AssistantThread::class);
+    }
+
+    public function assistantMessages(): HasMany
+    {
+        return $this->hasMany(AssistantMessage::class);
     }
 
     public function canAccessPanel(Panel $panel): bool

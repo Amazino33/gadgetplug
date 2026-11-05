@@ -22,7 +22,7 @@ function pickingVendor(): Vendor
 {
     return Vendor::create([
         'user_id' => User::factory()->create()->id,
-        'name'    => 'Picking Vendor '.uniqid(),
+        'name' => 'Picking Vendor '.uniqid(),
     ]);
 }
 
@@ -30,8 +30,8 @@ function pickingPicker(Vendor $vendor, string $name = 'Musa Bala'): Picker
 {
     return Picker::create([
         'vendor_id' => $vendor->id,
-        'name'      => $name,
-        'shop'      => 'Shop 12, Plaza',
+        'name' => $name,
+        'shop' => 'Shop 12, Plaza',
     ]);
 }
 
@@ -39,14 +39,14 @@ function pickingPicker(Vendor $vendor, string $name = 'Musa Bala'): Picker
 function pickingProduct(Vendor $vendor, Store $store, int $quantity, float $cost = 600, float $price = 1000): Product
 {
     $product = Product::create([
-        'vendor_id'      => $vendor->id,
-        'store_id'       => $store->id,
-        'category_id'    => Category::firstOrCreate(['name' => 'Picking Cat'])->id,
-        'name'           => 'Picked Widget '.Str::random(4),
-        'price'          => $price,
-        'cost_price'     => $cost,
+        'vendor_id' => $vendor->id,
+        'store_id' => $store->id,
+        'category_id' => Category::firstOrCreate(['name' => 'Picking Cat'])->id,
+        'name' => 'Picked Widget '.Str::random(4),
+        'price' => $price,
+        'cost_price' => $cost,
         'stock_quantity' => 0,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
     if ($quantity > 0) {

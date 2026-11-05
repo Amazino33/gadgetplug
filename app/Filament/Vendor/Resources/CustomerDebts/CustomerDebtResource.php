@@ -5,8 +5,8 @@ namespace App\Filament\Vendor\Resources\CustomerDebts;
 use App\Filament\Vendor\Resources\CustomerDebts\Pages\ListCustomerDebts;
 use App\Filament\Vendor\Resources\CustomerDebts\Pages\ViewCustomerDebt;
 use App\Models\PosCustomer;
-use App\Services\ActiveStore;
 use App\Models\PosCustomerLedgerEntry;
+use App\Services\ActiveStore;
 use Filament\Resources\Resource;
 use Illuminate\Database\Eloquent\Builder;
 use UnitEnum;
@@ -29,15 +29,19 @@ class CustomerDebtResource extends Resource
 
     protected static ?string $tenantOwnershipRelationshipName = 'vendor';
 
-    protected static string|null|\BackedEnum $navigationIcon  = 'heroicon-o-banknotes';
-    protected static string|null|UnitEnum    $navigationGroup = 'Sales Point';
-    protected static ?string                 $navigationLabel = 'Customer Debts';
-    protected static ?string                 $modelLabel      = 'customer debt';
-    protected static ?int                    $navigationSort  = 3;
+    protected static string|null|\BackedEnum $navigationIcon = 'heroicon-o-banknotes';
+
+    protected static string|null|UnitEnum $navigationGroup = 'Sales Point';
+
+    protected static ?string $navigationLabel = 'Customer Debts';
+
+    protected static ?string $modelLabel = 'customer debt';
+
+    protected static ?int $navigationSort = 3;
 
     public static function canAccess(): bool
     {
-        $user   = auth()->user();
+        $user = auth()->user();
         $vendor = filament()->getTenant();
 
         return $vendor && (
@@ -47,10 +51,25 @@ class CustomerDebtResource extends Resource
         );
     }
 
-    public static function canCreate(): bool        { return false; }
-    public static function canEdit($record): bool   { return false; }
-    public static function canDelete($record): bool { return false; }
-    public static function canDeleteAny(): bool     { return false; }
+    public static function canCreate(): bool
+    {
+        return false;
+    }
+
+    public static function canEdit($record): bool
+    {
+        return false;
+    }
+
+    public static function canDelete($record): bool
+    {
+        return false;
+    }
+
+    public static function canDeleteAny(): bool
+    {
+        return false;
+    }
 
     /** How much this vendor is owed in total, so the number is visible without opening the page. */
     public static function getNavigationBadge(): ?string
@@ -96,7 +115,7 @@ class CustomerDebtResource extends Resource
             // satisfy it would then break MySQL under ONLY_FULL_GROUP_BY. This
             // form is plain SQL both accept.
             ->whereRaw('(select coalesce(sum(amount), 0) from pos_customer_ledger_entries'
-                . ' where pos_customer_ledger_entries.pos_customer_id = pos_customers.id) > 0');
+                .' where pos_customer_ledger_entries.pos_customer_id = pos_customers.id) > 0');
     }
 
     /**
@@ -126,7 +145,7 @@ class CustomerDebtResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         $vendor = filament()->getTenant();
-        $query  = static::baseDebtQuery((int) $vendor?->id);
+        $query = static::baseDebtQuery((int) $vendor?->id);
 
         $user = auth()->user();
 
@@ -153,7 +172,7 @@ class CustomerDebtResource extends Resource
     {
         return [
             'index' => ListCustomerDebts::route('/'),
-            'view'  => ViewCustomerDebt::route('/{record}'),
+            'view' => ViewCustomerDebt::route('/{record}'),
         ];
     }
 }

@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Role;
 
 it('reports orphaned roles without deleting them unless forced', function () {
-    $owner  = User::factory()->create();
+    $owner = User::factory()->create();
     $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Ghost Store']);
     VendorRoles::seedFor($vendor);
 
@@ -31,10 +31,10 @@ it('removes orphaned roles along with their assignments and grants', function ()
     $role = Role::where('team_id', $vendor->id)->where('name', 'storekeeper')->first();
 
     DB::table(config('permission.table_names.model_has_roles'))->insert([
-        'role_id'    => $role->id,
+        'role_id' => $role->id,
         'model_type' => User::class,
-        'model_id'   => $staff->id,
-        'team_id'    => $vendor->id,
+        'model_id' => $staff->id,
+        'team_id' => $vendor->id,
     ]);
 
     $vendorId = $vendor->id;
@@ -47,7 +47,7 @@ it('removes orphaned roles along with their assignments and grants', function ()
 });
 
 it('leaves roles belonging to live vendors alone', function () {
-    $owner  = User::factory()->create();
+    $owner = User::factory()->create();
     $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Live Store']);
     VendorRoles::seedFor($vendor);
 

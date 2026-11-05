@@ -2,6 +2,7 @@
 
 use App\Models\Category;
 use App\Models\ImportLog;
+use App\Models\InventoryLedger;
 use App\Models\Product;
 use App\Models\Supplier;
 use App\Models\User;
@@ -55,7 +56,7 @@ function aroniumCsv(string ...$rows): string
 
 function prepareImport(string $path, Vendor $vendor, ?array $mapping = null)
 {
-    $reader  = app(SpreadsheetReader::class);
+    $reader = app(SpreadsheetReader::class);
     $mapping ??= app(ColumnMapper::class)->guess($reader->headers($path));
 
     return app(ImportPreparer::class)->prepare($path, $mapping, $vendor);
@@ -76,20 +77,20 @@ it('guesses an Aronium export without being told anything about Aronium', functi
     $mapping = app(ColumnMapper::class)->guess($headers);
 
     expect($mapping)->toMatchArray([
-        'Name'              => 'name',
-        'ProductGroup'      => 'category',
-        'SKU'               => 'sku',
-        'Barcode'           => 'barcode',
-        'MeasurementUnit'   => 'measurement_unit',
-        'Cost'              => 'cost_price',
-        'Price'             => 'price',
-        'IsService'         => 'is_service',
-        'IsEnabled'         => 'status',
-        'Description'       => 'description',
-        'Supplier'          => 'supplier',
-        'ReorderPoint'      => 'reorder_point',
+        'Name' => 'name',
+        'ProductGroup' => 'category',
+        'SKU' => 'sku',
+        'Barcode' => 'barcode',
+        'MeasurementUnit' => 'measurement_unit',
+        'Cost' => 'cost_price',
+        'Price' => 'price',
+        'IsService' => 'is_service',
+        'IsEnabled' => 'status',
+        'Description' => 'description',
+        'Supplier' => 'supplier',
+        'ReorderPoint' => 'reorder_point',
         'PreferredQuantity' => 'preferred_quantity',
-        'WarningQuantity'   => 'low_stock_threshold',
+        'WarningQuantity' => 'low_stock_threshold',
     ]);
 });
 
@@ -99,12 +100,12 @@ it('maps headers from a POS it has never seen, by shape alone', function () {
     ]);
 
     expect($mapping)->toBe([
-        'Item Name'    => 'name',
+        'Item Name' => 'name',
         'Product Code' => 'sku',
-        'Buy Price'    => 'cost_price',
-        'Sell Price'   => 'price',
-        'Min Stock'    => 'reorder_point',
-        'Department'   => 'category',
+        'Buy Price' => 'cost_price',
+        'Sell Price' => 'price',
+        'Min Stock' => 'reorder_point',
+        'Department' => 'category',
     ]);
 });
 
@@ -173,7 +174,7 @@ it('books the file\'s quantity as opening stock for a new product, through the l
     // Never written to the stock column directly: one ledgered movement into
     // the product's home branch, which the mirror then reflects.
     expect($product->stock_quantity)->toBe(14)
-        ->and(\App\Models\InventoryLedger::where('product_id', $product->id)->sole())
+        ->and(InventoryLedger::where('product_id', $product->id)->sole())
         ->transaction_type->toBe('stock_adjustment')
         ->quantity_change->toBe(14)
         ->description->toBe('Opening stock — import');
@@ -245,11 +246,11 @@ it('matches on barcode when the row carries no SKU', function () {
     $category = Category::create(['name' => 'Cables', 'slug' => 'cables']);
 
     $existing = Product::create([
-        'vendor_id'   => $vendor->id,
+        'vendor_id' => $vendor->id,
         'category_id' => $category->id,
-        'name'        => 'Old name',
-        'barcode'     => '6009880222',
-        'price'       => 1000,
+        'name' => 'Old name',
+        'barcode' => '6009880222',
+        'price' => 1000,
     ]);
 
     runImport(csvFile("Name,Barcode,Price\nUSB-C Cable 2m,6009880222,2000\n"), $vendor);
@@ -260,7 +261,7 @@ it('matches on barcode when the row carries no SKU', function () {
 });
 
 it('refuses a row whose SKU and barcode belong to two different products', function () {
-    $vendor   = importVendor();
+    $vendor = importVendor();
     $category = Category::create(['name' => 'Cables', 'slug' => 'cables']);
 
     $bySku = Product::create([
@@ -294,7 +295,7 @@ it('refuses a row whose SKU and barcode belong to two different products', funct
 });
 
 it('prefers SKU over barcode when only the SKU is already taken', function () {
-    $vendor   = importVendor();
+    $vendor = importVendor();
     $category = Category::create(['name' => 'Cables', 'slug' => 'cables']);
 
     $bySku = Product::create([
@@ -312,8 +313,8 @@ it('prefers SKU over barcode when only the SKU is already taken', function () {
 });
 
 it('does not reach across vendors when matching', function () {
-    $mine    = importVendor();
-    $theirs  = importVendor();
+    $mine = importVendor();
+    $theirs = importVendor();
     $category = Category::create(['name' => 'Cables', 'slug' => 'cables']);
 
     $foreign = Product::create([
@@ -472,10 +473,10 @@ it('leaves the catalogue untouched when the run fails partway through', function
 
 it('logs who imported what', function () {
     $vendor = importVendor();
-    $user   = User::factory()->create();
+    $user = User::factory()->create();
 
     $rows = prepareImport(csvFile("Name,SKU,Price\nThing,SKU-1,100\n"), $vendor);
-    $log  = app(ProductImporter::class)->commit($rows, $vendor, $user->id, 'aronium-export.csv');
+    $log = app(ProductImporter::class)->commit($rows, $vendor, $user->id, 'aronium-export.csv');
 
     expect($log->user_id)->toBe($user->id)
         ->and($log->vendor_id)->toBe($vendor->id)
@@ -513,24 +514,24 @@ it('exports every field an import can read back', function () {
     // Read back rather than string-matched: openspout writes a UTF-8 BOM and
     // quotes any field containing a space, so raw matching would be asserting
     // against CSV formatting rather than against the data.
-    $path   = app(ProductExporter::class)->export($vendor);
+    $path = app(ProductExporter::class)->export($vendor);
     $record = iterator_to_array(app(SpreadsheetReader::class)->records($path))[2];
 
     expect($record)->toMatchArray([
-        'Name'                => 'Anker 20W Charger',
-        'SKU'                 => 'ANK-20W',
-        'Barcode'             => '6009880111',
-        'Category'            => 'Chargers',
-        'Unit'                => 'pcs',
-        'Supplier'            => 'Lagos Electronics',
-        'Reorder Point'       => '10',
-        'Preferred Quantity'  => '50',
+        'Name' => 'Anker 20W Charger',
+        'SKU' => 'ANK-20W',
+        'Barcode' => '6009880111',
+        'Category' => 'Chargers',
+        'Unit' => 'pcs',
+        'Supplier' => 'Lagos Electronics',
+        'Reorder Point' => '10',
+        'Preferred Quantity' => '50',
         'Low Stock Threshold' => '5',
-        'Is Service'          => 'No',
-        'Status'              => 'published',
+        'Is Service' => 'No',
+        'Status' => 'published',
         // The file's 14 became the new product's opening stock, and the
         // export reports what is on hand.
-        'Quantity'            => '14',
+        'Quantity' => '14',
     ]);
 });
 
@@ -549,7 +550,7 @@ it('survives a full export, edit and re-import without losing anything', functio
 
     // Straight back in, unedited.
     $exported = app(ProductExporter::class)->export($vendor);
-    $log      = runImport($exported, $vendor);
+    $log = runImport($exported, $vendor);
 
     expect($log->updated_count)->toBe(1)
         ->and($log->created_count)->toBe(0)
@@ -558,7 +559,7 @@ it('survives a full export, edit and re-import without losing anything', functio
 });
 
 it('exports cost as blank rather than zero when nobody has entered one', function () {
-    $vendor   = importVendor();
+    $vendor = importVendor();
     $category = Category::create(['name' => 'Cables', 'slug' => 'cables']);
 
     Product::create([
@@ -566,7 +567,7 @@ it('exports cost as blank rather than zero when nobody has entered one', functio
         'name' => 'No cost', 'sku' => 'NC-1', 'price' => 1000, 'cost_price' => null,
     ]);
 
-    $path   = app(ProductExporter::class)->export($vendor);
+    $path = app(ProductExporter::class)->export($vendor);
     $record = iterator_to_array(app(SpreadsheetReader::class)->records($path))[2];
 
     // "0" would be a claim about the margin. Blank is the truth.
@@ -575,14 +576,14 @@ it('exports cost as blank rather than zero when nobody has entered one', functio
 });
 
 it('exports only what the filters asked for', function () {
-    $vendor   = importVendor();
+    $vendor = importVendor();
     $category = Category::create(['name' => 'Cables', 'slug' => 'cables']);
-    $other    = Category::create(['name' => 'Chargers', 'slug' => 'chargers']);
+    $other = Category::create(['name' => 'Chargers', 'slug' => 'chargers']);
 
     Product::create(['vendor_id' => $vendor->id, 'category_id' => $category->id, 'name' => 'Cable', 'sku' => 'C-1', 'price' => 100]);
     Product::create(['vendor_id' => $vendor->id, 'category_id' => $other->id, 'name' => 'Charger', 'sku' => 'C-2', 'price' => 100]);
 
-    $path    = app(ProductExporter::class)->export($vendor, 'csv', ['category_id' => $category->id]);
+    $path = app(ProductExporter::class)->export($vendor, 'csv', ['category_id' => $category->id]);
     $records = iterator_to_array(app(SpreadsheetReader::class)->records($path));
 
     expect($records)->toHaveCount(1)
@@ -590,14 +591,14 @@ it('exports only what the filters asked for', function () {
 });
 
 it('never exports another vendor catalogue', function () {
-    $mine     = importVendor();
-    $theirs   = importVendor();
+    $mine = importVendor();
+    $theirs = importVendor();
     $category = Category::create(['name' => 'Cables', 'slug' => 'cables']);
 
     Product::create(['vendor_id' => $mine->id, 'category_id' => $category->id, 'name' => 'Mine', 'sku' => 'M-1', 'price' => 100]);
     Product::create(['vendor_id' => $theirs->id, 'category_id' => $category->id, 'name' => 'Theirs', 'sku' => 'T-1', 'price' => 100]);
 
-    $path    = app(ProductExporter::class)->export($mine);
+    $path = app(ProductExporter::class)->export($mine);
     $records = iterator_to_array(app(SpreadsheetReader::class)->records($path));
 
     expect($records)->toHaveCount(1)
@@ -621,7 +622,7 @@ it('offers a blank template that imports cleanly as one product', function () {
 });
 
 it('writes an xlsx export that reads back with the same headers', function () {
-    $vendor   = importVendor();
+    $vendor = importVendor();
     $category = Category::create(['name' => 'Cables', 'slug' => 'cables']);
 
     Product::create(['vendor_id' => $vendor->id, 'category_id' => $category->id, 'name' => 'Cable', 'sku' => 'C-1', 'price' => 100]);

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Support\Quantity;
 use App\Casts\AsQuantity;
+use App\Support\Quantity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use LogicException;
@@ -25,11 +25,11 @@ class ProcurementItemCorrection extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'recorded_quantity'  => AsQuantity::class,
+        'recorded_quantity' => AsQuantity::class,
         'recorded_unit_cost' => 'decimal:2',
-        'verified_quantity'  => AsQuantity::class,
+        'verified_quantity' => AsQuantity::class,
         'verified_unit_cost' => 'decimal:2',
-        'corrected_at'       => 'datetime',
+        'corrected_at' => 'datetime',
     ];
 
     protected static function booted(): void

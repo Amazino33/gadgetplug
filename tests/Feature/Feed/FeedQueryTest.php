@@ -2,13 +2,13 @@
 
 use App\Models\Category;
 use App\Models\Product;
-use Database\Factories\ProductFactory;
 use App\Models\ProductInteraction;
 use App\Models\User;
 use App\Models\Vendor;
-use App\Services\Feed\FeedCursor;
+use App\Models\Wishlist;
 use App\Services\Feed\FeedQuery;
 use App\Services\Feed\ProductInteractions;
+use Database\Factories\ProductFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 
@@ -17,8 +17,8 @@ uses(RefreshDatabase::class);
 function feedVendor(string $name = 'Shop', bool $online = true): Vendor
 {
     return Vendor::create([
-        'user_id'              => User::factory()->create()->id,
-        'name'                 => $name.' '.uniqid(),
+        'user_id' => User::factory()->create()->id,
+        'name' => $name.' '.uniqid(),
         'online_sales_enabled' => $online,
     ]);
 }
@@ -26,16 +26,16 @@ function feedVendor(string $name = 'Shop', bool $online = true): Vendor
 function feedProduct(Vendor $vendor, array $over = []): Product
 {
     return ProductFactory::new()->withPhoto()->create(array_merge([
-        'vendor_id'      => $vendor->id,
-        'store_id'       => $vendor->defaultStore->id,
-        'category_id'    => Category::firstOrCreate(['name' => 'Feed Cat'])->id,
-        'name'           => 'Feed Item '.Str::random(6),
-        'price'          => 10000,
-        'cost_price'     => 6000,
+        'vendor_id' => $vendor->id,
+        'store_id' => $vendor->defaultStore->id,
+        'category_id' => Category::firstOrCreate(['name' => 'Feed Cat'])->id,
+        'name' => 'Feed Item '.Str::random(6),
+        'price' => 10000,
+        'cost_price' => 6000,
         'stock_quantity' => 5,
-        'status'         => 'published',
-        'published_at'   => now()->subMinutes(random_int(1, 10000)),
-        'show_online'    => true,
+        'status' => 'published',
+        'published_at' => now()->subMinutes(random_int(1, 10000)),
+        'show_online' => true,
     ], $over));
 }
 
@@ -268,7 +268,7 @@ describe('likes and saves', function () {
 
         $service->save($product, $user);
 
-        expect(App\Models\Wishlist::where('user_id', $user->id)->where('product_id', $product->id)->exists())
+        expect(Wishlist::where('user_id', $user->id)->where('product_id', $product->id)->exists())
             ->toBeTrue()
             ->and($service->hasSaved($product, $user))->toBeTrue();
 
@@ -285,7 +285,7 @@ describe('likes and saves', function () {
         $service->save($product, $user);
         $service->save($product, $user);
 
-        expect(App\Models\Wishlist::where('user_id', $user->id)->count())->toBe(1);
+        expect(Wishlist::where('user_id', $user->id)->count())->toBe(1);
     });
 });
 

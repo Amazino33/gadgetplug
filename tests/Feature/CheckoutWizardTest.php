@@ -14,19 +14,19 @@ uses(RefreshDatabase::class);
 function checkoutWizardProduct(): Product
 {
     $vendor = Vendor::create([
-        'user_id'              => User::factory()->create()->id,
-        'name'                 => 'Wizard Store',
+        'user_id' => User::factory()->create()->id,
+        'name' => 'Wizard Store',
         'online_sales_enabled' => true,
     ]);
 
     return Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => Category::create(['name' => 'Wizard Category'])->id,
-        'name'           => 'Wizard Product',
-        'price'          => 15000,
+        'vendor_id' => $vendor->id,
+        'category_id' => Category::create(['name' => 'Wizard Category'])->id,
+        'name' => 'Wizard Product',
+        'price' => 15000,
         'stock_quantity' => 10,
-        'status'         => 'published',
-        'show_online'    => true,
+        'status' => 'published',
+        'show_online' => true,
     ]);
 }
 
@@ -113,8 +113,7 @@ test('going back keeps everything already typed', function () {
         ->assertSet('step', 2)
         ->assertSet('name', 'Aniekan Udo')
         ->assertSet('phone', '08012345678')
-        ->assertSet('address', '12 Test Close, near the market')
-;
+        ->assertSet('address', '12 Test Close, near the market');
 });
 
 test('the progress bar cannot be used to jump forward past an unfilled step', function () {
@@ -233,13 +232,13 @@ test('the checkout steps are stripped of storefront chrome', function () {
 
 test('the confirmation screen hands the store back', function () {
     $order = Order::create([
-        'reference'        => 'GP-CHROMETEST',
-        'customer_name'    => 'Aniekan Udo',
-        'customer_phone'   => '08012345678',
+        'reference' => 'GP-CHROMETEST',
+        'customer_name' => 'Aniekan Udo',
+        'customer_phone' => '08012345678',
         'shipping_address' => 'Uyo, Akwa Ibom State — 12 Test Close',
-        'total_amount'     => 15000,
-        'status'           => 'confirmed',
-        'payment_method'   => 'pay_on_delivery',
+        'total_amount' => 15000,
+        'status' => 'confirmed',
+        'payment_method' => 'pay_on_delivery',
     ]);
 
     session()->put('payment_success', $order->reference);

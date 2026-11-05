@@ -25,7 +25,7 @@ class ListLegalPolicies extends ListRecords
         parent::mount();
 
         if (LegalPolicy::count() === 0) {
-            (new LegalPolicySeeder())->run();
+            (new LegalPolicySeeder)->run();
         }
     }
 
@@ -41,7 +41,7 @@ class ListLegalPolicies extends ListRecords
                 ->modalHeading('Load Default Policies')
                 ->modalDescription('This will insert any missing default policies (Privacy Policy, Terms, Refund Policy, Affiliate Agreement) without overwriting your existing policies.')
                 ->action(function () {
-                    (new LegalPolicySeeder())->run();
+                    (new LegalPolicySeeder)->run();
                     Notification::make()
                         ->title('Default policies checked and loaded')
                         ->success()

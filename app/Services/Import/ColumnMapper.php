@@ -33,12 +33,12 @@ class ColumnMapper
 
     /**
      * @param  array<int, string>  $headers
-     * @return array<string, string>  header => ProductField value, omitting unmatched headers
+     * @return array<string, string> header => ProductField value, omitting unmatched headers
      */
     public function guess(array $headers): array
     {
         $mapping = [];
-        $taken   = [];
+        $taken = [];
 
         // Two passes so an exact hit always beats a partial one. Without this,
         // a file with both "Description" and "Long Description" could hand
@@ -56,7 +56,7 @@ class ColumnMapper
                 }
 
                 $mapping[$header] = $field->value;
-                $taken[]          = $field->value;
+                $taken[] = $field->value;
             }
         }
 

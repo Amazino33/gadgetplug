@@ -34,7 +34,7 @@ return new class extends Migration
             ['name' => 'Growing (100–499)',       'min_reach' => 100,   'max_reach' => 499,  'points' => 15, 'is_active' => true, 'sort_order' => 2, 'created_at' => $now, 'updated_at' => $now],
             ['name' => 'Solid (500–1,999)',       'min_reach' => 500,   'max_reach' => 1999, 'points' => 30, 'is_active' => true, 'sort_order' => 3, 'created_at' => $now, 'updated_at' => $now],
             ['name' => 'Strong (2,000–9,999)',    'min_reach' => 2000,  'max_reach' => 9999, 'points' => 60, 'is_active' => true, 'sort_order' => 4, 'created_at' => $now, 'updated_at' => $now],
-            ['name' => 'Viral (10,000+)',         'min_reach' => 10000, 'max_reach' => null, 'points' => 100,'is_active' => true, 'sort_order' => 5, 'created_at' => $now, 'updated_at' => $now],
+            ['name' => 'Viral (10,000+)',         'min_reach' => 10000, 'max_reach' => null, 'points' => 100, 'is_active' => true, 'sort_order' => 5, 'created_at' => $now, 'updated_at' => $now],
         ]);
     }
 

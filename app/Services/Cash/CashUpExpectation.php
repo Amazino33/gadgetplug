@@ -7,10 +7,10 @@ namespace App\Services\Cash;
 use App\Models\CashUpRectification;
 use App\Models\Expense;
 use App\Models\PosDebtPayment;
-use App\Models\PosSession;
 use App\Models\PosReturn;
 use App\Models\PosSale;
 use App\Models\PosSalePayment;
+use App\Models\PosSession;
 use App\Support\Pos\BusinessDate;
 use App\Support\Pos\CashUpBreakdown;
 use Illuminate\Support\Collection;
@@ -85,8 +85,8 @@ class CashUpExpectation
         // ── Cash leg ─────────────────────────────────────────────────────────
 
         $cashLines = [[
-            'key'    => 'opening_float',
-            'label'  => 'Opening float',
+            'key' => 'opening_float',
+            'label' => 'Opening float',
             'amount' => round($openingFloat, 2),
         ]];
 
@@ -98,8 +98,8 @@ class CashUpExpectation
             ->value('v');
 
         $cashLines[] = [
-            'key'    => 'cash_sales',
-            'label'  => 'Cash sales',
+            'key' => 'cash_sales',
+            'label' => 'Cash sales',
             'amount' => round($cashSales, 2),
         ];
 
@@ -116,8 +116,8 @@ class CashUpExpectation
 
         if (abs($splitCashNet) > 0.009) {
             $cashLines[] = [
-                'key'    => 'split_cash',
-                'label'  => 'Cash part of mixed-payment sales',
+                'key' => 'split_cash',
+                'label' => 'Cash part of mixed-payment sales',
                 'amount' => $splitCashNet,
             ];
         }
@@ -126,8 +126,8 @@ class CashUpExpectation
 
         if ($cashRefunds > 0.009) {
             $cashLines[] = [
-                'key'    => 'cash_refunds',
-                'label'  => 'Refunds paid in cash',
+                'key' => 'cash_refunds',
+                'label' => 'Refunds paid in cash',
                 'amount' => round(-$cashRefunds, 2),
             ];
         }
@@ -140,8 +140,8 @@ class CashUpExpectation
 
         if ($paidOut > 0.009) {
             $cashLines[] = [
-                'key'    => 'drawer_payouts',
-                'label'  => 'Paid out of the drawer',
+                'key' => 'drawer_payouts',
+                'label' => 'Paid out of the drawer',
                 'amount' => round(-$paidOut, 2),
             ];
         }
@@ -153,8 +153,8 @@ class CashUpExpectation
 
         if ($debtRepaymentsCash > 0.009) {
             $cashLines[] = [
-                'key'    => 'debt_repayments',
-                'label'  => 'Debt repayments collected',
+                'key' => 'debt_repayments',
+                'label' => 'Debt repayments collected',
                 'amount' => round($debtRepaymentsCash, 2),
             ];
         }
@@ -171,8 +171,8 @@ class CashUpExpectation
             $taken = round($direct + $split, 2);
 
             $terminalLines[] = [
-                'key'    => $method === 'card' ? 'card_sales' : 'transfer_sales',
-                'label'  => $method === 'card' ? 'Card sales' : 'Transfer sales',
+                'key' => $method === 'card' ? 'card_sales' : 'transfer_sales',
+                'label' => $method === 'card' ? 'Card sales' : 'Transfer sales',
                 'amount' => $taken,
             ];
         }
@@ -181,8 +181,8 @@ class CashUpExpectation
 
         if ($terminalRefunds > 0.009) {
             $terminalLines[] = [
-                'key'    => 'terminal_refunds',
-                'label'  => 'Refunds paid back on the terminal',
+                'key' => 'terminal_refunds',
+                'label' => 'Refunds paid back on the terminal',
                 'amount' => round(-$terminalRefunds, 2),
             ];
         }
@@ -191,8 +191,8 @@ class CashUpExpectation
 
         if ($debtRepaymentsTerminal > 0.009) {
             $terminalLines[] = [
-                'key'    => 'debt_repayments',
-                'label'  => 'Debt repayments collected',
+                'key' => 'debt_repayments',
+                'label' => 'Debt repayments collected',
                 'amount' => round($debtRepaymentsTerminal, 2),
             ];
         }
@@ -311,10 +311,10 @@ class CashUpExpectation
     private function rectificationLines(Collection $entries, string $leg): array
     {
         $labels = [
-            CashUpRectification::KIND_EXPENSE        => 'Spent out of the drawer',
-            CashUpRectification::KIND_CASH_OUT       => 'Cash handed over',
+            CashUpRectification::KIND_EXPENSE => 'Spent out of the drawer',
+            CashUpRectification::KIND_CASH_OUT => 'Cash handed over',
             CashUpRectification::KIND_TENDER_RECLASS => 'Corrected — rung on the wrong tender',
-            CashUpRectification::KIND_DEBT_PAID      => 'Corrected — credit sale actually paid',
+            CashUpRectification::KIND_DEBT_PAID => 'Corrected — credit sale actually paid',
         ];
 
         $lines = [];
@@ -372,11 +372,11 @@ class CashUpExpectation
             ->count();
 
         return [
-            'sales_count'                   => $scope()->count(),
-            'gross_sales'                   => round((float) $scope()->sum('total'), 2),
-            'debt_rung'                     => $debtRung,
-            'store_credit_refunds'          => $storeCredit,
-            'sales_without_store'           => $withoutStore,
+            'sales_count' => $scope()->count(),
+            'gross_sales' => round((float) $scope()->sum('total'), 2),
+            'debt_rung' => $debtRung,
+            'store_credit_refunds' => $storeCredit,
+            'sales_without_store' => $withoutStore,
             'sales_without_completion_time' => $withoutTime,
         ];
     }

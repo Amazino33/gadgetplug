@@ -45,12 +45,12 @@ class SpreadsheetReader
     /**
      * Every data row keyed by header, header row excluded.
      *
-     * @return Generator<int, array<string, string>>  1-based file line number => row
+     * @return Generator<int, array<string, string>> 1-based file line number => row
      */
     public function records(string $path): Generator
     {
         $headers = null;
-        $line    = 1;
+        $line = 1;
 
         foreach ($this->rows($path) as $row) {
             if ($headers === null) {
@@ -93,9 +93,9 @@ class SpreadsheetReader
         }
 
         $reader = match (strtolower(pathinfo($path, PATHINFO_EXTENSION))) {
-            'csv', 'txt' => new CsvReader(),
-            'xlsx'       => new XlsxReader(),
-            default      => throw new RuntimeException('Only CSV and Excel (.xlsx) files can be imported. Older .xls files must be saved as .xlsx first.'),
+            'csv', 'txt' => new CsvReader,
+            'xlsx' => new XlsxReader,
+            default => throw new RuntimeException('Only CSV and Excel (.xlsx) files can be imported. Older .xls files must be saved as .xlsx first.'),
         };
 
         $reader->open($path);

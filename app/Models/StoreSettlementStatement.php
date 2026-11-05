@@ -22,20 +22,20 @@ class StoreSettlementStatement extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'payload'        => 'array',
-        'period_start'   => 'datetime',
-        'period_end'     => 'datetime',
-        'generated_at'   => 'datetime',
-        'expected_cash'  => 'decimal:2',
+        'payload' => 'array',
+        'period_start' => 'datetime',
+        'period_end' => 'datetime',
+        'generated_at' => 'datetime',
+        'expected_cash' => 'decimal:2',
         'confirmed_cash' => 'decimal:2',
-        'true_shortage'  => 'decimal:2',
+        'true_shortage' => 'decimal:2',
     ];
 
     protected static function booted(): void
     {
         static::created(function (self $statement) {
             $statement->updateQuietly([
-                'reference' => 'GP-STMT-' . str_pad((string) $statement->id, 6, '0', STR_PAD_LEFT),
+                'reference' => 'GP-STMT-'.str_pad((string) $statement->id, 6, '0', STR_PAD_LEFT),
             ]);
         });
 

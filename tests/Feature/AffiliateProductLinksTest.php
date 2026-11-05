@@ -25,13 +25,13 @@ function linkableProduct(array $attributes = []): Product
     $vendor = Vendor::factory()->onlineSalesEnabled()->create();
 
     return ProductFactory::new()->withPhoto()->create(array_merge([
-        'vendor_id'      => $vendor->id,
-        'store_id'       => $vendor->defaultStore->id,
-        'name'           => 'SHELF NAME '.Str::upper(Str::random(5)),
-        'sku'            => 'SKU-'.Str::upper(Str::random(5)),
-        'price'          => 12500,
+        'vendor_id' => $vendor->id,
+        'store_id' => $vendor->defaultStore->id,
+        'name' => 'SHELF NAME '.Str::upper(Str::random(5)),
+        'sku' => 'SKU-'.Str::upper(Str::random(5)),
+        'price' => 12500,
         'stock_quantity' => 3,
-        'status'         => 'published',
+        'status' => 'published',
     ], $attributes));
 }
 
@@ -60,9 +60,9 @@ function signedInAffiliate(): Affiliate
 describe('the catalogue the page searches', function () {
     test('each visible product carries the name customers see, plus what it is matched on', function () {
         $product = linkableProduct([
-            'name'        => 'TECNO SPK20 128 BLK',
+            'name' => 'TECNO SPK20 128 BLK',
             'online_name' => 'Tecno Spark 20 128GB Black',
-            'sku'         => 'TS20-128',
+            'sku' => 'TS20-128',
         ]);
 
         $rows = app(ProductLinkCatalogue::class)->forBrowser();
@@ -70,12 +70,12 @@ describe('the catalogue the page searches', function () {
         expect($rows)->toHaveCount(1)
             ->and(array_keys($rows[0]))->toBe(['id', 'name', 'displayName', 'sku', 'slug', 'price', 'thumb'])
             ->and($rows[0])->toMatchArray([
-                'id'          => $product->id,
-                'name'        => 'TECNO SPK20 128 BLK',
+                'id' => $product->id,
+                'name' => 'TECNO SPK20 128 BLK',
                 'displayName' => 'Tecno Spark 20 128GB Black',
-                'sku'         => 'TS20-128',
-                'slug'        => $product->slug,
-                'price'       => 12500.0,
+                'sku' => 'TS20-128',
+                'slug' => $product->slug,
+                'price' => 12500.0,
             ]);
     });
 

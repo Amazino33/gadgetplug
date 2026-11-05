@@ -30,7 +30,7 @@ class Store extends Model
 
     protected $casts = [
         'is_default' => 'boolean',
-        'is_active'  => 'boolean',
+        'is_active' => 'boolean',
     ];
 
     // Per-vendor uniqueness via extraScope, exactly as Product does it: two
@@ -60,6 +60,26 @@ class Store extends Model
     public function productStocks(): HasMany
     {
         return $this->hasMany(ProductStoreStock::class);
+    }
+
+    public function productStoreStocks(): HasMany
+    {
+        return $this->hasMany(ProductStoreStock::class);
+    }
+
+    public function posSessions(): HasMany
+    {
+        return $this->hasMany(PosSession::class);
+    }
+
+    public function posSales(): HasMany
+    {
+        return $this->hasMany(PosSale::class);
+    }
+
+    public function orders()
+    {
+        return Order::query()->whereHas('items.storeAllocations', fn ($q) => $q->where('store_id', $this->id));
     }
 
     public function orderItemAllocations(): HasMany
@@ -127,6 +147,6 @@ class Store extends Model
             ->logOnly(['name', 'is_default', 'is_active', 'address', 'phone'])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
-            ->setDescriptionForEvent(fn (string $event) => 'Store ' . $event);
+            ->setDescriptionForEvent(fn (string $event) => 'Store '.$event);
     }
 }

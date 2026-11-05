@@ -3,12 +3,14 @@
 use App\Actions\Inventory\ApproveStockCountAction;
 use App\Actions\Inventory\RecordPhysicalCountAction;
 use App\Models\AccountabilityLedgerEntry;
+use App\Models\Category;
 use App\Models\PhysicalStockCount;
+use App\Models\Product;
 use App\Models\ProductStoreStock;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
-require_once __DIR__ . '/Helpers.php';
+require_once __DIR__.'/Helpers.php';
 
 uses(RefreshDatabase::class);
 
@@ -26,9 +28,9 @@ function countContext(int $onShelf = 10): array
     $ctx['keeper']->givePermissionTo('count_stock');
     $ctx['collector']->givePermissionTo('approve_stock_count');
 
-    $ctx['product'] = App\Models\Product::create([
+    $ctx['product'] = Product::create([
         'vendor_id' => $ctx['vendor']->id, 'store_id' => $ctx['store']->id,
-        'category_id' => App\Models\Category::create(['name' => 'C' . uniqid()])->id,
+        'category_id' => Category::create(['name' => 'C'.uniqid()])->id,
         'name' => 'Counted Phone', 'price' => 100000, 'cost_price' => 60000,
         'stock_quantity' => $onShelf, 'reserved_stock' => 0, 'status' => 'published',
     ]);
@@ -44,11 +46,11 @@ function countContext(int $onShelf = 10): array
 function countOf(array $ctx, int $found): PhysicalStockCount
 {
     return app(RecordPhysicalCountAction::class)->execute(
-        countedBy:   $ctx['keeper'],
-        store:       $ctx['store'],
+        countedBy: $ctx['keeper'],
+        store: $ctx['store'],
         periodStart: now()->subWeek(),
-        periodEnd:   now(),
-        counts:      [$ctx['product']->id => $found],
+        periodEnd: now(),
+        counts: [$ctx['product']->id => $found],
     );
 }
 

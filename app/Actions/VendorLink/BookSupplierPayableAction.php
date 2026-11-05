@@ -35,9 +35,7 @@ use Throwable;
  */
 class BookSupplierPayableAction
 {
-    public function __construct(private readonly SupplierPayable $payable)
-    {
-    }
+    public function __construct(private readonly SupplierPayable $payable) {}
 
     /**
      * $soldAt is for booking after the fact (the one-off backfill): the line

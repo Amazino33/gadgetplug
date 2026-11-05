@@ -1,13 +1,18 @@
 <?php
 
 use App\Actions\VendorLink\PublishLinkedListingAction;
+use App\Filament\Vendor\Resources\Products\Pages\EditProduct;
 use App\Models\Product;
+use App\Models\User;
 use App\Services\Feed\FeedQuery;
 use Database\Factories\ProductFactory;
+use Database\Seeders\VendorPermissionsSeeder;
+use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
+use Livewire\Livewire;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 require_once __DIR__.'/Helpers.php';
@@ -162,7 +167,7 @@ describe('a listing that stops resolving leaves the cart with a reason', functio
         $link->update(['is_active' => false]);
 
         $this->withSession(['cart' => [
-            $listing->id  => ['quantity' => 1, 'max' => 5],
+            $listing->id => ['quantity' => 1, 'max' => 5],
             $ordinary->id => ['quantity' => 1, 'max' => 5],
         ]])->get(route('checkout'));
 
@@ -206,15 +211,15 @@ describe('a page of listings resolves its supplier side up front', function () {
 
 describe('in the reseller\'s own panel', function () {
     test('a linked listing offers no photo upload, says where photos come from, and lists his photo', function () {
-        (new \Database\Seeders\VendorPermissionsSeeder)->run();
+        (new VendorPermissionsSeeder)->run();
         [$listing, $source] = liveListing();
         $reseller = $listing->vendor;
 
-        test()->actingAs(\App\Models\User::find($reseller->user_id));
-        \Filament\Facades\Filament::setCurrentPanel(\Filament\Facades\Filament::getPanel('vendor'));
-        \Filament\Facades\Filament::setTenant($reseller);
+        test()->actingAs(User::find($reseller->user_id));
+        Filament::setCurrentPanel(Filament::getPanel('vendor'));
+        Filament::setTenant($reseller);
 
-        \Livewire\Livewire::test(\App\Filament\Vendor\Resources\Products\Pages\EditProduct::class, ['record' => $listing->getRouteKey()])
+        Livewire::test(EditProduct::class, ['record' => $listing->getRouteKey()])
             ->assertOk()
             ->assertSee('Photos come from your supplier')
             ->assertFormFieldDoesNotExist('images');

@@ -26,6 +26,7 @@ class Procurement extends Model
     {
         $activity->vendor_id = $this->vendor_id;
     }
+
     /** Recorded by the storekeeper, waiting on somebody else to receive it. */
     public const STATUS_PENDING = 'pending';
 
@@ -52,9 +53,9 @@ class Procurement extends Model
     ];
 
     protected $casts = [
-        'total_cost'   => 'decimal:2',
-        'amount_paid'  => 'decimal:2',
-        'approved_at'  => 'datetime',
+        'total_cost' => 'decimal:2',
+        'amount_paid' => 'decimal:2',
+        'approved_at' => 'datetime',
     ];
 
     protected static function booted(): void
@@ -62,7 +63,7 @@ class Procurement extends Model
         // Generate reference after insert: GP-PROC-00001
         static::created(function (self $procurement) {
             $procurement->updateQuietly([
-                'reference' => 'GP-PROC-' . str_pad($procurement->id, 5, '0', STR_PAD_LEFT),
+                'reference' => 'GP-PROC-'.str_pad($procurement->id, 5, '0', STR_PAD_LEFT),
             ]);
         });
     }
@@ -124,12 +125,12 @@ class Procurement extends Model
 
     public function recalculate(): void
     {
-        $total  = $this->items()->selectRaw('SUM(quantity * unit_cost) as total')->value('total') ?? 0;
-        $paid   = (float) $this->amount_paid;
+        $total = $this->items()->selectRaw('SUM(quantity * unit_cost) as total')->value('total') ?? 0;
+        $paid = (float) $this->amount_paid;
         $status = match (true) {
             $paid >= $total && $total > 0 => 'full',
-            $paid > 0                     => 'part_payment',
-            default                       => 'credit',
+            $paid > 0 => 'part_payment',
+            default => 'credit',
         };
 
         $this->updateQuietly(['total_cost' => $total, 'payment_status' => $status]);
@@ -147,20 +148,31 @@ class Procurement extends Model
     {
         $this->loadMissing('items.corrections');
 
-        $total  = $this->verifiedTotal();
-        $paid   = (float) $this->amount_paid;
+        $total = $this->verifiedTotal();
+        $paid = (float) $this->amount_paid;
         $status = match (true) {
             $paid >= $total && $total > 0 => 'full',
-            $paid > 0                     => 'part_payment',
-            default                       => 'credit',
+            $paid > 0 => 'part_payment',
+            default => 'credit',
         };
 
         $this->updateQuietly(['total_cost' => $total, 'payment_status' => $status]);
     }
 
-    public function isPending(): bool  { return $this->status === self::STATUS_PENDING; }
-    public function isApproved(): bool { return $this->status === self::STATUS_APPROVED; }
-    public function isVoided(): bool   { return $this->status === self::STATUS_VOIDED; }
+    public function isPending(): bool
+    {
+        return $this->status === self::STATUS_PENDING;
+    }
+
+    public function isApproved(): bool
+    {
+        return $this->status === self::STATUS_APPROVED;
+    }
+
+    public function isVoided(): bool
+    {
+        return $this->status === self::STATUS_VOIDED;
+    }
 
     public function isChangesRequested(): bool
     {

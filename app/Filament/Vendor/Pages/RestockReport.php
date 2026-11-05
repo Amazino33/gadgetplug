@@ -114,9 +114,9 @@ class RestockReport extends Page
                         ->placeholder('Same as lead time'),
                 ])
                 ->fillForm(fn () => [
-                    'restock_window_days'        => filament()->getTenant()->restock_window_days,
-                    'restock_lead_time_days'     => filament()->getTenant()->restock_lead_time_days,
-                    'restock_target_cover_days'  => filament()->getTenant()->restock_target_cover_days,
+                    'restock_window_days' => filament()->getTenant()->restock_window_days,
+                    'restock_lead_time_days' => filament()->getTenant()->restock_lead_time_days,
+                    'restock_target_cover_days' => filament()->getTenant()->restock_target_cover_days,
                     'restock_safety_buffer_days' => filament()->getTenant()->restock_safety_buffer_days,
                 ])
                 ->action(function (array $data): void {

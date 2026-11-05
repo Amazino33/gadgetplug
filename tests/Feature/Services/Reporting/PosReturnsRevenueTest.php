@@ -3,7 +3,6 @@
 use App\Models\PosReturn;
 use App\Models\PosSale;
 use App\Models\PosSaleItem;
-use App\Models\Product;
 use App\Services\Reporting\FinancialReportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -21,13 +20,13 @@ function returnsContext(int $quantity = 1): array
     $value = 10000 * $quantity;
 
     $ctx['sale'] = PosSale::create([
-        'reference'       => 'POS-RET-' . uniqid(),
-        'vendor_id'       => $ctx['vendor']->id,
-        'store_id'        => $ctx['store']->id,
-        'cashier_id'      => $ctx['owner']->id,
-        'subtotal'        => $value, 'discount_amount' => 0, 'vat_amount' => 0, 'total' => $value,
-        'payment_method'  => 'cash', 'amount_tendered' => $value, 'change_given' => 0,
-        'status'          => 'completed', 'completed_at' => now(),
+        'reference' => 'POS-RET-'.uniqid(),
+        'vendor_id' => $ctx['vendor']->id,
+        'store_id' => $ctx['store']->id,
+        'cashier_id' => $ctx['owner']->id,
+        'subtotal' => $value, 'discount_amount' => 0, 'vat_amount' => 0, 'total' => $value,
+        'payment_method' => 'cash', 'amount_tendered' => $value, 'change_given' => 0,
+        'status' => 'completed', 'completed_at' => now(),
     ]);
 
     PosSaleItem::create([
@@ -42,19 +41,19 @@ function returnsContext(int $quantity = 1): array
 function recordReturn(array $ctx, int $quantity, float $total, ?string $at = null): PosReturn
 {
     $return = PosReturn::create([
-        'reference'        => 'RET-' . uniqid(),
-        'vendor_id'        => $ctx['vendor']->id,
+        'reference' => 'RET-'.uniqid(),
+        'vendor_id' => $ctx['vendor']->id,
         'original_sale_id' => $ctx['sale']->id,
-        'cashier_id'       => $ctx['owner']->id,
-        'return_items'     => [[
-            'product_id'   => $ctx['product']->id,
+        'cashier_id' => $ctx['owner']->id,
+        'return_items' => [[
+            'product_id' => $ctx['product']->id,
             'product_name' => 'Credit Widget',
-            'quantity'     => $quantity,
-            'unit_price'   => 10000.0,
-            'total'        => $total,
+            'quantity' => $quantity,
+            'unit_price' => 10000.0,
+            'total' => $total,
         ]],
-        'refund_amount'    => $total,
-        'refund_method'    => 'cash',
+        'refund_amount' => $total,
+        'refund_method' => 'cash',
     ]);
 
     if ($at) {

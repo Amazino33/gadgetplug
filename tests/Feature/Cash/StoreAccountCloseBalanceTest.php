@@ -1,11 +1,23 @@
 <?php
 
+use App\Actions\Cash\CloseStoreAccountAction;
+use App\Actions\Cash\LogTillExpenseAction;
+use App\Actions\Cash\SubmitCashAction;
+use App\Actions\Inventory\RecordPhysicalCountAction;
+use App\Actions\Pos\ChargeCustomerDebtAction;
+use App\Models\PosCustomer;
 use App\Models\PosReturn;
+use App\Models\Procurement;
+use App\Models\ProcurementItem;
+use App\Models\Product;
+use App\Models\ProductStoreStock;
+use App\Models\Supplier;
 use App\Models\User;
 use App\Services\Cash\StoreReconciliation;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
-require_once __DIR__ . '/CloseHelpers.php';
+require_once __DIR__.'/CloseHelpers.php';
 
 uses(RefreshDatabase::class);
 
@@ -18,7 +30,6 @@ uses(RefreshDatabase::class);
  * it is the property that makes the gap meaningful, and most of what these
  * tests do is prove it still holds as each tender is added.
  */
-
 test('the balance closes to zero when everything was handed over', function () {
     $ctx = closeContext();
 
@@ -142,11 +153,11 @@ test('declared till spending is where the value went, not a shortage', function 
 
     closeSale($ctx, 'cash', 100000);
 
-    app(App\Actions\Cash\LogTillExpenseAction::class)->execute(
+    app(LogTillExpenseAction::class)->execute(
         loggedBy: $ctx['cashier'],
-        store:    $ctx['store'],
-        amount:   15000,
-        reason:   'Generator fuel',
+        store: $ctx['store'],
+        amount: 15000,
+        reason: 'Generator fuel',
     );
 
     closeRemit($ctx, 85000);
@@ -164,13 +175,13 @@ test('a refund comes off both sides, by the route the money went back out', func
     $sale = closeSale($ctx, 'card', 40000);
 
     PosReturn::create([
-        'reference'        => 'RET-' . uniqid(),
-        'vendor_id'        => $ctx['vendor']->id,
+        'reference' => 'RET-'.uniqid(),
+        'vendor_id' => $ctx['vendor']->id,
         'original_sale_id' => $sale->id,
-        'cashier_id'       => $ctx['cashier']->id,
-        'return_items'     => [],
-        'refund_amount'    => 15000,
-        'refund_method'    => 'card',
+        'cashier_id' => $ctx['cashier']->id,
+        'return_items' => [],
+        'refund_amount' => 15000,
+        'refund_method' => 'card',
     ]);
 
     $b = closeBalance($ctx)['balance'];
@@ -189,7 +200,7 @@ test('pending and disputed handovers are shown rather than assumed good', functi
 
     closeSale($ctx, 'cash', 100000);
 
-    app(App\Actions\Cash\SubmitCashAction::class)->execute(
+    app(SubmitCashAction::class)->execute(
         submitter: $ctx['cashier'], receiver: $ctx['owner'], store: $ctx['store'], amount: 100000,
     );
 
@@ -322,25 +333,25 @@ test('without an opening count nothing is reported as short', function () {
 test('a product the opening count never covered is flagged, not silently assumed', function () {
     $ctx = closeContext(onShelf: 10);
 
-    $newcomer = App\Models\Product::create([
+    $newcomer = Product::create([
         'vendor_id' => $ctx['vendor']->id,
-        'store_id'  => $ctx['store']->id,
+        'store_id' => $ctx['store']->id,
         'category_id' => $ctx['product']->category_id,
         'name' => 'Arrived Mid-Period', 'price' => 80000, 'cost_price' => 50000,
         'stock_quantity' => 5, 'reserved_stock' => 0, 'status' => 'published',
     ]);
-    App\Models\ProductStoreStock::updateOrCreate(
+    ProductStoreStock::updateOrCreate(
         ['product_id' => $newcomer->id, 'store_id' => $ctx['store']->id],
         ['quantity' => 5, 'reserved' => 0],
     );
 
-    $opening = app(App\Actions\Inventory\RecordPhysicalCountAction::class)->execute(
+    $opening = app(RecordPhysicalCountAction::class)->execute(
         countedBy: $ctx['owner'], store: $ctx['store'],
         periodStart: now()->subWeek(), periodEnd: now(),
         counts: [$ctx['product']->id => 10],
     );
 
-    $closing = app(App\Actions\Inventory\RecordPhysicalCountAction::class)->execute(
+    $closing = app(RecordPhysicalCountAction::class)->execute(
         countedBy: $ctx['owner'], store: $ctx['store'],
         periodStart: now()->subWeek(), periodEnd: now(),
         counts: [$ctx['product']->id => 10, $newcomer->id => 5],
@@ -352,7 +363,7 @@ test('a product the opening count never covered is flagged, not silently assumed
     // it is an assumption and it decides whether a line reads as a shortfall.
     expect($v['missing_from_opening'])->toBe(1)
         ->and(collect($v['top_offenders'])->firstWhere('product_id', $newcomer->id)['in_opening'] ?? null)
-            ->toBeFalse();
+        ->toBeFalse();
 });
 
 test('without a closing count there is no variance to report', function () {
@@ -371,13 +382,13 @@ test('without a closing count there is no variance to report', function () {
 test('the debt tender and the customer ledger agree when the charge was posted', function () {
     $ctx = closeContext();
 
-    $customer = App\Models\PosCustomer::create([
+    $customer = PosCustomer::create([
         'vendor_id' => $ctx['vendor']->id,
-        'name'      => 'Credit Customer',
+        'name' => 'Credit Customer',
     ]);
 
     $sale = closeSale($ctx, 'debt', 30000, ['customer_id' => $customer->id]);
-    app(App\Actions\Pos\ChargeCustomerDebtAction::class)->execute($sale);
+    app(ChargeCustomerDebtAction::class)->execute($sale);
 
     $check = closeBalance($ctx)['debt_check'];
 
@@ -408,21 +419,21 @@ test('a credit sale whose charge never reached the ledger shows as a difference'
 test('the goods block runs opening plus purchases less closing, at cost', function () {
     $ctx = closeContext(onShelf: 10);
 
-    $supplier = App\Models\Supplier::create([
+    $supplier = Supplier::create([
         'vendor_id' => $ctx['vendor']->id,
-        'name'      => 'Lagos Wholesale',
+        'name' => 'Lagos Wholesale',
     ]);
 
-    App\Models\Procurement::create([
-        'vendor_id'  => $ctx['vendor']->id,
-        'store_id'   => $ctx['store']->id,
+    Procurement::create([
+        'vendor_id' => $ctx['vendor']->id,
+        'store_id' => $ctx['store']->id,
         'supplier_id' => $supplier->id,
         'total_cost' => 180000,
         'amount_paid' => 180000,
         'payment_status' => 'full',
         'payment_method' => 'bank_transfer',
-        'status'      => App\Models\Procurement::STATUS_APPROVED,
-        'created_by'  => $ctx['cashier']->id,
+        'status' => Procurement::STATUS_APPROVED,
+        'created_by' => $ctx['cashier']->id,
         'approved_by' => $ctx['owner']->id,
         'approved_at' => now(),
     ]);
@@ -456,30 +467,30 @@ test('the goods block runs opening plus purchases less closing, at cost', functi
 test('the goods block carries a selling-price column beside the cost one', function () {
     $ctx = closeContext(onShelf: 10);
 
-    $procurement = App\Models\Procurement::create([
-        'vendor_id'  => $ctx['vendor']->id,
-        'store_id'   => $ctx['store']->id,
-        'supplier_id' => App\Models\Supplier::create([
+    $procurement = Procurement::create([
+        'vendor_id' => $ctx['vendor']->id,
+        'store_id' => $ctx['store']->id,
+        'supplier_id' => Supplier::create([
             'vendor_id' => $ctx['vendor']->id, 'name' => 'Lagos Wholesale',
         ])->id,
         'total_cost' => 180000,
         'amount_paid' => 180000,
         'payment_status' => 'full',
         'payment_method' => 'bank_transfer',
-        'status'      => App\Models\Procurement::STATUS_APPROVED,
-        'created_by'  => $ctx['cashier']->id,
+        'status' => Procurement::STATUS_APPROVED,
+        'created_by' => $ctx['cashier']->id,
         'approved_by' => $ctx['owner']->id,
         'approved_at' => now(),
     ]);
 
     // Three units at 60,000 cost and 100,000 retail — the delivery's own lines
     // carry the selling price, so retail is recorded rather than guessed.
-    App\Models\ProcurementItem::create([
+    ProcurementItem::create([
         'procurement_id' => $procurement->id,
-        'product_id'     => $ctx['product']->id,
-        'quantity'       => 3,
-        'unit_cost'      => 60000,
-        'selling_price'  => 100000,
+        'product_id' => $ctx['product']->id,
+        'quantity' => 3,
+        'unit_cost' => 60000,
+        'selling_price' => 100000,
     ]);
 
     // Fixture product: 60,000 cost, 100,000 selling.
@@ -503,14 +514,14 @@ test('a partial count is visible as partial, against what the branch holds', fun
     $ctx = closeContext(onShelf: 10);
 
     // A second product on the shelf that the count never touched.
-    $uncounted = App\Models\Product::create([
+    $uncounted = Product::create([
         'vendor_id' => $ctx['vendor']->id,
-        'store_id'  => $ctx['store']->id,
+        'store_id' => $ctx['store']->id,
         'category_id' => $ctx['product']->category_id,
         'name' => 'Uncounted Phone', 'price' => 250000, 'cost_price' => 150000,
         'stock_quantity' => 6, 'reserved_stock' => 0, 'status' => 'published',
     ]);
-    App\Models\ProductStoreStock::updateOrCreate(
+    ProductStoreStock::updateOrCreate(
         ['product_id' => $uncounted->id, 'store_id' => $ctx['store']->id],
         ['quantity' => 6, 'reserved' => 0],
     );
@@ -532,17 +543,17 @@ test('a partial count is visible as partial, against what the branch holds', fun
 test('a delivery nobody has approved is not stock the branch has received', function () {
     $ctx = closeContext();
 
-    App\Models\Procurement::create([
-        'vendor_id'  => $ctx['vendor']->id,
-        'store_id'   => $ctx['store']->id,
-        'supplier_id' => App\Models\Supplier::create([
+    Procurement::create([
+        'vendor_id' => $ctx['vendor']->id,
+        'store_id' => $ctx['store']->id,
+        'supplier_id' => Supplier::create([
             'vendor_id' => $ctx['vendor']->id, 'name' => 'Pending Supplier',
         ])->id,
         'total_cost' => 900000,
         'amount_paid' => 0,
         'payment_status' => 'credit',
         'payment_method' => 'credit',
-        'status'     => App\Models\Procurement::STATUS_PENDING,
+        'status' => Procurement::STATUS_PENDING,
         'created_by' => $ctx['cashier']->id,
     ]);
 
@@ -567,19 +578,19 @@ test('the goods block says so when it has only half the counts it needs', functi
 test('stock bought with cash is flagged, because it may have come out of the till', function () {
     $ctx = closeContext();
 
-    App\Models\Procurement::create([
-        'vendor_id'  => $ctx['vendor']->id,
-        'store_id'   => $ctx['store']->id,
-        'supplier_id' => App\Models\Supplier::create([
+    Procurement::create([
+        'vendor_id' => $ctx['vendor']->id,
+        'store_id' => $ctx['store']->id,
+        'supplier_id' => Supplier::create([
             'vendor_id' => $ctx['vendor']->id,
-            'name'      => 'Cash Supplier',
+            'name' => 'Cash Supplier',
         ])->id,
         'total_cost' => 50000,
         'amount_paid' => 50000,
         'payment_status' => 'full',
         'payment_method' => 'cash',
-        'status'      => App\Models\Procurement::STATUS_APPROVED,
-        'created_by'  => $ctx['cashier']->id,
+        'status' => Procurement::STATUS_APPROVED,
+        'created_by' => $ctx['cashier']->id,
         'approved_by' => $ctx['owner']->id,
         'approved_at' => now(),
     ]);
@@ -599,7 +610,7 @@ test('every handover in the period is listed, settled or not', function () {
     closeSale($ctx, 'cash', 100000);
     closeRemit($ctx, 60000);
 
-    app(App\Actions\Cash\SubmitCashAction::class)->execute(
+    app(SubmitCashAction::class)->execute(
         submitter: $ctx['cashier'], receiver: $ctx['owner'], store: $ctx['store'],
         amount: 25000, reason: 'Second drop',
     );
@@ -643,15 +654,15 @@ test('closing a period needs its own permission, which confirming cash does not 
     // Trusted with the money itself, and still not with declaring it settled.
     $collector->givePermissionTo('receive_cash');
 
-    app(App\Actions\Cash\CloseStoreAccountAction::class)->execute(
-        closedBy:     $collector,
-        store:        $ctx['store'],
-        from:         now()->subMonth(),
-        to:           now(),
+    app(CloseStoreAccountAction::class)->execute(
+        closedBy: $collector,
+        store: $ctx['store'],
+        from: now()->subMonth(),
+        to: now(),
         closingCount: closeCount($ctx, 7),
-        figures:      closeFigures(),
+        figures: closeFigures(),
     );
-})->throws(Illuminate\Auth\Access\AuthorizationException::class);
+})->throws(AuthorizationException::class);
 
 test('the close permission alone is enough, and only at the branch it was given for', function () {
     $ctx = closeContext();
@@ -663,13 +674,13 @@ test('the close permission alone is enough, and only at the branch it was given 
     setPermissionsTeamId($ctx['vendor']->id);
     $manager->givePermissionTo('close_store_period');
 
-    $close = app(App\Actions\Cash\CloseStoreAccountAction::class)->execute(
-        closedBy:     $manager,
-        store:        $ctx['store'],
-        from:         now()->subMonth(),
-        to:           now(),
+    $close = app(CloseStoreAccountAction::class)->execute(
+        closedBy: $manager,
+        store: $ctx['store'],
+        from: now()->subMonth(),
+        to: now(),
         closingCount: closeCount($ctx, 7),
-        figures:      closeFigures(),
+        figures: closeFigures(),
     );
 
     expect($close->closed_by)->toBe($manager->id);
@@ -686,13 +697,13 @@ test('the frozen payload is the computed one, not a second calculation', functio
 
     $figures = closeBalance($ctx, $closing, $opening);
 
-    $close = app(App\Actions\Cash\CloseStoreAccountAction::class)->execute(
-        closedBy:     $ctx['owner'],
-        store:        $ctx['store'],
-        from:         now()->subMonth(),
-        to:           now()->addDay(),
+    $close = app(CloseStoreAccountAction::class)->execute(
+        closedBy: $ctx['owner'],
+        store: $ctx['store'],
+        from: now()->subMonth(),
+        to: now()->addDay(),
         closingCount: $closing,
-        figures:      $figures,
+        figures: $figures,
         openingCount: $opening,
     );
 

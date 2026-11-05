@@ -22,7 +22,7 @@ class MetaConversionsService
      *     fbp?: ?string, fbc?: ?string, client_ip?: ?string, user_agent?: ?string,
      * } $userData Raw (unhashed) user data — em/ph/fn/ln/ct are hashed here;
      *   fbp, fbc, client IP, and user agent are sent as-is, per Meta's spec.
-     * @param array<string, mixed> $customData e.g. ['currency' => 'NGN', 'value' => 1000.0, 'content_ids' => [1], 'content_type' => 'product']
+     * @param  array<string, mixed>  $customData  e.g. ['currency' => 'NGN', 'value' => 1000.0, 'content_ids' => [1], 'content_type' => 'product']
      */
     public function buildEventPayload(
         string $eventName,
@@ -43,19 +43,19 @@ class MetaConversionsService
         // request metadata, not customer PII, and Meta's matching needs them
         // in the clear.
         $rawUserData = array_filter([
-            'fbp'                => $userData['fbp'] ?? null,
-            'fbc'                => $userData['fbc'] ?? null,
-            'client_ip_address'  => $userData['client_ip'] ?? null,
-            'client_user_agent'  => $userData['user_agent'] ?? null,
+            'fbp' => $userData['fbp'] ?? null,
+            'fbc' => $userData['fbc'] ?? null,
+            'client_ip_address' => $userData['client_ip'] ?? null,
+            'client_user_agent' => $userData['user_agent'] ?? null,
         ]);
 
         $event = [
-            'event_name'       => $eventName,
-            'event_time'       => now()->timestamp,
-            'event_id'         => $eventId,
+            'event_name' => $eventName,
+            'event_time' => now()->timestamp,
+            'event_id' => $eventId,
             'event_source_url' => $eventSourceUrl,
-            'action_source'    => 'website',
-            'user_data'        => $hashedUserData + $rawUserData,
+            'action_source' => 'website',
+            'user_data' => $hashedUserData + $rawUserData,
         ];
 
         if ($customData !== []) {
@@ -80,8 +80,8 @@ class MetaConversionsService
      * and for the one caller (checkout's success screen) that also needs the
      * built event_id to render a matching browser-side fbq() call.
      *
-     * @param array<string, mixed> $userData see buildEventPayload
-     * @param array<string, mixed> $customData see buildEventPayload
+     * @param  array<string, mixed>  $userData  see buildEventPayload
+     * @param  array<string, mixed>  $customData  see buildEventPayload
      */
     public function dispatchEvent(
         string $eventName,
@@ -108,7 +108,7 @@ class MetaConversionsService
     public function send(array $payload): void
     {
         $pixelId = config('services.meta.pixel_id');
-        $token   = config('services.meta.capi_access_token');
+        $token = config('services.meta.capi_access_token');
         $version = config('services.meta.graph_version');
 
         if (blank($pixelId) || blank($token)) {
@@ -124,14 +124,14 @@ class MetaConversionsService
         }
 
         $url = "https://graph.facebook.com/{$version}/{$pixelId}/events?"
-            . http_build_query(['access_token' => $token]);
+            .http_build_query(['access_token' => $token]);
 
         $response = Http::asForm()->timeout(15)->post($url, $form);
 
         if (! $response->successful()) {
             Log::error('Meta CAPI event send failed.', [
                 'status' => $response->status(),
-                'body'   => $response->body(),
+                'body' => $response->body(),
             ]);
 
             $response->throw();

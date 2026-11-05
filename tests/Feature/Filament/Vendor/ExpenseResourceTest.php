@@ -9,6 +9,7 @@ use App\Models\FinancialAccount;
 use App\Models\FinancialLedgerEntry;
 use App\Models\User;
 use App\Models\Vendor;
+use App\Services\FinancialLedger;
 use App\Services\VendorRoles;
 use Database\Seeders\VendorPermissionsSeeder;
 use Filament\Facades\Filament;
@@ -20,10 +21,10 @@ uses(RefreshDatabase::class);
 
 function setUpExpensesVendor(): array
 {
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
 
     $owner = User::factory()->create();
-    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Expenses Store ' . uniqid()]);
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Expenses Store '.uniqid()]);
     VendorRoles::seedFor($vendor);
 
     return compact('owner', 'vendor');
@@ -135,7 +136,7 @@ test('saving an already-posted expense again does not double-post', function () 
         'financial_account_id' => $account->id, 'posted_at' => now(),
     ]);
     // Simulate the entry that would already exist from the original posting.
-    \App\Services\FinancialLedger::postEntry($account, 'out', 3000, source: $expense, description: 'Original post');
+    FinancialLedger::postEntry($account, 'out', 3000, source: $expense, description: 'Original post');
     actAsExpensesOwner($data);
 
     Livewire::test(EditExpense::class, ['record' => $expense->getRouteKey()])

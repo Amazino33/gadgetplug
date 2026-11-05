@@ -40,7 +40,7 @@ class CleanupDuplicateVendorsCommand extends Command
             return self::SUCCESS;
         }
 
-        $tables  = $this->tablesReferencingVendors();
+        $tables = $this->tablesReferencingVendors();
         $ignored = $this->option('ignore');
 
         $this->line('Checking '.count($tables).' vendor-owned tables per candidate.');
@@ -65,11 +65,11 @@ class CleanupDuplicateVendorsCommand extends Command
             $this->line("<options=bold>{$group->name}</> — {$group->total} copies (owner #{$group->user_id})");
 
             $breakdowns = [];
-            $counts     = [];
+            $counts = [];
 
             foreach ($vendors as $vendor) {
                 $breakdowns[$vendor->id] = $this->attachedRows($vendor, $tables);
-                $counts[$vendor->id]     = collect($breakdowns[$vendor->id])
+                $counts[$vendor->id] = collect($breakdowns[$vendor->id])
                     ->reject(fn ($count, $table) => in_array($table, $ignored, true))
                     ->sum();
             }
@@ -82,7 +82,7 @@ class CleanupDuplicateVendorsCommand extends Command
                 ->first();
 
             foreach ($vendors as $vendor) {
-                $count  = $counts[$vendor->id];
+                $count = $counts[$vendor->id];
                 $detail = $this->describe($breakdowns[$vendor->id], $ignored);
 
                 if ($vendor->id === $keepId) {
@@ -117,7 +117,7 @@ class CleanupDuplicateVendorsCommand extends Command
             return self::SUCCESS;
         }
 
-        $deleted    = 0;
+        $deleted = 0;
         $roleIssues = 0;
 
         foreach ($deletable as $vendor) {
@@ -156,7 +156,7 @@ class CleanupDuplicateVendorsCommand extends Command
     // here, so a project that renames them does not silently skip the cleanup.
     private function purgeRoles(int $vendorId): void
     {
-        $tables  = config('permission.table_names');
+        $tables = config('permission.table_names');
         $teamKey = config('permission.column_names.team_foreign_key', 'team_id');
 
         $roleIds = DB::table($tables['roles'])->where($teamKey, $vendorId)->pluck('id');

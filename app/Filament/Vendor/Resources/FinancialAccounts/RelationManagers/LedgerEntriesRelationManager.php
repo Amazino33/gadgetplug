@@ -24,8 +24,8 @@ class LedgerEntriesRelationManager extends RelationManager
     // class_basename() (e.g. "ProcurementLogisticsLeg") means nothing to a
     // vendor reading their own money history.
     private const SOURCE_LABELS = [
-        'Order'                   => 'Order',
-        'Expense'                 => 'Expense',
+        'Order' => 'Order',
+        'Expense' => 'Expense',
         'ProcurementLogisticsLeg' => 'Logistics (Procurement)',
     ];
 

@@ -13,18 +13,18 @@ uses(RefreshDatabase::class);
 
 function checkoutTestProduct(): Product
 {
-    $owner    = User::factory()->create();
-    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Checkout Guard Store', 'online_sales_enabled' => true]);
+    $owner = User::factory()->create();
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Checkout Guard Store', 'online_sales_enabled' => true]);
     $category = Category::create(['name' => 'Checkout Guard Category']);
 
     return Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'name'           => 'Checkout Guard Product',
-        'price'          => 3000,
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'Checkout Guard Product',
+        'price' => 3000,
         'stock_quantity' => 5,
-        'status'         => 'published',
-        'show_online'    => true,
+        'status' => 'published',
+        'show_online' => true,
     ]);
 }
 

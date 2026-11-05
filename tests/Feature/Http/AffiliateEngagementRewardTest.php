@@ -17,24 +17,24 @@ const HUMAN_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (
 
 function makeEngagementProduct(): Product
 {
-    $owner  = User::factory()->create();
+    $owner = User::factory()->create();
     $vendor = Vendor::create([
-        'user_id'              => $owner->id,
-        'name'                 => 'Engagement Store ' . uniqid(),
+        'user_id' => $owner->id,
+        'name' => 'Engagement Store '.uniqid(),
         'online_sales_enabled' => true,
     ]);
-    $category = Category::create(['name' => 'Engagement Category ' . uniqid()]);
+    $category = Category::create(['name' => 'Engagement Category '.uniqid()]);
 
     // show_online + the vendor's online_sales_enabled are what scopeVisibleOnline
     // gates on — without both the storefront product page 404s.
     return Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'name'           => 'Engagement Product',
-        'price'          => 1000,
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'Engagement Product',
+        'price' => 1000,
         'stock_quantity' => 10,
-        'status'         => 'published',
-        'show_online'    => true,
+        'status' => 'published',
+        'show_online' => true,
     ]);
 }
 
@@ -69,7 +69,7 @@ test('landing on one page only pays nothing — the click stays unresolved', fun
 
 test('a second page load qualifies the click and credits the reward', function () {
     $affiliate = makeEngagementAffiliate();
-    $product   = makeEngagementProduct();
+    $product = makeEngagementProduct();
 
     browseAs(["/r/{$affiliate->code}", '/', "/product/{$product->slug}"]);
 
@@ -89,7 +89,7 @@ test('a second page load qualifies the click and credits the reward', function (
 
 test('browsing on past the second page never pays twice', function () {
     $affiliate = makeEngagementAffiliate();
-    $product   = makeEngagementProduct();
+    $product = makeEngagementProduct();
 
     browseAs(["/r/{$affiliate->code}", '/', "/product/{$product->slug}", '/', '/cart', '/']);
 
@@ -172,7 +172,7 @@ test('the per-IP daily limit stops the same visitor farming the reward', functio
 
 test('the daily cap bounds what traffic can pay in one day', function () {
     AffiliateSetting::current()->update([
-        'click_reward_daily_cap'      => 3.00,
+        'click_reward_daily_cap' => 3.00,
         'click_reward_daily_ip_limit' => 10,
     ]);
 

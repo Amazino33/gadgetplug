@@ -2,8 +2,8 @@
 
 namespace App\Support\Accountability;
 
-use App\Support\Quantity;
 use App\Models\Product;
+use App\Support\Quantity;
 
 // The loss, priced at the moment it was established, and never recalculated.
 //
@@ -29,7 +29,7 @@ final readonly class FrozenLossSnapshot
 
     /**
      * @param  int|float  $shortageQty  Units missing, as a positive number. A
-     *                                   half only for a shop that sells halves.
+     *                                  half only for a shop that sells halves.
      */
     public static function forProduct(Product $product, int|float $shortageQty): self
     {
@@ -45,7 +45,7 @@ final readonly class FrozenLossSnapshot
         // No usable retail price — the SKUs that show a dash. Charge at cost so
         // the store recovers what it paid, flag it, and never block the line.
         $priceFallback = $listedPrice <= 0.0;
-        $unitPrice     = $priceFallback ? $unitCost : $listedPrice;
+        $unitPrice = $priceFallback ? $unitCost : $listedPrice;
 
         return self::fromValues($quantity, $unitCost, $unitPrice, $priceFallback);
     }
@@ -87,13 +87,13 @@ final readonly class FrozenLossSnapshot
     public function toLedgerColumns(): array
     {
         return [
-            'shortage_qty'        => $this->shortageQty,
-            'unit_cost_snapshot'  => $this->unitCostSnapshot,
+            'shortage_qty' => $this->shortageQty,
+            'unit_cost_snapshot' => $this->unitCostSnapshot,
             'unit_price_snapshot' => $this->unitPriceSnapshot,
-            'charge_amount'       => $this->chargeAmount,
-            'cost_component'      => $this->costComponent,
-            'margin_component'    => $this->marginComponent,
-            'price_fallback'      => $this->priceFallback,
+            'charge_amount' => $this->chargeAmount,
+            'cost_component' => $this->costComponent,
+            'margin_component' => $this->marginComponent,
+            'price_fallback' => $this->priceFallback,
         ];
     }
 }

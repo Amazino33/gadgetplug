@@ -23,11 +23,15 @@ class CashSubmissionResource extends Resource
 
     protected static ?string $tenantOwnershipRelationshipName = 'vendor';
 
-    protected static string|null|BackedEnum $navigationIcon  = 'heroicon-o-banknotes';
-    protected static string|null|UnitEnum   $navigationGroup = 'Money';
-    protected static ?string                $navigationLabel = 'Cash Submissions';
-    protected static ?string                $modelLabel      = 'cash submission';
-    protected static ?int                   $navigationSort  = 1;
+    protected static string|null|BackedEnum $navigationIcon = 'heroicon-o-banknotes';
+
+    protected static string|null|UnitEnum $navigationGroup = 'Money';
+
+    protected static ?string $navigationLabel = 'Cash Submissions';
+
+    protected static ?string $modelLabel = 'cash submission';
+
+    protected static ?int $navigationSort = 1;
 
     public static function getPages(): array
     {

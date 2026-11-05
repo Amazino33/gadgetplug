@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services\Reporting;
 
-use App\Support\Quantity;
 use App\Models\InventoryLedger;
 use App\Models\Product;
+use App\Support\Quantity;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
@@ -52,7 +52,7 @@ class ProductVelocityService
                 fn ($q) => $q->join('product_store_stock as pss', function ($join) use ($storeId) {
                     $join->on('pss.product_id', '=', 'products.id')->where('pss.store_id', '=', $storeId);
                 })->select(['products.id', 'products.vendor_id', 'products.created_at'])
-                  ->selectRaw('pss.quantity as stock_quantity'),
+                    ->selectRaw('pss.quantity as stock_quantity'),
                 fn ($q) => $q->select(['products.id', 'products.vendor_id', 'products.stock_quantity', 'products.created_at']),
             )
             ->get();

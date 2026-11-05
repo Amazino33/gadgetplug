@@ -31,11 +31,11 @@ class ReserveStockAction
      * @throws \Exception when available stock is insufficient
      */
     public function execute(
-        int     $productId,
-        int     $quantity,
-        ?string $reference   = null,
+        int $productId,
+        int $quantity,
+        ?string $reference = null,
         ?string $description = null,
-        ?int    $orderItemId = null,
+        ?int $orderItemId = null,
         Store|int|null $store = null,
     ): InventoryLedger {
         return DB::transaction(function () use ($productId, $quantity, $reference, $description, $orderItemId, $store) {
@@ -80,22 +80,22 @@ class ReserveStockAction
                         ? $existing->update(['quantity' => $existing->quantity + $units])
                         : OrderItemStoreAllocation::create([
                             'order_item_id' => $orderItemId,
-                            'store_id'      => $storeId,
-                            'quantity'      => $units,
+                            'store_id' => $storeId,
+                            'quantity' => $units,
                         ]);
                 }
 
                 // One ledger row per store touched, so the movement log says
                 // which shelf the units were held on.
                 $ledger = InventoryLedger::create([
-                    'vendor_id'        => $product->vendor_id,
-                    'store_id'         => $storeId,
-                    'product_id'       => $product->id,
-                    'user_id'          => null,
+                    'vendor_id' => $product->vendor_id,
+                    'store_id' => $storeId,
+                    'product_id' => $product->id,
+                    'user_id' => null,
                     'transaction_type' => 'reserved',
-                    'quantity_change'  => $units,
-                    'reference'        => $reference,
-                    'description'      => $description ?? 'Stock reserved for order.',
+                    'quantity_change' => $units,
+                    'reference' => $reference,
+                    'description' => $description ?? 'Stock reserved for order.',
                 ]);
             }
 

@@ -15,7 +15,7 @@ function badgeVendor(): Vendor
 {
     return Vendor::create([
         'user_id' => User::factory()->create()->id,
-        'name'    => 'Badge Vendor '.uniqid(),
+        'name' => 'Badge Vendor '.uniqid(),
     ]);
 }
 
@@ -24,13 +24,13 @@ function badgeProcurement(Vendor $vendor, string $status = 'pending'): Procureme
     $supplier = Supplier::create(['vendor_id' => $vendor->id, 'name' => 'Badge Supplier '.uniqid()]);
 
     return Procurement::create([
-        'vendor_id'      => $vendor->id,
-        'supplier_id'    => $supplier->id,
-        'reference'      => 'PO-'.strtoupper(Str::random(8)),
-        'status'         => $status,
-        'created_by'     => $vendor->user_id,
-        'total_cost'     => 0,
-        'amount_paid'    => 0,
+        'vendor_id' => $vendor->id,
+        'supplier_id' => $supplier->id,
+        'reference' => 'PO-'.strtoupper(Str::random(8)),
+        'status' => $status,
+        'created_by' => $vendor->user_id,
+        'total_cost' => 0,
+        'amount_paid' => 0,
         'payment_status' => 'credit',
         'payment_method' => 'cash',
     ]);

@@ -2,7 +2,6 @@
 
 use App\Models\Category;
 use App\Models\Procurement;
-use App\Models\ProcurementLogisticsLeg;
 use App\Models\Product;
 use App\Models\Supplier;
 use App\Models\User;
@@ -15,7 +14,7 @@ uses(RefreshDatabase::class);
 
 function bootProcurementWizardVendor(): array
 {
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
 
     $owner = User::factory()->create();
     $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Transport Cost Store']);
@@ -23,12 +22,12 @@ function bootProcurementWizardVendor(): array
 
     $supplier = Supplier::create(['vendor_id' => $vendor->id, 'name' => 'Test Supplier']);
     $product = Product::create([
-        'vendor_id'   => $vendor->id,
+        'vendor_id' => $vendor->id,
         'category_id' => Category::create(['name' => 'Cat'])->id,
-        'name'        => 'Wired Earbuds',
-        'price'       => 5000,
-        'cost_price'  => 3000,
-        'status'      => 'published',
+        'name' => 'Wired Earbuds',
+        'price' => 5000,
+        'cost_price' => 3000,
+        'status' => 'published',
     ]);
 
     return [$owner, $vendor, $supplier, $product];
@@ -60,8 +59,8 @@ test('the procurement wizard records transport stages as logistics legs on submi
     $this->get(route('procurement.financials'))->assertOk()->assertSee('2,300.00');
 
     $this->post(route('procurement.storeFinancials'), [
-        'payment_method'   => 'bank_transfer',
-        'amount_paid'      => 6000,
+        'payment_method' => 'bank_transfer',
+        'amount_paid' => 6000,
         'reference_number' => '',
     ])->assertRedirect(route('procurement.confirm'));
 
@@ -98,7 +97,7 @@ test('the procurement wizard submits fine when the transport-cost step is skippe
     // Vendor jumps straight from Items to Financials without visiting Logistics.
     $this->post(route('procurement.storeFinancials'), [
         'payment_method' => 'cash',
-        'amount_paid'    => 0,
+        'amount_paid' => 0,
     ])->assertRedirect(route('procurement.confirm'));
 
     $this->post(route('procurement.submit'))->assertRedirect(route('procurement.create'));

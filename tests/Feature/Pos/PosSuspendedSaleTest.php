@@ -15,7 +15,7 @@ use Laravel\Sanctum\Sanctum;
 
 function suspendedSaleVendor(): array
 {
-    $owner  = User::factory()->create();
+    $owner = User::factory()->create();
     $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Suspend Test Store']);
 
     return compact('owner', 'vendor');
@@ -26,13 +26,13 @@ test('a suspended sale is visible in the list right after suspending', function 
     Sanctum::actingAs($data['owner']);
 
     $this->postJson('/api/pos/suspended', [
-        'vendor_id'   => $data['vendor']->id,
-        'label'       => 'Hold 1',
+        'vendor_id' => $data['vendor']->id,
+        'label' => 'Hold 1',
         'customer_id' => null,
-        'cart_data'   => ['items' => [['id' => 1, 'name' => 'Widget', 'price' => 500, 'qty' => 2]], 'customer' => null],
+        'cart_data' => ['items' => [['id' => 1, 'name' => 'Widget', 'price' => 500, 'qty' => 2]], 'customer' => null],
     ])->assertCreated();
 
-    $this->getJson('/api/pos/suspended?vendor_id=' . $data['vendor']->id)
+    $this->getJson('/api/pos/suspended?vendor_id='.$data['vendor']->id)
         ->assertOk()
         ->assertJsonCount(1)
         ->assertJsonPath('0.label', 'Hold 1');
@@ -45,12 +45,12 @@ test('there is no cap on how many sales can be held at once', function () {
     foreach (range(1, 5) as $i) {
         $this->postJson('/api/pos/suspended', [
             'vendor_id' => $data['vendor']->id,
-            'label'     => "Hold {$i}",
+            'label' => "Hold {$i}",
             'cart_data' => ['items' => [], 'customer' => null],
         ])->assertCreated();
     }
 
-    $this->getJson('/api/pos/suspended?vendor_id=' . $data['vendor']->id)
+    $this->getJson('/api/pos/suspended?vendor_id='.$data['vendor']->id)
         ->assertOk()
         ->assertJsonCount(5);
 });
@@ -63,17 +63,17 @@ test('a held sale belongs to the cashier who held it — another cashier neither
 
     Sanctum::actingAs($firstCashier);
     $id = $this->postJson('/api/pos/suspended', [
-        'vendor_id'   => $data['vendor']->id,
-        'label'       => 'Hold 2',
+        'vendor_id' => $data['vendor']->id,
+        'label' => 'Hold 2',
         'customer_id' => null,
-        'cart_data'   => ['items' => [['id' => 1, 'name' => 'Widget', 'price' => 500, 'qty' => 1]], 'customer' => null],
+        'cart_data' => ['items' => [['id' => 1, 'name' => 'Widget', 'price' => 500, 'qty' => 1]], 'customer' => null],
     ])->assertCreated()->json('id');
 
     $secondCashier = User::factory()->create();
     $data['vendor']->users()->syncWithoutDetaching([$secondCashier->id]);
 
     Sanctum::actingAs($secondCashier);
-    $this->getJson('/api/pos/suspended?vendor_id=' . $data['vendor']->id)
+    $this->getJson('/api/pos/suspended?vendor_id='.$data['vendor']->id)
         ->assertOk()
         ->assertJsonCount(0);
     $this->postJson("/api/pos/suspended/{$id}/resume", ['vendor_id' => $data['vendor']->id])->assertNotFound();
@@ -81,7 +81,7 @@ test('a held sale belongs to the cashier who held it — another cashier neither
 
     // Still there, and still the first cashier's.
     Sanctum::actingAs($firstCashier);
-    $this->getJson('/api/pos/suspended?vendor_id=' . $data['vendor']->id)
+    $this->getJson('/api/pos/suspended?vendor_id='.$data['vendor']->id)
         ->assertJsonCount(1)
         ->assertJsonPath('0.label', 'Hold 2');
 });
@@ -90,7 +90,7 @@ test('suspended-sale list responses tell intermediaries never to cache them', fu
     $data = suspendedSaleVendor();
     Sanctum::actingAs($data['owner']);
 
-    $response = $this->getJson('/api/pos/suspended?vendor_id=' . $data['vendor']->id)->assertOk();
+    $response = $this->getJson('/api/pos/suspended?vendor_id='.$data['vendor']->id)->assertOk();
 
     expect($response->headers->get('Cache-Control'))->toContain('no-store');
 });
@@ -100,10 +100,10 @@ test('resuming a held sale returns its cart and removes it from the list', funct
     Sanctum::actingAs($data['owner']);
 
     $suspended = PosSuspendedSale::create([
-        'vendor_id'  => $data['vendor']->id,
+        'vendor_id' => $data['vendor']->id,
         'cashier_id' => $data['owner']->id,
-        'label'      => 'Hold 1',
-        'cart_data'  => ['items' => [['id' => 1, 'name' => 'Widget', 'price' => 500, 'qty' => 1]], 'customer' => null],
+        'label' => 'Hold 1',
+        'cart_data' => ['items' => [['id' => 1, 'name' => 'Widget', 'price' => 500, 'qty' => 1]], 'customer' => null],
     ]);
 
     $this->postJson("/api/pos/suspended/{$suspended->id}/resume", ['vendor_id' => $data['vendor']->id])
@@ -114,14 +114,14 @@ test('resuming a held sale returns its cart and removes it from the list', funct
 });
 
 test('a vendor cannot resume or clear another vendor\'s held sale', function () {
-    $data      = suspendedSaleVendor();
+    $data = suspendedSaleVendor();
     $otherData = suspendedSaleVendor();
 
     $suspended = PosSuspendedSale::create([
-        'vendor_id'  => $otherData['vendor']->id,
+        'vendor_id' => $otherData['vendor']->id,
         'cashier_id' => $otherData['owner']->id,
-        'label'      => 'Someone else\'s hold',
-        'cart_data'  => ['items' => [], 'customer' => null],
+        'label' => 'Someone else\'s hold',
+        'cart_data' => ['items' => [], 'customer' => null],
     ]);
 
     Sanctum::actingAs($data['owner']);
@@ -140,10 +140,10 @@ test('clearing a held sale removes it without resuming it', function () {
     Sanctum::actingAs($data['owner']);
 
     $suspended = PosSuspendedSale::create([
-        'vendor_id'  => $data['vendor']->id,
+        'vendor_id' => $data['vendor']->id,
         'cashier_id' => $data['owner']->id,
-        'label'      => 'Hold 1',
-        'cart_data'  => ['items' => [], 'customer' => null],
+        'label' => 'Hold 1',
+        'cart_data' => ['items' => [], 'customer' => null],
     ]);
 
     $this->deleteJson("/api/pos/suspended/{$suspended->id}", ['vendor_id' => $data['vendor']->id])
@@ -162,16 +162,16 @@ test('the held-sale list carries everything the picker shows', function () {
     Sanctum::actingAs($data['owner']);
 
     $this->postJson('/api/pos/suspended', [
-        'vendor_id'   => $data['vendor']->id,
-        'label'       => 'Mrs Okafor',
+        'vendor_id' => $data['vendor']->id,
+        'label' => 'Mrs Okafor',
         'customer_id' => null,
-        'cart_data'   => ['items' => [
+        'cart_data' => ['items' => [
             ['id' => 1, 'name' => 'Anker Cable',   'price' => 4500,  'qty' => 2],
             ['id' => 2, 'name' => 'Oraimo Buds',   'price' => 12000, 'qty' => 1],
         ], 'customer' => null],
     ])->assertCreated();
 
-    $this->getJson('/api/pos/suspended?vendor_id=' . $data['vendor']->id)
+    $this->getJson('/api/pos/suspended?vendor_id='.$data['vendor']->id)
         ->assertOk()
         ->assertJsonPath('0.label', 'Mrs Okafor')
         // "held 5 minutes ago" is how a cashier picks the right one out of several
@@ -187,19 +187,19 @@ test('a hold uploaded twice with the same reference is saved once', function () 
     Sanctum::actingAs($data['owner']);
 
     $payload = [
-        'vendor_id'  => $data['vendor']->id,
-        'label'      => 'Held offline',
-        'cart_data'  => ['items' => [['id' => 1, 'name' => 'Widget', 'price' => 500, 'qty' => 1]], 'customer' => null],
+        'vendor_id' => $data['vendor']->id,
+        'label' => 'Held offline',
+        'cart_data' => ['items' => [['id' => 1, 'name' => 'Widget', 'price' => 500, 'qty' => 1]], 'customer' => null],
         'client_ref' => 'hold-abc',
     ];
 
-    $first  = $this->postJson('/api/pos/suspended', $payload)->assertCreated()->json('id');
+    $first = $this->postJson('/api/pos/suspended', $payload)->assertCreated()->json('id');
     $second = $this->postJson('/api/pos/suspended', $payload)->assertOk()->json('id');
 
     expect($second)->toBe($first)
         ->and(PosSuspendedSale::count())->toBe(1);
 
-    $this->getJson('/api/pos/suspended?vendor_id=' . $data['vendor']->id)
+    $this->getJson('/api/pos/suspended?vendor_id='.$data['vendor']->id)
         ->assertJsonPath('0.client_ref', 'hold-abc');
 });
 

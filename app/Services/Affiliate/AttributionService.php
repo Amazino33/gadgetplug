@@ -4,6 +4,7 @@ namespace App\Services\Affiliate;
 
 use App\Models\Affiliate;
 use App\Models\AffiliateCommission;
+use App\Models\AffiliateSetting;
 use App\Models\Order;
 use Illuminate\Support\Facades\Cookie;
 
@@ -76,7 +77,7 @@ class AttributionService
      */
     public function rememberClick(Affiliate $affiliate): void
     {
-        $days = (int) \App\Models\AffiliateSetting::current()->cookie_window_days;
+        $days = (int) AffiliateSetting::current()->cookie_window_days;
 
         Cookie::queue(self::COOKIE_NAME, $affiliate->code, $days * 24 * 60);
     }

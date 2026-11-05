@@ -14,8 +14,8 @@ return new class extends Migration
         Schema::create('product_images', function (Blueprint $table) {
             $table->id();
             // Links this image to a specific product and deletes the image if the product is deleted
-            $table->foreignId('product_id')->constrained()->cascadeOnDelete(); 
-            
+            $table->foreignId('product_id')->constrained()->cascadeOnDelete();
+
             $table->string('image_path');
             $table->boolean('is_cover')->default(false);
             $table->integer('sort_order')->default(0); // For drag-and-drop rearranging

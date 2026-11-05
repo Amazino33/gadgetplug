@@ -15,7 +15,7 @@ class WhatsAppCloudApiDriver implements MessagingDriver
 {
     public function send(DeliveryMessage $message): DriverSendResult
     {
-        $token         = config('services.whatsapp_cloud.token');
+        $token = config('services.whatsapp_cloud.token');
         $phoneNumberId = config('services.whatsapp_cloud.phone_number_id');
 
         if (! $token || ! $phoneNumberId) {
@@ -28,10 +28,10 @@ class WhatsAppCloudApiDriver implements MessagingDriver
             ->timeout(15)
             ->post("https://graph.facebook.com/{$version}/{$phoneNumberId}/messages", [
                 'messaging_product' => 'whatsapp',
-                'recipient_type'    => 'individual',
-                'to'                => preg_replace('/\D/', '', $message->to_number),
-                'type'              => 'text',
-                'text'              => ['body' => $message->body],
+                'recipient_type' => 'individual',
+                'to' => preg_replace('/\D/', '', $message->to_number),
+                'type' => 'text',
+                'text' => ['body' => $message->body],
             ])
             ->throw()
             ->json();

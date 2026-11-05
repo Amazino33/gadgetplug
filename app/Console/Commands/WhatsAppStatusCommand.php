@@ -18,10 +18,10 @@ class WhatsAppStatusCommand extends Command
 
     public function handle(): int
     {
-        $driver     = config('services.messaging.whatsapp_driver') ?: '(auto-select)';
-        $redirect   = config('services.messaging.redirect_all_to');
+        $driver = config('services.messaging.whatsapp_driver') ?: '(auto-select)';
+        $redirect = config('services.messaging.redirect_all_to');
         $instanceId = config('services.wawp.instance_id');
-        $token      = config('services.wawp.access_token');
+        $token = config('services.wawp.access_token');
 
         $this->newLine();
         $this->line('WhatsApp driver:  <info>'.$driver.'</info>');
@@ -55,7 +55,7 @@ class WhatsAppStatusCommand extends Command
             $response = Http::timeout(15)
                 ->asJson()
                 ->post('https://api.wawp.net/v2/session/info', [
-                    'instance_id'  => $instanceId,
+                    'instance_id' => $instanceId,
                     'access_token' => $token,
                 ]);
         } catch (Throwable $e) {
@@ -77,7 +77,7 @@ class WhatsAppStatusCommand extends Command
 
         $status = $response->json('status');
         $sender = $response->json('me.id');
-        $name   = $response->json('me.pushName');
+        $name = $response->json('me.pushName');
 
         $this->newLine();
         $this->line('Session status:   '.($status === 'WORKING' ? '<info>'.$status.'</info>' : '<error>'.$status.'</error>'));

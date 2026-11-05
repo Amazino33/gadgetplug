@@ -29,7 +29,7 @@ class PosCustomerController extends Controller
     {
         $request->validate([
             'vendor_id' => 'required|integer',
-            'q'         => 'nullable|string',
+            'q' => 'nullable|string',
         ]);
 
         $customers = PosCustomer::query()
@@ -49,9 +49,9 @@ class PosCustomerController extends Controller
     {
         $request->validate([
             'vendor_id' => 'required|integer',
-            'name'      => 'required|string|max:100',
-            'phone'     => 'nullable|string|max:20',
-            'email'     => 'nullable|email|max:100',
+            'name' => 'required|string|max:100',
+            'phone' => 'nullable|string|max:20',
+            'email' => 'nullable|email|max:100',
         ]);
 
         // Matching on phone only works when there IS one. firstOrCreate with a
@@ -69,9 +69,9 @@ class PosCustomerController extends Controller
             )
             : PosCustomer::create([
                 'vendor_id' => $request->vendor_id,
-                'name'      => $request->name,
-                'email'     => $request->email,
-                'phone'     => null,
+                'name' => $request->name,
+                'email' => $request->email,
+                'phone' => null,
             ]);
 
         return response()->json($customer, 201);

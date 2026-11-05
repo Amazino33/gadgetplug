@@ -1,6 +1,7 @@
 <?php
 
-use Spatie\Permission\DefaultTeamResolver;
+use App\Auth\VendorTeamResolver;
+use App\Models\Vendor;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
@@ -35,7 +36,7 @@ return [
          * Eloquent model should be used to retrieve your teams. Of course, it
          * is often just the "Team" model but you may use whatever you like.
          */
-        'team' => \App\Models\Vendor::class,
+        'team' => Vendor::class,
 
         /*
          * When using the "HasModels" trait and passing raw IDs to syncModels,
@@ -153,7 +154,7 @@ return [
     /*
      * The class to use to resolve the permissions team id
      */
-    'team_resolver' => \App\Auth\VendorTeamResolver::class,
+    'team_resolver' => VendorTeamResolver::class,
 
     /*
      * Passport Client Credentials Grant

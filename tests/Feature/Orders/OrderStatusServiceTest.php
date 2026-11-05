@@ -1,17 +1,14 @@
 <?php
 
-use App\Actions\Inventory\ReserveStockAction;
 use App\Filament\Resources\Orders\Pages\ViewOrder as AdminViewOrder;
+use App\Filament\Resources\VendorPayouts\Pages\ListVendorPayouts;
 use App\Filament\Vendor\Resources\Orders\Pages\ListOrders;
 use App\Filament\Vendor\Resources\Orders\Pages\ViewOrder;
 use App\Jobs\ReleaseStaleReservationsJob;
-use App\Models\Category;
 use App\Models\FinancialAccount;
 use App\Models\FinancialLedgerEntry;
 use App\Models\InventoryLedger;
 use App\Models\Order;
-use App\Models\OrderItem;
-use App\Models\Product;
 use App\Models\ProductStoreStock;
 use App\Models\Store;
 use App\Models\User;
@@ -21,11 +18,11 @@ use App\Services\Cash\StoreReconciliation;
 use App\Services\FinancialLedger;
 use App\Services\Orders\InvalidOrderTransition;
 use App\Services\Orders\OrderStatusService;
-use Filament\Facades\Filament;
+use App\Services\VendorRoles;
+use Database\Seeders\VendorPermissionsSeeder;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
-use Spatie\Permission\Models\Role;
 
 uses(RefreshDatabase::class);
 
@@ -35,7 +32,6 @@ require_once __DIR__.'/Helpers.php';
 // and hands over (stock leaves then); GadgetPlug records delivery, cancellation
 // and the money it collected (revenue goes to the vendor's Due from
 // GadgetPlug account then); delivered itself moves nothing.
-
 
 // ── Transitions ─────────────────────────────────────────────────────────────
 
@@ -81,7 +77,7 @@ it('takes stock out of the store that held it at handover, with its cost', funct
     oss()->handOver($order, $c['owner']);
 
     $branchRow = ProductStoreStock::where('product_id', $c['product']->id)->where('store_id', $c['branch']->id)->first();
-    $mainRow   = ProductStoreStock::where('product_id', $c['product']->id)->where('store_id', $c['main']->id)->first();
+    $mainRow = ProductStoreStock::where('product_id', $c['product']->id)->where('store_id', $c['main']->id)->first();
 
     expect((int) $branchRow->quantity)->toBe(3)
         ->and((int) $branchRow->reserved)->toBe(0)
@@ -94,9 +90,9 @@ it('moves no stock, revenue, payable or ledger when an order is delivered', func
     $c = ossVendor();
     $order = ossOrder($c, 'pay_on_delivery', 'shipped');
 
-    $ledgerRows    = FinancialLedgerEntry::count();
+    $ledgerRows = FinancialLedgerEntry::count();
     $inventoryRows = InventoryLedger::count();
-    $stock         = ProductStoreStock::where('product_id', $c['product']->id)->pluck('quantity', 'store_id')->all();
+    $stock = ProductStoreStock::where('product_id', $c['product']->id)->pluck('quantity', 'store_id')->all();
 
     oss()->markDelivered($order, $c['admin'], 'Customer confirmed by phone');
 
@@ -292,8 +288,8 @@ it('hands over from the vendor orders list through the service', function () {
 
 it('lets a storekeeper fulfil their own branch\'s order but not another branch\'s', function () {
     $c = ossVendor();
-    (new Database\Seeders\VendorPermissionsSeeder())->run();
-    App\Services\VendorRoles::seedFor($c['vendor']);
+    (new VendorPermissionsSeeder)->run();
+    VendorRoles::seedFor($c['vendor']);
 
     $keeper = User::factory()->create();
     $keeper->stores()->attach($c['branch']->id);
@@ -301,7 +297,7 @@ it('lets a storekeeper fulfil their own branch\'s order but not another branch\'
     setPermissionsTeamId($c['vendor']->id);
     $keeper->assignRole('storekeeper');
 
-    $mine   = ossOrder($c, 'paystack', 'paid', 1, $c['branch']);
+    $mine = ossOrder($c, 'paystack', 'paid', 1, $c['branch']);
     $theirs = ossOrder($c, 'paystack', 'paid', 1, $c['main']);
 
     setPermissionsTeamId($c['vendor']->id);
@@ -479,7 +475,7 @@ it('settles a new-rule payout from the admin payouts list and shows which rule i
     ]);
     ossActAsAdmin($c['admin']);
 
-    Livewire::test(App\Filament\Resources\VendorPayouts\Pages\ListVendorPayouts::class)
+    Livewire::test(ListVendorPayouts::class)
         ->set('activeTab', 'approved')
         ->assertTableColumnFormattedStateSet('funded_from', 'Collected money', $payout)
         ->callTableAction('mark_paid', $payout, data: ['admin_notes' => 'TRX-9'])

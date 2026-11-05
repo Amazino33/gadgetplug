@@ -40,10 +40,10 @@ class CashHandoffToken
 
         Cache::put(self::key($token), [
             'submission_id' => $submission->id,
-            'vendor_id'     => $submission->vendor_id,
-            'store_id'      => $submission->store_id,
-            'submitted_by'  => $submission->submitted_by,
-            'issued_at'     => now()->toIso8601String(),
+            'vendor_id' => $submission->vendor_id,
+            'store_id' => $submission->store_id,
+            'submitted_by' => $submission->submitted_by,
+            'issued_at' => now()->toIso8601String(),
         ], now()->addMinutes(self::TTL_MINUTES));
 
         return $token;
@@ -84,6 +84,6 @@ class CashHandoffToken
 
     private static function key(string $token): string
     {
-        return self::PREFIX . $token;
+        return self::PREFIX.$token;
     }
 }

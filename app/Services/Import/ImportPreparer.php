@@ -24,8 +24,7 @@ class ImportPreparer
     public function __construct(
         private readonly SpreadsheetReader $reader,
         private readonly RowParser $parser,
-    ) {
-    }
+    ) {}
 
     /**
      * @param  array<string, string>  $mapping  header => ProductField value
@@ -38,9 +37,9 @@ class ImportPreparer
         // Loaded once rather than queried per row: a 2,000-row file would
         // otherwise fire 4,000 lookups to answer questions two indexed columns
         // can answer in one pass each.
-        $bySku     = $this->existingIndex($vendor, 'sku');
+        $bySku = $this->existingIndex($vendor, 'sku');
         $byBarcode = $this->existingIndex($vendor, 'barcode');
-        $names     = Product::where('vendor_id', $vendor->id)->pluck('name', 'id')->all();
+        $names = Product::where('vendor_id', $vendor->id)->pluck('name', 'id')->all();
 
         // Every code the shop already answers to — main, extra and unit
         // barcodes — and which product holds it.
@@ -49,18 +48,18 @@ class ImportPreparer
             ->map(fn ($id) => (int) $id)
             ->all() + $byBarcode;
 
-        $seenSku     = [];
+        $seenSku = [];
         $seenBarcode = [];
         // Extra and unit barcodes already claimed earlier in this file.
-        $seenCode    = [];
+        $seenCode = [];
 
         $rows = collect();
 
         foreach ($this->reader->records($path) as $line => $record) {
             [$values, $errors, $warnings] = $this->parser->parse($record, $mapping);
 
-            $name    = trim((string) ($values[ProductField::Name->value] ?? ''));
-            $sku     = trim((string) ($values[ProductField::Sku->value] ?? ''));
+            $name = trim((string) ($values[ProductField::Name->value] ?? ''));
+            $sku = trim((string) ($values[ProductField::Sku->value] ?? ''));
             $barcode = trim((string) ($values[ProductField::Barcode->value] ?? ''));
 
             if ($name === '') {
@@ -219,12 +218,12 @@ class ImportPreparer
      */
     public static function unitsFor(array $values): array
     {
-        $units    = [];
+        $units = [];
         $warnings = [];
-        $names    = [];
+        $names = [];
 
         foreach (ProductField::UNIT_SLOTS as $n) {
-            $f    = ProductField::unitFields($n);
+            $f = ProductField::unitFields($n);
             $name = trim((string) ($values[$f['name']->value] ?? ''));
 
             if ($name === '') {
@@ -237,7 +236,7 @@ class ImportPreparer
                 continue;
             }
 
-            $label    = "Unit {$n} ({$name})";
+            $label = "Unit {$n} ({$name})";
             $rawCount = trim((string) ($values[$f['contains']->value] ?? ''));
 
             if (! preg_match('/^\d+(\.0+)?$/', $rawCount) || (int) $rawCount < 2) {
@@ -267,13 +266,13 @@ class ImportPreparer
             }
 
             $units[] = [
-                'slot'      => $n,
-                'name'      => mb_substr($name, 0, 64),
-                'contains'  => (int) $rawCount,
-                'price'     => $price === null ? null : (float) $price,
+                'slot' => $n,
+                'name' => mb_substr($name, 0, 64),
+                'contains' => (int) $rawCount,
+                'price' => $price === null ? null : (float) $price,
                 'wholesale' => isset($values[$f['wholesale']->value]) ? (float) $values[$f['wholesale']->value] : null,
-                'barcode'   => trim((string) ($values[$f['barcode']->value] ?? '')),
-                'active'    => $price !== null && (float) $price > 0,
+                'barcode' => trim((string) ($values[$f['barcode']->value] ?? '')),
+                'active' => $price !== null && (float) $price > 0,
             ];
         }
 
@@ -303,10 +302,10 @@ class ImportPreparer
     public function summarise(Collection $rows): array
     {
         return [
-            'total'  => $rows->count(),
+            'total' => $rows->count(),
             'create' => $rows->where(fn (ParsedRow $r) => $r->action() === ParsedRow::ACTION_CREATE)->count(),
             'update' => $rows->where(fn (ParsedRow $r) => $r->action() === ParsedRow::ACTION_UPDATE)->count(),
-            'skip'   => $rows->where(fn (ParsedRow $r) => $r->action() === ParsedRow::ACTION_SKIP)->count(),
+            'skip' => $rows->where(fn (ParsedRow $r) => $r->action() === ParsedRow::ACTION_SKIP)->count(),
         ];
     }
 

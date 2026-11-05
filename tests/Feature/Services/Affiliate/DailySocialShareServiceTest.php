@@ -20,12 +20,12 @@ uses(RefreshDatabase::class);
 function shareTask(array $overrides = []): AffiliateTask
 {
     return AffiliateTask::create(array_merge([
-        'name'              => 'Daily Share',
-        'task_type'         => 'daily_social_share',
+        'name' => 'Daily Share',
+        'task_type' => 'daily_social_share',
         'verification_type' => 'manual',
-        'reward_amount'     => 0,
-        'points_reward'     => 0,
-        'is_active'         => true,
+        'reward_amount' => 0,
+        'points_reward' => 0,
+        'is_active' => true,
     ], $overrides));
 }
 
@@ -42,16 +42,16 @@ function reviewer(): User
 /** Midday inside the default 08:00–22:00 WAT window. */
 function insideWindow(string $date = '2026-06-10'): Carbon
 {
-    return Carbon::parse($date . ' 12:00:00', 'Africa/Lagos')->utc();
+    return Carbon::parse($date.' 12:00:00', 'Africa/Lagos')->utc();
 }
 
 beforeEach(function () {
     AffiliateSetting::current()->update([
-        'share_timezone'          => 'Africa/Lagos',
-        'share_window_opens_at'   => '08:00:00',
-        'share_window_closes_at'  => '22:00:00',
-        'daily_share_points_cap'  => 120,
-        'streak_bonus_points'     => 50,
+        'share_timezone' => 'Africa/Lagos',
+        'share_window_opens_at' => '08:00:00',
+        'share_window_closes_at' => '22:00:00',
+        'daily_share_points_cap' => 120,
+        'streak_bonus_points' => 50,
         'streak_bonus_every_days' => 7,
     ]);
 });
@@ -139,7 +139,7 @@ test('a reach no active band covers awards nothing but still settles', function 
 test('points are credited only on approval', function () {
     Carbon::setTestNow(insideWindow());
 
-    $affiliate  = shareAffiliate();
+    $affiliate = shareAffiliate();
     $submission = app(DailySocialShareService::class)->submit(shareTask(), $affiliate, 5000);
 
     expect(app(PlugPointService::class)->balance($affiliate->id))->toBe(0);
@@ -152,9 +152,9 @@ test('points are credited only on approval', function () {
 test('approving twice credits once', function () {
     Carbon::setTestNow(insideWindow());
 
-    $affiliate  = shareAffiliate();
+    $affiliate = shareAffiliate();
     $submission = app(DailySocialShareService::class)->submit(shareTask(), $affiliate, 5000);
-    $service    = app(DailySocialShareService::class);
+    $service = app(DailySocialShareService::class);
 
     $service->approve($submission, reviewer());
     $service->approve($submission->fresh(), reviewer());
@@ -166,7 +166,7 @@ test('approving twice credits once', function () {
 test('rejecting credits nothing and records the reason', function () {
     Carbon::setTestNow(insideWindow());
 
-    $affiliate  = shareAffiliate();
+    $affiliate = shareAffiliate();
     $submission = app(DailySocialShareService::class)->submit(shareTask(), $affiliate, 5000);
 
     app(DailySocialShareService::class)->reject($submission, reviewer(), 'Screenshot does not show your code.');
@@ -182,7 +182,7 @@ test('rejecting credits nothing and records the reason', function () {
 test('a share never touches the wallet — points and cash stay separate', function () {
     Carbon::setTestNow(insideWindow());
 
-    $affiliate  = shareAffiliate();
+    $affiliate = shareAffiliate();
     $submission = app(DailySocialShareService::class)->submit(shareTask(), $affiliate, 250000);
     app(DailySocialShareService::class)->approve($submission, reviewer());
 
@@ -196,8 +196,8 @@ test('the daily cap is never exceeded across multiple submissions in one day', f
     Carbon::setTestNow(insideWindow());
 
     $affiliate = shareAffiliate();
-    $task      = shareTask();
-    $service   = app(DailySocialShareService::class);
+    $task = shareTask();
+    $service = app(DailySocialShareService::class);
 
     // Three Viral shares at 100 points each would be 300 without a cap.
     foreach (range(1, 3) as $i) {
@@ -213,8 +213,8 @@ test('the cap pays the remainder rather than overshooting or refusing', function
     Carbon::setTestNow(insideWindow());
 
     $affiliate = shareAffiliate();
-    $task      = shareTask();
-    $service   = app(DailySocialShareService::class);
+    $task = shareTask();
+    $service = app(DailySocialShareService::class);
 
     // 30 (Solid) then 60 (Strong) → second is trimmed to the remaining 15.
     $first = $service->submit($task, $affiliate, 500);
@@ -232,8 +232,8 @@ test('the cap resets on the next day', function () {
     AffiliateSetting::current()->update(['daily_share_points_cap' => 30]);
 
     $affiliate = shareAffiliate();
-    $task      = shareTask();
-    $service   = app(DailySocialShareService::class);
+    $task = shareTask();
+    $service = app(DailySocialShareService::class);
 
     Carbon::setTestNow(insideWindow('2026-06-10'));
     $service->approve($service->submit($task, $affiliate, 500), reviewer());
@@ -248,8 +248,8 @@ test('the cap resets on the next day', function () {
 
 test('consecutive days increment the streak', function () {
     $affiliate = shareAffiliate();
-    $task      = shareTask();
-    $service   = app(DailySocialShareService::class);
+    $task = shareTask();
+    $service = app(DailySocialShareService::class);
 
     foreach (['2026-06-10', '2026-06-11', '2026-06-12'] as $day) {
         Carbon::setTestNow(insideWindow($day));
@@ -263,8 +263,8 @@ test('consecutive days increment the streak', function () {
 
 test('missing a day resets the streak to zero, and the next share starts again at one', function () {
     $affiliate = shareAffiliate();
-    $task      = shareTask();
-    $service   = app(DailySocialShareService::class);
+    $task = shareTask();
+    $service = app(DailySocialShareService::class);
 
     Carbon::setTestNow(insideWindow('2026-06-10'));
     $service->approve($service->submit($task, $affiliate, 500), reviewer());
@@ -286,13 +286,13 @@ test('missing a day resets the streak to zero, and the next share starts again a
 test('the streak bonus lands on every Nth consecutive day', function () {
     AffiliateSetting::current()->update([
         'streak_bonus_every_days' => 3,
-        'streak_bonus_points'     => 25,
-        'daily_share_points_cap'  => 1000,
+        'streak_bonus_points' => 25,
+        'daily_share_points_cap' => 1000,
     ]);
 
     $affiliate = shareAffiliate();
-    $task      = shareTask();
-    $service   = app(DailySocialShareService::class);
+    $task = shareTask();
+    $service = app(DailySocialShareService::class);
 
     $awarded = [];
 
@@ -312,8 +312,8 @@ test('the streak bonus lands on every Nth consecutive day', function () {
 
 test('a rejected day breaks the streak exactly as a missed day does', function () {
     $affiliate = shareAffiliate();
-    $task      = shareTask();
-    $service   = app(DailySocialShareService::class);
+    $task = shareTask();
+    $service = app(DailySocialShareService::class);
 
     Carbon::setTestNow(insideWindow('2026-06-10'));
     $service->approve($service->submit($task, $affiliate, 500), reviewer());
@@ -333,12 +333,12 @@ test('a rejected day breaks the streak exactly as a missed day does', function (
 test('retuning bands and cap later never rewrites a settled award', function () {
     Carbon::setTestNow(insideWindow());
 
-    $affiliate  = shareAffiliate();
+    $affiliate = shareAffiliate();
     $submission = app(DailySocialShareService::class)->submit(shareTask(), $affiliate, 5000);
     app(DailySocialShareService::class)->approve($submission, reviewer());
 
     $frozenPoints = $submission->fresh()->points_awarded;
-    $frozenBand   = $submission->fresh()->affiliate_reach_band_id;
+    $frozenBand = $submission->fresh()->affiliate_reach_band_id;
 
     // Move the goalposts hard.
     AffiliateReachBand::query()->update(['points' => 1]);
@@ -352,7 +352,7 @@ test('retuning bands and cap later never rewrites a settled award', function () 
 test('a submission awaiting review is judged by the settings in force when it is approved', function () {
     Carbon::setTestNow(insideWindow());
 
-    $affiliate  = shareAffiliate();
+    $affiliate = shareAffiliate();
     $submission = app(DailySocialShareService::class)->submit(shareTask(), $affiliate, 5000);
 
     // Band retuned while the submission sits in the queue. The cap is lifted
@@ -373,7 +373,7 @@ test('a share flagged to count toward level freezes its progress value', functio
 
     $task = shareTask(['counts_toward_level' => true, 'level_progress_value' => 5000]);
 
-    $affiliate  = shareAffiliate();
+    $affiliate = shareAffiliate();
     $submission = app(DailySocialShareService::class)->submit($task, $affiliate, 500);
     app(DailySocialShareService::class)->approve($submission, reviewer());
 
@@ -391,7 +391,7 @@ test('an approved share actually advances the affiliate up a level', function ()
     AffiliateLevel::create(['name' => 'Bronze', 'target' => 0,     'rate_value' => 1.0, 'sort_order' => 0, 'is_active' => true]);
     AffiliateLevel::create(['name' => 'Silver', 'target' => 50000, 'rate_value' => 1.1, 'sort_order' => 1, 'is_active' => true]);
 
-    $task      = shareTask(['counts_toward_level' => true, 'level_progress_value' => 50000]);
+    $task = shareTask(['counts_toward_level' => true, 'level_progress_value' => 50000]);
     $affiliate = shareAffiliate();
 
     app(DailySocialShareService::class)->approve(
@@ -407,9 +407,9 @@ test('the level ratchet holds — a later rejection never pulls the level back d
     AffiliateLevel::create(['name' => 'Bronze', 'target' => 0,     'rate_value' => 1.0, 'sort_order' => 0, 'is_active' => true]);
     AffiliateLevel::create(['name' => 'Silver', 'target' => 50000, 'rate_value' => 1.1, 'sort_order' => 1, 'is_active' => true]);
 
-    $task      = shareTask(['counts_toward_level' => true, 'level_progress_value' => 50000]);
+    $task = shareTask(['counts_toward_level' => true, 'level_progress_value' => 50000]);
     $affiliate = shareAffiliate();
-    $service   = app(DailySocialShareService::class);
+    $service = app(DailySocialShareService::class);
 
     Carbon::setTestNow(insideWindow('2026-06-10'));
     $promoting = $service->submit($task, $affiliate, 500);
@@ -430,7 +430,7 @@ test('the level ratchet holds — a later rejection never pulls the level back d
 test('an approved share counts as qualifying activity against the demotion clock', function () {
     Carbon::setTestNow(insideWindow());
 
-    $task      = shareTask(['counts_toward_level' => true, 'level_progress_value' => 100]);
+    $task = shareTask(['counts_toward_level' => true, 'level_progress_value' => 100]);
     $affiliate = shareAffiliate();
 
     app(DailySocialShareService::class)->approve(
@@ -469,8 +469,8 @@ test('a second share cannot be submitted while one is still awaiting review that
     Carbon::setTestNow(insideWindow());
 
     $affiliate = shareAffiliate();
-    $task      = shareTask();
-    $service   = app(DailySocialShareService::class);
+    $task = shareTask();
+    $service = app(DailySocialShareService::class);
 
     $service->submit($task, $affiliate, 500);
 

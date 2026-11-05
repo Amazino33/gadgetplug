@@ -12,7 +12,7 @@ return new class extends Migration
     public function up(): void
     {
         if (LegalPolicy::count() === 0) {
-            (new LegalPolicySeeder())->run();
+            (new LegalPolicySeeder)->run();
         }
     }
 

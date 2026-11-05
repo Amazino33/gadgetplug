@@ -2,10 +2,10 @@
 
 use App\Models\Category;
 use App\Models\Product;
-use Database\Factories\ProductFactory;
 use App\Models\User;
 use App\Models\Vendor;
 use App\Support\CategoryIcon;
+use Database\Factories\ProductFactory;
 
 // Covers the storefront fixes that are easy to undo by accident: dead links,
 // missing accessible names, emoji creeping back in, and images without
@@ -17,22 +17,22 @@ function storefrontProduct(array $attributes = []): Product
 
     $vendor = Vendor::create([
         'user_id' => $owner->id,
-        'name'    => 'Leisure Hub',
+        'name' => 'Leisure Hub',
         'online_sales_enabled' => true,
     ]);
 
     $category = Category::firstOrCreate(['name' => 'Smartphones']);
 
     return ProductFactory::new()->withPhoto()->create(array_merge([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'name'           => 'Pixel 9 Pro',
-        'price'          => 850000,
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'Pixel 9 Pro',
+        'price' => 850000,
         'stock_quantity' => 5,
         'reserved_stock' => 0,
-        'status'         => 'published',
-        'show_online'    => true,
-        'show_in_pos'    => true,
+        'status' => 'published',
+        'show_online' => true,
+        'show_in_pos' => true,
     ], $attributes));
 }
 

@@ -40,7 +40,7 @@ test('the backfill seeder creates accounts for a vendor that predates this featu
 
     expect(FinancialAccount::where('vendor_id', $vendor->id)->count())->toBe(0);
 
-    (new FinancialAccountsBackfillSeeder())->run();
+    (new FinancialAccountsBackfillSeeder)->run();
 
     expect(FinancialAccount::where('vendor_id', $vendor->id)->count())->toBe(2);
 });
@@ -49,8 +49,8 @@ test('the backfill seeder is safe to re-run and does not duplicate existing acco
     $owner = User::factory()->create();
     $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Already Seeded Store']);
 
-    (new FinancialAccountsBackfillSeeder())->run();
-    (new FinancialAccountsBackfillSeeder())->run();
+    (new FinancialAccountsBackfillSeeder)->run();
+    (new FinancialAccountsBackfillSeeder)->run();
 
     expect(FinancialAccount::where('vendor_id', $vendor->id)->count())->toBe(2);
 });

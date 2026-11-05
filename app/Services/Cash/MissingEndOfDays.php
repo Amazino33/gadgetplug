@@ -114,21 +114,21 @@ class MissingEndOfDays
 
                 return [
                     'business_date' => $date,
-                    'store_id'      => (int) $store,
-                    'cashier_id'    => (int) $cashier,
+                    'store_id' => (int) $store,
+                    'cashier_id' => (int) $cashier,
                     // The record to close, if one was opened. Null means the day
                     // has to be opened before it can be counted, float and all.
-                    'session'       => $session ? [
-                        'id'            => $session->id,
+                    'session' => $session ? [
+                        'id' => $session->id,
                         'opening_float' => (float) $session->opening_float,
                     ] : null,
-                    'sales_count'   => $daySales->count(),
-                    'sales_total'   => round((float) $daySales->sum('total'), 2),
+                    'sales_count' => $daySales->count(),
+                    'sales_total' => round((float) $daySales->sum('total'), 2),
                     // Every time it has been put off, newest first.
-                    'reasons'       => $reasons->get($k, collect())
+                    'reasons' => $reasons->get($k, collect())
                         ->map(fn (PosMissingDayReason $r) => [
                             'given_on' => $r->given_on->toDateString(),
-                            'reason'   => $r->reason,
+                            'reason' => $r->reason,
                         ])->values()->all(),
                 ];
             })

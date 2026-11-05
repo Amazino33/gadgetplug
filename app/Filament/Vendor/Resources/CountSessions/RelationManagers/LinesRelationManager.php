@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Filament\Vendor\Resources\CountSessions\RelationManagers;
 
-use App\Support\Quantity;
 use App\Filament\Vendor\Resources\AuditSessions\AuditSessionResource;
+use App\Filament\Vendor\Resources\InventoryLedgers\InventoryLedgerResource;
 use App\Filament\Vendor\Resources\Products\Schemas\ProductForm;
 use App\Models\AuditSession;
+use App\Models\InventoryLedger;
+use App\Support\Quantity;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -63,32 +65,32 @@ class LinesRelationManager extends RelationManager
                     ->label('Sold')
                     ->alignCenter()
                     ->getStateUsing(function (AuditSession $r): int|float {
-                        return Quantity::of(\App\Models\InventoryLedger::where('product_id', $r->product_id)
+                        return Quantity::of(InventoryLedger::where('product_id', $r->product_id)
                             ->whereIn('transaction_type', ['pos_sale', 'online_sale'])
                             ->sum('quantity_change') * -1);
                     })
                     ->formatStateUsing(fn ($state): string => Quantity::display($state, filament()->getTenant()))
-                    ->url(fn (AuditSession $r): string => \App\Filament\Vendor\Resources\InventoryLedgers\InventoryLedgerResource::getUrl('index', [
+                    ->url(fn (AuditSession $r): string => InventoryLedgerResource::getUrl('index', [
                         'tableFilters' => [
                             'product_id' => ['value' => $r->product_id],
                             'transaction_type' => ['value' => 'pos_sale'],
-                        ]
+                        ],
                     ])),
 
                 TextColumn::make('total_stock_in')
                     ->label('Total Stock In')
                     ->alignCenter()
                     ->getStateUsing(function (AuditSession $r): int|float {
-                        return Quantity::of(\App\Models\InventoryLedger::where('product_id', $r->product_id)
+                        return Quantity::of(InventoryLedger::where('product_id', $r->product_id)
                             ->where('transaction_type', 'restock')
                             ->sum('quantity_change'));
                     })
                     ->formatStateUsing(fn ($state): string => Quantity::display($state, filament()->getTenant()))
-                    ->url(fn (AuditSession $r): string => \App\Filament\Vendor\Resources\InventoryLedgers\InventoryLedgerResource::getUrl('index', [
+                    ->url(fn (AuditSession $r): string => InventoryLedgerResource::getUrl('index', [
                         'tableFilters' => [
                             'product_id' => ['value' => $r->product_id],
                             'transaction_type' => ['value' => 'restock'],
-                        ]
+                        ],
                     ])),
 
                 TextColumn::make('variance')
@@ -105,9 +107,9 @@ class LinesRelationManager extends RelationManager
 
                         return match (true) {
                             $diff === null => 'gray',
-                            $diff < 0      => 'danger',
-                            $diff > 0      => 'warning',
-                            default        => 'success',
+                            $diff < 0 => 'danger',
+                            $diff > 0 => 'warning',
+                            default => 'success',
                         };
                     }),
 
@@ -115,17 +117,17 @@ class LinesRelationManager extends RelationManager
                     ->label('Line')
                     ->badge()
                     ->formatStateUsing(fn (string $state): string => match ($state) {
-                        'pending'              => 'Pending',
-                        'verified'             => 'Verified',
-                        'discrepancy'          => 'Review needed',
+                        'pending' => 'Pending',
+                        'verified' => 'Verified',
+                        'discrepancy' => 'Review needed',
                         'resolved_by_override' => 'Resolved',
-                        default                => ucfirst($state),
+                        default => ucfirst($state),
                     })
                     ->color(fn (string $state): string => match ($state) {
-                        'verified'             => 'success',
-                        'discrepancy'          => 'warning',
+                        'verified' => 'success',
+                        'discrepancy' => 'warning',
                         'resolved_by_override' => 'info',
-                        default                => 'gray',
+                        default => 'gray',
                     }),
 
                 // A line can be flagged as differing yet carry no case — when no
@@ -137,21 +139,21 @@ class LinesRelationManager extends RelationManager
                     ->badge()
                     ->getStateUsing(fn (AuditSession $r): string => match (true) {
                         $r->shortageCase?->status === 'pending_disposition' => 'Awaiting decision',
-                        $r->shortageCase?->status === 'investigating'       => 'Investigating',
-                        $r->shortageCase?->status === 'charged'             => 'Charged',
-                        $r->shortageCase?->status === 'recovered'           => 'Recovered',
-                        $r->shortageCase?->status === 'written_off'         => 'Written off',
-                        $r->countedVariance() === null                      => 'No baseline',
-                        default                                             => 'Balanced',
+                        $r->shortageCase?->status === 'investigating' => 'Investigating',
+                        $r->shortageCase?->status === 'charged' => 'Charged',
+                        $r->shortageCase?->status === 'recovered' => 'Recovered',
+                        $r->shortageCase?->status === 'written_off' => 'Written off',
+                        $r->countedVariance() === null => 'No baseline',
+                        default => 'Balanced',
                     })
                     ->color(fn (AuditSession $r): string => match (true) {
                         $r->shortageCase?->status === 'pending_disposition' => 'warning',
-                        $r->shortageCase?->status === 'investigating'       => 'info',
-                        $r->shortageCase?->status === 'charged'             => 'danger',
-                        $r->shortageCase?->status === 'recovered'           => 'success',
-                        $r->shortageCase?->status === 'written_off'         => 'gray',
-                        $r->countedVariance() === null                      => 'gray',
-                        default                                             => 'success',
+                        $r->shortageCase?->status === 'investigating' => 'info',
+                        $r->shortageCase?->status === 'charged' => 'danger',
+                        $r->shortageCase?->status === 'recovered' => 'success',
+                        $r->shortageCase?->status === 'written_off' => 'gray',
+                        $r->countedVariance() === null => 'gray',
+                        default => 'success',
                     })
                     ->tooltip(fn (AuditSession $r): ?string => $r->shortageCase === null && $r->countedVariance() === null
                         ? 'No system figure was recorded for this line, so no shortage can be valued or charged. Resolving it still corrects stock.'
@@ -181,9 +183,9 @@ class LinesRelationManager extends RelationManager
                 SelectFilter::make('status')
                     ->label('Line status')
                     ->options([
-                        'pending'              => 'Pending',
-                        'verified'             => 'Verified',
-                        'discrepancy'          => 'Review needed',
+                        'pending' => 'Pending',
+                        'verified' => 'Verified',
+                        'discrepancy' => 'Review needed',
                         'resolved_by_override' => 'Resolved',
                     ]),
             ])
@@ -198,7 +200,13 @@ class LinesRelationManager extends RelationManager
     }
 
     // Read-only relation: lines come from counting, never from typing them in here.
-    public function canCreate(): bool { return false; }
+    public function canCreate(): bool
+    {
+        return false;
+    }
 
-    public function isReadOnly(): bool { return false; }
+    public function isReadOnly(): bool
+    {
+        return false;
+    }
 }

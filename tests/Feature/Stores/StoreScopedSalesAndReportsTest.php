@@ -1,21 +1,25 @@
 <?php
 
-use App\Actions\Inventory\DispatchStockAction;
+use App\Actions\Inventory\AdjustStockAction;
 use App\Actions\Inventory\ReserveStockAction;
 use App\Models\BlindCountSession;
+use App\Models\Category;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\PosSale;
 use App\Models\PosSaleItem;
 use App\Models\Product;
 use App\Models\ProductStoreStock;
 use App\Models\Store;
+use App\Models\User;
+use App\Models\Vendor;
 use App\Services\Reporting\Cards\AdEfficiencyCardProvider;
 use App\Services\Reporting\Cards\MoneyPositionCardProvider;
 use App\Services\Reporting\Cards\SalesPulseCardProvider;
+use App\Services\Reporting\ProductVelocityService;
 use App\Services\Reporting\StoreSalesQuery;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
@@ -23,24 +27,24 @@ uses(RefreshDatabase::class);
 // into one namespace, so reusing the allocation file's helper names would
 // redeclare them, and borrowing them would make this file pass together and
 // fail alone.
-function salesVendor(): App\Models\Vendor
+function salesVendor(): Vendor
 {
-    return App\Models\Vendor::create([
-        'user_id' => App\Models\User::factory()->create()->id,
-        'name'    => 'Sales Vendor '.uniqid(),
+    return Vendor::create([
+        'user_id' => User::factory()->create()->id,
+        'name' => 'Sales Vendor '.uniqid(),
     ]);
 }
 
-function salesProduct(App\Models\Vendor $vendor, int $defaultQty, array $branches = []): Product
+function salesProduct(Vendor $vendor, int $defaultQty, array $branches = []): Product
 {
     $product = Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => App\Models\Category::create(['name' => 'Cat '.uniqid()])->id,
-        'name'           => 'Sales Product '.uniqid(),
-        'price'          => 1000,
-        'cost_price'     => 600,
+        'vendor_id' => $vendor->id,
+        'category_id' => Category::create(['name' => 'Cat '.uniqid()])->id,
+        'name' => 'Sales Product '.uniqid(),
+        'price' => 1000,
+        'cost_price' => 600,
         'stock_quantity' => 0,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
     ProductStoreStock::where('product_id', $product->id)->first()->update(['quantity' => $defaultQty]);
@@ -53,7 +57,7 @@ function salesProduct(App\Models\Vendor $vendor, int $defaultQty, array $branche
     return $product->fresh();
 }
 
-function salesOrderItem(Product $product, int $quantity): App\Models\OrderItem
+function salesOrderItem(Product $product, int $quantity): OrderItem
 {
     $order = Order::create([
         'reference' => 'ORD-'.strtoupper(uniqid()),
@@ -62,7 +66,7 @@ function salesOrderItem(Product $product, int $quantity): App\Models\OrderItem
         'total_amount' => 1000 * $quantity, 'status' => 'pending', 'payment_method' => 'pay_on_delivery',
     ]);
 
-    return App\Models\OrderItem::create([
+    return OrderItem::create([
         'order_id' => $order->id, 'product_id' => $product->id,
         'vendor_id' => $product->vendor_id, 'quantity' => $quantity, 'unit_price' => 1000,
     ]);
@@ -125,7 +129,7 @@ test('counter sales count toward their branch, not just online orders', function
     $sale = PosSale::create([
         'reference' => 'POS-'.strtoupper(uniqid()),
         'vendor_id' => $vendor->id,
-        'store_id'  => $branch,
+        'store_id' => $branch,
         'cashier_id' => $vendor->user_id,
         'subtotal' => 4000, 'discount_amount' => 0, 'vat_amount' => 0, 'total' => 4000,
         'payment_method' => 'cash', 'status' => 'completed', 'completed_at' => now(),
@@ -176,7 +180,7 @@ test('a store-scoped count trues up only that branch and leaves the other alone'
     // The branch is counted and found to hold 5, not 7.
     $session = BlindCountSession::create([
         'vendor_id' => $vendor->id,
-        'store_id'  => $branch,
+        'store_id' => $branch,
         'storekeeper_a_id' => $vendor->user_id,
         'status' => 'a_counting',
         'frequency' => 'daily',
@@ -184,7 +188,7 @@ test('a store-scoped count trues up only that branch and leaves the other alone'
         'product_order' => [$product->id],
     ]);
 
-    app(App\Actions\Inventory\AdjustStockAction::class)->execute(
+    app(AdjustStockAction::class)->execute(
         productId: $product->id,
         quantityChanged: 5 - 7,
         transactionType: 'audit_correction',
@@ -272,9 +276,9 @@ test('restock and dead stock read the named branch shelf', function () {
     $product = salesProduct($vendor, 100, ['Branch B' => 0]);
     $branch = Store::where('name', 'Branch B')->value('id');
 
-    $wide = app(App\Services\Reporting\ProductVelocityService::class)
+    $wide = app(ProductVelocityService::class)
         ->forVendor(vendorId: $vendor->id);
-    $atBranch = app(App\Services\Reporting\ProductVelocityService::class)
+    $atBranch = app(ProductVelocityService::class)
         ->forVendor(vendorId: $vendor->id, storeId: $branch);
 
     expect($wide->firstWhere('productId', $product->id)->currentStock)->toBe(100)

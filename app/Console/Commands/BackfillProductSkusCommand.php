@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Product;
+use App\Models\Vendor;
 use App\Services\Products\SkuGenerator;
 use Illuminate\Console\Command;
 
@@ -17,7 +18,7 @@ class BackfillProductSkusCommand extends Command
         $dry = (bool) $this->option('dry-run');
 
         // A shop that types its own SKUs has chosen not to have them made.
-        $manualShops = \App\Models\Vendor::where('sku_style', SkuGenerator::STYLE_MANUAL)->pluck('id');
+        $manualShops = Vendor::where('sku_style', SkuGenerator::STYLE_MANUAL)->pluck('id');
 
         if ($manualShops->isNotEmpty()) {
             $this->warn('Skipping '.$manualShops->count().' shop(s) set to type their own SKUs.');
@@ -28,7 +29,7 @@ class BackfillProductSkusCommand extends Command
             ->where(fn ($q) => $q->whereNull('sku')->orWhere('sku', ''))
             ->when($this->option('vendor'), fn ($q, $id) => $q->where('vendor_id', (int) $id));
 
-        $total  = (clone $query)->count();
+        $total = (clone $query)->count();
         $filled = 0;
         // Per vendor, so a dry run (which saves nothing) still previews
         // distinct numbers rather than the same one over and over.
@@ -40,7 +41,7 @@ class BackfillProductSkusCommand extends Command
             foreach ($products as $product) {
                 if ($dry) {
                     $skip = $offset[$product->vendor_id] ?? 0;
-                    $sku  = $generator->for($product->vendor_id, $product->category_id, $product->name, $product->id, $skip);
+                    $sku = $generator->for($product->vendor_id, $product->category_id, $product->name, $product->id, $skip);
                     $offset[$product->vendor_id] = $skip + 1;
 
                     if ($filled < 10) {

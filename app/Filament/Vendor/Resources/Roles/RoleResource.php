@@ -3,12 +3,12 @@
 namespace App\Filament\Vendor\Resources\Roles;
 
 use BezhanSalleh\FilamentShield\Resources\Roles\RoleResource as ShieldRoleResource;
-use Illuminate\Database\Eloquent\Builder;
-use Filament\Schemas\Schema;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\TextInput;
-use Spatie\Permission\Models\Permission;
+use Filament\Schemas\Schema;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Str;
+use Spatie\Permission\Models\Permission;
 
 class RoleResource extends ShieldRoleResource
 {
@@ -26,36 +26,38 @@ class RoleResource extends ShieldRoleResource
      * @var array<int, string>
      */
     public const GRANTABLE_PERMISSIONS = [
-                        'view_products', 'view_any_products', 'create_products', 'edit_products', 'delete_products', 'view_cost_price',
-                        'view_order_items', 'view_any_order_items', 'edit_order_items',
-                        'view_vendor', 'edit_vendor',
-                        'view_team_members', 'invite_team_members', 'edit_team_members', 'remove_team_members',
-                        'access_pos', 'void_sale', 'process_return', 'close_pos_session', 'view_sales_history',
-                        'manage_inventory', 'perform_inventory_count', 'authorize_recount', 'adjust_stock',
-                        'view_inventory_reports', 'view_restock_report', 'view_audit_sessions',
-                        'approve_procurement', 'manage_procurement',
-                        // Whoever is at the counter deals with the trader who
-                        // walks in, so both of these are grantable to a role.
-                        //
-                        // write_off_picking is deliberately absent: it is the
-                        // owner's alone, and hasVendorPermission() gives it to
-                        // them by ownership. Listing it here would let it be
-                        // granted to a role, which is exactly what being absent
-                        // prevents.
-                        'view_customer_debts',
-                        'manage_pickings',
-                        'submit_cash', 'receive_cash',
-                        'manage_logistics',
-                        'view_payouts',
-                        'manage_notification_settings',
-                        'manage_financial_accounts',
-                        'manage_expenses',
-                        'manage_financial_reports',
-                        'view_reports_hub',
-                    ];
+        'view_products', 'view_any_products', 'create_products', 'edit_products', 'delete_products', 'view_cost_price',
+        'view_order_items', 'view_any_order_items', 'edit_order_items',
+        'view_vendor', 'edit_vendor',
+        'view_team_members', 'invite_team_members', 'edit_team_members', 'remove_team_members',
+        'access_pos', 'void_sale', 'process_return', 'close_pos_session', 'view_sales_history',
+        'manage_inventory', 'perform_inventory_count', 'authorize_recount', 'adjust_stock',
+        'view_inventory_reports', 'view_restock_report', 'view_audit_sessions',
+        'approve_procurement', 'manage_procurement',
+        // Whoever is at the counter deals with the trader who
+        // walks in, so both of these are grantable to a role.
+        //
+        // write_off_picking is deliberately absent: it is the
+        // owner's alone, and hasVendorPermission() gives it to
+        // them by ownership. Listing it here would let it be
+        // granted to a role, which is exactly what being absent
+        // prevents.
+        'view_customer_debts',
+        'manage_pickings',
+        'submit_cash', 'receive_cash',
+        'manage_logistics',
+        'view_payouts',
+        'manage_notification_settings',
+        'manage_financial_accounts',
+        'manage_expenses',
+        'manage_financial_reports',
+        'view_reports_hub',
+    ];
 
     protected static ?int $navigationSort = 7;
+
     protected static string|null|\UnitEnum $navigationGroup = 'Settings';
+
     public static function isScopedToTenant(): bool
     {
         return false;
@@ -68,22 +70,34 @@ class RoleResource extends ShieldRoleResource
 
         return $user->isSuperAdmin() || ($vendor?->isOwner($user) && $vendor->owner_can_manage_roles);
     }
-    public static function canAccess(): bool   {
+
+    public static function canAccess(): bool
+    {
         return static::canManage();
     }
-    public static function canViewAny(): bool  {
+
+    public static function canViewAny(): bool
+    {
         return static::canManage();
     }
-    public static function canCreate(): bool   {
+
+    public static function canCreate(): bool
+    {
         return static::canManage();
     }
-    public static function canEdit($record): bool   {
+
+    public static function canEdit($record): bool
+    {
         return static::canManage();
     }
-    public static function canDelete($record): bool {
+
+    public static function canDelete($record): bool
+    {
         return static::canManage();
     }
-    public static function canDeleteAny(): bool     {
+
+    public static function canDeleteAny(): bool
+    {
         return static::canManage();
     }
 
@@ -134,10 +148,10 @@ class RoleResource extends ShieldRoleResource
     public static function getPages(): array
     {
         return [
-            'index'  => Pages\ListRoles::route('/'),
+            'index' => Pages\ListRoles::route('/'),
             'create' => Pages\CreateRole::route('/create'),
-            'view'   => Pages\ViewRole::route('/{record}'),
-            'edit'   => Pages\EditRole::route('/{record}/edit'),
+            'view' => Pages\ViewRole::route('/{record}'),
+            'edit' => Pages\EditRole::route('/{record}/edit'),
         ];
     }
 }

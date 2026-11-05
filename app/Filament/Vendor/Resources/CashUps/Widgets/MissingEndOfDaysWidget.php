@@ -57,7 +57,7 @@ class MissingEndOfDaysWidget extends Widget
         return $days
             ->map(fn (array $day) => $day + [
                 'cashier_name' => $names[$day['cashier_id']] ?? 'Cashier #'.$day['cashier_id'],
-                'store_name'   => $stores[$day['store_id']] ?? null,
+                'store_name' => $stores[$day['store_id']] ?? null,
             ])
             ->sortByDesc('business_date')
             ->values();

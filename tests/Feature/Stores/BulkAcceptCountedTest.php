@@ -1,6 +1,8 @@
 <?php
 
 use App\Filament\Vendor\Resources\AuditSessions\Pages\ManageAuditSessions;
+use App\Filament\Vendor\Resources\CountSessions\Pages\ViewCountSession;
+use App\Filament\Vendor\Resources\CountSessions\RelationManagers\LinesRelationManager;
 use App\Models\AuditSession;
 use App\Models\BlindCountSession;
 use App\Models\Category;
@@ -12,6 +14,7 @@ use App\Models\User;
 use App\Models\Vendor;
 use App\Services\ActiveStore;
 use App\Services\VendorRoles;
+use Database\Seeders\VendorPermissionsSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -26,21 +29,21 @@ function bulkVendor(): Vendor
 {
     return Vendor::create([
         'user_id' => User::factory()->create()->id,
-        'name'    => 'Bulk Vendor '.uniqid(),
+        'name' => 'Bulk Vendor '.uniqid(),
     ]);
 }
 
 function bulkProduct(Vendor $vendor, Store $home, int $onShelf, float $cost = 400): Product
 {
     return Product::create([
-        'vendor_id'      => $vendor->id,
-        'store_id'       => $home->id,
-        'category_id'    => Category::create(['name' => 'Cat '.uniqid()])->id,
-        'name'           => 'Bulk Product '.uniqid(),
-        'price'          => 1000,
-        'cost_price'     => $cost,
+        'vendor_id' => $vendor->id,
+        'store_id' => $home->id,
+        'category_id' => Category::create(['name' => 'Cat '.uniqid()])->id,
+        'name' => 'Bulk Product '.uniqid(),
+        'price' => 1000,
+        'cost_price' => $cost,
         'stock_quantity' => $onShelf,
-        'status'         => 'published',
+        'status' => 'published',
     ])->fresh();
 }
 
@@ -51,20 +54,20 @@ function bulkLine(Vendor $vendor, Store $store, Product $product, int $counted, 
         ['vendor_id' => $vendor->id, 'store_id' => $store->id, 'status' => 'completed'],
         [
             'storekeeper_a_id' => $vendor->user_id,
-            'frequency'        => 'daily',
-            'by_category'      => false,
-            'product_order'    => [],
+            'frequency' => 'daily',
+            'by_category' => false,
+            'product_order' => [],
         ],
     );
 
     return AuditSession::create([
-        'vendor_id'              => $vendor->id,
+        'vendor_id' => $vendor->id,
         'blind_count_session_id' => $session->id,
-        'product_id'             => $product->id,
-        'system_quantity'        => $system,
-        'storekeeper_a_id'       => $vendor->user_id,
-        'count_a'                => $counted,
-        'status'                 => 'discrepancy',
+        'product_id' => $product->id,
+        'system_quantity' => $system,
+        'storekeeper_a_id' => $vendor->user_id,
+        'count_a' => $counted,
+        'status' => 'discrepancy',
     ]);
 }
 
@@ -151,9 +154,9 @@ test('a shortfall books a loss, a surplus does not', function () {
     $branch = Store::create(['vendor_id' => $vendor->id, 'name' => 'Counted Branch']);
 
     $missing = bulkProduct($vendor, $branch, onShelf: 10, cost: 400);
-    $extra   = bulkProduct($vendor, $branch, onShelf: 0, cost: 400);
+    $extra = bulkProduct($vendor, $branch, onShelf: 0, cost: 400);
 
-    $short   = bulkLine($vendor, $branch, $missing, counted: 7, system: 10);  // 3 short
+    $short = bulkLine($vendor, $branch, $missing, counted: 7, system: 10);  // 3 short
     $surplus = bulkLine($vendor, $branch, $extra, counted: 5, system: 0);     // 5 over
 
     actAsManager($vendor);
@@ -188,7 +191,7 @@ test('a line already resolved is left alone rather than corrected twice', functi
 });
 
 test('a member without the permission cannot reach the bulk action', function () {
-    (new Database\Seeders\VendorPermissionsSeeder)->run();
+    (new VendorPermissionsSeeder)->run();
 
     $vendor = bulkVendor();
     VendorRoles::seedFor($vendor);
@@ -225,8 +228,8 @@ test('the count session lines table carries the same bulk actions', function () 
     // Driven through the relation manager on the count session page, which is
     // where a manager actually works through a count.
     Livewire::test(
-        App\Filament\Vendor\Resources\CountSessions\RelationManagers\LinesRelationManager::class,
-        ['ownerRecord' => $line->countSession, 'pageClass' => App\Filament\Vendor\Resources\CountSessions\Pages\ViewCountSession::class],
+        LinesRelationManager::class,
+        ['ownerRecord' => $line->countSession, 'pageClass' => ViewCountSession::class],
     )->callTableBulkAction('accept_counted', [$line], ['reason_code' => 'Opening Stock Count']);
 
     expect(ProductStoreStock::where('product_id', $product->id)->where('store_id', $branch->id)->value('quantity'))->toBe(25)

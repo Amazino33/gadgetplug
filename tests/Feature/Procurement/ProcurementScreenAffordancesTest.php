@@ -44,7 +44,7 @@ test('the item row being filled in is marked, numbered and kept clear of the key
 
     $this->actingAs($ctx['keeper'])->withSession([
         'procurement.supplier_id' => $ctx['supplier']->id,
-        'procurement.store_id'    => $ctx['store']->id,
+        'procurement.store_id' => $ctx['store']->id,
     ]);
 
     $html = $this->get(route('procurement.items'))->assertOk()->getContent();

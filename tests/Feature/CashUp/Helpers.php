@@ -21,7 +21,7 @@ function cashUpContext(): array
 
     $vendor = Vendor::create([
         'user_id' => $owner->id,
-        'name'    => 'Cash-Up Vendor '.uniqid(),
+        'name' => 'Cash-Up Vendor '.uniqid(),
     ]);
 
     $store = Store::where('vendor_id', $vendor->id)->where('is_default', true)->firstOrFail();
@@ -36,14 +36,14 @@ function cashUpContext(): array
 function openCashUp(array $ctx, array $over = []): PosSession
 {
     return PosSession::create(array_merge([
-        'vendor_id'     => $ctx['vendor']->id,
-        'store_id'      => $ctx['store']->id,
-        'cashier_id'    => $ctx['cashier']->id,
-        'terminal_id'   => 'MPT-001',
+        'vendor_id' => $ctx['vendor']->id,
+        'store_id' => $ctx['store']->id,
+        'cashier_id' => $ctx['cashier']->id,
+        'terminal_id' => 'MPT-001',
         'business_date' => '2026-09-11',
         'opening_float' => 20000,
-        'opened_at'     => now(),
-        'status'        => PosSession::STATUS_OPEN,
+        'opened_at' => now(),
+        'status' => PosSession::STATUS_OPEN,
     ], $over));
 }
 
@@ -54,15 +54,15 @@ function openCashUp(array $ctx, array $over = []): PosSession
 function closeCashUp(PosSession $session, array $over = []): PosSession
 {
     $session->update(array_merge([
-        'counted_cash'      => 100000,
-        'counted_terminal'  => 50000,
-        'expected_cash'     => 100000,
+        'counted_cash' => 100000,
+        'counted_terminal' => 50000,
+        'expected_cash' => 100000,
         'expected_terminal' => 50000,
-        'cash_variance'     => 0,
+        'cash_variance' => 0,
         'terminal_variance' => 0,
-        'breakdown'         => ['cash_sales' => 80000],
-        'status'            => PosSession::STATUS_PENDING_REVIEW,
-        'closed_at'         => now(),
+        'breakdown' => ['cash_sales' => 80000],
+        'status' => PosSession::STATUS_PENDING_REVIEW,
+        'closed_at' => now(),
     ], $over));
 
     return $session->refresh();
@@ -74,18 +74,18 @@ function tillSale(array $ctx, array $over = []): PosSale
     $total = $over['total'] ?? 80000;
 
     return PosSale::create(array_merge([
-        'reference'       => 'POS-'.Str::random(10),
-        'vendor_id'       => $ctx['vendor']->id,
-        'store_id'        => $ctx['store']->id,
-        'cashier_id'      => $ctx['cashier']->id,
-        'subtotal'        => $total,
+        'reference' => 'POS-'.Str::random(10),
+        'vendor_id' => $ctx['vendor']->id,
+        'store_id' => $ctx['store']->id,
+        'cashier_id' => $ctx['cashier']->id,
+        'subtotal' => $total,
         'discount_amount' => 0,
-        'vat_amount'      => 0,
-        'total'           => $total,
-        'payment_method'  => 'cash',
+        'vat_amount' => 0,
+        'total' => $total,
+        'payment_method' => 'cash',
         'amount_tendered' => $total,
-        'change_given'    => 0,
-        'status'          => 'completed',
-        'completed_at'    => now(),
+        'change_given' => 0,
+        'status' => 'completed',
+        'completed_at' => now(),
     ], $over));
 }

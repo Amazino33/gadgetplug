@@ -21,12 +21,12 @@ class ReleaseReservationAction
      * stale split.
      */
     public function execute(
-        int     $productId,
-        int     $quantity,
-        ?int    $userId      = null,
-        ?string $reference   = null,
+        int $productId,
+        int $quantity,
+        ?int $userId = null,
+        ?string $reference = null,
         ?string $description = null,
-        ?int    $orderItemId = null,
+        ?int $orderItemId = null,
         Store|int|null $store = null,
     ): InventoryLedger {
         return DB::transaction(function () use ($productId, $quantity, $userId, $reference, $description, $orderItemId, $store) {
@@ -52,14 +52,14 @@ class ReleaseReservationAction
                 $row->save();
 
                 $ledger = InventoryLedger::create([
-                    'vendor_id'        => $product->vendor_id,
-                    'store_id'         => $storeId,
-                    'product_id'       => $product->id,
-                    'user_id'          => $userId,
+                    'vendor_id' => $product->vendor_id,
+                    'store_id' => $storeId,
+                    'product_id' => $product->id,
+                    'user_id' => $userId,
                     'transaction_type' => 'reservation_released',
-                    'quantity_change'  => $units,
-                    'reference'        => $reference,
-                    'description'      => $description ?? 'Reservation released — order cancelled.',
+                    'quantity_change' => $units,
+                    'reference' => $reference,
+                    'description' => $description ?? 'Reservation released — order cancelled.',
                 ]);
             }
 

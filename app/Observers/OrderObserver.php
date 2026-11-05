@@ -5,6 +5,8 @@ namespace App\Observers;
 use App\Models\DeliveryMessage;
 use App\Models\MessageTemplate;
 use App\Models\Order;
+use App\Models\Vendor;
+use App\Models\VendorNotificationSetting;
 use App\Services\Messaging\MessagingService;
 use App\Services\Messaging\StorekeeperNotifier;
 use App\Services\Messaging\TemplateRenderer;
@@ -30,7 +32,7 @@ class OrderObserver
     // way" with their delivery code — sent by OrderStatusService/DispatchMessages
     // (customer_delivery_code). customer_dispatched stays for sending by hand.
     private const CUSTOMER_STATUS_TEMPLATES = [
-        'paid'      => 'customer_received',
+        'paid' => 'customer_received',
         'confirmed' => 'customer_received',
         'delivered' => 'customer_delivered',
     ];
@@ -89,26 +91,26 @@ class OrderObserver
                 }
 
                 $checkout->load('orders.items.product');
-                $items     = $checkout->orders->flatMap->items;
-                $eventId   = $checkout->reference;
-                $value     = (float) $checkout->grand_total;
-                $subject   = $checkout;
+                $items = $checkout->orders->flatMap->items;
+                $eventId = $checkout->reference;
+                $value = (float) $checkout->grand_total;
+                $subject = $checkout;
             } else {
                 $order->loadMissing('items.product');
-                $items     = $order->items;
-                $eventId   = $order->reference;
-                $value     = (float) $order->total_amount;
-                $subject   = $order;
+                $items = $order->items;
+                $eventId = $order->reference;
+                $value = (float) $order->total_amount;
+                $subject = $order;
             }
 
             $service = app(MetaConversionsService::class);
             $userData = [
-                'email'      => $subject->customer_email,
-                'phone'      => $subject->customer_phone,
-                'name'       => $subject->customer_name,
-                'city'       => $subject->local_government,
-                'fbp'        => $subject->fbp,
-                'fbc'        => $subject->fbc,
+                'email' => $subject->customer_email,
+                'phone' => $subject->customer_phone,
+                'name' => $subject->customer_name,
+                'city' => $subject->local_government,
+                'fbp' => $subject->fbp,
+                'fbc' => $subject->fbc,
             ];
 
             $service->dispatchEvent(
@@ -117,9 +119,9 @@ class OrderObserver
                 eventSourceUrl: route('checkout'),
                 userData: $userData,
                 customData: [
-                    'currency'     => 'NGN',
-                    'value'        => $value,
-                    'content_ids'  => $items->pluck('product_id')->all(),
+                    'currency' => 'NGN',
+                    'value' => $value,
+                    'content_ids' => $items->pluck('product_id')->all(),
                     // The online names the buyer saw, from the line snapshots.
                     'content_name' => $items->map(fn ($item) => $item->customerName())->unique()->implode(', '),
                     'content_type' => 'product',
@@ -129,17 +131,17 @@ class OrderObserver
             if ($order->status === 'confirmed' && $order->payment_method === 'pay_on_delivery') {
                 $service->dispatchEvent(
                     eventName: 'PaymentConfirmed',
-                    eventId: $eventId . '-payment-confirmed',
+                    eventId: $eventId.'-payment-confirmed',
                     eventSourceUrl: route('checkout'),
                     userData: $userData,
                     customData: [
                         'currency' => 'NGN',
-                        'value'    => $value,
+                        'value' => $value,
                     ],
                 );
             }
         } catch (\Throwable $e) {
-            Log::error("Meta conversion event dispatch failed for order {$order->id}: " . $e->getMessage());
+            Log::error("Meta conversion event dispatch failed for order {$order->id}: ".$e->getMessage());
         }
     }
 
@@ -162,8 +164,8 @@ class OrderObserver
             }
         } catch (\Throwable $e) {
             Log::warning('Storekeeper notification failed.', [
-                'order_id'  => $order->id,
-                'status'    => $order->status,
+                'order_id' => $order->id,
+                'status' => $order->status,
                 'exception' => $e->getMessage(),
             ]);
         }
@@ -182,10 +184,10 @@ class OrderObserver
                 continue;
             }
 
-            $itemCount   = (int) $items->sum('quantity');
-            $vendorTotal = (float) $items->sum(fn($item) => $item->quantity * $item->unit_price);
+            $itemCount = (int) $items->sum('quantity');
+            $vendorTotal = (float) $items->sum(fn ($item) => $item->quantity * $item->unit_price);
 
-            $body = $itemCount . ' item(s) · ₦' . number_format($vendorTotal, 2);
+            $body = $itemCount.' item(s) · ₦'.number_format($vendorTotal, 2);
 
             $recipients = $vendor->users()->get()
                 ->push($vendor->user)
@@ -194,7 +196,7 @@ class OrderObserver
 
             foreach ($recipients as $user) {
                 Notification::make()
-                    ->title('New order: #' . $order->reference)
+                    ->title('New order: #'.$order->reference)
                     ->body($body)
                     ->icon('heroicon-o-shopping-bag')
                     ->success()
@@ -207,10 +209,10 @@ class OrderObserver
 
     // The owner's own WhatsApp alert, when they have given an owner number.
     // Non-urgent (P2), so three orders in two minutes arrive as one message.
-    private function whatsAppVendorOwner(\App\Models\Vendor $vendor, Order $order): void
+    private function whatsAppVendorOwner(Vendor $vendor, Order $order): void
     {
         try {
-            $to = \App\Models\VendorNotificationSetting::forVendor($vendor)->owner_whatsapp;
+            $to = VendorNotificationSetting::forVendor($vendor)->owner_whatsapp;
 
             if (blank($to)) {
                 return;
@@ -223,14 +225,14 @@ class OrderObserver
             }
 
             $message = DeliveryMessage::create([
-                'vendor_id'      => $vendor->id,
-                'order_id'       => $order->id,
+                'vendor_id' => $vendor->id,
+                'order_id' => $order->id,
                 'recipient_type' => 'vendor',
-                'channel'        => $template->channel,
-                'to_number'      => $to,
-                'body'           => app(TemplateRenderer::class)->render($template->body, TemplateRenderer::contextForOrder($order, TemplateRenderer::AUDIENCE_STOREKEEPER)),
-                'status'         => 'queued',
-                'template_key'   => 'vendor_new_order',
+                'channel' => $template->channel,
+                'to_number' => $to,
+                'body' => app(TemplateRenderer::class)->render($template->body, TemplateRenderer::contextForOrder($order, TemplateRenderer::AUDIENCE_STOREKEEPER)),
+                'status' => 'queued',
+                'template_key' => 'vendor_new_order',
             ]);
 
             app(MessagingService::class)->dispatch($message);
@@ -285,14 +287,14 @@ class OrderObserver
             : TemplateRenderer::contextForOrder($order, TemplateRenderer::AUDIENCE_CUSTOMER);
 
         $message = DeliveryMessage::create([
-            'vendor_id'      => $checkout ? null : $vendorId,
-            'order_id'       => $order->id,
+            'vendor_id' => $checkout ? null : $vendorId,
+            'order_id' => $order->id,
             'recipient_type' => 'customer',
-            'channel'        => $template->channel,
-            'to_number'      => $order->customer_phone,
-            'body'           => app(TemplateRenderer::class)->render($template->body, $context),
-            'status'         => 'queued',
-            'template_key'   => $templateKey,
+            'channel' => $template->channel,
+            'to_number' => $order->customer_phone,
+            'body' => app(TemplateRenderer::class)->render($template->body, $context),
+            'status' => 'queued',
+            'template_key' => $templateKey,
         ]);
 
         // Queued: this runs inside checkout, which must not wait on a gateway.

@@ -2,10 +2,12 @@
 
 namespace App\Filament\Vendor\Pages;
 
+use App\Livewire\Vendor\HomeDashboard;
 use App\Services\Reporting\ReportPeriod;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Pages\Dashboard\Concerns\HasFiltersForm;
+use Filament\Schemas\Components\Livewire;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
@@ -18,8 +20,8 @@ class Dashboard extends \Filament\Pages\Dashboard
     {
         return $schema
             ->components([
-                \Filament\Schemas\Components\Livewire::make(\App\Livewire\Vendor\HomeDashboard::class),
-                \Filament\Schemas\Components\Section::make('Detailed Reports')
+                Livewire::make(HomeDashboard::class),
+                Section::make('Detailed Reports')
                     ->schema([
                         ...(method_exists($this, 'getFiltersForm') ? [$this->getFiltersFormContentComponent()] : []),
                         $this->getWidgetsContentComponent(),

@@ -2,30 +2,34 @@
 
 namespace App\Models;
 
-use App\Support\Quantity;
 use App\Casts\AsQuantity;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Str;
 use App\Services\Products\SkuGenerator;
 use App\Services\VendorLink\LinkedPricing;
-use Illuminate\Database\UniqueConstraintViolationException;
+use App\Services\VendorLink\SupplierCatalogue;
+use App\Support\Quantity;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Spatie\MediaLibrary\HasMedia;
-use Spatie\MediaLibrary\InteractsWithMedia;
-use Spatie\Image\Enums\Fit;
-use Spatie\MediaLibrary\MediaCollections\Models\Media;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Models\Activity;
 use Spatie\Activitylog\Traits\LogsActivity;
+use Spatie\Image\Enums\Fit;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Spatie\Sluggable\HasSlug;
 use Spatie\Sluggable\SlugOptions;
 
 class Product extends Model implements HasMedia
 {
-    use InteractsWithMedia, HasSlug, LogsActivity;
+    use HasSlug, InteractsWithMedia, LogsActivity;
 
     public function getActivitylogOptions(): LogOptions
     {
@@ -95,7 +99,7 @@ class Product extends Model implements HasMedia
         if ($product === null && $field === 'slug' && ($moved = self::movedFromSlug((string) $value)) !== null) {
             $query = request()->getQueryString();
 
-            throw new \Illuminate\Http\Exceptions\HttpResponseException(
+            throw new HttpResponseException(
                 redirect()->to(route('product.show', $moved->slug).($query ? '?'.$query : ''), 301)
             );
         }
@@ -154,20 +158,20 @@ class Product extends Model implements HasMedia
     }
 
     protected $casts = [
-        'price'           => 'decimal:2',
-        'cost_price'      => 'decimal:2',
+        'price' => 'decimal:2',
+        'cost_price' => 'decimal:2',
         'has_custom_price' => 'boolean',
         'allow_pos_price_override' => 'boolean',
-        'specifications'  => 'array',
-        'stock_quantity'  => AsQuantity::class,
-        'reserved_stock'  => AsQuantity::class,
-        'is_service'      => 'boolean',
-        'reorder_point'      => 'integer',
+        'specifications' => 'array',
+        'stock_quantity' => AsQuantity::class,
+        'reserved_stock' => AsQuantity::class,
+        'is_service' => 'boolean',
+        'reorder_point' => 'integer',
         'preferred_quantity' => 'integer',
-        'published_at'    => 'datetime',
-        'unpublish_at'    => 'datetime',
+        'published_at' => 'datetime',
+        'unpublish_at' => 'datetime',
         'wholesale_price' => 'decimal:2',
-        'half_price'      => 'decimal:2',
+        'half_price' => 'decimal:2',
         'negative_stock_override' => 'boolean',
     ];
 
@@ -186,7 +190,7 @@ class Product extends Model implements HasMedia
                 // A shop that types its own SKUs has chosen not to have one
                 // made for it, so a blank is a mistake to report, not fill.
                 if ($generator->isManual($product->vendor_id)) {
-                    throw \Illuminate\Validation\ValidationException::withMessages([
+                    throw ValidationException::withMessages([
                         'sku' => 'Enter a SKU for this product - this shop is set to type its own.',
                     ]);
                 }
@@ -279,13 +283,13 @@ class Product extends Model implements HasMedia
         }
 
         $values = [
-            'name'            => mb_substr($this->base_unit ?: 'Piece', 0, 64),
+            'name' => mb_substr($this->base_unit ?: 'Piece', 0, 64),
             // The stored column, not the accessor: a linked listing's accessor
             // quotes the supplier's live price, and this row mirrors what the
             // vendor actually saved.
-            'price'           => $this->attributes['price'] ?? 0,
+            'price' => $this->attributes['price'] ?? 0,
             'wholesale_price' => $this->attributes['wholesale_price'] ?? null,
-            'half_price'      => $this->attributes['half_price'] ?? null,
+            'half_price' => $this->attributes['half_price'] ?? null,
         ];
 
         $unit = ProductUnit::where('product_id', $this->id)->where('is_base', true)->first();
@@ -294,12 +298,12 @@ class Product extends Model implements HasMedia
             $unit->update($values);
         } else {
             $unit = ProductUnit::create($values + [
-                'product_id'        => $this->id,
-                'vendor_id'         => $this->vendor_id,
+                'product_id' => $this->id,
+                'vendor_id' => $this->vendor_id,
                 'conversion_factor' => 1,
-                'is_base'           => true,
-                'is_active'         => true,
-                'sort_order'        => 0,
+                'is_base' => true,
+                'is_active' => true,
+                'sort_order' => 0,
             ]);
         }
 
@@ -338,17 +342,17 @@ class Product extends Model implements HasMedia
             // Another product (or one of this product's own bigger units)
             // already answers to this code. Saving it anyway would leave a scan
             // unable to tell which one the customer is holding.
-            throw \Illuminate\Validation\ValidationException::withMessages([
+            throw ValidationException::withMessages([
                 'barcode' => "Barcode {$new} is already used by another product or unit in this shop.",
             ]);
         }
 
         if (! $existing) {
             ProductBarcode::create([
-                'vendor_id'       => $this->vendor_id,
-                'product_id'      => $this->id,
+                'vendor_id' => $this->vendor_id,
+                'product_id' => $this->id,
                 'product_unit_id' => null,
-                'barcode'         => $new,
+                'barcode' => $new,
             ]);
         }
     }
@@ -356,8 +360,8 @@ class Product extends Model implements HasMedia
     public function scopePublished(Builder $query): void
     {
         $query->where('status', 'published')
-              ->where(fn($q) => $q->whereNull('published_at')->orWhere('published_at', '<=', now()))
-              ->where(fn($q) => $q->whereNull('unpublish_at')->orWhere('unpublish_at', '>', now()));
+            ->where(fn ($q) => $q->whereNull('published_at')->orWhere('published_at', '<=', now()))
+            ->where(fn ($q) => $q->whereNull('unpublish_at')->orWhere('unpublish_at', '>', now()));
     }
 
     // "Published" governs whether a product physically exists/is live at all;
@@ -477,7 +481,7 @@ class Product extends Model implements HasMedia
         // A loaded relation can still read null inside the vendor panel, where
         // tenancy hides the supplier's row — so null falls through to the gateway.
         $source = $this->relationLoaded('sourceProduct') ? $this->sourceProduct : null;
-        $source ??= \App\Services\VendorLink\SupplierCatalogue::find($link, (int) $this->source_product_id);
+        $source ??= SupplierCatalogue::find($link, (int) $this->source_product_id);
 
         // The same conditions SupplierCatalogue applies and scopeVisibleOnline
         // repeats in SQL: his, and published.
@@ -500,7 +504,7 @@ class Product extends Model implements HasMedia
     }
 
     /** The photos a customer is shown, primary first. Empty when there is no source. */
-    public function catalogueMedia(): \Illuminate\Support\Collection
+    public function catalogueMedia(): Collection
     {
         return $this->catalogueSource()?->getMedia('product-images') ?? collect();
     }
@@ -588,38 +592,38 @@ class Product extends Model implements HasMedia
     public function scopeVisibleOnline(Builder $query): void
     {
         $query->published()->where('show_online', true)
-              ->whereHas('vendor', fn (Builder $q) => $q->where('online_sales_enabled', true))
-              ->where(function (Builder $q) {
-                  $q->where(function (Builder $own) {
-                      // Both null: an orphaned listing (source deleted) has
-                      // only its link id left and must not pass as ordinary.
-                      $own->whereNull('products.source_product_id')
-                          ->whereNull('products.supplier_link_id')
-                          ->whereHas('media', fn (Builder $m) => $m->where('collection_name', 'product-images'));
-                  })->orWhere(function (Builder $linked) {
-                      $linked->whereNotNull('products.source_product_id')
-                          ->whereExists(function ($src) {
-                              $src->selectRaw('1')
-                                  ->from('products as catalogue_src')
-                                  ->whereColumn('catalogue_src.id', 'products.source_product_id')
-                                  ->where('catalogue_src.status', 'published')
-                                  ->whereExists(function ($link) {
-                                      $link->selectRaw('1')
-                                          ->from('supplier_links')
-                                          ->whereColumn('supplier_links.id', 'products.supplier_link_id')
-                                          ->whereColumn('supplier_links.supplier_vendor_id', 'catalogue_src.vendor_id')
-                                          ->where('supplier_links.is_active', true);
-                                  })
-                                  ->whereExists(function ($media) {
-                                      $media->selectRaw('1')
-                                          ->from('media')
-                                          ->where('media.model_type', (new self)->getMorphClass())
-                                          ->whereColumn('media.model_id', 'catalogue_src.id')
-                                          ->where('media.collection_name', 'product-images');
-                                  });
-                          });
-                  });
-              });
+            ->whereHas('vendor', fn (Builder $q) => $q->where('online_sales_enabled', true))
+            ->where(function (Builder $q) {
+                $q->where(function (Builder $own) {
+                    // Both null: an orphaned listing (source deleted) has
+                    // only its link id left and must not pass as ordinary.
+                    $own->whereNull('products.source_product_id')
+                        ->whereNull('products.supplier_link_id')
+                        ->whereHas('media', fn (Builder $m) => $m->where('collection_name', 'product-images'));
+                })->orWhere(function (Builder $linked) {
+                    $linked->whereNotNull('products.source_product_id')
+                        ->whereExists(function ($src) {
+                            $src->selectRaw('1')
+                                ->from('products as catalogue_src')
+                                ->whereColumn('catalogue_src.id', 'products.source_product_id')
+                                ->where('catalogue_src.status', 'published')
+                                ->whereExists(function ($link) {
+                                    $link->selectRaw('1')
+                                        ->from('supplier_links')
+                                        ->whereColumn('supplier_links.id', 'products.supplier_link_id')
+                                        ->whereColumn('supplier_links.supplier_vendor_id', 'catalogue_src.vendor_id')
+                                        ->where('supplier_links.is_active', true);
+                                })
+                                ->whereExists(function ($media) {
+                                    $media->selectRaw('1')
+                                        ->from('media')
+                                        ->where('media.model_type', (new self)->getMorphClass())
+                                        ->whereColumn('media.model_id', 'catalogue_src.id')
+                                        ->where('media.collection_name', 'product-images');
+                                });
+                        });
+                });
+            });
     }
 
     public function scopeVisibleInPos(Builder $query): void
@@ -758,21 +762,27 @@ class Product extends Model implements HasMedia
     // null whenever cost_price hasn't been set, rather than faking a number.
     public function getProfitAttribute(): ?float
     {
-        if ($this->cost_price === null) return null;
+        if ($this->cost_price === null) {
+            return null;
+        }
 
         return (float) $this->price - (float) $this->cost_price;
     }
 
     public function getMarginPercentAttribute(): ?float
     {
-        if ($this->cost_price === null || (float) $this->price <= 0) return null;
+        if ($this->cost_price === null || (float) $this->price <= 0) {
+            return null;
+        }
 
         return ($this->profit / (float) $this->price) * 100;
     }
 
     public function getMarkupPercentAttribute(): ?float
     {
-        if ($this->cost_price === null || (float) $this->cost_price <= 0) return null;
+        if ($this->cost_price === null || (float) $this->cost_price <= 0) {
+            return null;
+        }
 
         return ($this->profit / (float) $this->cost_price) * 100;
     }
@@ -820,7 +830,7 @@ class Product extends Model implements HasMedia
             ->withResponsiveImages();    // auto-generates srcset sizes (optional but nice)
     }
 
-    public function registerMediaConversions(Media $media = null): void
+    public function registerMediaConversions(?Media $media = null): void
     {
         $this->addMediaConversion('thumb')
             ->fit(Fit::Crop, 300, 300)
@@ -889,18 +899,18 @@ class Product extends Model implements HasMedia
         // running at all. Serving the heavier preview is the honest degradation.
         if (! $feed) {
             return [
-                'src'    => $media->hasGeneratedConversion('preview')
+                'src' => $media->hasGeneratedConversion('preview')
                     ? $media->getUrl('preview')
                     : $media->getUrl(),
                 'srcset' => null,
-                'ready'  => false,
+                'ready' => false,
             ];
         }
 
         return [
-            'src'    => $feed,
+            'src' => $feed,
             'srcset' => $small ? "{$small} 400w, {$feed} 800w" : null,
-            'ready'  => true,
+            'ready' => true,
         ];
     }
 }

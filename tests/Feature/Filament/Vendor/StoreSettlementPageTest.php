@@ -1,12 +1,14 @@
 <?php
 
+use App\Actions\Cash\LogTillExpenseAction;
 use App\Filament\Vendor\Pages\StoreSettlement;
 use App\Filament\Vendor\Resources\CashSubmissions\Pages\ListCashSubmissions;
+use App\Models\StoreSettlementStatement;
 use App\Models\TillExpense;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
-require_once __DIR__ . '/../../Cash/Helpers.php';
+require_once __DIR__.'/../../Cash/Helpers.php';
 
 uses(RefreshDatabase::class);
 
@@ -38,7 +40,7 @@ test('freezing a statement from the page records one against the branch', functi
         ->set('filters.preset', 'this_month')
         ->callAction('generate');
 
-    expect(App\Models\StoreSettlementStatement::where('store_id', $ctx['store']->id)->count())->toBe(1);
+    expect(StoreSettlementStatement::where('store_id', $ctx['store']->id)->count())->toBe(1);
 });
 
 test('a storekeeper can declare money spent out of the till', function () {
@@ -65,7 +67,7 @@ test('a storekeeper can declare money spent out of the till', function () {
 test('declared spending comes off what the branch is expected to hand over', function () {
     $ctx = handoffContext();
 
-    app(App\Actions\Cash\LogTillExpenseAction::class)->execute(
+    app(LogTillExpenseAction::class)->execute(
         loggedBy: $ctx['keeper'], store: $ctx['store'], amount: 7500, reason: 'Diesel',
     );
 

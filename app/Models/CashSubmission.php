@@ -19,12 +19,12 @@ class CashSubmission extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'amount'          => 'decimal:2',
+        'amount' => 'decimal:2',
         'expected_amount' => 'decimal:2',
         'disputed_amount' => 'decimal:2',
-        'confirmed_at'    => 'datetime',
-        'disputed_at'     => 'datetime',
-        'resolved_at'     => 'datetime',
+        'confirmed_at' => 'datetime',
+        'disputed_at' => 'datetime',
+        'resolved_at' => 'datetime',
     ];
 
     /** Handed over, not yet acknowledged by the person named as receiving it. */

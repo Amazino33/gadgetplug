@@ -18,16 +18,16 @@ class ImportLog extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'errors'             => 'array',
-        'warnings'           => 'array',
-        'units_created_count'  => 'integer',
-        'units_updated_count'  => 'integer',
+        'errors' => 'array',
+        'warnings' => 'array',
+        'units_created_count' => 'integer',
+        'units_updated_count' => 'integer',
         'barcodes_added_count' => 'integer',
-        'opening_stock_count'  => 'integer',
-        'total_rows'         => 'integer',
-        'created_count'      => 'integer',
-        'updated_count'      => 'integer',
-        'skipped_count'      => 'integer',
+        'opening_stock_count' => 'integer',
+        'total_rows' => 'integer',
+        'created_count' => 'integer',
+        'updated_count' => 'integer',
+        'skipped_count' => 'integer',
         'performed_by_admin' => 'boolean',
     ];
 

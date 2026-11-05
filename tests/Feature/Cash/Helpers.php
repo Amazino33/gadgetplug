@@ -6,17 +6,22 @@
 // namespace: helpers declared in a sibling test only exist when that sibling
 // happens to be loaded too, so running a file on its own then fails.
 
+use App\Actions\Cash\SubmitCashAction;
+use App\Models\CashSubmission;
 use App\Models\PosSale;
 use App\Models\Store;
 use App\Models\User;
 use App\Models\Vendor;
+use App\Services\Cash\CashHandoffToken;
+use App\Services\VendorRoles;
+use Database\Seeders\VendorPermissionsSeeder;
 use Illuminate\Support\Str;
 
 function cashVendor(): Vendor
 {
     return Vendor::create([
         'user_id' => User::factory()->create()->id,
-        'name'    => 'Cash Vendor '.uniqid(),
+        'name' => 'Cash Vendor '.uniqid(),
     ]);
 }
 
@@ -26,19 +31,19 @@ function cashSale(Vendor $vendor, Store $store, int $cashierId, array $over = []
     $total = $over['total'] ?? 10000;
 
     return PosSale::create(array_merge([
-        'reference'       => 'POS-'.Str::random(10),
-        'vendor_id'       => $vendor->id,
-        'store_id'        => $store->id,
-        'cashier_id'      => $cashierId,
-        'subtotal'        => $total,
+        'reference' => 'POS-'.Str::random(10),
+        'vendor_id' => $vendor->id,
+        'store_id' => $store->id,
+        'cashier_id' => $cashierId,
+        'subtotal' => $total,
         'discount_amount' => 0,
-        'vat_amount'      => 0,
-        'total'           => $total,
-        'payment_method'  => 'cash',
+        'vat_amount' => 0,
+        'total' => $total,
+        'payment_method' => 'cash',
         'amount_tendered' => $total,
-        'change_given'    => 0,
-        'status'          => 'completed',
-        'completed_at'    => now(),
+        'change_given' => 0,
+        'status' => 'completed',
+        'completed_at' => now(),
     ], $over));
 }
 
@@ -49,8 +54,8 @@ function cashSale(Vendor $vendor, Store $store, int $cashierId, array $over = []
  */
 function cashRoles(Vendor $vendor): void
 {
-    (new Database\Seeders\VendorPermissionsSeeder())->run();
-    App\Services\VendorRoles::seedFor($vendor);
+    (new VendorPermissionsSeeder)->run();
+    VendorRoles::seedFor($vendor);
     setPermissionsTeamId($vendor->id);
 }
 
@@ -61,8 +66,8 @@ function cashRoles(Vendor $vendor): void
 function handoffContext(): array
 {
     $vendor = cashVendor();
-    $store  = $vendor->defaultStore;
-    $owner  = User::find($vendor->user_id);
+    $store = $vendor->defaultStore;
+    $owner = User::find($vendor->user_id);
 
     cashRoles($vendor);
 
@@ -85,15 +90,15 @@ function handoffContext(): array
     return compact('vendor', 'store', 'owner', 'keeper', 'collector');
 }
 
-/** @return array{0: App\Models\CashSubmission, 1: string} */
+/** @return array{0: CashSubmission, 1: string} */
 function issueHandoff(array $ctx, float $amount = 50000): array
 {
-    $submission = app(App\Actions\Cash\SubmitCashAction::class)->execute(
+    $submission = app(SubmitCashAction::class)->execute(
         submitter: $ctx['keeper'],
-        receiver:  null,
-        store:     $ctx['store'],
-        amount:    $amount,
+        receiver: null,
+        store: $ctx['store'],
+        amount: $amount,
     );
 
-    return [$submission, App\Services\Cash\CashHandoffToken::issue($submission)];
+    return [$submission, CashHandoffToken::issue($submission)];
 }

@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Vendor\Pages;
 
-use App\Filament\Support\QuantityInput;
-use App\Support\Quantity;
 use App\Actions\Cash\CloseStoreAccountAction;
 use App\Actions\Inventory\AdoptAuditCountAction;
 use App\Actions\Inventory\RecordPhysicalCountAction;
+use App\Filament\Support\QuantityInput;
 use App\Models\BlindCountSession;
 use App\Models\PhysicalStockCount;
 use App\Models\Product;
@@ -17,6 +16,7 @@ use App\Models\StoreAccountClose;
 use App\Services\ActiveStore;
 use App\Services\Auth\StorePermission;
 use App\Services\Cash\StoreAccountCloseBalance;
+use App\Support\Quantity;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
@@ -28,7 +28,6 @@ use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\Section;
-use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -108,7 +107,7 @@ class AccountClose extends Page
     {
         $this->form->fill([
             'store_id' => ActiveStore::currentId() ?? filament()->getTenant()?->defaultStore?->id,
-            'to'       => now()->toDateString(),
+            'to' => now()->toDateString(),
         ]);
     }
 
@@ -135,7 +134,7 @@ class AccountClose extends Page
                             ->disabled(fn (): bool => $this->priorClose() !== null)
                             ->dehydrated()
                             ->helperText(fn (): ?string => ($prior = $this->priorClose())
-                                ? 'Follows on from ' . $prior->reference . ', which closed ' . $prior->period_to->format('d M Y') . '.'
+                                ? 'Follows on from '.$prior->reference.', which closed '.$prior->period_to->format('d M Y').'.'
                                 : 'This branch has never been closed, so the first period starts wherever you say.'),
 
                         DatePicker::make('to')
@@ -256,13 +255,13 @@ class AccountClose extends Page
     protected function getViewData(): array
     {
         return [
-            'store'       => $this->store(),
-            'period'      => $this->period(),
-            'view'        => $this->balance(),
-            'priorClose'  => $this->priorClose(),
+            'store' => $this->store(),
+            'period' => $this->period(),
+            'view' => $this->balance(),
+            'priorClose' => $this->priorClose(),
             'closingCount' => $this->closingCount(),
-            'closes'      => $this->closes(),
-            'canClose'    => $this->canClose(),
+            'closes' => $this->closes(),
+            'canClose' => $this->canClose(),
         ];
     }
 
@@ -440,11 +439,11 @@ class AccountClose extends Page
 
         try {
             $count = app(RecordPhysicalCountAction::class)->execute(
-                countedBy:   auth()->user(),
-                store:       $store,
+                countedBy: auth()->user(),
+                store: $store,
                 periodStart: $period['from'],
-                periodEnd:   $period['to'],
-                counts:      $counts,
+                periodEnd: $period['to'],
+                counts: $counts,
             );
         } catch (Throwable $e) {
             Notification::make()->title($e->getMessage())->danger()->send();
@@ -492,13 +491,13 @@ class AccountClose extends Page
             ? 'opening'
             : 'closing';
 
-        $this->filters[$role . '_count_id'] = $count->id;
+        $this->filters[$role.'_count_id'] = $count->id;
         $this->memo = null;
 
         $skipped = $count->lines->count();
 
         Notification::make()
-            ->title('Inventory count #' . $session->id . ' is now the ' . $role . ' count')
+            ->title('Inventory count #'.$session->id.' is now the '.$role.' count')
             ->body($count->note ?? sprintf('%d products carried across.', $skipped))
             ->success()
             ->send();
@@ -532,12 +531,12 @@ class AccountClose extends Page
 
         try {
             $close = app(CloseStoreAccountAction::class)->execute(
-                closedBy:     auth()->user(),
-                store:        $store,
-                from:         $period['from'],
-                to:           $period['to'],
+                closedBy: auth()->user(),
+                store: $store,
+                from: $period['from'],
+                to: $period['to'],
                 closingCount: $closing,
-                figures:      $this->balance() ?? [],
+                figures: $this->balance() ?? [],
                 openingCount: $this->openingCount(),
             );
         } catch (Throwable $e) {
@@ -553,7 +552,7 @@ class AccountClose extends Page
         $this->memo = null;
 
         Notification::make()
-            ->title($close->reference . ' closed')
+            ->title($close->reference.' closed')
             ->body('The figures are frozen, and that closing count is now the next period\'s opening.')
             ->success()
             ->send();
@@ -682,8 +681,8 @@ class AccountClose extends Page
      * Counts taken at this branch, newest first.
      *
      * @param  bool  $excludeUsed  Drops any count that has already closed a
-     *   period. Reusing one would carry the same opening forward twice and hide
-     *   a whole period of movement.
+     *                             period. Reusing one would carry the same opening forward twice and hide
+     *                             a whole period of movement.
      * @return array<int, string>
      */
     private function countOptions(bool $excludeUsed = false): array

@@ -1,5 +1,7 @@
 <?php
 
+use App\Filament\Pages\MessagingSettings;
+use App\Filament\Widgets\WhatsAppHealthWidget;
 use App\Jobs\SendDeliveryMessageJob;
 use App\Models\DeliveryMessage;
 use App\Models\PlatformMessagingSetting;
@@ -26,31 +28,31 @@ function onWawp(int $wawpStatus = 200, array $wawpBody = ['id' => 'true_123@c.us
 {
     config([
         'services.messaging.whatsapp_driver' => 'wawp',
-        'services.messaging.sms_driver'      => 'termii',
-        'services.wawp.instance_id'          => 'TEST_INSTANCE',
-        'services.wawp.access_token'         => 'TEST_TOKEN',
-        'services.termii.api_key'            => 'TEST_TERMII',
-        'services.termii.sender_id'          => 'GadgetPlug',
-        'messaging.ops_number'               => '08099990000',
-        'messaging.throttle.enabled'         => true,
+        'services.messaging.sms_driver' => 'termii',
+        'services.wawp.instance_id' => 'TEST_INSTANCE',
+        'services.wawp.access_token' => 'TEST_TOKEN',
+        'services.termii.api_key' => 'TEST_TERMII',
+        'services.termii.sender_id' => 'GadgetPlug',
+        'messaging.ops_number' => '08099990000',
+        'messaging.throttle.enabled' => true,
     ]);
 
     Http::fake([
-        'api.wawp.net/*'        => Http::response($wawpBody, $wawpStatus),
-        'api.ng.termii.com/*'   => Http::response(['message_id' => 'SMS1', 'message' => 'Successfully Sent'], 200),
+        'api.wawp.net/*' => Http::response($wawpBody, $wawpStatus),
+        'api.ng.termii.com/*' => Http::response(['message_id' => 'SMS1', 'message' => 'Successfully Sent'], 200),
     ]);
 }
 
 function waMessage(string $to, string $key = 'storekeeper_new_order', array $over = []): DeliveryMessage
 {
     return DeliveryMessage::create($over + [
-        'vendor_id'      => null,
+        'vendor_id' => null,
         'recipient_type' => 'storekeeper',
-        'channel'        => 'whatsapp',
-        'to_number'      => $to,
-        'body'           => "Message {$key} to {$to}",
-        'status'         => 'queued',
-        'template_key'   => $key,
+        'channel' => 'whatsapp',
+        'to_number' => $to,
+        'body' => "Message {$key} to {$to}",
+        'status' => 'queued',
+        'template_key' => $key,
     ]);
 }
 
@@ -292,7 +294,7 @@ it('resumes from the panel: unpaused, counters cleared, held messages queued aga
     Filament::setCurrentPanel(Filament::getPanel('admin'));
     Filament::bootCurrentPanel();
 
-    Livewire::test(App\Filament\Pages\MessagingSettings::class)
+    Livewire::test(MessagingSettings::class)
         ->assertSee('PAUSED')
         ->callAction('resumeWhatsApp')
         ->assertHasNoActionErrors();
@@ -310,7 +312,7 @@ it('shows WhatsApp health on the admin dashboard', function () {
     Filament::setCurrentPanel(Filament::getPanel('admin'));
     Filament::bootCurrentPanel();
 
-    Livewire::test(App\Filament\Widgets\WhatsAppHealthWidget::class)
+    Livewire::test(WhatsAppHealthWidget::class)
         ->assertSee('Connected')
         ->assertSee('Sent today')
         ->assertSee('1 / '.gate()->dailyCap());

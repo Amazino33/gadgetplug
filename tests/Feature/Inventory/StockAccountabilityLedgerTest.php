@@ -24,24 +24,24 @@ function accountabilityContext(array $auditAttributes = []): array
     $category = Category::firstOrCreate(['name' => 'Chargers']);
 
     $product = Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'name'           => 'SHPLUS 60W Charger',
-        'price'          => 5300,
-        'cost_price'     => 2570,
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'SHPLUS 60W Charger',
+        'price' => 5300,
+        'cost_price' => 2570,
         'stock_quantity' => 10,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
     $audit = AuditSession::create(array_merge([
-        'vendor_id'        => $vendor->id,
-        'product_id'       => $product->id,
-        'system_quantity'  => 10,
+        'vendor_id' => $vendor->id,
+        'product_id' => $product->id,
+        'system_quantity' => 10,
         'storekeeper_a_id' => $staff->id,
-        'count_a'          => 7,
+        'count_a' => 7,
         'storekeeper_b_id' => $owner->id,
-        'count_b'          => 7,
-        'status'           => 'verified',
+        'count_b' => 7,
+        'status' => 'verified',
     ], $auditAttributes));
 
     return compact('owner', 'staff', 'vendor', 'product', 'audit');
@@ -106,13 +106,13 @@ it('never charges twice for the same count line', function () {
     $c = accountabilityContext();
     $ledger = app(StockAccountabilityLedger::class);
 
-    $first  = $ledger->attribute($c['audit'], 'recoverable', $c['staff']->id, $c['owner']->id);
+    $first = $ledger->attribute($c['audit'], 'recoverable', $c['staff']->id, $c['owner']->id);
     $second = $ledger->attribute($c['audit'], 'recoverable', $c['staff']->id, $c['owner']->id);
 
     expect($second->id)->toBe($first->id)
         ->and(StockAccountabilityEntry::count())->toBe(1)
         ->and(app(StockAccountabilityLedger::class)->outstandingFor($c['staff']->id, $c['vendor']->id))
-            ->toBe(7710.0);
+        ->toBe(7710.0);
 });
 
 it('is append-only — entries cannot be edited or deleted', function () {

@@ -13,18 +13,18 @@ uses(RefreshDatabase::class);
 
 function idempotencyVendor(): array
 {
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
 
-    $owner    = User::factory()->create();
-    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Idem Store ' . uniqid()]);
-    $category = Category::create(['name' => 'Idem Category ' . uniqid()]);
-    $product  = Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'name'           => 'Idem Product',
-        'price'          => 2500,
+    $owner = User::factory()->create();
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Idem Store '.uniqid()]);
+    $category = Category::create(['name' => 'Idem Category '.uniqid()]);
+    $product = Product::create([
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'Idem Product',
+        'price' => 2500,
         'stock_quantity' => 50,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
     return compact('owner', 'vendor', 'product');
@@ -33,17 +33,17 @@ function idempotencyVendor(): array
 function idemPayload(array $data, string $offlineId, int $qty = 1): array
 {
     return [
-        'vendor_id'  => $data['vendor']->id,
+        'vendor_id' => $data['vendor']->id,
         'offline_id' => $offlineId,
-        'items'      => [[
-            'product_id'   => $data['product']->id,
+        'items' => [[
+            'product_id' => $data['product']->id,
             'product_name' => 'Idem Product',
-            'unit_price'   => 2500,
-            'quantity'     => $qty,
+            'unit_price' => 2500,
+            'quantity' => $qty,
         ]],
-        'payment_method'  => 'cash',
+        'payment_method' => 'cash',
         'amount_tendered' => 10000,
-        'payments'        => null,
+        'payments' => null,
     ];
 }
 
@@ -83,7 +83,7 @@ test('the reference matches the scheme the offline sync deduplicates on', functi
     Sanctum::actingAs($data['owner']);
 
     $offlineId = 'till-scheme-9';
-    $expected  = 'POS-' . strtoupper(substr(md5($offlineId), 0, 8));
+    $expected = 'POS-'.strtoupper(substr(md5($offlineId), 0, 8));
 
     $this->postJson('/api/pos/sales', idemPayload($data, $offlineId))
         ->assertCreated()
@@ -102,18 +102,18 @@ test('a queued sale that already went through online is skipped by the sync', fu
     // ...so it queued it, and the sync sends it on
     $this->postJson('/api/pos/sync', [
         'vendor_id' => $data['vendor']->id,
-        'sales'     => [[
-            'offline_id'      => $offlineId,
-            'items'           => [[
-                'product_id'   => $data['product']->id,
+        'sales' => [[
+            'offline_id' => $offlineId,
+            'items' => [[
+                'product_id' => $data['product']->id,
                 'product_name' => 'Idem Product',
-                'unit_price'   => 2500,
-                'quantity'     => 1,
+                'unit_price' => 2500,
+                'quantity' => 1,
             ]],
-            'payment_method'  => 'cash',
-            'total'           => 2500,
+            'payment_method' => 'cash',
+            'total' => 2500,
             'amount_tendered' => 10000,
-            'completed_at'    => now()->toIso8601String(),
+            'completed_at' => now()->toIso8601String(),
         ]],
     ])->assertOk();
 
@@ -132,7 +132,7 @@ test('two different checkouts are still two sales', function () {
 });
 
 test('a sale without an offline id still works', function () {
-    $data    = idempotencyVendor();
+    $data = idempotencyVendor();
     Sanctum::actingAs($data['owner']);
 
     $payload = idemPayload($data, 'unused');

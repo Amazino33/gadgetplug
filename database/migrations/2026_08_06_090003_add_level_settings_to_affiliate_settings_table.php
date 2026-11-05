@@ -18,7 +18,7 @@ return new class extends Migration
 
         DB::table('affiliate_settings')->where('id', 1)->update([
             'inactivity_demotion_days' => 21,
-            'margin_cap_fraction'      => 0.35,
+            'margin_cap_fraction' => 0.35,
         ]);
     }
 

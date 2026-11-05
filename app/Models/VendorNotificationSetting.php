@@ -14,30 +14,30 @@ class VendorNotificationSetting extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'notify_new_order'         => 'boolean',
-        'notify_undispatched'      => 'boolean',
-        'notify_low_stock'         => 'boolean',
-        'notify_cancelled'         => 'boolean',
-        'notify_daily_summary'     => 'boolean',
-        'quiet_hours_enabled'      => 'boolean',
+        'notify_new_order' => 'boolean',
+        'notify_undispatched' => 'boolean',
+        'notify_low_stock' => 'boolean',
+        'notify_cancelled' => 'boolean',
+        'notify_daily_summary' => 'boolean',
+        'quiet_hours_enabled' => 'boolean',
         'undispatched_after_hours' => 'integer',
-        'last_reminder_sent_at'    => 'datetime',
-        'remind_orders_from'       => 'datetime',
-        'last_daily_summary_for'   => 'date',
+        'last_reminder_sent_at' => 'datetime',
+        'remind_orders_from' => 'datetime',
+        'last_daily_summary_for' => 'date',
     ];
 
     public const FREQUENCIES = [
         'hourly' => 'Every hour',
-        '3h'     => 'Every 3 hours',
-        '6h'     => 'Every 6 hours',
-        'daily'  => 'Once a day',
+        '3h' => 'Every 3 hours',
+        '6h' => 'Every 6 hours',
+        'daily' => 'Once a day',
     ];
 
     private const FREQUENCY_HOURS = [
         'hourly' => 1,
-        '3h'     => 3,
-        '6h'     => 6,
-        'daily'  => 24,
+        '3h' => 3,
+        '6h' => 6,
+        'daily' => 24,
     ];
 
     public function vendor(): BelongsTo
@@ -159,8 +159,8 @@ class VendorNotificationSetting extends Model
         $local = self::inBusinessTimezone($now);
 
         $minutes = ($local->hour * 60) + $local->minute;
-        $from    = $this->minutesOf($this->quiet_from);
-        $until   = $this->minutesOf($this->quiet_until);
+        $from = $this->minutesOf($this->quiet_from);
+        $until = $this->minutesOf($this->quiet_until);
 
         // Equal bounds would otherwise silence the whole day.
         if ($from === $until) {
