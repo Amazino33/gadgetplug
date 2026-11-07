@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Pos\BusinessDate;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -73,7 +74,7 @@ class FinancialAccount extends Model
     public function balance(?CarbonInterface $asOf = null): float
     {
         $entries = $this->ledgerEntries()
-            ->when($asOf, fn ($query) => $query->where('occurred_at', '<=', $asOf->toDateString()));
+            ->when($asOf, fn ($query) => $query->whereDate('occurred_at', '<=', BusinessDate::of($asOf)));
 
         $in  = (clone $entries)->where('direction', 'in')->sum('amount');
         $out = (clone $entries)->where('direction', 'out')->sum('amount');

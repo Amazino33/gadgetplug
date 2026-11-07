@@ -9,6 +9,7 @@ use App\Models\PosCustomer;
 use App\Models\PosCustomerLedgerEntry;
 use App\Models\User;
 use App\Services\FinancialLedger;
+use App\Support\Pos\BusinessDate;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -52,7 +53,7 @@ class RecordCustomerPaymentAction
                 'amount'          => -1 * round($amount, 2),
                 'store_id'        => $storeId,
                 'created_by'      => $collectedBy->id,
-                'occurred_at'     => now()->toDateString(),
+                'occurred_at'     => BusinessDate::today(),
                 'description'     => $note ?: 'Debt repayment',
             ]);
 

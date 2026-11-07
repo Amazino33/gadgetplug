@@ -9,6 +9,7 @@ use App\Models\PosCustomerLedgerEntry;
 use App\Models\User;
 use App\Policies\PosCustomerDebtPolicy;
 use App\Services\Pos\CustomerDebtService;
+use App\Support\Pos\BusinessDate;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -63,7 +64,7 @@ class WriteOffCustomerDebtAction
                 'amount'          => -1 * $outstanding,
                 'store_id'        => $storeId,
                 'created_by'      => $decidedBy->id,
-                'occurred_at'     => now()->toDateString(),
+                'occurred_at'     => BusinessDate::today(),
                 'description'     => 'Written off — ' . trim($reason),
             ]);
         });

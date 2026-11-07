@@ -9,6 +9,7 @@ use App\Models\PosCustomer;
 use App\Models\PosDebtPayment;
 use App\Models\User;
 use App\Services\Pos\CustomerDebtService;
+use App\Support\Pos\BusinessDate;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -96,7 +97,7 @@ class RecordDebtRepaymentAction
                 'method'                       => $method,
                 'amount'                       => round($amount, 2),
                 'note'                         => $note,
-                'collected_at'                 => now()->toDateString(),
+                'collected_at'                 => BusinessDate::today(),
             ]);
         });
     }

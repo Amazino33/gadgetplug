@@ -8,6 +8,7 @@ use App\Models\PosCustomerLedgerEntry;
 use App\Models\PosReturn;
 use App\Models\PosSale;
 use App\Services\Pos\CustomerDebtService;
+use App\Support\Pos\BusinessDate;
 
 /**
  * Takes back what a customer owes when the goods come back.
@@ -118,7 +119,7 @@ class ReverseCustomerDebtAction
             'amount'          => -1 * $amount,
             'store_id'        => $sale->store_id,
             'created_by'      => auth()->id(),
-            'occurred_at'     => now()->toDateString(),
+            'occurred_at'     => BusinessDate::today(),
             'description'     => "{$description} [{$key}]",
         ]);
     }

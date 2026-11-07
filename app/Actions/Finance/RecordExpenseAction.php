@@ -8,6 +8,7 @@ use App\Models\Expense;
 use App\Models\FinancialAccount;
 use App\Models\User;
 use App\Services\FinancialLedger;
+use App\Support\Pos\BusinessDate;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -51,7 +52,7 @@ class RecordExpenseAction
                 'category'             => $category,
                 'amount'               => round($amount, 2),
                 'description'          => $description,
-                'incurred_at'          => $incurredAt ?? now()->toDateString(),
+                'incurred_at'          => $incurredAt ?? BusinessDate::today(),
                 'financial_account_id' => $account?->id,
                 'created_by'           => $recordedBy->id,
             ]);

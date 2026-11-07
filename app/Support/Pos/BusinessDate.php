@@ -25,7 +25,16 @@ final class BusinessDate
     /** The trading day now in progress, as Y-m-d. */
     public static function today(): string
     {
-        return CarbonImmutable::now(self::timezone())->toDateString();
+        return self::now()->toDateString();
+    }
+
+    /**
+     * Now, on the shop's wall clock. For working out which day or week or month
+     * it is — never for querying: convert back with boundsFor()/rangeFor() first.
+     */
+    public static function now(): CarbonImmutable
+    {
+        return CarbonImmutable::now(self::timezone());
     }
 
     /**
@@ -53,6 +62,11 @@ final class BusinessDate
      * The half-open-feeling inclusive window a business date covers, converted to
      * the app timezone so it can be compared against stored timestamps directly.
      *
+     * Takes a CALENDAR DATE. A Carbon is read by its own date, so pass a
+     * business-local date (a date column, BusinessDate::now()), never a stored
+     * UTC instant: for an instant, take BusinessDate::of() first. 23:30 UTC on
+     * the 6th is the 7th in Lagos, and its date read raw would be the 6th.
+     *
      * @return array{0: CarbonInterface, 1: CarbonInterface}
      */
     public static function boundsFor(string|CarbonInterface $date): array
@@ -67,6 +81,17 @@ final class BusinessDate
             self::toAppTimezone($local->startOfDay()),
             self::toAppTimezone($local->endOfDay()),
         ];
+    }
+
+    /**
+     * The window from the start of one business date to the end of another,
+     * in the app timezone, ready for whereBetween() on stored timestamps.
+     *
+     * @return array{0: CarbonInterface, 1: CarbonInterface}
+     */
+    public static function rangeFor(string|CarbonInterface $fromDate, string|CarbonInterface $toDate): array
+    {
+        return [self::boundsFor($fromDate)[0], self::boundsFor($toDate)[1]];
     }
 
     /**
@@ -97,7 +122,11 @@ final class BusinessDate
         return $value === self::today();
     }
 
-    private static function timezone(): string
+    /**
+     * The one timezone a trading day is measured in. config('reporting.timezone'),
+     * Africa/Lagos by default — deliberately not a per-vendor column (see above).
+     */
+    public static function timezone(): string
     {
         return (string) config('reporting.timezone', 'Africa/Lagos');
     }

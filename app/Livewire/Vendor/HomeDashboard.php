@@ -7,6 +7,7 @@ use App\Services\ActiveStore;
 use App\Services\Reporting\SalesReportService;
 use App\Models\Product;
 use App\Models\Order;
+use App\Support\Pos\BusinessDate;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Livewire\Component;
@@ -41,8 +42,10 @@ class HomeDashboard extends Component
 
         // Stat strip figures
         $reports = app(SalesReportService::class);
-        $todayStart = Carbon::now('Africa/Lagos')->startOfDay();
-        $todayEnd = Carbon::now('Africa/Lagos')->endOfDay();
+        // The Lagos trading day, converted to stored (UTC) time. Lagos-zoned
+        // bounds passed straight to the query were compared as if UTC, so the
+        // tile ran 01:00–01:00 and missed every sale rung before 01:00.
+        [$todayStart, $todayEnd] = BusinessDate::boundsFor(BusinessDate::today());
         
         $summary = $reports->summary($vendor->id, $todayStart, $todayEnd, $storeId);
         

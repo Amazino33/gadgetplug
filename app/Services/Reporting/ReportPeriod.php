@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Reporting;
 
+use App\Support\Pos\BusinessDate;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 
@@ -14,6 +15,10 @@ use Carbon\CarbonInterface;
 // and only then converted to the app timezone for querying — otherwise "today"
 // would start an hour late for a Nigerian store and the first hour of each day's
 // takings would land under yesterday.
+//
+// The calendar arithmetic (which days a preset covers) happens here; turning
+// those days into stored-timestamp bounds is BusinessDate's, the one place the
+// trading day is defined, so the reports and the till can never disagree.
 final class ReportPeriod
 {
     public const PRESETS = [
@@ -41,22 +46,25 @@ final class ReportPeriod
     public static function fromFilters(?array $filters): self
     {
         $preset = $filters['preset'] ?? self::DEFAULT_PRESET;
-        $now = CarbonImmutable::now(config('reporting.timezone'));
+        $now = BusinessDate::now();
 
-        [$from, $to] = match ($preset) {
-            'today' => [$now->startOfDay(), $now->endOfDay()],
-            'yesterday' => [$now->subDay()->startOfDay(), $now->subDay()->endOfDay()],
-            'this_week' => [$now->startOfWeek(), $now->endOfDay()],
-            'last_7' => [$now->subDays(6)->startOfDay(), $now->endOfDay()],
+        // Business-local calendar dates; BusinessDate turns them into bounds.
+        [$fromDate, $toDate] = match ($preset) {
+            'today' => [$now, $now],
+            'yesterday' => [$now->subDay(), $now->subDay()],
+            'this_week' => [$now->startOfWeek(), $now],
+            'last_7' => [$now->subDays(6), $now],
             'last_month' => [$now->subMonth()->startOfMonth(), $now->subMonth()->endOfMonth()],
-            'this_year' => [$now->startOfYear(), $now->endOfDay()],
+            'this_year' => [$now->startOfYear(), $now],
             'custom' => self::customRange($filters, $now),
-            default => [$now->startOfMonth(), $now->endOfDay()],
+            default => [$now->startOfMonth(), $now],
         };
 
+        [$from, $to] = BusinessDate::rangeFor($fromDate, $toDate);
+
         return new self(
-            self::toAppTimezone($from),
-            self::toAppTimezone($to),
+            $from,
+            $to,
             self::PRESETS[$preset] ?? self::PRESETS[self::DEFAULT_PRESET],
         );
     }
@@ -78,27 +86,22 @@ final class ReportPeriod
 
     /**
      * @param  array<string, mixed>|null  $filters
-     * @return array{0: CarbonInterface, 1: CarbonInterface}
+     * @return array{0: CarbonImmutable, 1: CarbonImmutable}  business-local dates
      */
     private static function customRange(?array $filters, CarbonImmutable $now): array
     {
-        $tz = config('reporting.timezone');
+        $tz = BusinessDate::timezone();
 
         // Falls back to the month so a half-filled custom range still renders
         // something sane rather than an empty or inverted window.
         $from = filled($filters['from'] ?? null)
-            ? CarbonImmutable::parse($filters['from'], $tz)->startOfDay()
+            ? CarbonImmutable::parse($filters['from'], $tz)
             : $now->startOfMonth();
 
         $to = filled($filters['to'] ?? null)
-            ? CarbonImmutable::parse($filters['to'], $tz)->endOfDay()
-            : $now->endOfDay();
+            ? CarbonImmutable::parse($filters['to'], $tz)
+            : $now;
 
-        return $from->greaterThan($to) ? [$to->startOfDay(), $from->endOfDay()] : [$from, $to];
-    }
-
-    private static function toAppTimezone(CarbonInterface $date): CarbonInterface
-    {
-        return $date->setTimezone(config('app.timezone', 'UTC'));
+        return $from->toDateString() > $to->toDateString() ? [$to, $from] : [$from, $to];
     }
 }

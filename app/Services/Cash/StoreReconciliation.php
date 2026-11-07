@@ -18,6 +18,7 @@ use App\Services\Inventory\StoreStockMetrics;
 use App\Services\Pickings\PickingLedger;
 use App\Services\Pos\CustomerDebtService;
 use App\Services\Reporting\SalesReportService;
+use App\Support\Pos\BusinessDate;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -152,7 +153,13 @@ class StoreReconciliation
 
         $expenses = (float) Expense::query()
             ->where('store_id', $store->id)
-            ->whereBetween('incurred_at', [$from->toDateString(), $to->toDateString()])
+            // $from/$to are stored-time (UTC) instants. Their own date is
+            // the UTC one, so "today" from 00:00 Lagos read as yesterday and
+            // pulled in yesterday's expenses; BusinessDate gives the Lagos day.
+            // whereDate, as CashUpExpectation does for this column: compared as
+            // a date on every driver, not as a string against a datetime.
+            ->whereDate('incurred_at', '>=', BusinessDate::of($from))
+            ->whereDate('incurred_at', '<=', BusinessDate::of($to))
             ->sum('amount');
 
         $pickings = PickingLedger::heldTotals($store->vendor_id, $store->id);
