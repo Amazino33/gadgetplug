@@ -94,6 +94,11 @@ class HomeDashboard extends Component
 
         $isOwner = $user->isSuperAdmin() || $vendor->isOwner($user);
 
+        // Profit is revenue minus cost, so showing it beside revenue hands over
+        // the cost too. It follows view_cost_price, the same single rule the
+        // product screens use — not the tile's own view_inventory_reports gate.
+        $canSeeCost = \App\Filament\Vendor\Resources\Products\Schemas\ProductForm::canSeeCostPrice();
+
         // Build Tile Registry
         $tiles = collect([
             [
@@ -112,7 +117,7 @@ class HomeDashboard extends Component
                 'icon' => 'heroicon-o-banknotes',
                 'route' => null,
                 'value' => '₦' . number_format($summary['revenue']),
-                'subtext' => 'Profit: ₦' . number_format($summary['profit']),
+                'subtext' => $canSeeCost ? 'Profit: ₦' . number_format($summary['profit']) : null,
                 'permission' => 'view_inventory_reports',
                 'owner_prominence' => 'hidden',
                 'staff_prominence' => 'secondary',
