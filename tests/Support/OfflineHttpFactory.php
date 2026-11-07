@@ -51,11 +51,11 @@ class OfflineHttpFactory extends Factory
             // ever confirmed by accident.
             Str::is('https://api.paystack.co/transaction/initialize*', $url) => static::response([
                 'status' => true,
-                'data'   => ['authorization_url' => 'https://checkout.paystack.com/test', 'reference' => 'test'],
+                'data' => ['authorization_url' => 'https://checkout.paystack.com/test', 'reference' => 'test'],
             ]),
             Str::is('https://api.paystack.co/transaction/verify/*', $url) => static::response([
                 'status' => true,
-                'data'   => ['status' => 'abandoned', 'amount' => 0, 'currency' => 'NGN'],
+                'data' => ['status' => 'abandoned', 'amount' => 0, 'currency' => 'NGN'],
             ]),
 
             default => null,

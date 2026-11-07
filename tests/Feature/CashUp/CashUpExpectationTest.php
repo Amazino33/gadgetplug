@@ -4,7 +4,10 @@ use App\Models\CashUpRectification;
 use App\Models\PosReturn;
 use App\Models\PosSale;
 use App\Models\PosSalePayment;
+use App\Models\Store;
+use App\Models\User;
 use App\Services\Cash\CashUpExpectation;
+use App\Support\Pos\CashUpBreakdown;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 
@@ -20,38 +23,38 @@ function cashUpSale(array $ctx, array $over = []): PosSale
     $total = $over['total'] ?? 10000;
 
     return PosSale::create(array_merge([
-        'reference'       => 'POS-'.Str::random(10),
-        'vendor_id'       => $ctx['vendor']->id,
-        'store_id'        => $ctx['store']->id,
-        'cashier_id'      => $ctx['cashier']->id,
-        'subtotal'        => $total,
+        'reference' => 'POS-'.Str::random(10),
+        'vendor_id' => $ctx['vendor']->id,
+        'store_id' => $ctx['store']->id,
+        'cashier_id' => $ctx['cashier']->id,
+        'subtotal' => $total,
         'discount_amount' => 0,
-        'vat_amount'      => 0,
-        'total'           => $total,
-        'payment_method'  => 'cash',
+        'vat_amount' => 0,
+        'total' => $total,
+        'payment_method' => 'cash',
         'amount_tendered' => $total,
-        'change_given'    => 0,
-        'status'          => 'completed',
+        'change_given' => 0,
+        'status' => 'completed',
         // Mid-morning in Lagos, comfortably inside the trading day either way.
-        'completed_at'    => '2026-09-11 09:00:00',
+        'completed_at' => '2026-09-11 09:00:00',
     ], $over));
 }
 
 function cashUpRefund(array $ctx, PosSale $original, float $amount, string $method): PosReturn
 {
     return PosReturn::create([
-        'reference'        => 'RET-'.Str::random(8),
-        'vendor_id'        => $ctx['vendor']->id,
+        'reference' => 'RET-'.Str::random(8),
+        'vendor_id' => $ctx['vendor']->id,
         'original_sale_id' => $original->id,
-        'cashier_id'       => $ctx['cashier']->id,
-        'return_items'     => [],
-        'refund_amount'    => $amount,
-        'refund_method'    => $method,
-        'created_at'       => '2026-09-11 14:00:00',
+        'cashier_id' => $ctx['cashier']->id,
+        'return_items' => [],
+        'refund_amount' => $amount,
+        'refund_method' => $method,
+        'created_at' => '2026-09-11 14:00:00',
     ]);
 }
 
-function cashUpExpectation(array $ctx, float $float = 20000, iterable $rectifications = []): App\Support\Pos\CashUpBreakdown
+function cashUpExpectation(array $ctx, float $float = 20000, iterable $rectifications = []): CashUpBreakdown
 {
     return app(CashUpExpectation::class)->compute(
         vendorId: $ctx['vendor']->id,
@@ -209,7 +212,7 @@ test('a credit sale puts nothing in either leg but is reported', function () {
 
 test('another cashier takings are not this cashier problem', function () {
     $ctx = cashUpContext();
-    $other = App\Models\User::factory()->create();
+    $other = User::factory()->create();
 
     cashUpSale($ctx, ['total' => 30000]);
     cashUpSale($ctx, ['total' => 50000, 'cashier_id' => $other->id]);
@@ -219,7 +222,7 @@ test('another cashier takings are not this cashier problem', function () {
 
 test('another branch takings are not this drawer', function () {
     $ctx = cashUpContext();
-    $other = App\Models\Store::create([
+    $other = Store::create([
         'vendor_id' => $ctx['vendor']->id, 'name' => 'Second Branch', 'is_default' => false,
     ]);
 

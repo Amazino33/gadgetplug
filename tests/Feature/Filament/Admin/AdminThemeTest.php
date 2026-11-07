@@ -61,10 +61,10 @@ test('the custom admin pages render', function (string $path) {
         ->assertOk()
         ->assertSee('build/assets/theme-', false);
 })->with([
-    'delivery settings'      => '/admin/delivery-settings',
-    'messaging settings'     => '/admin/messaging-settings',
-    'affiliate settings'     => '/admin/affiliate-settings',
+    'delivery settings' => '/admin/delivery-settings',
+    'messaging settings' => '/admin/messaging-settings',
+    'affiliate settings' => '/admin/affiliate-settings',
     'affiliate payout batch' => '/admin/affiliate-payout-batch',
-    'all products'           => '/admin/products',
-    'dispatch'               => '/admin/orders',
+    'all products' => '/admin/products',
+    'dispatch' => '/admin/orders',
 ]);

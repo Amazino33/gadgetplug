@@ -2,14 +2,15 @@
 
 use App\Jobs\SendMetaConversionEventJob;
 use App\Services\Meta\MetaConversionsService;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 
 test('the job hands its payload to MetaConversionsService::send unchanged', function () {
     config([
-        'services.meta.pixel_id'          => '111222333',
+        'services.meta.pixel_id' => '111222333',
         'services.meta.capi_access_token' => 'job-test-token',
-        'services.meta.graph_version'     => 'v26.0',
+        'services.meta.graph_version' => 'v26.0',
     ]);
 
     Http::fake([
@@ -20,7 +21,7 @@ test('the job hands its payload to MetaConversionsService::send unchanged', func
 
     (new SendMetaConversionEventJob($payload))->handle(app(MetaConversionsService::class));
 
-    Http::assertSent(function (\Illuminate\Http\Client\Request $request) {
+    Http::assertSent(function (Request $request) {
         return json_decode($request['data'], true)[0]['event_id'] === 'GP-JOB-1';
     });
 });

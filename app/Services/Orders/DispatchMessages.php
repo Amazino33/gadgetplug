@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Services\Messaging\MessagingService;
 use App\Services\Messaging\TemplateRenderer;
 use Filament\Notifications\Notification;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\URL;
@@ -38,7 +39,7 @@ class DispatchMessages
     {
         $this->queue($order, 'customer_delivery_code', $order->customer_phone, TemplateRenderer::AUDIENCE_CUSTOMER, [
             'delivery_code' => $code,
-            'collect_line'  => self::collectLine($order, forCustomer: true),
+            'collect_line' => self::collectLine($order, forCustomer: true),
         ]);
     }
 
@@ -52,8 +53,8 @@ class DispatchMessages
 
         $extra = [
             'dispatch_link' => self::link($order),
-            'pickup'        => self::pickupLine($order),
-            'collect_line'  => self::collectLine($order, forCustomer: false),
+            'pickup' => self::pickupLine($order),
+            'collect_line' => self::collectLine($order, forCustomer: false),
         ];
 
         $numbers = collect([$order->logisticsCompany?->dispatchNumber(), $order->rider_phone])
@@ -104,7 +105,7 @@ class DispatchMessages
         ]))))->implode("\n");
     }
 
-    /** @return \Illuminate\Support\Collection<int, Store> */
+    /** @return Collection<int, Store> */
     public static function pickupStores(Order $order)
     {
         $storeIds = OrderItemStoreAllocation::query()
@@ -148,17 +149,17 @@ class DispatchMessages
 
             // GadgetPlug's own message: tied to the order, filed under no vendor.
             $message = DeliveryMessage::create([
-                'vendor_id'      => null,
-                'order_id'       => $order->id,
+                'vendor_id' => null,
+                'order_id' => $order->id,
                 'recipient_type' => $template->recipient_type,
-                'channel'        => $template->channel,
-                'to_number'      => $to,
-                'body'           => app(TemplateRenderer::class)->render(
+                'channel' => $template->channel,
+                'to_number' => $to,
+                'body' => app(TemplateRenderer::class)->render(
                     $template->body,
                     TemplateRenderer::contextForOrder($order, $audience) + $extra,
                 ),
-                'status'         => 'queued',
-                'template_key'   => $key,
+                'status' => 'queued',
+                'template_key' => $key,
             ]);
 
             app(MessagingService::class)->dispatch($message);
@@ -175,7 +176,7 @@ class DispatchMessages
      * User::isSuperAdmin(): the roles relation filters by whichever team is
      * current, and this can run anywhere.
      *
-     * @return \Illuminate\Support\Collection<int, User>
+     * @return Collection<int, User>
      */
     public static function dispatchStaff()
     {

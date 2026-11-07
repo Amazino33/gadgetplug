@@ -70,12 +70,12 @@ class CashUpRefreeze
             PosSession::whereKey($session->id)->update([
                 // Bound as a date rather than a bare string, so it is stored in
                 // the same shape the model writes and the unique key still bites.
-                'business_date'     => Carbon::parse($businessDate)->startOfDay(),
-                'expected_cash'     => $breakdown->expectedCash,
+                'business_date' => Carbon::parse($businessDate)->startOfDay(),
+                'expected_cash' => $breakdown->expectedCash,
                 'expected_terminal' => $breakdown->expectedTerminal,
-                'cash_variance'     => $breakdown->cashVarianceAgainst((float) $session->counted_cash),
+                'cash_variance' => $breakdown->cashVarianceAgainst((float) $session->counted_cash),
                 'terminal_variance' => $breakdown->terminalVarianceAgainst((float) $session->counted_terminal),
-                'breakdown'         => json_encode($breakdown->toArray()),
+                'breakdown' => json_encode($breakdown->toArray()),
             ]);
 
             $this->zReports->write($session->refresh());

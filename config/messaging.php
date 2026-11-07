@@ -33,17 +33,17 @@ return [
 
         // P3 only goes out inside these hours (business clock).
         'p3_window' => [env('WHATSAPP_P3_FROM', '08:00'), env('WHATSAPP_P3_UNTIL', '20:00')],
-        'timezone'  => env('MESSAGING_TIMEZONE', 'Africa/Lagos'),
+        'timezone' => env('MESSAGING_TIMEZONE', 'Africa/Lagos'),
 
         // Caps on WhatsApp sends. At a cap, P2 and P3 wait for the next
         // hour/day; P1 is never held back — it goes by SMS instead.
         'hourly_cap' => (int) env('WHATSAPP_HOURLY_CAP', 60),
-        'daily_cap'  => (int) env('WHATSAPP_DAILY_CAP', 400),
+        'daily_cap' => (int) env('WHATSAPP_DAILY_CAP', 400),
 
         // Warm-up: a new number sends less while WhatsApp gets used to it. On
         // by default; raise WHATSAPP_WARMUP_DAILY_CAP over the first weeks,
         // then turn warm-up off to use daily_cap.
-        'warmup'           => (bool) env('WHATSAPP_WARMUP', true),
+        'warmup' => (bool) env('WHATSAPP_WARMUP', true),
         'warmup_daily_cap' => (int) env('WHATSAPP_WARMUP_DAILY_CAP', 80),
 
         // Non-urgent messages (P2, P3) to the same number within this window
@@ -64,21 +64,21 @@ return [
     'lanes' => [
         // P1 — the customer is waiting on it.
         'customer_delivery_code' => 1,   // handed to the rider: the delivery code
-        'customer_received'      => 1,   // order confirmation
-        'logistics_dispatch'     => 1,   // the rider link
+        'customer_received' => 1,   // order confirmation
+        'logistics_dispatch' => 1,   // the rider link
 
         // P2 — staff alerts and delivered updates (the default).
-        'storekeeper_new_order'  => 2,
-        'storekeeper_cancelled'  => 2,
-        'vendor_new_order'       => 2,
-        'customer_delivered'     => 2,
+        'storekeeper_new_order' => 2,
+        'storekeeper_cancelled' => 2,
+        'vendor_new_order' => 2,
+        'customer_delivered' => 2,
 
         // P3 — reminders and summaries.
-        'storekeeper_undispatched'    => 3,
-        'storekeeper_low_stock'       => 3,
+        'storekeeper_undispatched' => 3,
+        'storekeeper_low_stock' => 3,
         'storekeeper_unremitted_cash' => 3,
-        'vendor_daily_summary'        => 3,
-        'dispatch_packed_reminder'    => 3,
+        'vendor_daily_summary' => 3,
+        'dispatch_packed_reminder' => 3,
     ],
 
     // Admin dispatch: packed orders not handed over for this long are listed

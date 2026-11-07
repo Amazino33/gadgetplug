@@ -7,7 +7,9 @@ use App\Models\PosCustomer;
 use App\Models\PosCustomerLedgerEntry;
 use App\Models\Store;
 use App\Models\User;
+use App\Policies\PosCustomerDebtPolicy;
 use App\Services\ActiveStore;
+use App\Services\Pos\CustomerDebtService;
 use App\Services\VendorRoles;
 use Database\Seeders\VendorPermissionsSeeder;
 use Filament\Facades\Filament;
@@ -20,7 +22,7 @@ uses(RefreshDatabase::class);
 function debtDashboardContext(): array
 {
     $ctx = repaymentContext(0);
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
     VendorRoles::seedFor($ctx['vendor']);
 
     $ctx['branch'] = Store::create(['vendor_id' => $ctx['vendor']->id, 'name' => 'Itel Home']);
@@ -47,18 +49,18 @@ function creditGivenBy(array $ctx, User $staff, ?Store $store, float $amount, ?P
 {
     $customer ??= PosCustomer::create([
         'vendor_id' => $ctx['vendor']->id,
-        'name'      => 'Customer ' . uniqid(),
-        'phone'     => '080' . random_int(10000000, 99999999),
+        'name' => 'Customer '.uniqid(),
+        'phone' => '080'.random_int(10000000, 99999999),
     ]);
 
     PosCustomerLedgerEntry::create([
         'pos_customer_id' => $customer->id,
-        'vendor_id'       => $ctx['vendor']->id,
-        'direction'       => 'charge',
-        'amount'          => $amount,
-        'store_id'        => $store?->id,
-        'created_by'      => $staff->id,
-        'occurred_at'     => now()->toDateString(),
+        'vendor_id' => $ctx['vendor']->id,
+        'direction' => 'charge',
+        'amount' => $amount,
+        'store_id' => $store?->id,
+        'created_by' => $staff->id,
+        'occurred_at' => now()->toDateString(),
     ]);
 
     return $customer;
@@ -78,7 +80,7 @@ function actAsDebtStaff(array $ctx, User $user, ?Store $store = null): void
 // ─── A storekeeper can now reach the debts ──────────────────────────────
 
 it('lets a storekeeper reach the debt list so they can take a payment', function () {
-    $ctx         = debtDashboardContext();
+    $ctx = debtDashboardContext();
     $storekeeper = debtStaff($ctx, 'storekeeper');
 
     actAsDebtStaff($ctx, $storekeeper);
@@ -87,34 +89,34 @@ it('lets a storekeeper reach the debt list so they can take a payment', function
 });
 
 it('lets a storekeeper record a repayment', function () {
-    $ctx         = debtDashboardContext();
+    $ctx = debtDashboardContext();
     $storekeeper = debtStaff($ctx, 'storekeeper');
-    $customer    = creditGivenBy($ctx, $storekeeper, $ctx['store'], 5000);
+    $customer = creditGivenBy($ctx, $storekeeper, $ctx['store'], 5000);
 
     app(RecordCustomerPaymentAction::class)->execute(
         customer: $customer, amount: 2000, collectedBy: $storekeeper, storeId: $ctx['store']->id,
     );
 
-    expect(app(App\Services\Pos\CustomerDebtService::class)->outstanding($customer->id))->toBe(3000.0);
+    expect(app(CustomerDebtService::class)->outstanding($customer->id))->toBe(3000.0);
 });
 
 it('still refuses a storekeeper the write-off', function () {
-    $ctx         = debtDashboardContext();
+    $ctx = debtDashboardContext();
     $storekeeper = debtStaff($ctx, 'storekeeper');
-    $customer    = creditGivenBy($ctx, $storekeeper, $ctx['store'], 5000);
+    $customer = creditGivenBy($ctx, $storekeeper, $ctx['store'], 5000);
 
     // Collecting is everyone's job; forgiving is the owner's alone.
-    expect(app(App\Policies\PosCustomerDebtPolicy::class)->writeOff($storekeeper, $customer))
+    expect(app(PosCustomerDebtPolicy::class)->writeOff($storekeeper, $customer))
         ->toBeFalse();
 });
 
 // ─── Store scoping of the list ──────────────────────────────────────────
 
 it('shows a storekeeper only the customers who took credit at their branch', function () {
-    $ctx         = debtDashboardContext();
+    $ctx = debtDashboardContext();
     $storekeeper = debtStaff($ctx, 'storekeeper');
 
-    $here      = creditGivenBy($ctx, $storekeeper, $ctx['store'], 5000);
+    $here = creditGivenBy($ctx, $storekeeper, $ctx['store'], 5000);
     $elsewhere = creditGivenBy($ctx, $storekeeper, $ctx['branch'], 8000);
 
     actAsDebtStaff($ctx, $storekeeper, $ctx['store']);
@@ -139,9 +141,9 @@ it('shows the owner every branch regardless of the store selector', function () 
 });
 
 it('drops a customer off every branch list once they have paid in full', function () {
-    $ctx         = debtDashboardContext();
+    $ctx = debtDashboardContext();
     $storekeeper = debtStaff($ctx, 'storekeeper');
-    $customer    = creditGivenBy($ctx, $storekeeper, $ctx['store'], 5000);
+    $customer = creditGivenBy($ctx, $storekeeper, $ctx['store'], 5000);
 
     // Paid at the OTHER branch — they must not still be chased at the first.
     app(RecordCustomerPaymentAction::class)->execute(
@@ -156,7 +158,7 @@ it('drops a customer off every branch list once they have paid in full', functio
 // ─── The dashboard card ─────────────────────────────────────────────────
 
 it('shows the vendor-wide total to a storekeeper', function () {
-    $ctx         = debtDashboardContext();
+    $ctx = debtDashboardContext();
     $storekeeper = debtStaff($ctx, 'storekeeper');
 
     creditGivenBy($ctx, $storekeeper, $ctx['store'], 5000);
@@ -170,7 +172,7 @@ it('shows the vendor-wide total to a storekeeper', function () {
 });
 
 it('shows the branch figure beside the vendor total', function () {
-    $ctx         = debtDashboardContext();
+    $ctx = debtDashboardContext();
     $storekeeper = debtStaff($ctx, 'storekeeper');
 
     creditGivenBy($ctx, $storekeeper, $ctx['store'], 5000);
@@ -185,9 +187,9 @@ it('shows the branch figure beside the vendor total', function () {
 });
 
 it('shows each storekeeper only the credit they themselves gave', function () {
-    $ctx    = debtDashboardContext();
-    $ada    = debtStaff($ctx, 'storekeeper');
-    $bola   = debtStaff($ctx, 'storekeeper');
+    $ctx = debtDashboardContext();
+    $ada = debtStaff($ctx, 'storekeeper');
+    $bola = debtStaff($ctx, 'storekeeper');
 
     creditGivenBy($ctx, $ada, $ctx['store'], 5000);
     creditGivenBy($ctx, $bola, $ctx['store'], 9000);
@@ -200,9 +202,9 @@ it('shows each storekeeper only the credit they themselves gave', function () {
 });
 
 it('reduces what a storekeeper gave as it is repaid, whoever collects it', function () {
-    $ctx      = debtDashboardContext();
-    $ada      = debtStaff($ctx, 'storekeeper');
-    $bola     = debtStaff($ctx, 'storekeeper');
+    $ctx = debtDashboardContext();
+    $ada = debtStaff($ctx, 'storekeeper');
+    $bola = debtStaff($ctx, 'storekeeper');
     $customer = creditGivenBy($ctx, $ada, $ctx['store'], 5000);
 
     // Bola takes the money; Ada's exposure still falls, because the debt is
@@ -217,8 +219,8 @@ it('reduces what a storekeeper gave as it is repaid, whoever collects it', funct
 });
 
 it('never lets one storekeeper collection push another figure negative', function () {
-    $ctx      = debtDashboardContext();
-    $ada      = debtStaff($ctx, 'storekeeper');
+    $ctx = debtDashboardContext();
+    $ada = debtStaff($ctx, 'storekeeper');
     $customer = creditGivenBy($ctx, $ada, $ctx['store'], 5000);
 
     // Overpaid — the customer is now in credit overall.
@@ -233,7 +235,7 @@ it('never lets one storekeeper collection push another figure negative', functio
 });
 
 it('links every figure through to the debt list', function () {
-    $ctx         = debtDashboardContext();
+    $ctx = debtDashboardContext();
     $storekeeper = debtStaff($ctx, 'storekeeper');
     creditGivenBy($ctx, $storekeeper, $ctx['store'], 5000);
 
@@ -244,7 +246,7 @@ it('links every figure through to the debt list', function () {
 });
 
 it('shows nothing at all to someone who cannot see debts', function () {
-    $ctx    = debtDashboardContext();
+    $ctx = debtDashboardContext();
     $member = debtStaff($ctx, 'member');
 
     actAsDebtStaff($ctx, $member, $ctx['store']);

@@ -16,18 +16,31 @@ class ProcurementResource extends Resource
 {
     protected static ?string $model = Procurement::class;
 
-    protected static string|null|BackedEnum $navigationIcon  = 'heroicon-o-inbox-arrow-down';
-    protected static string|null|UnitEnum   $navigationGroup = 'Inventory';
-    protected static ?string                $navigationLabel = 'Procurements';
+    protected static string|null|BackedEnum $navigationIcon = 'heroicon-o-inbox-arrow-down';
+
+    protected static string|null|UnitEnum $navigationGroup = 'Inventory';
+
+    protected static ?string $navigationLabel = 'Procurements';
 
     public static function canAccess(): bool
     {
         return auth()->user()?->hasRole('super_admin') ?? false;
     }
 
-    public static function canCreate(): bool   { return false; }
-    public static function canEdit($r): bool   { return false; }
-    public static function canDelete($r): bool { return false; }
+    public static function canCreate(): bool
+    {
+        return false;
+    }
+
+    public static function canEdit($r): bool
+    {
+        return false;
+    }
+
+    public static function canDelete($r): bool
+    {
+        return false;
+    }
 
     public static function form(Schema $schema): Schema
     {
@@ -47,24 +60,24 @@ class ProcurementResource extends Resource
 
                 TextColumn::make('payment_status')->badge()
                     ->color(fn (string $state) => match ($state) {
-                        'full'         => 'success',
+                        'full' => 'success',
                         'part_payment' => 'warning',
-                        'credit'       => 'danger',
-                        default        => 'gray',
+                        'credit' => 'danger',
+                        default => 'gray',
                     })
                     ->formatStateUsing(fn (string $state) => match ($state) {
-                        'full'         => 'Fully Paid',
+                        'full' => 'Fully Paid',
                         'part_payment' => 'Part-Payment',
-                        'credit'       => 'Credit',
-                        default        => $state,
+                        'credit' => 'Credit',
+                        default => $state,
                     }),
 
                 TextColumn::make('status')->badge()
                     ->color(fn (string $state) => match ($state) {
-                        'pending'  => 'warning',
+                        'pending' => 'warning',
                         'approved' => 'success',
-                        'voided'   => 'danger',
-                        default    => 'gray',
+                        'voided' => 'danger',
+                        default => 'gray',
                     }),
 
                 TextColumn::make('variance_flag')->label('⚠ Variance')
@@ -97,7 +110,7 @@ class ProcurementResource extends Resource
     {
         return [
             'index' => Pages\ListProcurements::route('/'),
-            'view'  => Pages\ViewProcurement::route('/{record}'),
+            'view' => Pages\ViewProcurement::route('/{record}'),
         ];
     }
 }

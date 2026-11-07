@@ -49,8 +49,8 @@ class ViewVendorApplication extends ViewRecord
 
                         // Slug auto-generated uniquely by spatie/laravel-sluggable
                         $vendor = Vendor::create([
-                            'user_id'     => $locked->user_id,
-                            'name'        => $locked->store_name,
+                            'user_id' => $locked->user_id,
+                            'name' => $locked->store_name,
                             'is_verified' => true,
                         ]);
 
@@ -61,7 +61,7 @@ class ViewVendorApplication extends ViewRecord
                         $vendor->users()->syncWithoutDetaching([$locked->user_id]);
 
                         $locked->update([
-                            'status'      => 'approved',
+                            'status' => 'approved',
                             'admin_notes' => $data['admin_notes'] ?? null,
                         ]);
 
@@ -81,14 +81,14 @@ class ViewVendorApplication extends ViewRecord
                     $panelUrl = route('filament.vendor.home', ['tenant' => $vendor->slug]);
 
                     Notification::make()
-                        ->title('Approved — ' . $record->store_name)
-                        ->body('Vendor panel ready: ' . $panelUrl)
+                        ->title('Approved — '.$record->store_name)
+                        ->body('Vendor panel ready: '.$panelUrl)
                         ->success()
                         ->send();
 
                     $this->refreshFormData(['status', 'admin_notes']);
                 })
-                ->visible(fn() => $this->record->status === 'pending'),
+                ->visible(fn () => $this->record->status === 'pending'),
 
             Action::make('reject')
                 ->label('Reject')
@@ -102,14 +102,14 @@ class ViewVendorApplication extends ViewRecord
                 ])
                 ->action(function (array $data): void {
                     $this->record->update([
-                        'status'      => 'rejected',
+                        'status' => 'rejected',
                         'admin_notes' => $data['admin_notes'],
                     ]);
 
                     Notification::make()->title('Application rejected')->warning()->send();
                     $this->refreshFormData(['status', 'admin_notes']);
                 })
-                ->visible(fn() => $this->record->status === 'pending'),
+                ->visible(fn () => $this->record->status === 'pending'),
         ];
     }
 }

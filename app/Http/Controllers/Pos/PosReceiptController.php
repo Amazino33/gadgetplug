@@ -8,7 +8,9 @@ use App\Http\Controllers\Controller;
 use App\Models\PosSale;
 use App\Models\Store;
 use App\Models\VendorReceiptSetting;
+use App\Services\QrCode;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 
 /**
@@ -33,38 +35,38 @@ class PosReceiptController extends Controller
 
         $sale->loadMissing(['items', 'payments', 'cashier', 'customer', 'vendor', 'store']);
 
-        $vendor   = $sale->vendor;
+        $vendor = $sale->vendor;
         $settings = VendorReceiptSetting::forVendor($vendor);
 
         return view('pos.receipt', [
-            'sale'         => $sale,
-            'vendor'       => $vendor,
-            'settings'     => $settings,
+            'sale' => $sale,
+            'vendor' => $vendor,
+            'settings' => $settings,
             // Which branch sold this. A vendor with one store gains nothing
             // from repeating itself, so it is only shown when there is more
             // than one — otherwise every receipt carries a line the customer
             // cannot act on.
-            'store'        => $sale->store,
-            'showStore'    => $sale->store !== null
+            'store' => $sale->store,
+            'showStore' => $sale->store !== null
                 && Store::where('vendor_id', $vendor->id)->count() > 1,
-            'soldAt'       => $sale->completed_at ?? $sale->created_at,
-            'cashierName'  => $sale->cashier?->name,
+            'soldAt' => $sale->completed_at ?? $sale->created_at,
+            'cashierName' => $sale->cashier?->name,
             'customerName' => $sale->customer?->name,
-            'payments'     => $sale->payments,
-            'items'        => $sale->items->map(fn ($item) => [
-                'name'       => $item->product_name,
+            'payments' => $sale->payments,
+            'items' => $sale->items->map(fn ($item) => [
+                'name' => $item->product_name,
                 // "1 Crate × ₦9,700" and "1½ Crate × ₦10,100" — see
                 // PosSaleItem::receiptLine(). Unchanged for a base-unit line.
                 ...$item->receiptLine(),
-                'total'      => $item->total,
+                'total' => $item->total,
             ]),
             // VAT is a vendor setting; the old receipt hardcoded "VAT (7.5%)"
             // and would have lied on any store using a different rate.
-            'vatEnabled'   => (bool) ($vendor->pos_vat_enabled ?? true),
-            'vatRate'      => $vendor->pos_vat_rate ?? 7.5,
-            'logoUrl'      => $vendor->logo ? asset('storage/' . $vendor->logo) : null,
+            'vatEnabled' => (bool) ($vendor->pos_vat_enabled ?? true),
+            'vatRate' => $vendor->pos_vat_rate ?? 7.5,
+            'logoUrl' => $vendor->logo ? asset('storage/'.$vendor->logo) : null,
             // ?print=1 makes the page print itself — that is how the POS opens it
-            'autoPrint'    => $request->boolean('print'),
+            'autoPrint' => $request->boolean('print'),
             // Rendered at generous size: a thermal head turns a small QR to mush.
             //
             // Never allowed to take the receipt down with it. If the QR encoder
@@ -72,22 +74,22 @@ class PosReceiptController extends Controller
             // the POS treats any error from this endpoint as "print the old
             // modal instead", so an exception here costs the whole layout, not
             // just the code.
-            'qrSvg'        => $this->qrOrNull($settings, $sale),
+            'qrSvg' => $this->qrOrNull($settings, $sale),
         ]);
     }
 
-    private function qrOrNull(\App\Models\VendorReceiptSetting $settings, PosSale $sale): ?string
+    private function qrOrNull(VendorReceiptSetting $settings, PosSale $sale): ?string
     {
         if (! ($settings->show_qr ?? true) || ! $sale->public_token) {
             return null;
         }
 
         try {
-            return \App\Services\QrCode::svg($sale->publicUrl(), 240);
+            return QrCode::svg($sale->publicUrl(), 240);
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::warning('Receipt QR could not be generated', [
+            Log::warning('Receipt QR could not be generated', [
                 'sale_id' => $sale->id,
-                'error'   => $e->getMessage(),
+                'error' => $e->getMessage(),
             ]);
 
             return null;

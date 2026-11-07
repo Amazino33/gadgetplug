@@ -21,11 +21,11 @@ uses(RefreshDatabase::class);
 
 function staleReservationContext(): array
 {
-    $owner    = User::factory()->create();
-    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Stale Reservation Store']);
-    $store    = Store::create(['vendor_id' => $vendor->id, 'name' => 'Main', 'is_default' => true]);
+    $owner = User::factory()->create();
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Stale Reservation Store']);
+    $store = Store::create(['vendor_id' => $vendor->id, 'name' => 'Main', 'is_default' => true]);
     $category = Category::create(['name' => 'Stale Reservation Category '.uniqid()]);
-    $product  = Product::create([
+    $product = Product::create([
         'vendor_id' => $vendor->id, 'category_id' => $category->id,
         'name' => 'Reserved Widget', 'price' => 5000, 'store_id' => $store->id,
         'stock_quantity' => 10, 'status' => 'published',
@@ -57,19 +57,19 @@ function reservedOrder(array $c, string $status = 'paid', int $quantity = 3): Or
 }
 
 it('stamps reserved_at the moment stock is actually reserved for an order', function () {
-    $c     = staleReservationContext();
+    $c = staleReservationContext();
     $order = reservedOrder($c);
 
     expect($order->reserved_at)->not->toBeNull();
 });
 
 it('auto-releases an unpaid order\'s reservation held for over 24 hours', function () {
-    $c     = staleReservationContext();
+    $c = staleReservationContext();
     $order = reservedOrder($c, 'pending', 3);
 
     $this->travelTo($order->reserved_at->copy()->addHours(25));
 
-    (new ReleaseStaleReservationsJob())->handle();
+    (new ReleaseStaleReservationsJob)->handle();
 
     $row = ProductStoreStock::where('product_id', $c['product']->id)->where('store_id', $c['store']->id)->first();
 
@@ -80,12 +80,12 @@ it('auto-releases an unpaid order\'s reservation held for over 24 hours', functi
 });
 
 it('never auto-releases a paid order\'s reservation — that stock is the customer\'s', function () {
-    $c     = staleReservationContext();
+    $c = staleReservationContext();
     $order = reservedOrder($c, 'paid', 3);
 
     $this->travelTo($order->reserved_at->copy()->addHours(72));
 
-    (new ReleaseStaleReservationsJob())->handle();
+    (new ReleaseStaleReservationsJob)->handle();
 
     $row = ProductStoreStock::where('product_id', $c['product']->id)->where('store_id', $c['store']->id)->first();
 
@@ -94,12 +94,12 @@ it('never auto-releases a paid order\'s reservation — that stock is the custom
 });
 
 it('leaves a reservation alone before the 24 hour window has passed', function () {
-    $c     = staleReservationContext();
+    $c = staleReservationContext();
     $order = reservedOrder($c, 'confirmed', 2);
 
     $this->travelTo($order->reserved_at->copy()->addHours(23));
 
-    (new ReleaseStaleReservationsJob())->handle();
+    (new ReleaseStaleReservationsJob)->handle();
 
     $row = ProductStoreStock::where('product_id', $c['product']->id)->where('store_id', $c['store']->id)->first();
 
@@ -108,13 +108,13 @@ it('leaves a reservation alone before the 24 hour window has passed', function (
 });
 
 it('never releases the same order twice', function () {
-    $c     = staleReservationContext();
+    $c = staleReservationContext();
     $order = reservedOrder($c, 'pending', 3);
 
     $this->travelTo($order->reserved_at->copy()->addHours(25));
 
-    (new ReleaseStaleReservationsJob())->handle();
-    (new ReleaseStaleReservationsJob())->handle();
+    (new ReleaseStaleReservationsJob)->handle();
+    (new ReleaseStaleReservationsJob)->handle();
 
     $row = ProductStoreStock::where('product_id', $c['product']->id)->where('store_id', $c['store']->id)->first();
 
@@ -122,23 +122,23 @@ it('never releases the same order twice', function () {
 });
 
 it('does not touch a shipped order — dispatch already resolved its reservation', function () {
-    $c     = staleReservationContext();
+    $c = staleReservationContext();
     $order = reservedOrder($c, 'shipped', 3);
 
     $this->travelTo($order->reserved_at->copy()->addHours(25));
 
-    (new ReleaseStaleReservationsJob())->handle();
+    (new ReleaseStaleReservationsJob)->handle();
 
     expect($order->fresh()->reservation_released_at)->toBeNull();
 });
 
 it('notifies the vendor when a reservation is auto-released', function () {
-    $c     = staleReservationContext();
+    $c = staleReservationContext();
     $order = reservedOrder($c, 'pending', 3);
 
     $this->travelTo($order->reserved_at->copy()->addHours(25));
 
-    (new ReleaseStaleReservationsJob())->handle();
+    (new ReleaseStaleReservationsJob)->handle();
 
     expect($c['owner']->fresh()->notifications()->count())->toBe(1)
         ->and($c['owner']->fresh()->notifications()->first()->data['title'])->toContain($order->reference);

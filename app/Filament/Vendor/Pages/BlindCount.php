@@ -4,38 +4,47 @@ declare(strict_types=1);
 
 namespace App\Filament\Vendor\Pages;
 
-use App\Support\Quantity;
 use App\Actions\Inventory\AdjustStockAction;
-use App\Services\ActiveStore;
 use App\Models\AuditSession;
 use App\Models\BlindCountAuthorization;
 use App\Models\BlindCountEntry;
 use App\Models\BlindCountSession;
 use App\Models\Product;
 use App\Models\ProductStoreStock;
-use App\Services\Pickings\PickingLedger;
 use App\Models\User;
+use App\Models\Vendor;
+use App\Services\ActiveStore;
+use App\Services\Pickings\PickingLedger;
 use App\Services\ShortageCaseService;
+use App\Support\Quantity;
+use BackedEnum;
+use Carbon\CarbonInterface;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use BackedEnum;
 use UnitEnum;
 
 class BlindCount extends Page
 {
-    protected static null|string|BackedEnum $navigationIcon  = 'heroicon-o-eye-slash';
-    protected static string|null|UnitEnum   $navigationGroup = 'Inventory';
+    protected static null|string|BackedEnum $navigationIcon = 'heroicon-o-eye-slash';
+
+    protected static string|null|UnitEnum $navigationGroup = 'Inventory';
+
     protected static ?string $navigationLabel = 'Inventory Count';
-    protected static ?string $title           = 'Inventory Count';
+
+    protected static ?string $title = 'Inventory Count';
+
     protected static ?int $navigationSort = 2;
-    protected string  $view = 'filament.vendor.pages.blind-count';
+
+    protected string $view = 'filament.vendor.pages.blind-count';
 
     public static function canAccess(): bool
     {
-        $user   = auth()->user();
+        $user = auth()->user();
         $vendor = filament()->getTenant();
+
         return $vendor && $user->hasVendorPermission($vendor->id, 'manage_inventory');
     }
 
@@ -46,16 +55,20 @@ class BlindCount extends Page
     // resolves discrepancies shouldn't also be the one recording the counts.
     public function canCount(): bool
     {
-        $user   = auth()->user();
+        $user = auth()->user();
         $vendor = filament()->getTenant();
-        if ($vendor->isOwner($user)) return false;
+        if ($vendor->isOwner($user)) {
+            return false;
+        }
+
         return $user->hasVendorPermission($vendor->id, 'perform_inventory_count');
     }
 
     public function canReset(): bool
     {
-        $user   = auth()->user();
+        $user = auth()->user();
         $vendor = filament()->getTenant();
+
         return $user->isSuperAdmin() || $vendor->isOwner($user) || $user->hasVendorPermission($vendor->id, 'edit_products');
     }
 
@@ -65,16 +78,18 @@ class BlindCount extends Page
     // point of having a cadence at all.
     public function canAuthorizeRecount(): bool
     {
-        $user   = auth()->user();
+        $user = auth()->user();
         $vendor = filament()->getTenant();
+
         return $user->isSuperAdmin()
             || $vendor->isOwner($user)
             || $user->hasVendorPermission($vendor->id, 'authorize_recount');
     }
 
     // ── Livewire state ────────────────────────────────────────────────────────
-    public ?int    $sessionId       = null;
-    public bool    $byCategory      = false;
+    public ?int $sessionId = null;
+
+    public bool $byCategory = false;
 
     // ── Helpers ───────────────────────────────────────────────────────────────
     public function getSession(): ?BlindCountSession
@@ -95,7 +110,9 @@ class BlindCount extends Page
     public function productsForCounting(): array
     {
         $session = $this->getSession();
-        if (! $session) return [];
+        if (! $session) {
+            return [];
+        }
 
         $productIds = $session->product_order;
 
@@ -114,16 +131,18 @@ class BlindCount extends Page
             ->map(function (int $id) use ($products, $outOnPicking) {
                 $product = $products->get($id);
 
-                if (! $product) return null;
+                if (! $product) {
+                    return null;
+                }
 
                 return [
-                    'id'             => $product->id,
-                    'name'           => $product->name,
-                    'sku'            => $product->sku,
-                    'barcode'        => $product->barcode,
+                    'id' => $product->id,
+                    'name' => $product->name,
+                    'sku' => $product->sku,
+                    'barcode' => $product->barcode,
                     // No stock/reorder signal here — a blind count must never
                     // see system stock state while counting.
-                    'image'          => $product->getFirstMediaUrl('product-images', 'preview') ?: null,
+                    'image' => $product->getFirstMediaUrl('product-images', 'preview') ?: null,
                     'out_on_picking' => $outOnPicking[$id] ?? 0,
                 ];
             })
@@ -135,9 +154,16 @@ class BlindCount extends Page
     public function getRole(): string
     {
         $session = $this->getSession();
-        if (! $session) return 'none';
-        if ($session->storekeeper_a_id === auth()->id()) return 'a';
-        if ($session->storekeeper_b_id === auth()->id()) return 'b';
+        if (! $session) {
+            return 'none';
+        }
+        if ($session->storekeeper_a_id === auth()->id()) {
+            return 'a';
+        }
+        if ($session->storekeeper_b_id === auth()->id()) {
+            return 'b';
+        }
+
         return 'observer';
     }
 
@@ -162,7 +188,7 @@ class BlindCount extends Page
             return;
         }
 
-        $vendor  = filament()->getTenant();
+        $vendor = filament()->getTenant();
         $storeId = ActiveStore::currentId();
 
         // Scoped to the branch you are standing in.
@@ -192,6 +218,7 @@ class BlindCount extends Page
     {
         if (! $this->canCount()) {
             Notification::make()->title('Only storekeepers can start an inventory count session.')->warning()->send();
+
             return;
         }
 
@@ -206,6 +233,7 @@ class BlindCount extends Page
                 ->body($this->blockedMessage())
                 ->warning()
                 ->send();
+
             return;
         }
 
@@ -229,6 +257,7 @@ class BlindCount extends Page
 
         if (empty($productIds)) {
             Notification::make()->title('No published products found to count.')->warning()->send();
+
             return;
         }
 
@@ -236,14 +265,14 @@ class BlindCount extends Page
         $this->consumeAuthorization($vendor);
 
         $session = BlindCountSession::create([
-            'vendor_id'        => $vendor->id,
-            'store_id'         => $storeId,
+            'vendor_id' => $vendor->id,
+            'store_id' => $storeId,
             'storekeeper_a_id' => auth()->id(),
-            'status'           => 'a_counting',
-            'frequency'        => $vendor->pos_blind_count_frequency ?? 'daily',
-            'custom_days'      => $vendor->pos_blind_count_custom_days,
-            'by_category'      => $this->byCategory,
-            'product_order'    => $productIds,
+            'status' => 'a_counting',
+            'frequency' => $vendor->pos_blind_count_frequency ?? 'daily',
+            'custom_days' => $vendor->pos_blind_count_custom_days,
+            'by_category' => $this->byCategory,
+            'product_order' => $productIds,
         ]);
 
         $this->sessionId = $session->id;
@@ -251,7 +280,7 @@ class BlindCount extends Page
 
     // ── Cadence / re-count authorisation ──────────────────────────────────────
 
-    public function nextCountDue(): ?\Carbon\CarbonInterface
+    public function nextCountDue(): ?CarbonInterface
     {
         return BlindCountSession::nextCountDueFor(auth()->id(), filament()->getTenant(), ActiveStore::currentId());
     }
@@ -275,15 +304,17 @@ class BlindCount extends Page
             : 'A manager can authorise an earlier count.';
     }
 
-    private function consumeAuthorization(\App\Models\Vendor $vendor): void
+    private function consumeAuthorization(Vendor $vendor): void
     {
         BlindCountAuthorization::unusedFor(auth()->id(), $vendor->id)?->update(['used_at' => now()]);
     }
 
     // Counters currently held back by the cadence, for the manager's view
-    public function getBlockedCounters(): \Illuminate\Support\Collection
+    public function getBlockedCounters(): Collection
     {
-        if (! $this->canAuthorizeRecount()) return collect();
+        if (! $this->canAuthorizeRecount()) {
+            return collect();
+        }
 
         $vendor = filament()->getTenant();
 
@@ -295,8 +326,8 @@ class BlindCount extends Page
         return $vendor->users
             ->filter(fn (User $u) => BlindCountSession::nextCountDueFor($u->id, $vendor, $storeId) !== null)
             ->map(fn (User $u) => (object) [
-                'user'       => $u,
-                'due'        => BlindCountSession::nextCountDueFor($u->id, $vendor, $storeId),
+                'user' => $u,
+                'due' => BlindCountSession::nextCountDueFor($u->id, $vendor, $storeId),
                 'authorized' => BlindCountAuthorization::unusedFor($u->id, $vendor->id) !== null,
             ])
             ->values();
@@ -306,6 +337,7 @@ class BlindCount extends Page
     {
         if (! $this->canAuthorizeRecount()) {
             Notification::make()->title('You are not allowed to authorise a re-count.')->danger()->send();
+
             return;
         }
 
@@ -314,22 +346,25 @@ class BlindCount extends Page
         // A counter authorising themselves would defeat the cadence entirely
         if ($userId === auth()->id()) {
             Notification::make()->title('You cannot authorise your own re-count.')->danger()->send();
+
             return;
         }
 
         if (! $vendor->users->contains('id', $userId)) {
             Notification::make()->title('That user is not part of this store.')->danger()->send();
+
             return;
         }
 
         if (BlindCountAuthorization::unusedFor($userId, $vendor->id)) {
             Notification::make()->title('That counter is already authorised.')->warning()->send();
+
             return;
         }
 
         BlindCountAuthorization::create([
-            'vendor_id'     => $vendor->id,
-            'user_id'       => $userId,
+            'vendor_id' => $vendor->id,
+            'user_id' => $userId,
             'granted_by_id' => auth()->id(),
         ]);
 
@@ -393,14 +428,18 @@ class BlindCount extends Page
     {
         if (! $this->canCount()) {
             Notification::make()->title('Only storekeepers can participate in inventory counts.')->warning()->send();
+
             return;
         }
 
         $session = $this->getSession();
-        if (! $session || $session->status !== 'b_counting') return;
+        if (! $session || $session->status !== 'b_counting') {
+            return;
+        }
 
         if ($session->storekeeper_a_id === auth()->id()) {
             Notification::make()->title('You cannot verify your own count.')->danger()->send();
+
             return;
         }
 
@@ -412,6 +451,7 @@ class BlindCount extends Page
                 ->body($this->blockedMessage())
                 ->warning()
                 ->send();
+
             return;
         }
 
@@ -451,13 +491,17 @@ class BlindCount extends Page
 
     private function saveAllEntries(array $entries): void
     {
-        if (! $this->isParticipant()) return;
+        if (! $this->isParticipant()) {
+            return;
+        }
 
         $session = $this->getSession();
-        if (! $session) return;
+        if (! $session) {
+            return;
+        }
 
-        $now    = now();
-        $rows   = [];
+        $now = now();
+        $rows = [];
         $halves = Quantity::allowsHalves(filament()->getTenant());
 
         foreach ($session->product_order as $index => $productId) {
@@ -468,26 +512,30 @@ class BlindCount extends Page
             // than defaulted to zero here — submitAll()'s completeness check
             // below is what decides whether that blocks finishing, the same
             // guard it has always enforced.
-            if ($count === null || $count === '') continue;
+            if ($count === null || $count === '') {
+                continue;
+            }
 
             $note = ! empty($entry['note']) ? (string) $entry['note'] : null;
 
             $rows[] = [
                 'blind_count_session_id' => $session->id,
-                'user_id'                => auth()->id(),
-                'product_id'             => $productId,
-                'position'               => $index + 1,
+                'user_id' => auth()->id(),
+                'product_id' => $productId,
+                'position' => $index + 1,
                 // In halves for a shop that sells them (7½ crates); whole for
                 // everyone else, as the screen already enforces.
-                'count'                  => $halves ? Quantity::of(round((float) $count * 2) / 2) : (int) $count,
-                'note'                   => $note,
-                'counted_at'             => $now,
-                'created_at'             => $now,
-                'updated_at'             => $now,
+                'count' => $halves ? Quantity::of(round((float) $count * 2) / 2) : (int) $count,
+                'note' => $note,
+                'counted_at' => $now,
+                'created_at' => $now,
+                'updated_at' => $now,
             ];
         }
 
-        if ($rows === []) return;
+        if ($rows === []) {
+            return;
+        }
 
         BlindCountEntry::upsert(
             $rows,
@@ -498,10 +546,14 @@ class BlindCount extends Page
 
     public function submitAll(): void
     {
-        if (! $this->isParticipant()) return;
+        if (! $this->isParticipant()) {
+            return;
+        }
 
         $session = $this->getSession();
-        if (! $session) return;
+        if (! $session) {
+            return;
+        }
 
         $counted = BlindCountEntry::where('blind_count_session_id', $session->id)
             ->where('user_id', auth()->id())
@@ -514,33 +566,34 @@ class BlindCount extends Page
                 ->body('All products must be counted before submitting.')
                 ->warning()
                 ->send();
+
             return;
         }
 
-        $role        = $this->getRole();
-        $vendor      = filament()->getTenant();
+        $role = $this->getRole();
+        $vendor = filament()->getTenant();
         $singlePerson = ($vendor->pos_blind_count_participants ?? 2) === 1;
 
         if ($role === 'a') {
             if ($singlePerson) {
                 // Single-person mode: complete immediately without waiting for a second counter
                 $session->update([
-                    'status'          => 'completed',
-                    'a_submitted_at'  => now(),
-                    'b_submitted_at'  => now(),
+                    'status' => 'completed',
+                    'a_submitted_at' => now(),
+                    'b_submitted_at' => now(),
                 ]);
 
                 try {
                     $discrepancies = $this->processComparisonSinglePerson($session->fresh());
                     $message = $discrepancies > 0
-                        ? "Count complete. {$discrepancies} discrepanc" . ($discrepancies === 1 ? 'y' : 'ies') . " flagged for manager review."
+                        ? "Count complete. {$discrepancies} discrepanc".($discrepancies === 1 ? 'y' : 'ies').' flagged for manager review.'
                         : 'Count complete. All stock levels verified.';
                     Notification::make()->title($message)->success()->send();
                 } catch (\Throwable $e) {
                     Log::error('BlindCount single-person comparison failed', ['session_id' => $session->id, 'error' => $e->getMessage()]);
                     Notification::make()
                         ->title('Comparison failed')
-                        ->body('Your count was saved but stock records could not be updated. Error: ' . $e->getMessage())
+                        ->body('Your count was saved but stock records could not be updated. Error: '.$e->getMessage())
                         ->danger()
                         ->send();
                 }
@@ -554,14 +607,14 @@ class BlindCount extends Page
             try {
                 $discrepancies = $this->processComparison($session->fresh());
                 $message = $discrepancies > 0
-                    ? "Count complete. {$discrepancies} discrepanc" . ($discrepancies === 1 ? 'y' : 'ies') . " flagged for manager review."
+                    ? "Count complete. {$discrepancies} discrepanc".($discrepancies === 1 ? 'y' : 'ies').' flagged for manager review.'
                     : 'Count complete. All stock levels verified and updated.';
                 Notification::make()->title($message)->success()->send();
             } catch (\Throwable $e) {
                 Log::error('BlindCount processComparison failed', ['session_id' => $session->id, 'error' => $e->getMessage()]);
                 Notification::make()
                     ->title('Comparison failed')
-                    ->body('Your count was saved but the audit records could not be created. Contact your administrator. Error: ' . $e->getMessage())
+                    ->body('Your count was saved but the audit records could not be created. Contact your administrator. Error: '.$e->getMessage())
                     ->danger()
                     ->send();
             }
@@ -577,9 +630,13 @@ class BlindCount extends Page
         $session = $this->getSession();
 
         // A completed session is an audit record — it must never be deletable
-        if (! $session || $session->status === 'completed' || $session->status === 'cancelled') return false;
+        if (! $session || $session->status === 'completed' || $session->status === 'cancelled') {
+            return false;
+        }
 
-        if ($this->canReset()) return true;
+        if ($this->canReset()) {
+            return true;
+        }
 
         // A counter may abandon a session only while it is actually their turn,
         // so nobody can wipe out a colleague's submitted count mid-verification.
@@ -587,9 +644,10 @@ class BlindCount extends Page
             || ($session->status === 'b_counting' && $this->getRole() === 'b');
     }
 
-    public function getActiveSessions(): \Illuminate\Support\Collection
+    public function getActiveSessions(): Collection
     {
         $vendor = filament()->getTenant();
+
         return BlindCountSession::with(['store', 'storekeeperA', 'storekeeperB'])
             ->where('vendor_id', $vendor->id)
             ->whereIn('status', ['a_counting', 'b_counting'])
@@ -601,11 +659,14 @@ class BlindCount extends Page
     {
         if (! $this->canReset()) {
             Notification::make()->title('You cannot cancel count sessions.')->danger()->send();
+
             return;
         }
 
         $session = BlindCountSession::where('vendor_id', filament()->getTenant()->id)->find($id);
-        if (! $session || $session->status === 'completed' || $session->status === 'cancelled') return;
+        if (! $session || $session->status === 'completed' || $session->status === 'cancelled') {
+            return;
+        }
 
         $session->update(['status' => 'cancelled']);
 
@@ -624,11 +685,14 @@ class BlindCount extends Page
     {
         if (! $this->canCancel()) {
             Notification::make()->title('You cannot cancel this count session.')->danger()->send();
+
             return;
         }
 
         $session = $this->getSession();
-        if (! $session) return;
+        if (! $session) {
+            return;
+        }
 
         $session->update(['status' => 'cancelled']);
 
@@ -646,19 +710,22 @@ class BlindCount extends Page
     {
         if (! $this->canReset()) {
             Notification::make()->title('Only owners and inventory managers can reset a count session.')->danger()->send();
+
             return;
         }
 
         $session = $this->getSession();
-        if (! $session) return;
+        if (! $session) {
+            return;
+        }
 
         BlindCountEntry::where('blind_count_session_id', $session->id)->delete();
 
         $session->update([
-            'status'           => 'a_counting',
+            'status' => 'a_counting',
             'storekeeper_b_id' => null,
-            'a_submitted_at'   => null,
-            'b_submitted_at'   => null,
+            'a_submitted_at' => null,
+            'b_submitted_at' => null,
         ]);
 
         Notification::make()->title('Session reset. Storekeeper A can start their count over.')->success()->send();
@@ -679,25 +746,25 @@ class BlindCount extends Page
             foreach ($session->product_order as $productId) {
                 // Not (int): a shop that sells halves counts 7½ crates, and
                 // truncating here would turn every half into a false shortage.
-                $count      = Quantity::of($entries[$productId]?->count ?? 0);
-                $product    = Product::find($productId);
+                $count = Quantity::of($entries[$productId]?->count ?? 0);
+                $product = Product::find($productId);
                 $difference = Quantity::sub($count, $this->systemQuantityFor($session, $product));
-                $matched    = $difference === 0;
+                $matched = $difference === 0;
 
                 $line = AuditSession::create([
-                    'vendor_id'        => $session->vendor_id,
+                    'vendor_id' => $session->vendor_id,
                     // Which count produced this line — without it the sessions
                     // list has no way to group its own lines.
                     'blind_count_session_id' => $session->id,
-                    'product_id'       => $productId,
+                    'product_id' => $productId,
                     // The baseline this count is measured against, frozen now.
                     // Read live afterwards it would drift with every sale.
-                    'system_quantity'  => $this->systemQuantityFor($session, $product),
+                    'system_quantity' => $this->systemQuantityFor($session, $product),
                     'storekeeper_a_id' => $session->storekeeper_a_id,
                     'storekeeper_b_id' => null,
-                    'count_a'          => $count,
-                    'count_b'          => null,
-                    'status'           => $matched ? 'verified' : 'discrepancy',
+                    'count_a' => $count,
+                    'count_b' => null,
+                    'status' => $matched ? 'verified' : 'discrepancy',
                 ]);
 
                 if (! $matched) {
@@ -719,22 +786,24 @@ class BlindCount extends Page
 
     private function notifyManagersOfDiscrepancies(int $vendorId, int $discrepancies): void
     {
-        if ($discrepancies <= 0) return;
+        if ($discrepancies <= 0) {
+            return;
+        }
 
         try {
             $managers = User::where(fn ($q) => $q
-                    ->whereHas('ownedVendors', fn ($q) => $q->where('id', $vendorId))
-                    ->orWhereHas('roles', fn ($q) => $q
-                        ->where('name', 'inventory_manager')
-                        ->where('team_id', $vendorId)
-                    )
+                ->whereHas('ownedVendors', fn ($q) => $q->where('id', $vendorId))
+                ->orWhereHas('roles', fn ($q) => $q
+                    ->where('name', 'inventory_manager')
+                    ->where('team_id', $vendorId)
                 )
+            )
                 ->where('id', '!=', auth()->id())
                 ->get();
 
             if ($managers->isNotEmpty()) {
                 Notification::make()
-                    ->title("{$discrepancies} discrepanc" . ($discrepancies === 1 ? 'y' : 'ies') . " found in inventory count")
+                    ->title("{$discrepancies} discrepanc".($discrepancies === 1 ? 'y' : 'ies').' found in inventory count')
                     ->body('Review the Audit Sessions page to resolve them.')
                     ->danger()
                     ->sendToDatabase($managers);
@@ -754,7 +823,7 @@ class BlindCount extends Page
             ->where('user_id', $session->storekeeper_b_id)
             ->get()->keyBy('product_id');
 
-        $adjustStock   = app(AdjustStockAction::class);
+        $adjustStock = app(AdjustStockAction::class);
         $discrepancies = 0;
 
         // Wrap in a transaction so all AuditSessions are created or none are
@@ -762,24 +831,24 @@ class BlindCount extends Page
             foreach ($session->product_order as $productId) {
                 // Halves kept (see the solo path above). Quantity::of gives an
                 // int for every whole count, so 7 against 7 still matches.
-                $countA  = Quantity::of($aEntries[$productId]?->count ?? 0);
-                $countB  = Quantity::of($bEntries[$productId]?->count ?? 0);
+                $countA = Quantity::of($aEntries[$productId]?->count ?? 0);
+                $countB = Quantity::of($bEntries[$productId]?->count ?? 0);
                 $matched = $countA === $countB;
                 $product = Product::find($productId);
 
                 $line = AuditSession::create([
-                    'vendor_id'        => $session->vendor_id,
+                    'vendor_id' => $session->vendor_id,
                     // Which count produced this line — without it the sessions
                     // list has no way to group its own lines.
                     'blind_count_session_id' => $session->id,
-                    'product_id'       => $productId,
+                    'product_id' => $productId,
                     // Frozen baseline — see the solo path above.
-                    'system_quantity'  => $this->systemQuantityFor($session, $product),
+                    'system_quantity' => $this->systemQuantityFor($session, $product),
                     'storekeeper_a_id' => $session->storekeeper_a_id,
                     'storekeeper_b_id' => $session->storekeeper_b_id,
-                    'count_a'          => $countA,
-                    'count_b'          => $countB,
-                    'status'           => $matched ? 'verified' : 'discrepancy',
+                    'count_a' => $countA,
+                    'count_b' => $countB,
+                    'status' => $matched ? 'verified' : 'discrepancy',
                 ]);
 
                 if ($matched) {
@@ -788,16 +857,16 @@ class BlindCount extends Page
 
                     if ($difference !== 0) {
                         $adjustStock->execute(
-                            productId:       $productId,
+                            productId: $productId,
                             quantityChanged: $difference,
                             transactionType: 'audit_correction',
-                            userId:          $session->storekeeper_b_id,
-                            reference:       "Inventory Count #{$session->id}",
-                            description:     'Verified count. System had '.Quantity::format($systemQuantity, true).', found '.Quantity::format($countB, true).'.',
+                            userId: $session->storekeeper_b_id,
+                            reference: "Inventory Count #{$session->id}",
+                            description: 'Verified count. System had '.Quantity::format($systemQuantity, true).', found '.Quantity::format($countB, true).'.',
                             // The branch this session counted, read from the
                             // session itself rather than from whoever happens
                             // to be looking at the page when it reconciles.
-                            store:           $session->store_id,
+                            store: $session->store_id,
                         );
                     }
                 } else {

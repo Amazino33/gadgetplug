@@ -17,9 +17,11 @@ class AffiliateReachBandResource extends Resource
 {
     protected static ?string $model = AffiliateReachBand::class;
 
-    protected static string|null|BackedEnum $navigationIcon  = 'heroicon-o-signal';
-    protected static ?string                $navigationLabel = 'Reach Bands';
-    protected static ?int                   $navigationSort  = 7;
+    protected static string|null|BackedEnum $navigationIcon = 'heroicon-o-signal';
+
+    protected static ?string $navigationLabel = 'Reach Bands';
+
+    protected static ?int $navigationSort = 7;
 
     public static function getNavigationGroup(): ?string
     {

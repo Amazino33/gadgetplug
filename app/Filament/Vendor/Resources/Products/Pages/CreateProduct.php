@@ -5,6 +5,9 @@ namespace App\Filament\Vendor\Resources\Products\Pages;
 use App\Filament\Vendor\Resources\Products\Pages\Concerns\ConfiguresProductPage;
 use App\Filament\Vendor\Resources\Products\ProductResource;
 use App\Filament\Vendor\Resources\Products\Schemas\ProductForm;
+use App\Services\ActiveStore;
+use App\Services\FreePlan\FreePlanLimits;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 
 class CreateProduct extends CreateRecord
@@ -12,6 +15,27 @@ class CreateProduct extends CreateRecord
     use ConfiguresProductPage;
 
     protected static string $resource = ProductResource::class;
+
+    public function mount(): void
+    {
+        // A free shop at its cap is told so before it fills the form in.
+        // Product::creating refuses the save regardless; this is the courtesy.
+        $vendor = filament()->getTenant();
+
+        if ($vendor && FreePlanLimits::productLimitReached($vendor)) {
+            Notification::make()
+                ->title(FreePlanLimits::productLimitMessage())
+                ->warning()
+                ->persistent()
+                ->send();
+
+            $this->redirect(ProductResource::getUrl('index'));
+
+            return;
+        }
+
+        parent::mount();
+    }
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
@@ -31,7 +55,7 @@ class CreateProduct extends CreateRecord
         // The home-store field is only shown to the owner. For anyone else the
         // product is homed in the branch they are working in — never left
         // without one, since ProductObserver opens its stock row there.
-        $data['store_id'] ??= \App\Services\ActiveStore::currentId();
+        $data['store_id'] ??= ActiveStore::currentId();
 
         return $data;
     }

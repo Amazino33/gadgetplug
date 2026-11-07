@@ -19,21 +19,21 @@ uses(RefreshDatabase::class);
 
 function unitProcurementContext(): array
 {
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
 
-    $owner  = User::factory()->create();
+    $owner = User::factory()->create();
     $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Noodle Store', 'allow_negative_stock' => true]);
     VendorRoles::seedFor($vendor);
 
     $supplier = Supplier::create(['vendor_id' => $vendor->id, 'name' => 'Distributor']);
-    $product  = Product::create([
-        'vendor_id'   => $vendor->id,
+    $product = Product::create([
+        'vendor_id' => $vendor->id,
         'category_id' => Category::create(['name' => 'Food'])->id,
-        'name'        => 'Indomie',
-        'base_unit'   => 'Pack',
-        'price'       => 250,
-        'cost_price'  => 200,
-        'status'      => 'published',
+        'name' => 'Indomie',
+        'base_unit' => 'Pack',
+        'price' => 250,
+        'cost_price' => 200,
+        'status' => 'published',
     ]);
 
     $carton = ProductUnit::create([

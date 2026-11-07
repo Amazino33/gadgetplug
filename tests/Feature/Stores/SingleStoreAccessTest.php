@@ -23,7 +23,7 @@ uses(RefreshDatabase::class);
 /** A shop with no branches — just whatever store it was created with. */
 function soloVendor(): array
 {
-    $oga    = User::factory()->create();
+    $oga = User::factory()->create();
     $vendor = Vendor::create(['user_id' => $oga->id, 'name' => 'Solo Shop '.uniqid()]);
 
     return ['vendor' => $vendor, 'oga' => $oga, 'shop' => $vendor->defaultStore];
@@ -40,14 +40,14 @@ function soloOrder(Vendor $vendor, ?Store $store): Procurement
     $supplier = Supplier::create(['vendor_id' => $vendor->id, 'name' => 'Solo Supplier '.uniqid()]);
 
     return Procurement::create([
-        'vendor_id'      => $vendor->id,
-        'supplier_id'    => $supplier->id,
-        'store_id'       => $store?->id,
-        'reference'      => 'PO-'.strtoupper(Str::random(8)),
-        'status'         => 'pending',
-        'created_by'     => $vendor->user_id,
-        'total_cost'     => 0,
-        'amount_paid'    => 0,
+        'vendor_id' => $vendor->id,
+        'supplier_id' => $supplier->id,
+        'store_id' => $store?->id,
+        'reference' => 'PO-'.strtoupper(Str::random(8)),
+        'status' => 'pending',
+        'created_by' => $vendor->user_id,
+        'total_cost' => 0,
+        'amount_paid' => 0,
         'payment_status' => 'credit',
         'payment_method' => 'cash',
     ]);

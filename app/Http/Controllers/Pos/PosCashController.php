@@ -7,8 +7,8 @@ use App\Http\Controllers\Controller;
 use App\Models\CashSubmission;
 use App\Models\User;
 use App\Models\Vendor;
-use App\Services\Inventory\TillStore;
 use App\Services\Cash\CashDrawer;
+use App\Services\Inventory\TillStore;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Throwable;
@@ -45,10 +45,10 @@ class PosCashController extends Controller
                 ->limit(5)
                 ->get(['reference', 'amount', 'expected_amount', 'status', 'created_at'])
                 ->map(fn (CashSubmission $row) => [
-                    'reference'  => $row->reference,
-                    'amount'     => (float) $row->amount,
-                    'variance'   => $row->variance(),
-                    'status'     => $row->status,
+                    'reference' => $row->reference,
+                    'amount' => (float) $row->amount,
+                    'variance' => $row->variance(),
+                    'status' => $row->status,
                     'created_at' => $row->created_at,
                 ]),
         ]);
@@ -57,10 +57,10 @@ class PosCashController extends Controller
     public function submit(Request $request, SubmitCashAction $submit): JsonResponse
     {
         $request->validate([
-            'vendor_id'   => 'required|integer',
+            'vendor_id' => 'required|integer',
             'received_by' => 'required|integer',
-            'amount'      => 'required|numeric|min:0.01',
-            'reason'      => 'nullable|string|max:500',
+            'amount' => 'required|numeric|min:0.01',
+            'reason' => 'nullable|string|max:500',
         ]);
 
         $vendorId = (int) $request->vendor_id;
@@ -86,9 +86,9 @@ class PosCashController extends Controller
 
         return response()->json([
             'reference' => $submission->reference,
-            'amount'    => (float) $submission->amount,
-            'variance'  => $submission->variance(),
-            'receiver'  => $submission->receiver->name,
+            'amount' => (float) $submission->amount,
+            'variance' => $submission->variance(),
+            'receiver' => $submission->receiver->name,
         ]);
     }
 

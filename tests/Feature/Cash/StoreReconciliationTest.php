@@ -3,23 +3,29 @@
 use App\Actions\Cash\LogTillExpenseAction;
 use App\Actions\Cash\ResolveCashSubmissionAction;
 use App\Actions\Cash\SubmitCashAction;
+use App\Models\Category;
+use App\Models\PosCustomer;
 use App\Models\PosCustomerLedgerEntry;
 use App\Models\PosSalePayment;
+use App\Models\Product;
+use App\Models\ProductStoreStock;
+use App\Models\Store;
 use App\Models\User;
 use App\Services\Cash\StoreReconciliation;
 use App\Services\Pos\CustomerDebtService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 
-require_once __DIR__ . '/Helpers.php';
+require_once __DIR__.'/Helpers.php';
 
 uses(RefreshDatabase::class);
 
 function reconContext(): array
 {
-    $vendor  = cashVendor();
-    $store   = $vendor->defaultStore;
+    $vendor = cashVendor();
+    $store = $vendor->defaultStore;
     $cashier = User::factory()->create();
-    $owner   = User::find($vendor->user_id);
+    $owner = User::find($vendor->user_id);
 
     return compact('vendor', 'store', 'cashier', 'owner');
 }
@@ -28,8 +34,8 @@ function reconcile(array $ctx, ?string $from = null, ?string $to = null): array
 {
     return app(StoreReconciliation::class)->forStore(
         $ctx['store'],
-        $from ? Illuminate\Support\Carbon::parse($from) : now()->subMonth(),
-        $to ? Illuminate\Support\Carbon::parse($to) : now()->addDay(),
+        $from ? Carbon::parse($from) : now()->subMonth(),
+        $to ? Carbon::parse($to) : now()->addDay(),
     );
 }
 
@@ -65,9 +71,9 @@ test('declared till spending nets off what is expected back', function () {
 
     app(LogTillExpenseAction::class)->execute(
         loggedBy: $ctx['cashier'],
-        store:    $ctx['store'],
-        amount:   7500,
-        reason:   'Diesel for the generator',
+        store: $ctx['store'],
+        amount: 7500,
+        reason: 'Diesel for the generator',
     );
 
     $recon = reconcile($ctx);
@@ -197,7 +203,7 @@ test('voiding a split sale only withdraws the cash leg, not the card half', func
 test('cash is broken down per branch, and per cashier within a branch', function () {
     $ctx = reconContext();
 
-    $second = App\Models\Store::create([
+    $second = Store::create([
         'vendor_id' => $ctx['vendor']->id, 'name' => 'Second Branch', 'is_default' => false,
     ]);
 
@@ -253,14 +259,14 @@ test('the total balance is everything the branch holds or is owed', function () 
     $ctx = reconContext();
 
     // 20 units on the shelf at 6,000 cost = 120,000 tied up in stock.
-    $product = App\Models\Product::create([
+    $product = Product::create([
         'vendor_id' => $ctx['vendor']->id, 'store_id' => $ctx['store']->id,
-        'category_id' => App\Models\Category::create(['name' => 'C' . uniqid()])->id,
+        'category_id' => Category::create(['name' => 'C'.uniqid()])->id,
         'name' => 'Balance Widget', 'price' => 10000, 'cost_price' => 6000,
         'stock_quantity' => 20, 'reserved_stock' => 0, 'status' => 'published',
     ]);
 
-    App\Models\ProductStoreStock::updateOrCreate(
+    ProductStoreStock::updateOrCreate(
         ['product_id' => $product->id, 'store_id' => $ctx['store']->id],
         ['quantity' => 20, 'reserved' => 0],
     );
@@ -269,8 +275,8 @@ test('the total balance is everything the branch holds or is owed', function () 
     cashSale($ctx['vendor'], $ctx['store'], $ctx['cashier']->id, ['total' => 50000]);
 
     // A customer owes 30,000.
-    $customer = App\Models\PosCustomer::create([
-        'vendor_id' => $ctx['vendor']->id, 'name' => 'Debtor', 'phone' => '0803' . rand(1000000, 9999999),
+    $customer = PosCustomer::create([
+        'vendor_id' => $ctx['vendor']->id, 'name' => 'Debtor', 'phone' => '0803'.rand(1000000, 9999999),
     ]);
     PosCustomerLedgerEntry::create([
         'pos_customer_id' => $customer->id, 'vendor_id' => $ctx['vendor']->id,
@@ -310,14 +316,14 @@ test('handing the cash over moves it out of the balance, it does not vanish', fu
 test('stock with no cost price is left out of the value and counted instead', function () {
     $ctx = reconContext();
 
-    $product = App\Models\Product::create([
+    $product = Product::create([
         'vendor_id' => $ctx['vendor']->id, 'store_id' => $ctx['store']->id,
-        'category_id' => App\Models\Category::create(['name' => 'C' . uniqid()])->id,
+        'category_id' => Category::create(['name' => 'C'.uniqid()])->id,
         'name' => 'Uncosted Widget', 'price' => 9000, 'cost_price' => null,
         'stock_quantity' => 7, 'reserved_stock' => 0, 'status' => 'published',
     ]);
 
-    App\Models\ProductStoreStock::updateOrCreate(
+    ProductStoreStock::updateOrCreate(
         ['product_id' => $product->id, 'store_id' => $ctx['store']->id],
         ['quantity' => 7, 'reserved' => 0],
     );
@@ -332,8 +338,8 @@ test('stock with no cost price is left out of the value and counted instead', fu
 test('debt payments clear the oldest charge first, so aging is real', function () {
     $ctx = reconContext();
 
-    $customer = App\Models\PosCustomer::create([
-        'vendor_id' => $ctx['vendor']->id, 'name' => 'Ada Obi', 'phone' => '0803' . rand(1000000, 9999999),
+    $customer = PosCustomer::create([
+        'vendor_id' => $ctx['vendor']->id, 'name' => 'Ada Obi', 'phone' => '0803'.rand(1000000, 9999999),
     ]);
 
     foreach ([['2026-06-01', 30000], ['2026-09-10', 20000]] as [$date, $amount]) {
@@ -352,7 +358,7 @@ test('debt payments clear the oldest charge first, so aging is real', function (
     ]);
 
     $aged = app(CustomerDebtService::class)->aged(
-        $ctx['vendor']->id, $ctx['store']->id, Illuminate\Support\Carbon::parse('2026-09-16'),
+        $ctx['vendor']->id, $ctx['store']->id, Carbon::parse('2026-09-16'),
     );
 
     // What is left is the recent charge, not the old one — so this customer is

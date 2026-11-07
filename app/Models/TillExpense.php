@@ -25,8 +25,8 @@ class TillExpense extends Model
     public const UPDATED_AT = null;
 
     protected $casts = [
-        'amount'     => 'decimal:2',
-        'spent_at'   => 'datetime',
+        'amount' => 'decimal:2',
+        'spent_at' => 'datetime',
         'created_at' => 'datetime',
     ];
 

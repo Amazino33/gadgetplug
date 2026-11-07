@@ -1,9 +1,11 @@
 <?php
 
+use App\Filament\Resources\Orders\Pages\ListOrders;
 use App\Filament\Resources\Orders\Pages\ViewOrder;
 use App\Models\Checkout;
 use App\Models\DeliveryMessage;
 use App\Models\Lga;
+use App\Models\LogisticsCompany;
 use App\Models\Order;
 use App\Models\User;
 use App\Models\VendorNotificationSetting;
@@ -18,6 +20,7 @@ use Filament\Facades\Filament;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Livewire\Volt\Volt;
 
 uses(RefreshDatabase::class);
 
@@ -72,10 +75,10 @@ it('steps through placed, confirmed, packed, with rider and delivered — who an
     $steps = collect(app(OrderProgress::class)->steps($order->fresh()))->keyBy('key');
 
     expect($steps->pluck('state', 'key')->all())->toBe([
-        'placed'    => OrderProgress::DONE,
+        'placed' => OrderProgress::DONE,
         'confirmed' => OrderProgress::DONE,
-        'packed'    => OrderProgress::DONE,
-        'shipped'   => OrderProgress::CURRENT,
+        'packed' => OrderProgress::DONE,
+        'shipped' => OrderProgress::CURRENT,
         'delivered' => OrderProgress::UPCOMING,
     ])
         ->and($steps['confirmed']['label'])->toBe('Confirmed')
@@ -110,7 +113,7 @@ it('lists only recipients with a number: customer, rider/company, storekeeper, o
 
     $c['main']->update(['phone' => '08031110000']);
     VendorNotificationSetting::forVendor($c['vendor'])->update(['owner_whatsapp' => '08032220000']);
-    app(DispatchService::class)->assign($order, $c['admin'], App\Models\LogisticsCompany::create([
+    app(DispatchService::class)->assign($order, $c['admin'], LogisticsCompany::create([
         'vendor_id' => null, 'name' => 'Swift', 'phone' => '08033330000', 'whatsapp' => '08033330000', 'is_active' => true,
     ])->id, cost: 1500, notify: false);
 
@@ -256,7 +259,7 @@ it('shows the mismatch on the order page and the dispatch board', function () {
         ->assertSee('Progress')
         ->assertSee('Messages');
 
-    Livewire::test(App\Filament\Resources\Orders\Pages\ListOrders::class)
+    Livewire::test(ListOrders::class)
         ->assertTableColumnStateSet('location_check', "Location doesn't match LGA", $order);
 });
 
@@ -265,7 +268,7 @@ it('gives the rider link the directions button, and never puts the exact pin on 
     $c['main']->update(['latitude' => 5.0102, 'longitude' => 7.8505]);
     $order = ossOrder($c, 'pay_on_delivery', 'shipped');
     orderInUyo($order, 5.0401, 7.9302);
-    app(DispatchService::class)->assign($order, $c['admin'], App\Models\LogisticsCompany::create([
+    app(DispatchService::class)->assign($order, $c['admin'], LogisticsCompany::create([
         'vendor_id' => null, 'name' => 'Swift', 'phone' => '08033330000', 'is_active' => true,
     ])->id, cost: 1500, notify: false);
 
@@ -274,7 +277,7 @@ it('gives the rider link the directions button, and never puts the exact pin on 
         ->assertSee('Open directions in Google Maps')
         ->assertSee('destination=5.0401,7.9302', false);
 
-    \Livewire\Volt\Volt::test('pages.track-order')
+    Volt::test('pages.track-order')
         ->set('reference', $order->reference)
         ->call('lookup')
         ->assertSee($order->reference)

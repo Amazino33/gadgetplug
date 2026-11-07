@@ -25,6 +25,7 @@ use Carbon\CarbonImmutable;
 class SalesPulseCardProvider implements ReportCardProvider
 {
     private const CANCEL_RATE_URGENT = 20.0;
+
     private const CANCEL_RATE_ATTENTION = 10.0;
 
     public function summarize(int $vendorId, ?int $storeId = null): CardSummary
@@ -39,12 +40,12 @@ class SalesPulseCardProvider implements ReportCardProvider
         // store had a hand in supplying, so a branch's pulse is about its own
         // trade rather than the whole vendor's.
         $placedToday = Order::whereHas('items', fn ($q) => $q->where('vendor_id', $vendorId)
-                ->when($storeId, fn ($iq) => $iq->whereHas('storeAllocations', fn ($a) => $a->where('store_id', $storeId))))
+            ->when($storeId, fn ($iq) => $iq->whereHas('storeAllocations', fn ($a) => $a->where('store_id', $storeId))))
             ->whereBetween('created_at', [$todayStart, $todayEnd])
             ->count();
 
         $cancelledToday = Order::whereHas('items', fn ($q) => $q->where('vendor_id', $vendorId)
-                ->when($storeId, fn ($iq) => $iq->whereHas('storeAllocations', fn ($a) => $a->where('store_id', $storeId))))
+            ->when($storeId, fn ($iq) => $iq->whereHas('storeAllocations', fn ($a) => $a->where('store_id', $storeId))))
             ->where('status', 'cancelled')
             ->whereBetween('updated_at', [$todayStart, $todayEnd])
             ->count();
@@ -61,9 +62,9 @@ class SalesPulseCardProvider implements ReportCardProvider
         $gap = max(0, $placedToday - $deliveredCount);
 
         $headline = "{$placedToday} placed, {$deliveredCount} delivered today"
-            . ($gap > 0 ? " ({$gap} awaiting delivery)" : '')
-            . ' · ₦' . number_format($deliveredRevenue, 2)
-            . ' · ' . number_format($cancelRate, 1) . '% cancelled';
+            .($gap > 0 ? " ({$gap} awaiting delivery)" : '')
+            .' · ₦'.number_format($deliveredRevenue, 2)
+            .' · '.number_format($cancelRate, 1).'% cancelled';
 
         return new CardSummary(
             key: 'sales_pulse',

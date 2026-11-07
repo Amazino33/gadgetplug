@@ -3,7 +3,6 @@
 namespace App\Filament\Vendor\Resources\OrderItems\Pages;
 
 use App\Filament\Vendor\Resources\OrderItems\OrderItemResource;
-use Filament\Actions\CreateAction;
 use Filament\Resources\Pages\ListRecords;
 
 class ListOrderItems extends ListRecords
@@ -13,7 +12,7 @@ class ListOrderItems extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            
+
         ];
     }
 }

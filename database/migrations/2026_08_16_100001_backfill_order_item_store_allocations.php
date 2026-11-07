@@ -46,10 +46,10 @@ return new class extends Migration
 
                     $rows[] = [
                         'order_item_id' => $item->id,
-                        'store_id'      => $storeId,
-                        'quantity'      => (int) $item->quantity,
-                        'created_at'    => $now,
-                        'updated_at'    => $now,
+                        'store_id' => $storeId,
+                        'quantity' => (int) $item->quantity,
+                        'created_at' => $now,
+                        'updated_at' => $now,
                     ];
                 }
 

@@ -22,7 +22,7 @@ class PurgeOrphanedVendorRolesCommand extends Command
 
     public function handle(): int
     {
-        $tables  = config('permission.table_names');
+        $tables = config('permission.table_names');
         $teamKey = config('permission.column_names.team_foreign_key', 'team_id');
 
         $orphanRoleIds = DB::table($tables['roles'])
@@ -37,7 +37,7 @@ class PurgeOrphanedVendorRolesCommand extends Command
         }
 
         $assignments = DB::table($tables['model_has_roles'])->whereIn('role_id', $orphanRoleIds)->count();
-        $grants      = DB::table($tables['role_has_permissions'])->whereIn('role_id', $orphanRoleIds)->count();
+        $grants = DB::table($tables['role_has_permissions'])->whereIn('role_id', $orphanRoleIds)->count();
 
         $this->line("Orphaned roles: {$orphanRoleIds->count()}");
         $this->line("  assignments in {$tables['model_has_roles']}: {$assignments}");
@@ -53,14 +53,14 @@ class PurgeOrphanedVendorRolesCommand extends Command
         // Deleted in chunks: `whereIn` over hundreds of ids becomes an enormous
         // statement, and on a shared database that is worth avoiding.
         $removedAssignments = 0;
-        $removedGrants      = 0;
-        $removedRoles       = 0;
+        $removedGrants = 0;
+        $removedRoles = 0;
 
         foreach ($orphanRoleIds->chunk(100) as $chunk) {
             $ids = $chunk->all();
 
             $removedAssignments += DB::table($tables['model_has_roles'])->whereIn('role_id', $ids)->delete();
-            $removedGrants      += DB::table($tables['role_has_permissions'])->whereIn('role_id', $ids)->delete();
+            $removedGrants += DB::table($tables['role_has_permissions'])->whereIn('role_id', $ids)->delete();
         }
 
         // On this database the bulk delete fails with a 1451 naming
@@ -77,7 +77,7 @@ class PurgeOrphanedVendorRolesCommand extends Command
             $this->warn('Bulk delete refused; retrying one role at a time to isolate it.');
 
             $removedRoles = 0;
-            $stubborn     = [];
+            $stubborn = [];
 
             foreach ($orphanRoleIds as $id) {
                 try {

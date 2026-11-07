@@ -2,6 +2,7 @@
 
 use App\Models\User;
 use App\Models\Vendor;
+use Database\Seeders\VendorPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\Sanctum;
@@ -13,7 +14,7 @@ uses(RefreshDatabase::class);
 // the sidebar, which throws on a bare database. Seeded here so a render that
 // reaches the panel is a real render rather than a 500 that any assertion
 // about the page would misread.
-beforeEach(fn () => (new Database\Seeders\VendorPermissionsSeeder())->run());
+beforeEach(fn () => (new VendorPermissionsSeeder)->run());
 
 // The block is a money lever: an admin turns it on when a vendor owes the
 // platform or breaks the terms, and the vendor loses both the back office and
@@ -32,11 +33,11 @@ function panelPage(Vendor $vendor): string
 
 function blockedVendor(array $attributes = []): array
 {
-    $owner  = User::factory()->create();
+    $owner = User::factory()->create();
     $vendor = Vendor::create(array_merge([
-        'user_id'                  => $owner->id,
-        'name'                     => 'Blocked Store '.uniqid(),
-        'dashboard_blocked'        => true,
+        'user_id' => $owner->id,
+        'name' => 'Blocked Store '.uniqid(),
+        'dashboard_blocked' => true,
         'dashboard_blocked_reason' => 'Outstanding platform commission for August.',
     ], $attributes));
 
@@ -108,7 +109,7 @@ it('refuses a till PIN login while the account is blocked', function () {
 
     $this->postJson('/api/pos/auth/login', [
         'vendor_id' => $vendor->id,
-        'pin'       => '1234',
+        'pin' => '1234',
     ])
         ->assertStatus(403)
         ->assertJson([

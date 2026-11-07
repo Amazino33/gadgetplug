@@ -33,9 +33,9 @@ class StoreSalesQuery
         $pos = self::posTotals($vendorId, $storeId, $from, $to);
 
         return [
-            'units'   => $online['units'] + $pos['units'],
+            'units' => $online['units'] + $pos['units'],
             'revenue' => $online['revenue'] + $pos['revenue'],
-            'orders'  => $online['orders'] + $pos['orders'],
+            'orders' => $online['orders'] + $pos['orders'],
         ];
     }
 
@@ -64,9 +64,9 @@ class StoreSalesQuery
                 ->first();
 
             return [
-                'units'   => (int) $row->units,
+                'units' => (int) $row->units,
                 'revenue' => (float) $row->revenue,
-                'orders'  => (int) $row->orders,
+                'orders' => (int) $row->orders,
             ];
         }
 
@@ -91,9 +91,9 @@ class StoreSalesQuery
             ->first();
 
         return [
-            'units'   => (int) $row->units,
+            'units' => (int) $row->units,
             'revenue' => (float) $row->revenue,
-            'orders'  => (int) $row->orders,
+            'orders' => (int) $row->orders,
         ];
     }
 
@@ -123,9 +123,9 @@ class StoreSalesQuery
             ->sum('pos_sale_items.quantity');
 
         return [
-            'units'   => $units,
+            'units' => $units,
             'revenue' => (float) $money->revenue,
-            'orders'  => (int) $money->orders,
+            'orders' => (int) $money->orders,
         ];
     }
 }

@@ -82,10 +82,10 @@ class DispatchActions
             ])
             ->fillForm(fn (Order $record) => [
                 'logistics_company_id' => $record->logisticsCompany?->vendor_id === null ? $record->logistics_company_id : null,
-                'rider_name'           => $record->rider_name,
-                'rider_phone'          => $record->rider_phone,
-                'company_cost'         => $record->company_cost ?? app(DispatchService::class)->expectedCostFor($record),
-                'notify'               => true,
+                'rider_name' => $record->rider_name,
+                'rider_phone' => $record->rider_phone,
+                'company_cost' => $record->company_cost ?? app(DispatchService::class)->expectedCostFor($record),
+                'notify' => true,
             ])
             ->visible(fn (Order $record) => in_array($record->status, DispatchService::ASSIGNABLE, true) && self::canDispatch($record))
             ->action(function (Order $record, array $data) {
@@ -189,8 +189,8 @@ class DispatchActions
                     Notification::make()
                         ->title(match ($reason) {
                             'already_recognized' => 'This order was already counted — nothing changed.',
-                            'no_account'         => 'This vendor has no active cash account to book it to.',
-                            default              => 'Could not record this payment. Try again; if it keeps failing, check the log.',
+                            'no_account' => 'This vendor has no active cash account to book it to.',
+                            default => 'Could not record this payment. Try again; if it keeps failing, check the log.',
                         })
                         ->warning()
                         ->send();

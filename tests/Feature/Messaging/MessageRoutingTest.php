@@ -1,8 +1,12 @@
 <?php
 
 use App\Filament\Vendor\Resources\Orders\Pages\ViewOrder as VendorViewOrder;
+use App\Models\Checkout;
 use App\Models\DeliveryMessage;
+use App\Models\LogisticsCompany;
+use App\Models\Order;
 use App\Models\PlatformMessagingSetting;
+use App\Models\Store;
 use App\Models\User;
 use App\Models\VendorNotificationSetting;
 use App\Services\Orders\DispatchService;
@@ -10,6 +14,7 @@ use App\Services\VendorRoles;
 use Database\Seeders\VendorPermissionsSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Session;
 use Livewire\Livewire;
 use Livewire\Volt\Volt;
 
@@ -19,7 +24,7 @@ require_once __DIR__.'/../Orders/Helpers.php';
 
 // Phase 5 routing: who each message goes to.
 
-function storekeeperAt(array $c, App\Models\Store $store, string $phone): User
+function storekeeperAt(array $c, Store $store, string $phone): User
 {
     (new VendorPermissionsSeeder)->run();
     VendorRoles::seedFor($c['vendor']);
@@ -33,7 +38,7 @@ function storekeeperAt(array $c, App\Models\Store $store, string $phone): User
     return $keeper;
 }
 
-function storekeeperAlertsFor(App\Models\Order $order)
+function storekeeperAlertsFor(Order $order)
 {
     return DeliveryMessage::where('order_id', $order->id)->where('recipient_type', 'storekeeper')->pluck('to_number')->all();
 }
@@ -152,7 +157,7 @@ it('sends one customer message at handover with the code, and the code appears n
 
 function LogisticsCompanyFor(): int
 {
-    return App\Models\LogisticsCompany::create(['vendor_id' => null, 'name' => 'Partner '.uniqid(), 'phone' => '08078888888', 'is_active' => true])->id;
+    return LogisticsCompany::create(['vendor_id' => null, 'name' => 'Partner '.uniqid(), 'phone' => '08078888888', 'is_active' => true])->id;
 }
 
 // ── Vendor page: message the rider ──────────────────────────────────────────
@@ -183,14 +188,14 @@ it('offers a "Get updates on WhatsApp" chat on the success screen, the order ref
     config(['messaging.automation_whatsapp' => '08012345678']);
     $c = ossVendor();
     $order = ossOrder($c, 'pay_on_delivery', 'confirmed', 1);
-    $checkout = App\Models\Checkout::create([
+    $checkout = Checkout::create([
         'reference' => $order->reference, 'customer_name' => 'Ada', 'customer_phone' => '08040000000',
         'shipping_address' => '1 Test Street', 'payment_method' => 'pay_on_delivery',
         'items_total' => 5000, 'delivery_fee' => 0, 'grand_total' => 5000,
     ]);
     $order->updateQuietly(['checkout_id' => $checkout->id]);
 
-    Illuminate\Support\Facades\Session::put('payment_success', $checkout->reference);
+    Session::put('payment_success', $checkout->reference);
 
     Volt::test('checkout')
         ->assertSee('Get updates on WhatsApp')
@@ -201,14 +206,14 @@ it('hides the WhatsApp button when no automation number is configured', function
     config(['messaging.automation_whatsapp' => null]);
     $c = ossVendor();
     $order = ossOrder($c, 'pay_on_delivery', 'confirmed', 1);
-    $checkout = App\Models\Checkout::create([
+    $checkout = Checkout::create([
         'reference' => $order->reference, 'customer_name' => 'Ada', 'customer_phone' => '08040000000',
         'shipping_address' => '1 Test Street', 'payment_method' => 'pay_on_delivery',
         'items_total' => 5000, 'delivery_fee' => 0, 'grand_total' => 5000,
     ]);
     $order->updateQuietly(['checkout_id' => $checkout->id]);
 
-    Illuminate\Support\Facades\Session::put('payment_success', $checkout->reference);
+    Session::put('payment_success', $checkout->reference);
 
     Volt::test('checkout')->assertDontSee('Get updates on WhatsApp');
 });

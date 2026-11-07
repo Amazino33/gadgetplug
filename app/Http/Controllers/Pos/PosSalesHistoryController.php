@@ -32,13 +32,13 @@ class PosSalesHistoryController extends Controller
     {
         $validated = $request->validate([
             'vendor_id' => 'required|integer',
-            'preset'    => ['nullable', Rule::in(array_keys(ReportPeriod::PRESETS))],
-            'from'      => 'nullable|date_format:Y-m-d',
-            'to'        => 'nullable|date_format:Y-m-d',
-            'method'    => ['nullable', Rule::in(CashierSalesHistory::FILTER_METHODS)],
-            'status'    => ['nullable', Rule::in(CashierSalesHistory::FILTER_STATUSES)],
-            'q'         => 'nullable|string|max:100',
-            'page'      => 'nullable|integer|min:1',
+            'preset' => ['nullable', Rule::in(array_keys(ReportPeriod::PRESETS))],
+            'from' => 'nullable|date_format:Y-m-d',
+            'to' => 'nullable|date_format:Y-m-d',
+            'method' => ['nullable', Rule::in(CashierSalesHistory::FILTER_METHODS)],
+            'status' => ['nullable', Rule::in(CashierSalesHistory::FILTER_STATUSES)],
+            'q' => 'nullable|string|max:100',
+            'page' => 'nullable|integer|min:1',
         ]);
 
         $user = $request->user();
@@ -52,14 +52,14 @@ class PosSalesHistoryController extends Controller
         // in Lagos and not an hour later.
         $period = ReportPeriod::fromFilters([
             'preset' => $validated['preset'] ?? 'today',
-            'from'   => $validated['from'] ?? null,
-            'to'     => $validated['to'] ?? null,
+            'from' => $validated['from'] ?? null,
+            'to' => $validated['to'] ?? null,
         ]);
 
         $filters = [
             'method' => $validated['method'] ?? null,
             'status' => $validated['status'] ?? null,
-            'q'      => $validated['q'] ?? null,
+            'q' => $validated['q'] ?? null,
         ];
 
         $page = $history->sales($vendorId, $user->id, $period->from, $period->to, $filters)
@@ -70,7 +70,7 @@ class PosSalesHistoryController extends Controller
 
         $sales = collect($page->items())->map(fn (PosSale $sale) => array_merge($sale->toArray(), [
             'business_date' => BusinessDate::of($sale->completed_at),
-            'cashier_name'  => $user->name,
+            'cashier_name' => $user->name,
         ]));
 
         // Only the days this page touches. The till keeps what it has already
@@ -84,19 +84,19 @@ class PosSalesHistoryController extends Controller
         return response()->json([
             'period' => [
                 'label' => $period->label,
-                'from'  => BusinessDate::of($period->from),
-                'to'    => BusinessDate::of($period->to),
+                'from' => BusinessDate::of($period->from),
+                'to' => BusinessDate::of($period->to),
             ],
             // The whole window, sent with the first page only: it does not
             // change as the cashier scrolls.
-            'summary'      => $page->currentPage() === 1
+            'summary' => $page->currentPage() === 1
                 ? $history->summary($vendorId, $user->id, $period->from, $period->to, $filters)
                 : null,
-            'days'         => $days,
-            'data'         => $sales->values(),
+            'days' => $days,
+            'data' => $sales->values(),
             'current_page' => $page->currentPage(),
-            'last_page'    => $page->lastPage(),
-            'total'        => $page->total(),
+            'last_page' => $page->lastPage(),
+            'total' => $page->total(),
         ]);
     }
 }

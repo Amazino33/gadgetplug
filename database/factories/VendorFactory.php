@@ -21,8 +21,8 @@ class VendorFactory extends Factory
     public function definition(): array
     {
         return [
-            'user_id'              => User::factory(),
-            'name'                 => fake()->unique()->company(),
+            'user_id' => User::factory(),
+            'name' => fake()->unique()->company(),
             // Matches the column's own default for newly created vendors —
             // an admin has to opt a vendor into online sales explicitly.
             'online_sales_enabled' => false,

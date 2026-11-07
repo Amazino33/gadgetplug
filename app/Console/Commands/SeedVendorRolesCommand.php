@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\Vendor;
 use App\Services\VendorRoles;
 use Illuminate\Console\Command;
+use Illuminate\Support\Collection;
 
 class SeedVendorRolesCommand extends Command
 {
@@ -22,6 +23,7 @@ class SeedVendorRolesCommand extends Command
 
         if ($vendors->isEmpty()) {
             $this->error('No matching vendor(s) found.');
+
             return self::FAILURE;
         }
 
@@ -31,10 +33,11 @@ class SeedVendorRolesCommand extends Command
         }
 
         $this->info('Done.');
+
         return self::SUCCESS;
     }
 
-    private function resolveVendor(string $identifier): \Illuminate\Support\Collection
+    private function resolveVendor(string $identifier): Collection
     {
         return Vendor::where('id', $identifier)
             ->orWhere('slug', $identifier)

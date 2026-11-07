@@ -43,9 +43,9 @@ class FeedCategories
             ->orderByDesc('products_count')
             ->get(['id', 'name', 'slug'])
             ->map(fn (Category $c) => [
-                'id'    => (int) $c->id,
-                'name'  => (string) $c->name,
-                'slug'  => (string) $c->slug,
+                'id' => (int) $c->id,
+                'name' => (string) $c->name,
+                'slug' => (string) $c->slug,
                 'count' => (int) $c->products_count,
             ])
             ->all();

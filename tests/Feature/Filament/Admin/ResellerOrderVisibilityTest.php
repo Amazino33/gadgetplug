@@ -4,6 +4,8 @@ use App\Filament\Resources\Orders\Pages\ListOrders;
 use App\Filament\Resources\Orders\Pages\ViewOrder;
 use App\Models\Affiliate;
 use App\Models\Category;
+use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\User;
 use App\Models\Vendor;
@@ -23,29 +25,29 @@ function actingAsSuperAdminForResellerOrders(): User
     return $admin;
 }
 
-function makeResellerOrderForVisibilityTest(): \App\Models\Order
+function makeResellerOrderForVisibilityTest(): Order
 {
     $user = User::factory()->create(['phone' => '08040000000']);
     $affiliate = Affiliate::findOrCreateForUser($user);
 
     WalletTransaction::create([
         'affiliate_id' => $affiliate->id,
-        'type'         => 'credit',
-        'amount'       => 5000,
-        'description'  => 'Seed credit',
+        'type' => 'credit',
+        'amount' => 5000,
+        'description' => 'Seed credit',
     ]);
 
-    $owner    = User::factory()->create();
-    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Reseller Visibility Store ' . uniqid()]);
-    $category = Category::create(['name' => 'Reseller Visibility Category ' . uniqid()]);
-    $product  = Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'name'           => 'Reseller Visibility Product',
-        'price'          => 2000,
+    $owner = User::factory()->create();
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Reseller Visibility Store '.uniqid()]);
+    $category = Category::create(['name' => 'Reseller Visibility Category '.uniqid()]);
+    $product = Product::create([
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'Reseller Visibility Product',
+        'price' => 2000,
         'reseller_discount' => 25.0,
         'stock_quantity' => 10,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
     return app(ResellerCheckoutService::class)->purchase(
@@ -88,34 +90,34 @@ test('the order detail page shows the reseller affiliate and the exact wallet de
 test('the reseller purchase section is hidden on a normal Paystack order', function () {
     $this->actingAs(actingAsSuperAdminForResellerOrders());
 
-    $owner    = User::factory()->create();
-    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Normal Order Store']);
+    $owner = User::factory()->create();
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Normal Order Store']);
     $category = Category::create(['name' => 'Normal Order Category']);
-    $product  = Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'name'           => 'Normal Order Product',
-        'price'          => 1000,
+    $product = Product::create([
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'Normal Order Product',
+        'price' => 1000,
         'stock_quantity' => 5,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
-    $order = \App\Models\Order::create([
-        'reference'        => 'GP-NORMAL-' . uniqid(),
-        'customer_name'    => 'Normal Buyer',
-        'customer_email'   => 'buyer@example.com',
-        'customer_phone'   => '08040000000',
+    $order = Order::create([
+        'reference' => 'GP-NORMAL-'.uniqid(),
+        'customer_name' => 'Normal Buyer',
+        'customer_email' => 'buyer@example.com',
+        'customer_phone' => '08040000000',
         'shipping_address' => 'Uyo, Akwa Ibom State — Normal Address',
-        'total_amount'     => 1000,
-        'status'           => 'paid',
-        'payment_method'   => 'paystack',
+        'total_amount' => 1000,
+        'status' => 'paid',
+        'payment_method' => 'paystack',
     ]);
 
-    \App\Models\OrderItem::create([
-        'order_id'   => $order->id,
+    OrderItem::create([
+        'order_id' => $order->id,
         'product_id' => $product->id,
-        'vendor_id'  => $vendor->id,
-        'quantity'   => 1,
+        'vendor_id' => $vendor->id,
+        'quantity' => 1,
         'unit_price' => 1000,
     ]);
 

@@ -22,7 +22,7 @@ class VendorActivity extends Activity
     {
         static::creating(function (self $activity) {
             $activity->vendor_id ??= $activity->resolveVendorId();
-            $activity->store_id  ??= $activity->resolveStoreId();
+            $activity->store_id ??= $activity->resolveStoreId();
         });
     }
 
@@ -93,6 +93,11 @@ class VendorActivity extends Activity
 
     protected function resolveStoreId(): ?int
     {
+        // When a Store itself is being deleted, referencing its deleted ID in a FK column violates DB integrity.
+        if ($this->event === 'deleted' && $this->subject instanceof Store) {
+            return null;
+        }
+
         $subject = $this->subject;
 
         if ($subject) {

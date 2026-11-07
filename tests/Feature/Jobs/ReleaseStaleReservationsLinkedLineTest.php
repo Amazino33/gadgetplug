@@ -20,10 +20,10 @@ uses(RefreshDatabase::class);
 function staleLinkedOrder(): array
 {
     $reseller = linkVendor('Stale Reseller');
-    $own      = linkProduct($reseller, price: 5000, stock: 10);
+    $own = linkProduct($reseller, price: 5000, stock: 10);
     $supplier = linkVendor('Stale Supplier');
-    $source   = linkProduct($supplier, price: 4000, stock: 6);
-    $link     = makeLink($reseller, $supplier);
+    $source = linkProduct($supplier, price: 4000, stock: 6);
+    $link = makeLink($reseller, $supplier);
 
     $listing = Product::create([
         'vendor_id' => $reseller->id, 'store_id' => $reseller->defaultStore->id,

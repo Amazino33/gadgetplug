@@ -17,22 +17,22 @@ uses(RefreshDatabase::class);
 
 function negativeReportContext(): array
 {
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
 
-    $owner  = User::factory()->create();
+    $owner = User::factory()->create();
     $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Negative Store', 'allow_negative_stock' => true]);
     VendorRoles::seedFor($vendor);
 
     $product = Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => Category::create(['name' => 'Drinks'])->id,
-        'name'           => 'Malt 33cl',
-        'base_unit'      => 'Bottle',
-        'price'          => 500,
-        'cost_price'     => 400,
+        'vendor_id' => $vendor->id,
+        'category_id' => Category::create(['name' => 'Drinks'])->id,
+        'name' => 'Malt 33cl',
+        'base_unit' => 'Bottle',
+        'price' => 500,
+        'cost_price' => 400,
         'stock_quantity' => 2,
-        'status'         => 'published',
-        'show_in_pos'    => true,
+        'status' => 'published',
+        'show_in_pos' => true,
     ]);
 
     return compact('owner', 'vendor', 'product');
@@ -59,11 +59,11 @@ test('a product sold below zero shows with what is owed and its estimated-cost s
 
     Sanctum::actingAs($ctx['owner']);
     $this->postJson('/api/pos/sales', [
-        'vendor_id'       => $ctx['vendor']->id,
-        'items'           => [['product_id' => $ctx['product']->id, 'product_name' => 'Malt 33cl', 'unit_price' => 500, 'quantity' => 5]],
-        'payment_method'  => 'cash',
+        'vendor_id' => $ctx['vendor']->id,
+        'items' => [['product_id' => $ctx['product']->id, 'product_name' => 'Malt 33cl', 'unit_price' => 500, 'quantity' => 5]],
+        'payment_method' => 'cash',
         'amount_tendered' => 2500,
-        'vat_rate'        => 0,
+        'vat_rate' => 0,
     ])->assertCreated();
 
     // Back from the till's API guard to the panel's.
@@ -80,16 +80,16 @@ test('a product sold below zero shows with what is owed and its estimated-cost s
 });
 
 test('another shop\'s negative stock is not shown', function () {
-    $mine  = negativeReportContext();
+    $mine = negativeReportContext();
     $other = negativeReportContext();
 
     Sanctum::actingAs($other['owner']);
     $this->postJson('/api/pos/sales', [
-        'vendor_id'       => $other['vendor']->id,
-        'items'           => [['product_id' => $other['product']->id, 'product_name' => 'Malt 33cl', 'unit_price' => 500, 'quantity' => 5]],
-        'payment_method'  => 'cash',
+        'vendor_id' => $other['vendor']->id,
+        'items' => [['product_id' => $other['product']->id, 'product_name' => 'Malt 33cl', 'unit_price' => 500, 'quantity' => 5]],
+        'payment_method' => 'cash',
         'amount_tendered' => 2500,
-        'vat_rate'        => 0,
+        'vat_rate' => 0,
     ])->assertCreated();
 
     auth()->shouldUse('web');

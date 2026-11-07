@@ -33,7 +33,7 @@ class VendorRoles
         'product_manager' => [
             'view_products', 'view_any_products', 'create_products', 'edit_products', 'delete_products',
             'import_products', 'export_products',
-            'view_order_items', 'view_any_order_items', 
+            'view_order_items', 'view_any_order_items',
             'manage_inventory',
         ],
         'order_manager' => [
@@ -111,9 +111,9 @@ class VendorRoles
         foreach (self::ROLES as $roleName => $permissionNames) {
             // Idempotent — skip if this vendor already has the role
             $role = Role::firstOrCreate([
-                'name'       => $roleName,
+                'name' => $roleName,
                 'guard_name' => 'web',
-                'team_id'    => $vendor->id,
+                'team_id' => $vendor->id,
             ]);
 
             $permissions = Permission::whereIn('name', $permissionNames)

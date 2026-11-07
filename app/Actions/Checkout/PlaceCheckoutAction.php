@@ -42,8 +42,8 @@ class PlaceCheckoutAction
         }
 
         return DB::transaction(function () use ($attributes, $byVendor, $orderStatus): Checkout {
-            $itemsTotal  = 0.0;
-            $subtotals   = [];
+            $itemsTotal = 0.0;
+            $subtotals = [];
 
             foreach ($byVendor as $vendorId => $vendorLines) {
                 $subtotals[$vendorId] = round(array_sum(array_map(
@@ -53,48 +53,48 @@ class PlaceCheckoutAction
                 $itemsTotal += $subtotals[$vendorId];
             }
 
-            $itemsTotal  = round($itemsTotal, 2);
+            $itemsTotal = round($itemsTotal, 2);
             $deliveryFee = round((float) ($attributes['delivery_fee'] ?? 0), 2);
 
             $checkout = Checkout::create(array_merge($attributes, [
-                'items_total'  => $itemsTotal,
+                'items_total' => $itemsTotal,
                 'delivery_fee' => $deliveryFee,
-                'grand_total'  => round($itemsTotal + $deliveryFee, 2),
+                'grand_total' => round($itemsTotal + $deliveryFee, 2),
             ]));
 
             $single = count($byVendor) === 1;
-            $n      = 0;
+            $n = 0;
 
             foreach ($byVendor as $vendorId => $vendorLines) {
                 $n++;
 
                 $order = Order::create([
-                    'checkout_id'      => $checkout->id,
-                    'user_id'          => $checkout->user_id,
+                    'checkout_id' => $checkout->id,
+                    'user_id' => $checkout->user_id,
                     // A single-vendor checkout's order shares the checkout's
                     // reference, so nothing a customer is told changes for the
                     // ordinary basket. A mixed basket's orders are -1, -2, …
-                    'reference'        => $single ? $checkout->reference : $checkout->reference.'-'.$n,
-                    'customer_name'    => $checkout->customer_name,
-                    'customer_email'   => $checkout->customer_email,
-                    'customer_phone'   => $checkout->customer_phone,
+                    'reference' => $single ? $checkout->reference : $checkout->reference.'-'.$n,
+                    'customer_name' => $checkout->customer_name,
+                    'customer_email' => $checkout->customer_email,
+                    'customer_phone' => $checkout->customer_phone,
                     'shipping_address' => $checkout->shipping_address,
                     'local_government' => $checkout->local_government,
-                    'total_amount'     => $subtotals[$vendorId],
-                    'status'           => $orderStatus,
-                    'payment_method'   => $checkout->payment_method,
-                    'fbp'              => $checkout->fbp,
-                    'fbc'              => $checkout->fbc,
+                    'total_amount' => $subtotals[$vendorId],
+                    'status' => $orderStatus,
+                    'payment_method' => $checkout->payment_method,
+                    'fbp' => $checkout->fbp,
+                    'fbc' => $checkout->fbc,
                 ]);
 
                 foreach ($vendorLines as $line) {
                     OrderItem::create([
-                        'order_id'   => $order->id,
+                        'order_id' => $order->id,
                         'product_id' => $line['product']->id,
-                        'vendor_id'  => $vendorId,
-                        'quantity'   => $line['quantity'],
+                        'vendor_id' => $vendorId,
+                        'quantity' => $line['quantity'],
                         'unit_price' => $line['unit_price'],
-                        'unit_cost'  => $line['unit_cost'],
+                        'unit_cost' => $line['unit_cost'],
                     ]);
                 }
             }

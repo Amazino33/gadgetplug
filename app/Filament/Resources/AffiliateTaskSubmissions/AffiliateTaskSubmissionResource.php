@@ -9,7 +9,6 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use UnitEnum;
 
 // Read-only-plus-actions: no create/edit form exists. Every state transition
 // happens through the approve/reject row actions, wired through
@@ -19,9 +18,11 @@ class AffiliateTaskSubmissionResource extends Resource
 {
     protected static ?string $model = AffiliateTaskSubmission::class;
 
-    protected static string|null|BackedEnum $navigationIcon  = 'heroicon-o-inbox-stack';
-    protected static ?string                $navigationLabel = 'Submissions';
-    protected static ?int                   $navigationSort  = 6;
+    protected static string|null|BackedEnum $navigationIcon = 'heroicon-o-inbox-stack';
+
+    protected static ?string $navigationLabel = 'Submissions';
+
+    protected static ?int $navigationSort = 6;
 
     public static function getNavigationGroup(): ?string
     {
@@ -45,9 +46,20 @@ class AffiliateTaskSubmissionResource extends Resource
         return 'warning';
     }
 
-    public static function canCreate(): bool { return false; }
-    public static function canEdit($record): bool { return false; }
-    public static function canDelete($record): bool { return false; }
+    public static function canCreate(): bool
+    {
+        return false;
+    }
+
+    public static function canEdit($record): bool
+    {
+        return false;
+    }
+
+    public static function canDelete($record): bool
+    {
+        return false;
+    }
 
     public static function getEloquentQuery(): Builder
     {

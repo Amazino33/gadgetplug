@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use App\Support\Quantity;
 use App\Casts\AsQuantity;
+use App\Support\Quantity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
@@ -18,10 +18,10 @@ class StockCostLayer extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'unit_cost'          => 'decimal:2',
-        'quantity_received'  => AsQuantity::class,
+        'unit_cost' => 'decimal:2',
+        'quantity_received' => AsQuantity::class,
         'quantity_remaining' => AsQuantity::class,
-        'received_at'        => 'datetime',
+        'received_at' => 'datetime',
     ];
 
     public function product(): BelongsTo

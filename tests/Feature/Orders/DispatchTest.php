@@ -2,6 +2,7 @@
 
 use App\Filament\Pages\Dashboard;
 use App\Filament\Resources\LogisticsCompanies\LogisticsCompanyResource;
+use App\Filament\Resources\LogisticsCompanies\Pages\ManageLogisticsCompanies;
 use App\Filament\Resources\Orders\OrderResource;
 use App\Filament\Resources\Orders\Pages\ListOrders as AdminListOrders;
 use App\Filament\Resources\Orders\Pages\ViewOrder as AdminViewOrder;
@@ -10,6 +11,7 @@ use App\Models\DeliveryMessage;
 use App\Models\DeliveryRule;
 use App\Models\FinancialLedgerEntry;
 use App\Models\InventoryLedger;
+use App\Models\Lga;
 use App\Models\LogisticsCompany;
 use App\Models\Order;
 use App\Models\ProductStoreStock;
@@ -25,6 +27,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Livewire;
+use Spatie\Activitylog\Models\Activity;
 
 uses(RefreshDatabase::class);
 
@@ -57,7 +60,7 @@ function platformCompany(array $over = []): LogisticsCompany
 function inUyoCheckout(Order $order, float $fee = 2500): Checkout
 {
     [$stateId, $lgaId] = checkoutLocation('Uyo');
-    DeliveryRule::setForLga(App\Models\Lga::find($lgaId), ['mode' => DeliveryRule::FEE, 'fee' => $fee, 'expected_cost' => 1800]);
+    DeliveryRule::setForLga(Lga::find($lgaId), ['mode' => DeliveryRule::FEE, 'fee' => $fee, 'expected_cost' => 1800]);
 
     $checkout = Checkout::create([
         'reference' => 'CK-'.uniqid(), 'customer_name' => $order->customer_name, 'customer_phone' => $order->customer_phone,
@@ -390,7 +393,7 @@ it('logs an override with its reason', function () {
     oss()->markDelivered($order, $c['admin'], 'Rider\'s phone died; customer confirmed by call');
 
     expect($order->fresh()->delivered_via)->toBe('override')
-        ->and(Spatie\Activitylog\Models\Activity::where('subject_id', $order->id)
+        ->and(Activity::where('subject_id', $order->id)
             ->where('subject_type', $order->getMorphClass())
             ->get()
             ->contains(fn ($a) => data_get($a->properties, 'attributes.delivered_override_reason') === 'Rider\'s phone died; customer confirmed by call'))->toBeTrue();
@@ -452,7 +455,7 @@ it('lists and creates only platform logistics companies', function () {
     $platform = platformCompany(['name' => 'GadgetPlug Partner']);
     actAsDispatcher(dispatcherUser());
 
-    Livewire::test(App\Filament\Resources\LogisticsCompanies\Pages\ManageLogisticsCompanies::class)
+    Livewire::test(ManageLogisticsCompanies::class)
         ->assertCanSeeTableRecords([$platform])
         ->assertCanNotSeeTableRecords([$vendorOwn])
         ->callAction('create', data: ['name' => 'New Partner', 'phone' => '08055556666', 'is_active' => true])

@@ -27,7 +27,7 @@ class CashUpRectification extends Model
     public const UPDATED_AT = null;
 
     protected $casts = [
-        'amount'     => 'decimal:2',
+        'amount' => 'decimal:2',
         'created_at' => 'datetime',
     ];
 
@@ -79,6 +79,7 @@ class CashUpRectification extends Model
     public const TENDERS = ['cash', 'card', 'bank_transfer', 'debt'];
 
     public const LEG_CASH = 'cash';
+
     public const LEG_TERMINAL = 'terminal';
 
     protected static function booted(): void

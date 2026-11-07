@@ -153,9 +153,9 @@ class ViewOrder extends ViewRecord
                     default => Notification::make()
                         ->title('Message not sent')
                         ->body(match ($message->provider_response['error'] ?? null) {
-                            'whatsapp_paused'   => 'WhatsApp sending is paused. Try SMS, or resume it on the WhatsApp page.',
+                            'whatsapp_paused' => 'WhatsApp sending is paused. Try SMS, or resume it on the WhatsApp page.',
                             'marketing_refused' => 'Promotional messages can\'t go out on WhatsApp.',
-                            default             => $message->provider_response['error'] ?? 'The provider did not accept it.',
+                            default => $message->provider_response['error'] ?? 'The provider did not accept it.',
                         })
                         ->danger()
                         ->send(),

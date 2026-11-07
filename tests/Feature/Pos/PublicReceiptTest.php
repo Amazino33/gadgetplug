@@ -14,13 +14,13 @@ uses(RefreshDatabase::class);
 
 function pubVendor(): array
 {
-    $owner  = User::factory()->create(['name' => 'Owner Person']);
+    $owner = User::factory()->create(['name' => 'Owner Person']);
     $vendor = Vendor::create([
-        'user_id'         => $owner->id,
-        'name'            => 'Zelink Tech',
-        'slug'            => 'zelink-pub',
+        'user_id' => $owner->id,
+        'name' => 'Zelink Tech',
+        'slug' => 'zelink-pub',
         'pos_vat_enabled' => true,
-        'pos_vat_rate'    => 7.5,
+        'pos_vat_rate' => 7.5,
     ]);
 
     $cashier = User::factory()->create(['name' => 'Grace Cashier']);
@@ -32,37 +32,37 @@ function pubVendor(): array
 function pubSale(array $data, array $overrides = []): PosSale
 {
     $sale = PosSale::create(array_merge([
-        'reference'       => 'POS-PUB' . fake()->unique()->numerify('####'),
-        'vendor_id'       => $data['vendor']->id,
-        'cashier_id'      => $data['cashier']->id,
-        'subtotal'        => 10000,
+        'reference' => 'POS-PUB'.fake()->unique()->numerify('####'),
+        'vendor_id' => $data['vendor']->id,
+        'cashier_id' => $data['cashier']->id,
+        'subtotal' => 10000,
         'discount_amount' => 0,
-        'vat_amount'      => 750,
-        'total'           => 10750,
-        'payment_method'  => 'cash',
+        'vat_amount' => 750,
+        'total' => 10750,
+        'payment_method' => 'cash',
         'amount_tendered' => 11000,
-        'change_given'    => 250,
-        'status'          => 'completed',
-        'completed_at'    => now(),
+        'change_given' => 250,
+        'status' => 'completed',
+        'completed_at' => now(),
     ], $overrides));
 
     $product = Product::create([
-        'vendor_id'      => $data['vendor']->id,
-        'category_id'    => Category::firstOrCreate(['name' => 'Pub Cat'])->id,
-        'name'           => 'Itel Power Go Pro',
-        'sku'            => 'ITL-PGP-' . fake()->unique()->numerify('###'),
-        'price'          => 5000,
+        'vendor_id' => $data['vendor']->id,
+        'category_id' => Category::firstOrCreate(['name' => 'Pub Cat'])->id,
+        'name' => 'Itel Power Go Pro',
+        'sku' => 'ITL-PGP-'.fake()->unique()->numerify('###'),
+        'price' => 5000,
         'stock_quantity' => 10,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
     PosSaleItem::create([
-        'pos_sale_id'  => $sale->id,
-        'product_id'   => $product->id,
+        'pos_sale_id' => $sale->id,
+        'product_id' => $product->id,
         'product_name' => 'Itel Power Go Pro',
-        'unit_price'   => 5000,
-        'quantity'     => 2,
-        'total'        => 10000,
+        'unit_price' => 5000,
+        'quantity' => 2,
+        'total' => 10000,
     ]);
 
     return $sale->fresh();
@@ -70,8 +70,8 @@ function pubSale(array $data, array $overrides = []): PosSale
 
 test('every sale is given an unguessable token automatically', function () {
     $data = pubVendor();
-    $a    = pubSale($data);
-    $b    = pubSale($data);
+    $a = pubSale($data);
+    $b = pubSale($data);
 
     expect($a->public_token)->not->toBeNull()
         ->and(strlen($a->public_token))->toBe(16)
@@ -93,11 +93,11 @@ test('the public page opens with no login and shows the sale', function () {
 // The paper can be photographed or left on a counter, so whoever holds it is
 // not necessarily who bought. This is the property the whole design rests on.
 test('the customer name and phone never reach the public page', function () {
-    $data     = pubVendor();
+    $data = pubVendor();
     $customer = PosCustomer::create([
         'vendor_id' => $data['vendor']->id,
-        'name'      => 'Ada Buyer',
-        'phone'     => '08031234567',
+        'name' => 'Ada Buyer',
+        'phone' => '08031234567',
     ]);
     $sale = pubSale($data, ['customer_id' => $customer->id]);
 
@@ -178,16 +178,16 @@ test('loyalty is absent unless the store switches it on', function () {
 test('marking the card reports real progress from the purchase history', function () {
     $data = pubVendor();
     VendorReceiptSetting::create([
-        'vendor_id'           => $data['vendor']->id,
-        'loyalty_enabled'     => true,
-        'loyalty_goal'        => 5,
+        'vendor_id' => $data['vendor']->id,
+        'loyalty_enabled' => true,
+        'loyalty_goal' => 5,
         'loyalty_reward_text' => 'a free phone case',
     ]);
 
     $customer = PosCustomer::create([
-        'vendor_id'          => $data['vendor']->id,
-        'name'               => 'Ada Buyer',
-        'phone'              => '08031234567',
+        'vendor_id' => $data['vendor']->id,
+        'name' => 'Ada Buyer',
+        'phone' => '08031234567',
         'total_transactions' => 3,
     ]);
     $sale = pubSale($data, ['customer_id' => $customer->id]);
@@ -195,13 +195,13 @@ test('marking the card reports real progress from the purchase history', functio
     $this->postJson(route('receipt.public.loyalty', $sale->public_token))
         ->assertOk()
         ->assertJson([
-            'claimed'  => true,
-            'visits'   => 3,
-            'goal'     => 5,
+            'claimed' => true,
+            'visits' => 3,
+            'goal' => 5,
             'position' => 3,
-            'to_go'    => 2,
-            'earned'   => false,
-            'reward'   => 'a free phone case',
+            'to_go' => 2,
+            'earned' => false,
+            'reward' => 'a free phone case',
         ]);
 
     expect($sale->fresh()->loyalty_claimed_at)->not->toBeNull();
@@ -210,15 +210,15 @@ test('marking the card reports real progress from the purchase history', functio
 test('a full card is reported as earned', function () {
     $data = pubVendor();
     VendorReceiptSetting::create([
-        'vendor_id'       => $data['vendor']->id,
+        'vendor_id' => $data['vendor']->id,
         'loyalty_enabled' => true,
-        'loyalty_goal'    => 5,
+        'loyalty_goal' => 5,
     ]);
 
     $customer = PosCustomer::create([
-        'vendor_id'          => $data['vendor']->id,
-        'name'               => 'Ada Buyer',
-        'phone'              => '08031234567',
+        'vendor_id' => $data['vendor']->id,
+        'name' => 'Ada Buyer',
+        'phone' => '08031234567',
         'total_transactions' => 10,
     ]);
     $sale = pubSale($data, ['customer_id' => $customer->id]);
@@ -232,15 +232,15 @@ test('a full card is reported as earned', function () {
 test('claiming twice does not move the stamp date again', function () {
     $data = pubVendor();
     VendorReceiptSetting::create([
-        'vendor_id'       => $data['vendor']->id,
+        'vendor_id' => $data['vendor']->id,
         'loyalty_enabled' => true,
-        'loyalty_goal'    => 5,
+        'loyalty_goal' => 5,
     ]);
 
     $customer = PosCustomer::create([
-        'vendor_id'          => $data['vendor']->id,
-        'name'               => 'Ada Buyer',
-        'phone'              => '08031234567',
+        'vendor_id' => $data['vendor']->id,
+        'name' => 'Ada Buyer',
+        'phone' => '08031234567',
         'total_transactions' => 2,
     ]);
     $sale = pubSale($data, ['customer_id' => $customer->id]);
@@ -257,7 +257,7 @@ test('claiming twice does not move the stamp date again', function () {
 test('a walk-in with no customer record is nudged rather than stamped', function () {
     $data = pubVendor();
     VendorReceiptSetting::create([
-        'vendor_id'       => $data['vendor']->id,
+        'vendor_id' => $data['vendor']->id,
         'loyalty_enabled' => true,
     ]);
 
@@ -271,11 +271,11 @@ test('a walk-in with no customer record is nudged rather than stamped', function
 test('the store banner and button appear when configured', function () {
     $data = pubVendor();
     VendorReceiptSetting::create([
-        'vendor_id'    => $data['vendor']->id,
+        'vendor_id' => $data['vendor']->id,
         'banner_image' => 'receipt-banners/promo.jpg',
-        'banner_link'  => 'https://example.com/promo',
-        'cta_label'    => 'Chat with us on WhatsApp',
-        'cta_link'     => 'https://wa.me/2348012345678',
+        'banner_link' => 'https://example.com/promo',
+        'cta_label' => 'Chat with us on WhatsApp',
+        'cta_link' => 'https://wa.me/2348012345678',
     ]);
 
     $sale = pubSale($data);

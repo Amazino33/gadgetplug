@@ -78,8 +78,8 @@ test('a correction can be recorded at the till, where the cartons are', function
 
     $this->postJson("/api/pos/procurements/{$delivery->id}/correct", [
         'vendor_id' => $ctx['vendor']->id,
-        'lines'     => [$item->id => ['quantity' => 10]],
-        'note'      => 'Two short',
+        'lines' => [$item->id => ['quantity' => 10]],
+        'note' => 'Two short',
     ])->assertOk()
         ->assertJsonPath('status', Procurement::STATUS_CHANGES_REQUESTED)
         ->assertJsonPath('awaiting_user_id', $ctx['keeper']->id);
@@ -100,7 +100,7 @@ test('a delivery sent back shows up for the person being waited on, not the othe
     Sanctum::actingAs($ctx['checker']);
     $this->postJson("/api/pos/procurements/{$delivery->id}/correct", [
         'vendor_id' => $ctx['vendor']->id,
-        'lines'     => [$item->id => ['quantity' => 10]],
+        'lines' => [$item->id => ['quantity' => 10]],
     ])->assertOk();
 
     // The approver has done their part; it is not theirs to act on any more.
@@ -128,7 +128,7 @@ test('the recorder accepts from the till and the stock lands at the verified fig
     Sanctum::actingAs($ctx['checker']);
     $this->postJson("/api/pos/procurements/{$delivery->id}/correct", [
         'vendor_id' => $ctx['vendor']->id,
-        'lines'     => [$item->id => ['quantity' => 10]],
+        'lines' => [$item->id => ['quantity' => 10]],
     ])->assertOk();
 
     Sanctum::actingAs($ctx['keeper']);

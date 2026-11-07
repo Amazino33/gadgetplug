@@ -18,7 +18,7 @@ class AffiliateReachBand extends Model
     protected $casts = [
         'min_reach' => 'integer',
         'max_reach' => 'integer',
-        'points'    => 'integer',
+        'points' => 'integer',
         'is_active' => 'boolean',
     ];
 

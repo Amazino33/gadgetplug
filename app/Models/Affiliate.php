@@ -16,7 +16,7 @@ class Affiliate extends Model implements HasMedia
     protected $guarded = [];
 
     protected $casts = [
-        'is_active'         => 'boolean',
+        'is_active' => 'boolean',
         'level_achieved_at' => 'datetime',
     ];
 

@@ -55,11 +55,11 @@ test('creating a level from the admin UI persists it correctly', function () {
 
     Livewire::test(CreateAffiliateLevel::class)
         ->fillForm([
-            'name'       => 'Gold',
-            'target'     => 200000,
+            'name' => 'Gold',
+            'target' => 200000,
             'rate_value' => 1.20,
             'sort_order' => 2,
-            'is_active'  => true,
+            'is_active' => true,
         ])
         ->call('create')
         ->assertHasNoFormErrors();

@@ -12,6 +12,7 @@ use App\Models\Vendor;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Spatie\Permission\Models\Role;
 
 uses(RefreshDatabase::class);
 
@@ -65,7 +66,7 @@ function actAsAutomationVendor(array $data): void
 function actAsAutomationAdmin(): void
 {
     $admin = User::factory()->create();
-    Spatie\Permission\Models\Role::firstOrCreate(['name' => 'super_admin', 'guard_name' => 'web', 'team_id' => null]);
+    Role::firstOrCreate(['name' => 'super_admin', 'guard_name' => 'web', 'team_id' => null]);
     setPermissionsTeamId(null);
     $admin->assignRole('super_admin');
 

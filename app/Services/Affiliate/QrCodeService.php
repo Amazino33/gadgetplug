@@ -54,7 +54,7 @@ class QrCodeService
         $svg = $this->renderSvg($url);
 
         $affiliate->addMediaFromString($svg)
-            ->usingFileName($key . '.svg')
+            ->usingFileName($key.'.svg')
             ->withCustomProperties(['qr_key' => $key, 'url' => $url])
             ->toMediaCollection('qr-codes');
 

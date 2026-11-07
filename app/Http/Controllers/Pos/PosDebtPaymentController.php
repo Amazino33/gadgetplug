@@ -24,9 +24,9 @@ class PosDebtPaymentController extends Controller
     {
         $request->validate([
             'vendor_id' => 'required|integer',
-            'amount'    => 'required|numeric|min:0.01',
-            'method'    => 'required|string|in:'.implode(',', PosDebtPayment::METHODS),
-            'note'      => 'nullable|string|max:255',
+            'amount' => 'required|numeric|min:0.01',
+            'method' => 'required|string|in:'.implode(',', PosDebtPayment::METHODS),
+            'note' => 'nullable|string|max:255',
         ]);
 
         $vendorId = (int) $request->vendor_id;
@@ -45,7 +45,7 @@ class PosDebtPaymentController extends Controller
         }
 
         return response()->json([
-            'payment'     => $payment->only(['id', 'method', 'amount', 'note', 'collected_at']),
+            'payment' => $payment->only(['id', 'method', 'amount', 'note', 'collected_at']),
             'outstanding' => app(CustomerDebtService::class)->outstanding($customer->id),
         ], 201);
     }

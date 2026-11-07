@@ -27,21 +27,21 @@ function movementsContext(): array
 function recordMovement(array $ctx, array $overrides = []): InventoryLedger
 {
     return InventoryLedger::create(array_merge([
-        'vendor_id'        => $ctx['vendor']->id,
-        'store_id'         => $ctx['store']->id,
-        'product_id'       => $ctx['product']->id,
-        'user_id'          => $ctx['owner']->id,
+        'vendor_id' => $ctx['vendor']->id,
+        'store_id' => $ctx['store']->id,
+        'product_id' => $ctx['product']->id,
+        'user_id' => $ctx['owner']->id,
         'transaction_type' => 'restock',
-        'quantity_change'  => 10,
-        'reference'        => 'REF-1',
-        'description'      => 'Opening delivery',
+        'quantity_change' => 10,
+        'reference' => 'REF-1',
+        'description' => 'Opening delivery',
     ], $overrides));
 }
 
 /** The modal body for one product, as the action renders it. */
 function movementsHtml(array $ctx, ?Product $product = null): string
 {
-    $widget = new InventoryTableWidget();
+    $widget = new InventoryTableWidget;
 
     $method = new ReflectionMethod($widget, 'buildStockMovementsTable');
     $method->setAccessible(true);

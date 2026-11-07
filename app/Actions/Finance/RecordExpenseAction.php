@@ -46,14 +46,14 @@ class RecordExpenseAction
             $vendorId, $category, $amount, $recordedBy, $account, $description, $storeId, $incurredAt
         ) {
             $expense = Expense::create([
-                'vendor_id'            => $vendorId,
-                'store_id'             => $storeId,
-                'category'             => $category,
-                'amount'               => round($amount, 2),
-                'description'          => $description,
-                'incurred_at'          => $incurredAt ?? now()->toDateString(),
+                'vendor_id' => $vendorId,
+                'store_id' => $storeId,
+                'category' => $category,
+                'amount' => round($amount, 2),
+                'description' => $description,
+                'incurred_at' => $incurredAt ?? now()->toDateString(),
                 'financial_account_id' => $account?->id,
-                'created_by'           => $recordedBy->id,
+                'created_by' => $recordedBy->id,
             ]);
 
             // Choosing an account is what "records this as paid" — the same rule

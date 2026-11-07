@@ -1,22 +1,29 @@
 <?php
 
+use App\Filament\Pages\Delivery\DeliveryStats;
+use App\Filament\Pages\Delivery\HubsTable;
+use App\Filament\Pages\Delivery\LgaRulesTable;
+use App\Filament\Pages\Delivery\StateRulesTable;
 use App\Filament\Pages\DeliverySettings;
+use App\Models\Affiliate;
 use App\Models\Checkout;
 use App\Models\DeliveryMessage;
 use App\Models\DeliveryRule;
 use App\Models\FinancialLedgerEntry;
 use App\Models\Lga;
+use App\Models\MessageTemplate;
 use App\Models\Order;
+use App\Models\ProductStoreStock;
 use App\Models\State;
 use App\Models\Store;
 use App\Models\User;
 use App\Models\Vendor;
-use App\Models\VendorNotificationSetting;
 use App\Models\WalletTransaction;
 use App\Services\Affiliate\ResellerCheckoutService;
 use App\Services\Delivery\DeliveryDistance;
 use App\Services\Delivery\DeliveryPricing;
 use App\Services\Delivery\DistanceBandPricer;
+use App\Services\Orders\OrderLocation;
 use Database\Factories\ProductFactory;
 use Database\Seeders\CatalogueEditorRoleSeeder;
 use Database\Seeders\DeliveryRulesSeeder;
@@ -25,6 +32,7 @@ use Database\Seeders\NigeriaLocationsSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Session;
 use Livewire\Livewire;
 use Livewire\Volt\Volt;
@@ -367,8 +375,8 @@ describe('the customer confirmation shows the delivery fee', function () {
     test('vendors\' stored copies of the template are switched to the new lines; customised ones are left alone', function () {
         $vendor = deliveryVendor();
         $old = "Hello\n\n*Your items*\n{{order_items}}\n\n*Total:* {{total}}\n*Payment:* {{payment_method}}";
-        $stored = App\Models\MessageTemplate::create(['vendor_id' => $vendor->id, 'key' => 'customer_received', 'recipient_type' => 'customer', 'channel' => 'whatsapp', 'body' => $old]);
-        $custom = App\Models\MessageTemplate::create(['vendor_id' => deliveryVendor()->id, 'key' => 'customer_received', 'recipient_type' => 'customer', 'channel' => 'whatsapp', 'body' => 'Custom {{order_items}}']);
+        $stored = MessageTemplate::create(['vendor_id' => $vendor->id, 'key' => 'customer_received', 'recipient_type' => 'customer', 'channel' => 'whatsapp', 'body' => $old]);
+        $custom = MessageTemplate::create(['vendor_id' => deliveryVendor()->id, 'key' => 'customer_received', 'recipient_type' => 'customer', 'channel' => 'whatsapp', 'body' => 'Custom {{order_items}}']);
 
         (require database_path('migrations/2026_10_21_120000_add_payment_summary_to_customer_received_template.php'))->up();
 
@@ -385,7 +393,7 @@ describe('reseller wallet purchases are atomic', function () {
         $short = ProductFactory::new()->withPhoto()->create(['vendor_id' => $b->id, 'store_id' => $b->defaultStore->id, 'price' => 1000, 'stock_quantity' => 0]);
 
         $user = User::factory()->create(['phone' => '08040000000']);
-        $affiliate = App\Models\Affiliate::findOrCreateForUser($user);
+        $affiliate = Affiliate::findOrCreateForUser($user);
         WalletTransaction::create(['affiliate_id' => $affiliate->id, 'type' => 'credit', 'amount' => 50000, 'description' => 'Top-up']);
 
         expect(fn () => app(ResellerCheckoutService::class)->purchase(
@@ -397,7 +405,7 @@ describe('reseller wallet purchases are atomic', function () {
         expect(Checkout::count())->toBe(0)
             ->and(Order::count())->toBe(0)
             ->and(WalletTransaction::where('type', 'debit')->count())->toBe(0)
-            ->and(App\Models\ProductStoreStock::where('product_id', $ok->id)->value('reserved'))->toBe(0);
+            ->and(ProductStoreStock::where('product_id', $ok->id)->value('reserved'))->toBe(0);
     });
 });
 
@@ -507,7 +515,7 @@ describe('the Delivery settings page', function () {
 
 describe('legacy checkouts', function () {
     test('free-text areas map to an LGA; anything unrecognisable is reported, not guessed', function () {
-        Illuminate\Support\Facades\Log::spy();
+        Log::spy();
 
         $make = fn (string $area) => Checkout::create([
             'reference' => 'GP-OLD-'.uniqid(), 'customer_name' => 'Old', 'customer_phone' => '08011112222',
@@ -524,7 +532,7 @@ describe('legacy checkouts', function () {
             // Re-running is safe: still exactly 37 / 774.
             ->and(State::count())->toBe(37)->and(Lga::count())->toBe(774);
 
-        Illuminate\Support\Facades\Log::shouldHaveReceived('info')
+        Log::shouldHaveReceived('info')
             ->withArgs(fn ($line) => str_contains($line, 'Unmapped: "Atlantis" ×1'))
             ->once();
     });
@@ -557,7 +565,7 @@ describe('Delivery settings, redesigned', function () {
             ->assertDontSee('NGN 1', false)
             ->assertDontSee('1,500.00', false);
 
-        expect(App\Filament\Pages\Delivery\DeliveryStats::summary())->toMatchArray(['paid' => 1, 'pinned' => 1]);
+        expect(DeliveryStats::summary())->toMatchArray(['paid' => 1, 'pinned' => 1]);
     });
 
     test('tapping an LGA on the map opens its rule, saves it, and resets it to the state default', function () {
@@ -581,7 +589,7 @@ describe('Delivery settings, redesigned', function () {
     test('a store is pinned from the hubs table, and a pin outside Nigeria is refused', function () {
         $store = deliveryVendor()->defaultStore;
 
-        Livewire::test(App\Filament\Pages\Delivery\HubsTable::class)
+        Livewire::test(HubsTable::class)
             ->callTableAction('editCoordinates', $store, ['latitude' => 5.0377, 'longitude' => 7.9128])
             ->assertHasNoTableActionErrors()
             ->assertDispatched('delivery-rules-changed');
@@ -589,7 +597,7 @@ describe('Delivery settings, redesigned', function () {
         expect([(float) $store->fresh()->latitude, (float) $store->fresh()->longitude])->toBe([5.0377, 7.9128]);
 
         // Latitude and longitude swapped: not in Nigeria.
-        Livewire::test(App\Filament\Pages\Delivery\HubsTable::class)
+        Livewire::test(HubsTable::class)
             ->callTableAction('pinOnMap', $store, ['latitude' => 7.9128, 'longitude' => 51.5])
             ->assertHasTableActionErrors(['longitude']);
 
@@ -606,7 +614,7 @@ describe('Delivery settings, redesigned', function () {
         $pinned->update(['latitude' => 5.03, 'longitude' => 7.91]);
         $unpinned = deliveryVendor()->defaultStore;
 
-        Livewire::test(App\Filament\Pages\Delivery\HubsTable::class)
+        Livewire::test(HubsTable::class)
             ->filterTable('pinned', true)
             ->assertCanSeeTableRecords([$pinned])
             ->assertCanNotSeeTableRecords([$unpinned])
@@ -619,7 +627,7 @@ describe('Delivery settings, redesigned', function () {
         $akwaIbom = state('Akwa Ibom');
         $picked = [lga('Uyo'), lga('Eket'), lga('Abak')];
 
-        Livewire::test(App\Filament\Pages\Delivery\LgaRulesTable::class, ['stateId' => $akwaIbom->id])
+        Livewire::test(LgaRulesTable::class, ['stateId' => $akwaIbom->id])
             ->callTableBulkAction('setRule', $picked, ['mode' => 'fee', 'fee' => 2000, 'expected_cost' => 1500, 'delivery_days' => '2 days'])
             ->assertHasNoTableBulkActionErrors();
 
@@ -627,7 +635,7 @@ describe('Delivery settings, redesigned', function () {
             expect(app(DeliveryPricing::class)->quote($lga))->toMatchObject(['mode' => 'fee', 'fee' => 2000.0, 'source' => 'lga']);
         }
 
-        Livewire::test(App\Filament\Pages\Delivery\LgaRulesTable::class, ['stateId' => $akwaIbom->id])
+        Livewire::test(LgaRulesTable::class, ['stateId' => $akwaIbom->id])
             ->assertTableBulkActionExists('clearOverrides', fn ($action) => $action->isConfirmationRequired())
             ->callTableBulkAction('clearOverrides', [$picked[0], $picked[1]]);
 
@@ -638,7 +646,7 @@ describe('Delivery settings, redesigned', function () {
     test('the rules table counts delivered LGAs per state and finds a state by an LGA name', function () {
         DeliveryRule::setForLga(lga('Uyo'), ['mode' => 'fee', 'fee' => 1500]);
 
-        Livewire::test(App\Filament\Pages\Delivery\StateRulesTable::class)
+        Livewire::test(StateRulesTable::class)
             ->searchTable('Eket')
             ->assertCanSeeTableRecords([state('Akwa Ibom')])
             ->assertCanNotSeeTableRecords([state('Lagos')])
@@ -676,9 +684,9 @@ describe('Delivery settings, redesigned', function () {
         $this->actingAs(User::factory()->create());
 
         // A 403, which the app turns into a redirect away (bootstrap/app.php).
-        Livewire::test(App\Filament\Pages\Delivery\HubsTable::class)->assertRedirect()->assertDontSee('Store locations');
-        Livewire::test(App\Filament\Pages\Delivery\StateRulesTable::class)->assertRedirect()->assertDontSee('Rules by state');
-        Livewire::test(App\Filament\Pages\Delivery\LgaRulesTable::class, ['stateId' => state('Lagos')->id])->assertRedirect();
+        Livewire::test(HubsTable::class)->assertRedirect()->assertDontSee('Store locations');
+        Livewire::test(StateRulesTable::class)->assertRedirect()->assertDontSee('Rules by state');
+        Livewire::test(LgaRulesTable::class, ['stateId' => state('Lagos')->id])->assertRedirect();
     });
 });
 
@@ -713,7 +721,7 @@ describe('the customer\'s shared location at checkout', function () {
             ->and($checkout->customer_longitude)->toBe(3.3947)
             ->and($checkout->customer_location_accuracy)->toBe(18)
             ->and((float) $checkout->delivery_fee)->toBe(1500.0)
-            ->and(app(App\Services\Orders\OrderLocation::class)->mismatched($checkout->orders()->first()))->toBeTrue();
+            ->and(app(OrderLocation::class)->mismatched($checkout->orders()->first()))->toBeTrue();
     });
 
     test('a location outside Nigeria is left off, and the checkout still goes through', function () {

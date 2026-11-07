@@ -83,7 +83,7 @@ class AffiliateLevelProgressionService
         if ($qualifyingLevel->sort_order > $currentSortOrder) {
             $affiliate->update([
                 'affiliate_level_id' => $qualifyingLevel->id,
-                'level_achieved_at'  => now(),
+                'level_achieved_at' => now(),
             ]);
         }
     }

@@ -34,15 +34,15 @@ final class DeliveryQuote
     public function snapshot(): array
     {
         return [
-            'mode'          => $this->mode,
-            'fee'           => $this->fee,
+            'mode' => $this->mode,
+            'fee' => $this->fee,
             'expected_cost' => $this->expectedCost,
             'delivery_days' => $this->deliveryDays,
-            'rule_id'       => $this->rule?->id,
-            'source'        => $this->source,
-            'lga'           => $this->lga->name,
-            'state'         => $this->lga->state?->name,
-            'distance_km'   => $this->distanceKm,
+            'rule_id' => $this->rule?->id,
+            'source' => $this->source,
+            'lga' => $this->lga->name,
+            'state' => $this->lga->state?->name,
+            'distance_km' => $this->distanceKm,
             'distance_kind' => 'straight_line',
         ];
     }

@@ -32,7 +32,7 @@ class VendorInviteMail extends Mailable
             markdown: 'emails.vendor-invite',
             with: [
                 'vendorName' => $this->vendor->name,
-                'inviteUrl'  => route('vendor.invite.accept', ['token' => $this->token]),
+                'inviteUrl' => route('vendor.invite.accept', ['token' => $this->token]),
             ],
         );
     }

@@ -9,18 +9,23 @@ use App\Filament\Vendor\Widgets\InventoryTableWidget;
 use App\Filament\Vendor\Widgets\StockMovementChart;
 use App\Models\Store;
 use App\Services\ActiveStore;
+use BackedEnum;
 use Filament\Pages\Page;
 use Illuminate\Support\Collection;
-use BackedEnum;
 
 class InventoryPage extends Page
 {
     protected static string|null|\UnitEnum $navigationGroup = 'Inventory';
-    protected static null|string|BackedEnum $navigationIcon  = 'heroicon-o-clipboard-document-list';
+
+    protected static null|string|BackedEnum $navigationIcon = 'heroicon-o-clipboard-document-list';
+
     protected static ?string $navigationLabel = 'Inventory';
-    protected static ?string $title           = 'Inventory & Stock Evaluation';
+
+    protected static ?string $title = 'Inventory & Stock Evaluation';
+
     protected static ?int $navigationSort = 1;
-    protected string  $view            = 'filament.vendor.pages.inventory';
+
+    protected string $view = 'filament.vendor.pages.inventory';
 
     /**
      * Which branch this screen is reporting on. Null means every branch the

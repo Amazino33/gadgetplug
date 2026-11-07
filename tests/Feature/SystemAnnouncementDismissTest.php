@@ -10,12 +10,12 @@ uses(RefreshDatabase::class);
 function dismissibleAnnouncement(array $attrs = []): SystemAnnouncement
 {
     return SystemAnnouncement::create(array_merge([
-        'title'           => 'Make sure you record all your sales including the Kitchen',
-        'message'         => '<p>All records needs to be recorded.</p>',
-        'target_group'    => 'all',
-        'is_dismissible'  => true,
+        'title' => 'Make sure you record all your sales including the Kitchen',
+        'message' => '<p>All records needs to be recorded.</p>',
+        'target_group' => 'all',
+        'is_dismissible' => true,
         'requires_action' => false,
-        'is_active'       => true,
+        'is_active' => true,
     ], $attrs));
 }
 

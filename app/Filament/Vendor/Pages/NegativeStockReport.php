@@ -88,9 +88,9 @@ class NegativeStockReport extends Page
             ]);
 
         return [
-            'rows'            => $rows,
+            'rows' => $rows,
             'estimatedCounts' => $estimatedCounts,
-            'estimatedSales'  => $estimatedSales,
+            'estimatedSales' => $estimatedSales,
         ];
     }
 

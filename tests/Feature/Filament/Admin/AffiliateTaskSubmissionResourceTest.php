@@ -5,9 +5,9 @@ use App\Filament\Resources\AffiliateTaskSubmissions\Pages\ListAffiliateTaskSubmi
 use App\Models\Affiliate;
 use App\Models\AffiliateTask;
 use App\Models\AffiliateTaskSubmission;
+use App\Models\PlugPointTransaction;
 use App\Models\User;
 use App\Models\Vendor;
-use App\Models\PlugPointTransaction;
 use App\Services\Affiliate\AffiliateTaskService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -27,11 +27,11 @@ function makeReviewQueueSubmission(): AffiliateTaskSubmission
 {
     $affiliate = Affiliate::findOrCreateForUser(User::factory()->create());
     $task = AffiliateTask::create([
-        'name'               => 'Post to Facebook',
-        'task_type'          => 'manual',
-        'verification_type'  => 'manual',
-        'points_reward'      => 500,
-        'is_active'          => true,
+        'name' => 'Post to Facebook',
+        'task_type' => 'manual',
+        'verification_type' => 'manual',
+        'points_reward' => 500,
+        'is_active' => true,
     ]);
 
     return app(AffiliateTaskService::class)->submit($task, $affiliate, 'Check my post');
@@ -54,8 +54,8 @@ test('a regular vendor owner cannot access the task submissions resource', funct
 
 test('the resource has no create, edit, or delete capability — only approve/reject actions', function () {
     expect(AffiliateTaskSubmissionResource::canCreate())->toBeFalse()
-        ->and(AffiliateTaskSubmissionResource::canEdit(new AffiliateTaskSubmission()))->toBeFalse()
-        ->and(AffiliateTaskSubmissionResource::canDelete(new AffiliateTaskSubmission()))->toBeFalse();
+        ->and(AffiliateTaskSubmissionResource::canEdit(new AffiliateTaskSubmission))->toBeFalse()
+        ->and(AffiliateTaskSubmissionResource::canDelete(new AffiliateTaskSubmission))->toBeFalse();
 });
 
 test('the navigation badge shows the count of pending submissions', function () {

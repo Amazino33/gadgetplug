@@ -28,28 +28,28 @@ function recoveryContext(): array
     $category = Category::firstOrCreate(['name' => 'Chargers']);
 
     $product = Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'name'           => 'SHPLUS 60W Charger',
-        'price'          => 5300,
-        'cost_price'     => 2570,
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'SHPLUS 60W Charger',
+        'price' => 5300,
+        'cost_price' => 2570,
         'stock_quantity' => 10,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
     $line = AuditSession::create([
-        'vendor_id'        => $vendor->id,
-        'product_id'       => $product->id,
-        'system_quantity'  => 10,
+        'vendor_id' => $vendor->id,
+        'product_id' => $product->id,
+        'system_quantity' => 10,
         'storekeeper_a_id' => $staff->id,
-        'count_a'          => 7,
+        'count_a' => 7,
         'storekeeper_b_id' => $owner->id,
-        'count_b'          => 7,
-        'status'           => 'verified',
+        'count_b' => 7,
+        'status' => 'verified',
     ]);
 
     $service = app(ShortageCaseService::class);
-    $case    = $service->openForCountLine($line);
+    $case = $service->openForCountLine($line);
     $service->reassign($case, $staff->id);
 
     return compact('owner', 'staff', 'vendor', 'product', 'case', 'service');
@@ -126,9 +126,9 @@ it('allocates recovery to cost before margin', function () {
 
     expect($c['service']->allocation($case->fresh()))
         ->toMatchArray([
-            'recovered_cost'     => 5000.0,
-            'recovered_margin'   => 0.0,
-            'unrecovered_cost'   => 2710.0,
+            'recovered_cost' => 5000.0,
+            'recovered_margin' => 0.0,
+            'unrecovered_cost' => 2710.0,
             'unrecovered_margin' => 8190.0,
         ]);
 });
@@ -141,7 +141,7 @@ it('spills into margin only once cost is whole', function () {
 
     expect($c['service']->allocation($case->fresh()))
         ->toMatchArray([
-            'recovered_cost'   => 7710.0,
+            'recovered_cost' => 7710.0,
             'recovered_margin' => 2290.0,
         ]);
 });
@@ -156,7 +156,7 @@ it('moves only the unrecovered cost to loss and closes the case', function () {
     $c['service']->convertToWriteOff($case->fresh(), 'wo:1', $c['owner']->id, 'Left the company.');
 
     $fresh = $case->fresh();
-    $row   = app(ShrinkageReadModel::class)->forCase($fresh);
+    $row = app(ShrinkageReadModel::class)->forCase($fresh);
 
     expect($fresh->status)->toBe('written_off')
         ->and($c['service']->outstandingFor($fresh))->toBe(0.0)
@@ -226,8 +226,8 @@ it('labels the direction of every P&L figure', function () {
     expect(app(ShrinkageReadModel::class)->forVendor($c['vendor']->id)['direction'])
         ->toBe([
             'shrinkage_loss_at_cost' => 'out',
-            'recovered_cost'         => 'in',
-            'recovered_margin'       => 'in',
+            'recovered_cost' => 'in',
+            'recovered_margin' => 'in',
         ]);
 });
 

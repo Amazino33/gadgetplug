@@ -5,6 +5,7 @@ use App\Models\PosSession;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
+use Spatie\Activitylog\Models\Activity;
 
 require_once __DIR__.'/Helpers.php';
 
@@ -147,7 +148,7 @@ test('a refresh measures the count against every sale of its own day', function 
         ->and((float) $session->cash_variance)->toBe(0.0);
 
     // What was there before is kept whole, so it can be put back exactly.
-    $log = Spatie\Activitylog\Models\Activity::where('subject_id', $session->id)->latest('id')->first();
+    $log = Activity::where('subject_id', $session->id)->latest('id')->first();
     expect($log->properties['before']['expected_cash'])->toBe('20000.00')
         ->and($log->properties['before'])->toHaveKey('breakdown');
 });

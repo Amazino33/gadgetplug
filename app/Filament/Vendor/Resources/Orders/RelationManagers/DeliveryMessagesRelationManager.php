@@ -42,18 +42,18 @@ class DeliveryMessagesRelationManager extends RelationManager
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
                         'sent', 'link_generated' => 'success',
-                        'queued'                 => 'gray',
-                        'failed'                 => 'danger',
-                        'held'                   => 'warning',
-                        default                  => 'gray',
+                        'queued' => 'gray',
+                        'failed' => 'danger',
+                        'held' => 'warning',
+                        default => 'gray',
                     })
                     ->formatStateUsing(fn (string $state) => match ($state) {
                         'link_generated' => 'Link Generated',
                         // WhatsApp paused: goes out when an admin resumes.
-                        'held'           => 'Held',
+                        'held' => 'Held',
                         // Sent as part of a combined message to the same number.
-                        'merged'         => 'Combined',
-                        default          => ucfirst($state),
+                        'merged' => 'Combined',
+                        default => ucfirst($state),
                     }),
 
                 TextColumn::make('sentBy.name')
@@ -77,10 +77,10 @@ class DeliveryMessagesRelationManager extends RelationManager
                         $result = app(MessagingService::class)->send($record);
 
                         $notification = Notification::make()->title(match ($result->status) {
-                            'sent'           => 'Message resent',
+                            'sent' => 'Message resent',
                             'link_generated' => 'WhatsApp link regenerated — tap to send',
-                            'failed'         => 'Resend failed',
-                            default          => 'Resend attempted',
+                            'failed' => 'Resend failed',
+                            default => 'Resend attempted',
                         });
 
                         $result->status === 'failed' ? $notification->danger()->send() : $notification->success()->send();

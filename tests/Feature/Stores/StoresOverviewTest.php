@@ -3,6 +3,8 @@
 use App\Filament\Vendor\Pages\StoreSelector;
 use App\Filament\Vendor\Pages\StoresOverview;
 use App\Models\Category;
+use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\PosSale;
 use App\Models\PosSaleItem;
 use App\Models\Product;
@@ -11,9 +13,11 @@ use App\Models\Store;
 use App\Models\User;
 use App\Models\Vendor;
 use App\Services\VendorRoles;
+use Database\Seeders\VendorPermissionsSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Spatie\Permission\Models\Role;
 
 uses(RefreshDatabase::class);
 
@@ -21,20 +25,20 @@ function overviewVendor(): Vendor
 {
     return Vendor::create([
         'user_id' => User::factory()->create()->id,
-        'name'    => 'Overview Vendor '.uniqid(),
+        'name' => 'Overview Vendor '.uniqid(),
     ]);
 }
 
 function overviewProduct(Vendor $vendor, Store $store, int $qty, ?float $cost = 400.0, float $price = 1000.0): Product
 {
     $product = Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => Category::create(['name' => 'Cat '.uniqid()])->id,
-        'name'           => 'Overview Product '.uniqid(),
-        'price'          => $price,
-        'cost_price'     => $cost,
+        'vendor_id' => $vendor->id,
+        'category_id' => Category::create(['name' => 'Cat '.uniqid()])->id,
+        'name' => 'Overview Product '.uniqid(),
+        'price' => $price,
+        'cost_price' => $cost,
         'stock_quantity' => 0,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
     if ($store->id === $vendor->defaultStore->id) {
@@ -52,7 +56,7 @@ function overviewTillSale(Vendor $vendor, Store $store, Product $product, int $q
     $sale = PosSale::create([
         'reference' => 'POS-'.strtoupper(uniqid()),
         'vendor_id' => $vendor->id,
-        'store_id'  => $store->id,
+        'store_id' => $store->id,
         'cashier_id' => $vendor->user_id,
         'subtotal' => $qty * $unit, 'discount_amount' => 0, 'vat_amount' => 0, 'total' => $qty * $unit,
         'payment_method' => 'cash', 'status' => 'completed', 'completed_at' => now(),
@@ -131,13 +135,13 @@ test('the roll-up names sales it could not attribute to any store', function () 
 
     // A recognised line with no allocation — it counts vendor-wide and for no
     // branch, which is the gap the page discloses.
-    $order = App\Models\Order::create([
+    $order = Order::create([
         'reference' => 'ORD-'.strtoupper(uniqid()),
         'customer_name' => 'B', 'customer_email' => 'b@example.com',
         'customer_phone' => '08040000000', 'shipping_address' => 'Uyo',
         'total_amount' => 3000, 'status' => 'delivered', 'payment_method' => 'pay_on_delivery',
     ]);
-    App\Models\OrderItem::create([
+    OrderItem::create([
         'order_id' => $order->id, 'product_id' => $product->id,
         'vendor_id' => $vendor->id, 'quantity' => 3, 'unit_price' => 1000,
     ]);
@@ -160,7 +164,7 @@ test('an owner may open the roll-up', function () {
 });
 
 test('a non-owner member may not open the roll-up at all', function () {
-    (new Database\Seeders\VendorPermissionsSeeder)->run();
+    (new VendorPermissionsSeeder)->run();
 
     $vendor = overviewVendor();
     VendorRoles::seedFor($vendor);
@@ -184,7 +188,7 @@ test('a super admin may open the roll-up', function () {
     // super_admin is a global role, not a vendor team one, so it is created
     // with no team context.
     setPermissionsTeamId(null);
-    Spatie\Permission\Models\Role::findOrCreate('super_admin', 'web');
+    Role::findOrCreate('super_admin', 'web');
     $admin->assignRole('super_admin');
 
     actAsOverview($vendor, $admin);
@@ -232,7 +236,7 @@ test('a store card shows what that branch sold today, online and over the counte
 });
 
 test('a member sees only their own store on the grid, with its own sales', function () {
-    (new Database\Seeders\VendorPermissionsSeeder)->run();
+    (new VendorPermissionsSeeder)->run();
 
     $vendor = overviewVendor();
     $branch = Store::create(['vendor_id' => $vendor->id, 'name' => 'Other Branch']);

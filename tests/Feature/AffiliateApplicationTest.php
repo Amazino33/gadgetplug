@@ -12,7 +12,7 @@ test('a user with no application sees the form and can submit one', function () 
     $this->actingAs($user);
 
     $state = State::first() ?? State::create(['name' => 'Akwa Ibom']);
-    $lga   = Lga::where('state_id', $state->id)->first() ?? Lga::create(['name' => 'Uyo', 'state_id' => $state->id]);
+    $lga = Lga::where('state_id', $state->id)->first() ?? Lga::create(['name' => 'Uyo', 'state_id' => $state->id]);
 
     Volt::test('pages.account.affiliate-apply')
         ->set('category', 'student')
@@ -50,7 +50,7 @@ test('submission without consent or without a platform fails validation', functi
     $this->actingAs($user);
 
     $state = State::first() ?? State::create(['name' => 'Akwa Ibom']);
-    $lga   = Lga::where('state_id', $state->id)->first() ?? Lga::create(['name' => 'Uyo', 'state_id' => $state->id]);
+    $lga = Lga::where('state_id', $state->id)->first() ?? Lga::create(['name' => 'Uyo', 'state_id' => $state->id]);
 
     // Missing consent
     Volt::test('pages.account.affiliate-apply')
@@ -90,10 +90,10 @@ test('submission without consent or without a platform fails validation', functi
 test('a user with a pending application sees the status banner, not the form', function () {
     $user = User::factory()->create();
     AffiliateApplication::create([
-        'user_id'  => $user->id,
+        'user_id' => $user->id,
         'whatsapp' => '+2348000000000',
-        'reason'   => 'Already applied, waiting on review, this text is long enough.',
-        'status'   => 'pending',
+        'reason' => 'Already applied, waiting on review, this text is long enough.',
+        'status' => 'pending',
     ]);
     $this->actingAs($user);
 
@@ -106,11 +106,11 @@ test('a user with a pending application sees the status banner, not the form', f
 test('a rejected application shows the reason and allows reapplying', function () {
     $user = User::factory()->create();
     AffiliateApplication::create([
-        'user_id'      => $user->id,
-        'whatsapp'     => '+2348000000000',
-        'reason'       => 'First attempt, long enough to pass the minimum length validation.',
-        'status'       => 'rejected',
-        'admin_notes'  => 'Not enough audience reach yet.',
+        'user_id' => $user->id,
+        'whatsapp' => '+2348000000000',
+        'reason' => 'First attempt, long enough to pass the minimum length validation.',
+        'status' => 'rejected',
+        'admin_notes' => 'Not enough audience reach yet.',
     ]);
     $this->actingAs($user);
 

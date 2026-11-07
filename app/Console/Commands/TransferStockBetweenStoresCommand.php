@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Support\Quantity;
 use App\Actions\Inventory\AdjustStockAction;
 use App\Models\Product;
 use App\Models\ProductStoreStock;
 use App\Models\Store;
+use App\Support\Quantity;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Throwable;
@@ -50,9 +50,9 @@ class TransferStockBetweenStoresCommand extends Command
     public function handle(): int
     {
         $vendorId = (int) $this->argument('vendor');
-        $fromId   = (int) $this->argument('from');
-        $toId     = $this->option('to') !== null ? (int) $this->option('to') : null;
-        $onlyId   = $this->option('product') !== null ? (int) $this->option('product') : null;
+        $fromId = (int) $this->argument('from');
+        $toId = $this->option('to') !== null ? (int) $this->option('to') : null;
+        $onlyId = $this->option('product') !== null ? (int) $this->option('product') : null;
 
         if ($toId !== null && $toId === $fromId) {
             $this->error('Source and destination are the same store.');
@@ -136,15 +136,16 @@ class TransferStockBetweenStoresCommand extends Command
                 ? "Stock removed from store #{$fromId} — applied to the wrong branch"
                 : "Stock moved from store #{$fromId} to #{$toId} — applied to the wrong branch");
 
-        $adjust  = app(AdjustStockAction::class);
-        $moved   = 0;
-        $units   = 0;
+        $adjust = app(AdjustStockAction::class);
+        $moved = 0;
+        $units = 0;
         $skipped = 0;
-        $failed  = [];
+        $failed = [];
 
         foreach ($movable as $row) {
             if ($row->reserved > 0) {
                 $skipped++;
+
                 continue;
             }
 
@@ -157,24 +158,24 @@ class TransferStockBetweenStoresCommand extends Command
                 // corrected.
                 DB::transaction(function () use ($adjust, $row, $quantity, $fromId, $toId, $reason) {
                     $adjust->execute(
-                        productId:       $row->product_id,
+                        productId: $row->product_id,
                         quantityChanged: -$quantity,
                         transactionType: 'store_transfer',
-                        userId:          null,
-                        reference:       'Store correction',
-                        description:     $reason,
-                        store:           $fromId,
+                        userId: null,
+                        reference: 'Store correction',
+                        description: $reason,
+                        store: $fromId,
                     );
 
                     if ($toId !== null) {
                         $adjust->execute(
-                            productId:       $row->product_id,
+                            productId: $row->product_id,
                             quantityChanged: $quantity,
                             transactionType: 'store_transfer',
-                            userId:          null,
-                            reference:       'Store correction',
-                            description:     $reason,
-                            store:           $toId,
+                            userId: null,
+                            reference: 'Store correction',
+                            description: $reason,
+                            store: $toId,
                         );
                     }
                 });

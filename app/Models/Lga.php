@@ -42,11 +42,11 @@ class Lga extends Model
         $rule = $this->overrideRule ?? $this->state?->defaultRule;
 
         return [
-            'mode'          => $rule?->mode ?? DeliveryRule::NOT_DELIVERED,
-            'fee'           => $rule && $rule->mode === DeliveryRule::FEE ? (float) $rule->fee : 0.0,
+            'mode' => $rule?->mode ?? DeliveryRule::NOT_DELIVERED,
+            'fee' => $rule && $rule->mode === DeliveryRule::FEE ? (float) $rule->fee : 0.0,
             'expected_cost' => $rule?->expected_cost !== null ? (float) $rule->expected_cost : null,
             'delivery_days' => $rule?->delivery_days,
-            'source'        => $this->overrideRule ? 'lga' : ($rule ? 'state' : 'none'),
+            'source' => $this->overrideRule ? 'lga' : ($rule ? 'state' : 'none'),
         ];
     }
 }

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services\Inventory;
 
-use App\Support\Quantity;
 use App\Models\Product;
 use App\Models\StockCostLayer;
+use App\Support\Quantity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 
@@ -50,14 +50,14 @@ class StockCostLayers
         }
 
         return StockCostLayer::create([
-            'product_id'         => $productId,
-            'store_id'           => $storeId,
-            'unit_cost'          => $unitCost,
-            'quantity_received'  => $quantity,
+            'product_id' => $productId,
+            'store_id' => $storeId,
+            'unit_cost' => $unitCost,
+            'quantity_received' => $quantity,
             'quantity_remaining' => $quantity,
-            'source_type'        => $source?->getMorphClass(),
-            'source_id'          => $source?->getKey(),
-            'received_at'        => $receivedAt ?? now(),
+            'source_type' => $source?->getMorphClass(),
+            'source_id' => $source?->getKey(),
+            'received_at' => $receivedAt ?? now(),
         ]);
     }
 
@@ -117,9 +117,9 @@ class StockCostLayers
         }
 
         return [
-            'cost'           => round($cost, 2),
-            'consumed'       => Quantity::sub($quantity, $outstanding),
-            'shortfall'      => $outstanding,
+            'cost' => round($cost, 2),
+            'consumed' => Quantity::sub($quantity, $outstanding),
+            'shortfall' => $outstanding,
             'uncosted_units' => $uncosted,
         ];
     }

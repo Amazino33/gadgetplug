@@ -17,7 +17,7 @@ function essentialsVendor(): Vendor
 {
     $vendor = Vendor::create([
         'user_id' => User::factory()->create()->id,
-        'name'    => 'Essentials Vendor '.uniqid(),
+        'name' => 'Essentials Vendor '.uniqid(),
     ]);
 
     test()->actingAs($vendor->user);
@@ -31,7 +31,7 @@ function essentialsVendor(): Vendor
 // ── The point of the whole restructure ──────────────────────────────────────
 
 test('a product saves with nothing but the essentials filled in', function () {
-    $vendor   = essentialsVendor();
+    $vendor = essentialsVendor();
     $category = Category::create(['name' => 'Essentials Cat '.uniqid()]);
 
     // Name, category, price, status. No brand, no SKU, no barcode, no
@@ -39,10 +39,10 @@ test('a product saves with nothing but the essentials filled in', function () {
     // under Advanced settings is left untouched, and the form still saves.
     Livewire::test(CreateProduct::class)
         ->fillForm([
-            'name'        => 'Bare Minimum Product',
+            'name' => 'Bare Minimum Product',
             'category_id' => $category->id,
-            'price'       => 5000,
-            'status'      => 'published',
+            'price' => 5000,
+            'status' => 'published',
         ])
         ->call('create')
         ->assertHasNoFormErrors();
@@ -60,10 +60,10 @@ test('the defaults behind Advanced settings are applied without it being opened'
 
     Livewire::test(CreateProduct::class)
         ->fillForm([
-            'name'        => 'Defaults Product',
+            'name' => 'Defaults Product',
             'category_id' => $category->id,
-            'price'       => 7500,
-            'status'      => 'draft',
+            'price' => 7500,
+            'status' => 'draft',
         ])
         ->call('create')
         ->assertHasNoFormErrors();
@@ -105,16 +105,16 @@ test('the create form still offers every advanced field, just not up front', fun
 });
 
 test('the edit form is built the same way, so the two pages cannot drift apart', function () {
-    $vendor   = essentialsVendor();
+    $vendor = essentialsVendor();
     $category = Category::create(['name' => 'Essentials Cat '.uniqid()]);
 
     $product = Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'name'           => 'Editable Product',
-        'price'          => 9000,
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'Editable Product',
+        'price' => 9000,
         'stock_quantity' => 3,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
     Livewire::test(EditProduct::class, ['record' => $product->getRouteKey()])
@@ -137,11 +137,11 @@ test('a selling price below the cost price is refused', function () {
     // wherever either field is moved to next.
     Livewire::test(CreateProduct::class)
         ->fillForm([
-            'name'        => 'Loss Maker',
+            'name' => 'Loss Maker',
             'category_id' => $category->id,
-            'cost_price'  => 8000,
-            'price'       => 5000,
-            'status'      => 'draft',
+            'cost_price' => 8000,
+            'price' => 5000,
+            'status' => 'draft',
         ])
         ->call('create')
         ->assertHasFormErrors(['price']);
@@ -155,10 +155,10 @@ test('a blank cost price still lets the product save', function () {
 
     Livewire::test(CreateProduct::class)
         ->fillForm([
-            'name'        => 'No Cost Known',
+            'name' => 'No Cost Known',
             'category_id' => $category->id,
-            'price'       => 5000,
-            'status'      => 'draft',
+            'price' => 5000,
+            'status' => 'draft',
         ])
         ->call('create')
         ->assertHasNoFormErrors();
@@ -173,11 +173,11 @@ test('an owner picks the home store right in the essentials', function () {
 
     Livewire::test(CreateProduct::class)
         ->fillForm([
-            'name'        => 'Homed Product',
+            'name' => 'Homed Product',
             'category_id' => $category->id,
-            'price'       => 4000,
-            'status'      => 'draft',
-            'store_id'    => $branch->id,
+            'price' => 4000,
+            'status' => 'draft',
+            'store_id' => $branch->id,
         ])
         ->call('create')
         ->assertHasNoFormErrors();

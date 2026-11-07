@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\Model;
 class OrderResource extends Resource
 {
     protected static string|null|\UnitEnum $navigationGroup = 'Orders';
+
     protected static ?string $model = Order::class;
 
     // Orders don't have a direct vendor relationship — scoping is handled in getEloquentQuery()
@@ -46,7 +47,7 @@ class OrderResource extends Resource
         $vendorId = filament()->getTenant()?->id;
 
         return parent::getEloquentQuery()
-            ->whereHas('items', fn(Builder $q) => $q->where('vendor_id', $vendorId))
+            ->whereHas('items', fn (Builder $q) => $q->where('vendor_id', $vendorId))
             ->with(['items.product', 'user'])
             ->latest();
     }
@@ -62,7 +63,7 @@ class OrderResource extends Resource
     {
         return [
             'index' => ListOrders::route('/'),
-            'view'  => ViewOrder::route('/{record}'),
+            'view' => ViewOrder::route('/{record}'),
         ];
     }
 
@@ -79,7 +80,7 @@ class OrderResource extends Resource
     private static function isAuthorized(): bool
     {
         $vendor = filament()->getTenant();
-        $user   = auth()->user();
+        $user = auth()->user();
 
         // Online orders are the whole point of this resource — a vendor with
         // online sales switched off loses it entirely, same as any other

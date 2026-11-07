@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Models\Vendor;
 use App\Services\ActiveStore;
 use App\Services\VendorRoles;
+use Database\Seeders\VendorPermissionsSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -20,21 +21,21 @@ function invVendor(): Vendor
 {
     return Vendor::create([
         'user_id' => User::factory()->create()->id,
-        'name'    => 'Inventory Vendor '.uniqid(),
+        'name' => 'Inventory Vendor '.uniqid(),
     ]);
 }
 
 function invProduct(Vendor $vendor, Store $home, int $qty, float $price = 1000, ?float $cost = 400): Product
 {
     return Product::create([
-        'vendor_id'      => $vendor->id,
-        'store_id'       => $home->id,
-        'category_id'    => Category::create(['name' => 'Cat '.uniqid()])->id,
-        'name'           => 'Inv Product '.uniqid(),
-        'price'          => $price,
-        'cost_price'     => $cost,
+        'vendor_id' => $vendor->id,
+        'store_id' => $home->id,
+        'category_id' => Category::create(['name' => 'Cat '.uniqid()])->id,
+        'name' => 'Inv Product '.uniqid(),
+        'price' => $price,
+        'cost_price' => $cost,
         'stock_quantity' => $qty,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 }
 
@@ -75,7 +76,7 @@ test('the owner may report on every branch', function () {
 // the screen outright, so the interesting case is a role that CAN open it and
 // is still confined to its own branch.
 test('a member may only report on the branches they are assigned to', function () {
-    (new Database\Seeders\VendorPermissionsSeeder)->run();
+    (new VendorPermissionsSeeder)->run();
 
     $vendor = invVendor();
     VendorRoles::seedFor($vendor);

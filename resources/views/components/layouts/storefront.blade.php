@@ -218,6 +218,16 @@ $navCategories = \Illuminate\Support\Facades\Cache::remember(
             {{-- Right icons --}}
             <div class="flex items-center gap-2 md:gap-[18px] flex-shrink-0 ml-auto md:ml-0">
 
+                {{-- The free plan's front door. Hidden from anyone who already
+                     runs a shop; short label on phones, where space is tight. --}}
+                @if (! auth()->check() || auth()->user()->ownedVendors()->doesntExist())
+                <a href="{{ route('free-shop.create') }}"
+                   class="flex items-center justify-center min-h-[36px] px-3 rounded-xl border border-brand text-brand hover:bg-brand hover:text-white text-[11px] md:text-[12px] font-montserrat font-bold whitespace-nowrap transition-colors">
+                    <span class="md:hidden">Sell free</span>
+                    <span class="hidden md:inline">List your business free</span>
+                </a>
+                @endif
+
                 {{-- Account dropdown (desktop only) --}}
                 <div x-data="{ acctOpen: false }" @click.outside="acctOpen = false" class="hidden md:block relative">
                     <button @click="acctOpen = !acctOpen"
@@ -538,6 +548,7 @@ $navCategories = \Illuminate\Support\Facades\Cache::remember(
                         ['label' => 'Affiliate Agreement',    'url' => route('affiliate-terms')],
                     ],
                     'Sell on GadgetPlug' => [
+                        ['label' => 'List your business free', 'url' => route('free-shop.create')],
                         ['label' => 'Become a Vendor', 'url' => route('account.vendor-apply')],
                         ...(auth()->check() && auth()->user()->affiliate ? [] : [['label' => 'Become an Affiliate', 'url' => route('affiliate.join')]]),
                     ],

@@ -56,7 +56,7 @@ final class HalfPricing
         }
 
         $retail = $isBase ? (float) $product->price : (float) $unit->price;
-        $set    = $isBase ? $product->half_price : $unit->half_price;
+        $set = $isBase ? $product->half_price : $unit->half_price;
 
         return $set !== null ? round((float) $set, 2) : round($retail / 2, 2);
     }

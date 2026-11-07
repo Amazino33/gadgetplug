@@ -38,7 +38,7 @@ class EditExpense extends EditRecord
                 direction: 'out',
                 amount: (float) $expense->amount,
                 source: $expense,
-                description: "Expense — {$expense->category}" . ($expense->description ? ": {$expense->description}" : ''),
+                description: "Expense — {$expense->category}".($expense->description ? ": {$expense->description}" : ''),
                 occurredAt: $expense->incurred_at,
                 createdBy: auth()->id(),
             );

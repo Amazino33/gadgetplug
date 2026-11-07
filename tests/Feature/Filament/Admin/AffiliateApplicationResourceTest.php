@@ -23,10 +23,10 @@ function actingAsSuperAdminForApplications(): User
 function makePendingApplication(): AffiliateApplication
 {
     return AffiliateApplication::create([
-        'user_id'  => User::factory()->create()->id,
+        'user_id' => User::factory()->create()->id,
         'whatsapp' => '+2348000000000',
-        'reason'   => 'I promote GadgetPlug through my social media pages and community groups.',
-        'status'   => 'pending',
+        'reason' => 'I promote GadgetPlug through my social media pages and community groups.',
+        'status' => 'pending',
     ]);
 }
 

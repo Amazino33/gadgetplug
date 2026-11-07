@@ -19,7 +19,6 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
-use UnitEnum;
 
 // Manual weekly payout, per the money core's locked rule: no payment-provider
 // API in v1. This page lists only affiliates currently eligible (available
@@ -91,7 +90,7 @@ class AffiliatePayoutBatch extends Page implements HasTable
                     ->weight('bold')
                     ->color('success')
                     ->getStateUsing(fn (Affiliate $record) => app(WalletService::class)->availableBalance($record->id))
-                    ->formatStateUsing(fn ($state) => '₦' . number_format((float) $state, 2)),
+                    ->formatStateUsing(fn ($state) => '₦'.number_format((float) $state, 2)),
                 TextColumn::make('bank_name')
                     ->label('Bank Details')
                     ->getStateUsing(fn (Affiliate $record) => $record->hasBankDetails()
@@ -115,7 +114,7 @@ class AffiliatePayoutBatch extends Page implements HasTable
     private function runBatch(Collection $affiliates): void
     {
         $walletService = app(WalletService::class);
-        $batchReference = 'PAYOUT-' . now()->format('Y-m-d-His');
+        $batchReference = 'PAYOUT-'.now()->format('Y-m-d-His');
         $paidCount = 0;
         $totalPaid = 0.0;
         $missingBankCount = 0;
@@ -139,23 +138,23 @@ class AffiliatePayoutBatch extends Page implements HasTable
                 }
 
                 $payout = AffiliatePayout::create([
-                    'affiliate_id'    => $affiliate->id,
+                    'affiliate_id' => $affiliate->id,
                     'batch_reference' => $batchReference,
-                    'amount'          => $balance,
-                    'bank_name'       => $affiliate->bank_name,
-                    'account_number'  => $affiliate->account_number,
-                    'account_name'    => $affiliate->account_name,
-                    'status'          => 'paid',
-                    'paid_at'         => now(),
-                    'paid_by'         => auth()->id(),
+                    'amount' => $balance,
+                    'bank_name' => $affiliate->bank_name,
+                    'account_number' => $affiliate->account_number,
+                    'account_name' => $affiliate->account_name,
+                    'status' => 'paid',
+                    'paid_at' => now(),
+                    'paid_by' => auth()->id(),
                 ]);
 
                 WalletTransaction::create([
-                    'affiliate_id'        => $affiliate->id,
+                    'affiliate_id' => $affiliate->id,
                     'affiliate_payout_id' => $payout->id,
-                    'type'                => 'debit',
-                    'amount'              => -$balance,
-                    'description'         => "Payout batch {$batchReference} — marked paid.",
+                    'type' => 'debit',
+                    'amount' => -$balance,
+                    'description' => "Payout batch {$batchReference} — marked paid.",
                 ]);
 
                 $paidCount++;
@@ -164,7 +163,7 @@ class AffiliatePayoutBatch extends Page implements HasTable
         }
 
         $title = $paidCount > 0
-            ? "Paid {$paidCount} affiliate(s) — ₦" . number_format($totalPaid, 2) . ' total.'
+            ? "Paid {$paidCount} affiliate(s) — ₦".number_format($totalPaid, 2).' total.'
             : 'Nothing to pay — select at least one affiliate with a positive balance and bank details.';
 
         if ($missingBankCount > 0) {

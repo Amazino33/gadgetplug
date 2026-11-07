@@ -54,17 +54,17 @@ class PosSessionController extends Controller
     public function open(Request $request): JsonResponse
     {
         $request->validate([
-            'vendor_id'       => 'required|integer',
-            'opening_float'   => 'required|numeric|min:0',
-            'terminal_id'     => 'nullable|string|max:100',
+            'vendor_id' => 'required|integer',
+            'opening_float' => 'required|numeric|min:0',
+            'terminal_id' => 'nullable|string|max:100',
             'idempotency_key' => 'nullable|string|max:120',
-            'business_date'   => 'nullable|date_format:Y-m-d',
+            'business_date' => 'nullable|date_format:Y-m-d',
             // Why earlier days are being left uncounted. Sent with the open
             // because the open is what reliably reaches the server, offline
             // or not; the till will not start a day without one.
-            'missing_day_reasons'                 => 'nullable|array|max:31',
+            'missing_day_reasons' => 'nullable|array|max:31',
             'missing_day_reasons.*.business_date' => 'required|date_format:Y-m-d',
-            'missing_day_reasons.*.reason'        => 'required|string|min:3|max:500',
+            'missing_day_reasons.*.reason' => 'required|string|min:3|max:500',
         ]);
 
         $storeId = TillStore::resolve($request->user(), (int) $request->vendor_id);
@@ -102,14 +102,14 @@ class PosSessionController extends Controller
 
         try {
             $session = PosSession::create([
-                'vendor_id'            => (int) $request->vendor_id,
-                'store_id'             => $storeId,
-                'cashier_id'           => $request->user()->id,
-                'terminal_id'          => $request->terminal_id ?? 'default',
-                'business_date'        => $businessDate,
-                'opening_float'        => (float) $request->opening_float,
-                'opened_at'            => now(),
-                'status'               => PosSession::STATUS_OPEN,
+                'vendor_id' => (int) $request->vendor_id,
+                'store_id' => $storeId,
+                'cashier_id' => $request->user()->id,
+                'terminal_id' => $request->terminal_id ?? 'default',
+                'business_date' => $businessDate,
+                'opening_float' => (float) $request->opening_float,
+                'opened_at' => now(),
+                'status' => PosSession::STATUS_OPEN,
                 'open_idempotency_key' => $request->idempotency_key,
             ]);
         } catch (UniqueConstraintViolationException $e) {
@@ -142,16 +142,16 @@ class PosSessionController extends Controller
 
         return response()->json([
             'business_date' => BusinessDate::today(),
-            'store_id'      => $storeId,
-            'session'       => $session?->toBlindArray(),
+            'store_id' => $storeId,
+            'session' => $session?->toBlindArray(),
             // Days this cashier left open behind them. Offered back rather than
             // left hanging — a forgotten day would otherwise stay open for ever
             // with its float unaccounted for.
-            'unclosed'      => $this->unclosed($request->user()->id, $storeId),
+            'unclosed' => $this->unclosed($request->user()->id, $storeId),
             // Wider than unclosed: any device, and days with sales but no
             // record at all. What the till asks the cashier to account for
             // before it starts a new day.
-            'missing'       => app(MissingEndOfDays::class)
+            'missing' => app(MissingEndOfDays::class)
                 ->forCashier((int) $request->vendor_id, $storeId, $request->user()->id),
         ]);
     }
@@ -170,11 +170,11 @@ class PosSessionController extends Controller
     public function close(Request $request, PosSession $session): JsonResponse
     {
         $request->validate([
-            'counted_cash'     => 'required|numeric|min:0',
+            'counted_cash' => 'required|numeric|min:0',
             'counted_terminal' => 'required|numeric|min:0',
-            'notes'            => 'nullable|string|max:1000',
-            'idempotency_key'  => 'nullable|string|max:120',
-            'business_date'    => 'nullable|date_format:Y-m-d',
+            'notes' => 'nullable|string|max:1000',
+            'idempotency_key' => 'nullable|string|max:120',
+            'business_date' => 'nullable|date_format:Y-m-d',
         ]);
 
         if ((int) $session->cashier_id !== $request->user()->id) {
@@ -189,7 +189,7 @@ class PosSessionController extends Controller
         if ($request->filled('business_date')
             && $session->business_date->toDateString() !== $request->business_date) {
             return response()->json([
-                'code'    => self::WRONG_DAY,
+                'code' => self::WRONG_DAY,
                 'message' => 'This count is for '.$request->business_date.', but that session is for '
                     .$session->business_date->toDateString().'.',
             ], 409);
@@ -202,7 +202,7 @@ class PosSessionController extends Controller
             return response()->json([
                 'message' => $sameRequest ? 'Already closed.' : 'This day has already been cashed up.',
                 'session' => $session->toBlindArray(),
-                'report'  => $session->zReport,
+                'report' => $session->zReport,
             ], $sameRequest ? 200 : 409);
         }
 
@@ -216,19 +216,19 @@ class PosSessionController extends Controller
             $countedTerminal = (float) $request->counted_terminal;
 
             $session->update([
-                'counted_cash'          => $countedCash,
-                'counted_terminal'      => $countedTerminal,
+                'counted_cash' => $countedCash,
+                'counted_terminal' => $countedTerminal,
                 // Kept in step with counted_cash rather than left behind: it is
                 // the same figure under the name this table used before cash-up.
-                'closing_float'         => $countedCash,
-                'expected_cash'         => $breakdown->expectedCash,
-                'expected_terminal'     => $breakdown->expectedTerminal,
-                'cash_variance'         => $breakdown->cashVarianceAgainst($countedCash),
-                'terminal_variance'     => $breakdown->terminalVarianceAgainst($countedTerminal),
-                'breakdown'             => $breakdown->toArray(),
-                'notes'                 => $request->notes,
-                'status'                => PosSession::STATUS_PENDING_REVIEW,
-                'closed_at'             => now(),
+                'closing_float' => $countedCash,
+                'expected_cash' => $breakdown->expectedCash,
+                'expected_terminal' => $breakdown->expectedTerminal,
+                'cash_variance' => $breakdown->cashVarianceAgainst($countedCash),
+                'terminal_variance' => $breakdown->terminalVarianceAgainst($countedTerminal),
+                'breakdown' => $breakdown->toArray(),
+                'notes' => $request->notes,
+                'status' => PosSession::STATUS_PENDING_REVIEW,
+                'closed_at' => now(),
                 'close_idempotency_key' => $request->idempotency_key,
             ]);
 
@@ -240,9 +240,9 @@ class PosSessionController extends Controller
         activity()->causedBy($request->user())
             ->performedOn($session)
             ->withProperties([
-                'counted_cash'      => (float) $session->counted_cash,
-                'counted_terminal'  => (float) $session->counted_terminal,
-                'cash_variance'     => (float) $session->cash_variance,
+                'counted_cash' => (float) $session->counted_cash,
+                'counted_terminal' => (float) $session->counted_terminal,
+                'cash_variance' => (float) $session->cash_variance,
                 'terminal_variance' => (float) $session->terminal_variance,
             ])
             ->tap(fn ($a) => $a->vendor_id = $session->vendor_id)
@@ -252,10 +252,10 @@ class PosSessionController extends Controller
         // with them, because "you are short" without the arithmetic is not
         // something a cashier can check or a manager can defend.
         return response()->json([
-            'session'   => $session->toBlindArray(),
+            'session' => $session->toBlindArray(),
             'breakdown' => $breakdown->toArray(),
-            'warnings'  => $breakdown->warnings(),
-            'report'    => $report,
+            'warnings' => $breakdown->warnings(),
+            'report' => $report,
         ]);
     }
 
@@ -279,7 +279,7 @@ class PosSessionController extends Controller
             'sessions' => $sessions->map(fn (PosSession $s) => $s->toBlindArray() + [
                 // What is still unexplained today, which is not what was frozen
                 // at close once a manager has rectified part of it.
-                'resolved_cash_variance'     => $s->countsSubmitted() ? $s->resolvedCashVariance() : null,
+                'resolved_cash_variance' => $s->countsSubmitted() ? $s->resolvedCashVariance() : null,
                 'resolved_terminal_variance' => $s->countsSubmitted() ? $s->resolvedTerminalVariance() : null,
             ]),
         ]);
@@ -302,7 +302,7 @@ class PosSessionController extends Controller
 
         $cashier = $request->user();
         $storeId = TillStore::resolve($cashier, (int) $request->vendor_id);
-        $today   = BusinessDate::today();
+        $today = BusinessDate::today();
 
         $session = PosSession::where('vendor_id', $request->vendor_id)
             ->where('store_id', $storeId)
@@ -316,12 +316,12 @@ class PosSessionController extends Controller
         // cashier, branch and date, not by session — so the slip is built
         // from them all the same, with no float on record yet.
         $session ??= new PosSession([
-            'vendor_id'     => (int) $request->vendor_id,
-            'store_id'      => $storeId,
-            'cashier_id'    => $cashier->id,
+            'vendor_id' => (int) $request->vendor_id,
+            'store_id' => $storeId,
+            'cashier_id' => $cashier->id,
             'business_date' => $today,
             'opening_float' => 0,
-            'status'        => PosSession::STATUS_OPEN,
+            'status' => PosSession::STATUS_OPEN,
         ]);
 
         return $this->zReport($session);
@@ -334,12 +334,12 @@ class PosSessionController extends Controller
         if (! $report) {
             if ($session->isOpen()) {
                 $breakdown = app(CashUpExpectation::class)->for($session);
-                
+
                 // Pretend the expected amounts are what was counted so variance is 0
                 $session->expected_cash = $breakdown->expectedCash;
                 $session->counted_cash = $breakdown->expectedCash;
                 $session->cash_variance = 0;
-                
+
                 $session->expected_terminal = $breakdown->expectedTerminal;
                 $session->counted_terminal = $breakdown->expectedTerminal;
                 $session->terminal_variance = 0;
@@ -370,16 +370,16 @@ class PosSessionController extends Controller
 
             PosMissingDayReason::updateOrCreate(
                 [
-                    'cashier_id'    => $request->user()->id,
-                    'store_id'      => $storeId,
+                    'cashier_id' => $request->user()->id,
+                    'store_id' => $storeId,
                     // Dates rather than strings, so a retry matches the row
                     // the first attempt wrote in whatever shape it was stored.
                     'business_date' => Carbon::parse($entry['business_date'])->startOfDay(),
-                    'given_on'      => Carbon::parse($today)->startOfDay(),
+                    'given_on' => Carbon::parse($today)->startOfDay(),
                 ],
                 [
                     'vendor_id' => (int) $request->vendor_id,
-                    'reason'    => trim($entry['reason']),
+                    'reason' => trim($entry['reason']),
                 ],
             );
         }
@@ -408,7 +408,7 @@ class PosSessionController extends Controller
     private function openedResponse(Request $request, PosSession $session, int $status): JsonResponse
     {
         return response()->json([
-            'session'         => $session->toBlindArray(),
+            'session' => $session->toBlindArray(),
             'vendor_settings' => TillProfile::for($request->user(), $session->vendor),
         ], $status);
     }
@@ -440,14 +440,14 @@ class PosSessionController extends Controller
     public function suspend(Request $request): JsonResponse
     {
         $request->validate([
-            'vendor_id'   => 'required|integer',
-            'label'       => 'nullable|string|max:80',
+            'vendor_id' => 'required|integer',
+            'label' => 'nullable|string|max:80',
             'customer_id' => 'nullable|integer',
-            'cart_data'   => 'required|array',
+            'cart_data' => 'required|array',
             // The till's own reference for this hold. A sale held offline is
             // uploaded later, perhaps more than once if a response is lost;
             // the same reference returns the one already saved.
-            'client_ref'  => 'nullable|string|max:64',
+            'client_ref' => 'nullable|string|max:64',
         ]);
 
         if ($request->filled('client_ref')) {
@@ -462,12 +462,12 @@ class PosSessionController extends Controller
         }
 
         $suspended = PosSuspendedSale::create([
-            'vendor_id'   => $request->vendor_id,
-            'cashier_id'  => $request->user()->id,
-            'client_ref'  => $request->client_ref,
+            'vendor_id' => $request->vendor_id,
+            'cashier_id' => $request->user()->id,
+            'client_ref' => $request->client_ref,
             'customer_id' => $request->customer_id,
-            'label'       => $request->label,
-            'cart_data'   => $request->cart_data,
+            'label' => $request->label,
+            'cart_data' => $request->cart_data,
         ]);
 
         return response()->json($suspended, 201);

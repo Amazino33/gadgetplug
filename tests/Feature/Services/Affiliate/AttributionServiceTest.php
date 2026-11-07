@@ -19,35 +19,35 @@ function makeAttributionAffiliate(?string $email = null): Affiliate
 
 function makeAttributionOrder(?int $userId = null, ?string $email = null): Order
 {
-    $owner    = User::factory()->create();
-    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Attribution Store ' . uniqid()]);
-    $category = Category::create(['name' => 'Attribution Category ' . uniqid()]);
-    $product  = Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'name'           => 'Attribution Product',
-        'price'          => 1000,
+    $owner = User::factory()->create();
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Attribution Store '.uniqid()]);
+    $category = Category::create(['name' => 'Attribution Category '.uniqid()]);
+    $product = Product::create([
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'Attribution Product',
+        'price' => 1000,
         'stock_quantity' => 10,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
     $order = Order::create([
-        'reference'        => 'GP-' . uniqid(),
-        'user_id'          => $userId,
-        'customer_name'    => 'Test Buyer',
-        'customer_email'   => $email ?? 'buyer@example.com',
-        'customer_phone'   => '08040000000',
+        'reference' => 'GP-'.uniqid(),
+        'user_id' => $userId,
+        'customer_name' => 'Test Buyer',
+        'customer_email' => $email ?? 'buyer@example.com',
+        'customer_phone' => '08040000000',
         'shipping_address' => 'Uyo',
-        'total_amount'     => 1000,
-        'status'           => 'pending',
-        'payment_method'   => 'paystack',
+        'total_amount' => 1000,
+        'status' => 'pending',
+        'payment_method' => 'paystack',
     ]);
 
     OrderItem::create([
-        'order_id'   => $order->id,
+        'order_id' => $order->id,
         'product_id' => $product->id,
-        'vendor_id'  => $product->vendor_id,
-        'quantity'   => 1,
+        'vendor_id' => $product->vendor_id,
+        'quantity' => 1,
         'unit_price' => 1000,
     ]);
 
@@ -56,8 +56,8 @@ function makeAttributionOrder(?int $userId = null, ?string $email = null): Order
 
 test('a valid checkout-entered code wins over a cookie from a different affiliate', function () {
     $checkoutAffiliate = makeAttributionAffiliate();
-    $cookieAffiliate   = makeAttributionAffiliate();
-    $order             = makeAttributionOrder();
+    $cookieAffiliate = makeAttributionAffiliate();
+    $order = makeAttributionOrder();
 
     $commission = app(AttributionService::class)->attributeOrder(
         $order,
@@ -70,7 +70,7 @@ test('a valid checkout-entered code wins over a cookie from a different affiliat
 
 test('the cookie is used when no code is entered at checkout', function () {
     $cookieAffiliate = makeAttributionAffiliate();
-    $order           = makeAttributionOrder();
+    $order = makeAttributionOrder();
 
     $commission = app(AttributionService::class)->attributeOrder($order, null, $cookieAffiliate->code);
 
@@ -79,7 +79,7 @@ test('the cookie is used when no code is entered at checkout', function () {
 
 test('an invalid entered code falls back to a valid cookie rather than blocking attribution', function () {
     $cookieAffiliate = makeAttributionAffiliate();
-    $order           = makeAttributionOrder();
+    $order = makeAttributionOrder();
 
     $commission = app(AttributionService::class)->attributeOrder($order, 'NOT-A-REAL-CODE', $cookieAffiliate->code);
 
@@ -98,9 +98,9 @@ test('an inactive affiliate code produces no attribution', function () {
 });
 
 test('an affiliate cannot earn commission on their own logged-in order', function () {
-    $user      = User::factory()->create();
+    $user = User::factory()->create();
     $affiliate = Affiliate::findOrCreateForUser($user);
-    $order     = makeAttributionOrder(userId: $user->id);
+    $order = makeAttributionOrder(userId: $user->id);
 
     $commission = app(AttributionService::class)->attributeOrder($order, $affiliate->code, null);
 
@@ -110,7 +110,7 @@ test('an affiliate cannot earn commission on their own logged-in order', functio
 
 test('an affiliate cannot earn commission on a guest order using their own email', function () {
     $affiliate = makeAttributionAffiliate(email: 'selfref@example.com');
-    $order     = makeAttributionOrder(email: 'selfref@example.com');
+    $order = makeAttributionOrder(email: 'selfref@example.com');
 
     $commission = app(AttributionService::class)->attributeOrder($order, $affiliate->code, null);
 
@@ -119,7 +119,7 @@ test('an affiliate cannot earn commission on a guest order using their own email
 
 test('self-referral email comparison is case-insensitive', function () {
     $affiliate = makeAttributionAffiliate(email: 'SelfRef@Example.com');
-    $order     = makeAttributionOrder(email: 'selfref@example.com');
+    $order = makeAttributionOrder(email: 'selfref@example.com');
 
     $commission = app(AttributionService::class)->attributeOrder($order, $affiliate->code, null);
 
@@ -128,7 +128,7 @@ test('self-referral email comparison is case-insensitive', function () {
 
 test('a different affiliate still earns commission on an order placed by another user', function () {
     $affiliate = makeAttributionAffiliate();
-    $order     = makeAttributionOrder(email: 'someone-else@example.com');
+    $order = makeAttributionOrder(email: 'someone-else@example.com');
 
     $commission = app(AttributionService::class)->attributeOrder($order, $affiliate->code, null);
 

@@ -69,6 +69,18 @@ class EnsurePosVendorAccess
                     'blocked' => true,
                 ], 403);
             }
+
+            // Free (self-signup) shops have no till, so no till API either —
+            // including a token minted before the shop was moved to free.
+            $free = $touched
+                && Vendor::whereKey($touched)->where('plan', Vendor::PLAN_FREE)->exists();
+
+            if ($free) {
+                return response()->json([
+                    'message' => Vendor::FREE_PLAN_NO_TILL,
+                    'blocked' => true,
+                ], 403);
+            }
         }
 
         return $next($request);

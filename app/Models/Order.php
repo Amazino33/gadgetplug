@@ -73,30 +73,32 @@ class Order extends Model
     protected function casts(): array
     {
         return [
-            'preferred_delivery_date'    => 'date',
+            'preferred_delivery_date' => 'date',
             'delivery_preference_set_at' => 'datetime',
-            'reserved_at'                => 'datetime',
-            'reservation_released_at'    => 'datetime',
+            'reserved_at' => 'datetime',
+            'reservation_released_at' => 'datetime',
             // The fulfilment timeline OrderStatusService writes.
-            'packed_at'                  => 'datetime',
-            'handed_over_at'             => 'datetime',
-            'delivered_at'               => 'datetime',
-            'payment_collected_at'       => 'datetime',
-            'cancelled_at'               => 'datetime',
-            'stale_alerted_at'           => 'datetime',
-            'dispatch_assigned_at'       => 'datetime',
-            'company_cost'               => 'decimal:2',
-            'company_paid_at'            => 'datetime',
-            'delivery_code_set_at'       => 'datetime',
-            'delivery_code_locked_at'    => 'datetime',
-            'returned_at'                => 'datetime',
+            'packed_at' => 'datetime',
+            'handed_over_at' => 'datetime',
+            'delivered_at' => 'datetime',
+            'payment_collected_at' => 'datetime',
+            'cancelled_at' => 'datetime',
+            'stale_alerted_at' => 'datetime',
+            'dispatch_assigned_at' => 'datetime',
+            'company_cost' => 'decimal:2',
+            'company_paid_at' => 'datetime',
+            'delivery_code_set_at' => 'datetime',
+            'delivery_code_locked_at' => 'datetime',
+            'returned_at' => 'datetime',
         ];
     }
 
     // What the customer tapped on the success screen. 'scheduled' means they
     // picked a specific date; the date itself is in preferred_delivery_date.
-    public const URGENCY_TODAY     = 'today';
-    public const URGENCY_TOMORROW  = 'tomorrow';
+    public const URGENCY_TODAY = 'today';
+
+    public const URGENCY_TOMORROW = 'tomorrow';
+
     public const URGENCY_SCHEDULED = 'scheduled';
 
     public const URGENCIES = [
@@ -117,9 +119,9 @@ class Order extends Model
         }
 
         return match ($this->delivery_urgency) {
-            self::URGENCY_TODAY    => 'Today',
+            self::URGENCY_TODAY => 'Today',
             self::URGENCY_TOMORROW => 'Tomorrow',
-            default                => $this->preferred_delivery_date?->format('D, j M Y') ?? 'Scheduled',
+            default => $this->preferred_delivery_date?->format('D, j M Y') ?? 'Scheduled',
         };
     }
 

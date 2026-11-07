@@ -20,6 +20,7 @@ use Filament\Support\Icons\Heroicon;
 class NotificationSettings extends Page
 {
     protected static string|null|\UnitEnum $navigationGroup = 'Settings';
+
     use InteractsWithForms;
 
     protected string $view = 'filament.vendor.pages.notification-settings';
@@ -51,19 +52,19 @@ class NotificationSettings extends Page
         $settings = VendorNotificationSetting::forVendor(filament()->getTenant());
 
         $this->form->fill([
-            'storekeeper_whatsapp'     => $settings->storekeeper_whatsapp,
-            'owner_whatsapp'           => $settings->owner_whatsapp,
-            'notify_daily_summary'     => $settings->notify_daily_summary,
-            'daily_summary_time'       => $settings->daily_summary_time,
-            'notify_new_order'         => $settings->notify_new_order,
-            'notify_undispatched'      => $settings->notify_undispatched,
-            'notify_low_stock'         => $settings->notify_low_stock,
-            'notify_cancelled'         => $settings->notify_cancelled,
+            'storekeeper_whatsapp' => $settings->storekeeper_whatsapp,
+            'owner_whatsapp' => $settings->owner_whatsapp,
+            'notify_daily_summary' => $settings->notify_daily_summary,
+            'daily_summary_time' => $settings->daily_summary_time,
+            'notify_new_order' => $settings->notify_new_order,
+            'notify_undispatched' => $settings->notify_undispatched,
+            'notify_low_stock' => $settings->notify_low_stock,
+            'notify_cancelled' => $settings->notify_cancelled,
             'undispatched_after_hours' => $settings->undispatched_after_hours,
-            'reminder_frequency'       => $settings->reminder_frequency,
-            'quiet_hours_enabled'      => $settings->quiet_hours_enabled,
-            'quiet_from'               => $settings->quiet_from,
-            'quiet_until'              => $settings->quiet_until,
+            'reminder_frequency' => $settings->reminder_frequency,
+            'quiet_hours_enabled' => $settings->quiet_hours_enabled,
+            'quiet_from' => $settings->quiet_from,
+            'quiet_until' => $settings->quiet_until,
         ]);
     }
 
@@ -291,21 +292,21 @@ class NotificationSettings extends Page
         $data = $this->form->getState();
 
         VendorNotificationSetting::forVendor(filament()->getTenant())->update([
-            'storekeeper_whatsapp'     => $data['storekeeper_whatsapp'] ?: null,
-            'owner_whatsapp'           => $data['owner_whatsapp'] ?: null,
-            'notify_daily_summary'     => (bool) ($data['notify_daily_summary'] ?? false),
-            'daily_summary_time'       => $data['daily_summary_time'] ?? '07:00',
+            'storekeeper_whatsapp' => $data['storekeeper_whatsapp'] ?: null,
+            'owner_whatsapp' => $data['owner_whatsapp'] ?: null,
+            'notify_daily_summary' => (bool) ($data['notify_daily_summary'] ?? false),
+            'daily_summary_time' => $data['daily_summary_time'] ?? '07:00',
             // notify_new_order is deliberately absent — the toggle is dehydrated,
             // so a crafted request cannot switch off a platform-locked alert by
             // posting the field this form no longer submits.
-            'notify_undispatched'      => (bool) ($data['notify_undispatched'] ?? false),
-            'notify_low_stock'         => (bool) ($data['notify_low_stock'] ?? false),
-            'notify_cancelled'         => (bool) ($data['notify_cancelled'] ?? false),
+            'notify_undispatched' => (bool) ($data['notify_undispatched'] ?? false),
+            'notify_low_stock' => (bool) ($data['notify_low_stock'] ?? false),
+            'notify_cancelled' => (bool) ($data['notify_cancelled'] ?? false),
             'undispatched_after_hours' => (int) ($data['undispatched_after_hours'] ?? 6),
-            'reminder_frequency'       => $data['reminder_frequency'] ?? '3h',
-            'quiet_hours_enabled'      => (bool) ($data['quiet_hours_enabled'] ?? false),
-            'quiet_from'               => $data['quiet_from'] ?? '08:00',
-            'quiet_until'              => $data['quiet_until'] ?? '20:00',
+            'reminder_frequency' => $data['reminder_frequency'] ?? '3h',
+            'quiet_hours_enabled' => (bool) ($data['quiet_hours_enabled'] ?? false),
+            'quiet_from' => $data['quiet_from'] ?? '08:00',
+            'quiet_until' => $data['quiet_until'] ?? '20:00',
         ]);
 
         Notification::make()

@@ -56,9 +56,9 @@ class DailySocialShareService
     public function windowIsOpen(?CarbonInterface $moment = null): bool
     {
         $settings = AffiliateSetting::current();
-        $local    = ($moment ?: now())->setTimezone($settings->share_timezone);
+        $local = ($moment ?: now())->setTimezone($settings->share_timezone);
 
-        $opens  = $this->timeOnDay($local, $settings->share_window_opens_at);
+        $opens = $this->timeOnDay($local, $settings->share_window_opens_at);
         $closes = $this->timeOnDay($local, $settings->share_window_closes_at);
 
         // A window that closes before it opens wraps past midnight (e.g.
@@ -84,8 +84,8 @@ class DailySocialShareService
         $settings = AffiliateSetting::current();
 
         return Carbon::parse($settings->share_window_opens_at)->format('g:i A')
-            . ' – ' . Carbon::parse($settings->share_window_closes_at)->format('g:i A')
-            . ' (' . $settings->share_timezone . ')';
+            .' – '.Carbon::parse($settings->share_window_closes_at)->format('g:i A')
+            .' ('.$settings->share_timezone.')';
     }
 
     // ─── Submission ─────────────────────────────────────────────────────
@@ -105,7 +105,7 @@ class DailySocialShareService
         }
 
         if (! $this->windowIsOpen()) {
-            throw new RuntimeException('Today\'s submission window is closed. It opens ' . $this->windowDescription() . '.');
+            throw new RuntimeException('Today\'s submission window is closed. It opens '.$this->windowDescription().'.');
         }
 
         if ($reportedReach < 0) {
@@ -120,12 +120,12 @@ class DailySocialShareService
 
         return AffiliateTaskSubmission::create([
             'affiliate_task_id' => $task->id,
-            'affiliate_id'      => $affiliate->id,
-            'status'            => 'submitted',
-            'notes'             => $notes,
-            'submitted_at'      => now(),
-            'share_date'        => $shareDate->toDateString(),
-            'reported_reach'    => $reportedReach,
+            'affiliate_id' => $affiliate->id,
+            'status' => 'submitted',
+            'notes' => $notes,
+            'submitted_at' => now(),
+            'share_date' => $shareDate->toDateString(),
+            'reported_reach' => $reportedReach,
         ]);
     }
 
@@ -159,11 +159,11 @@ class DailySocialShareService
                 return;
             }
 
-            $settings  = AffiliateSetting::current();
-            $task      = $locked->task;
+            $settings = AffiliateSetting::current();
+            $task = $locked->task;
             $shareDate = Carbon::parse($locked->share_date);
 
-            $band       = AffiliateReachBand::forReach((int) $locked->reported_reach);
+            $band = AffiliateReachBand::forReach((int) $locked->reported_reach);
             $bandPoints = $band?->points ?? 0;
 
             // The daily cap is applied against what this affiliate has already
@@ -171,26 +171,26 @@ class DailySocialShareService
             // day can never sum past it. Partial award rather than refusal:
             // the cap is a ceiling on spend, not a reason to void the work.
             $alreadyToday = $this->pointsAwardedOn($locked->affiliate_id, $shareDate);
-            $remaining    = max((int) $settings->daily_share_points_cap - $alreadyToday, 0);
-            $awarded      = min($bandPoints, $remaining);
+            $remaining = max((int) $settings->daily_share_points_cap - $alreadyToday, 0);
+            $awarded = min($bandPoints, $remaining);
 
             // Streak counts consecutive days with an approved share. It is
             // computed BEFORE this row is marked approved, then frozen.
-            $streakDay   = $this->streakDayFor($locked->affiliate_id, $shareDate);
-            $bonusEvery  = (int) $settings->streak_bonus_every_days;
+            $streakDay = $this->streakDayFor($locked->affiliate_id, $shareDate);
+            $bonusEvery = (int) $settings->streak_bonus_every_days;
             $bonusPoints = ($bonusEvery > 0 && $streakDay % $bonusEvery === 0)
                 ? (int) $settings->streak_bonus_points
                 : 0;
 
             $locked->update([
-                'status'                  => 'approved',
-                'reviewed_at'             => now(),
-                'reviewed_by'             => $reviewer->id,
+                'status' => 'approved',
+                'reviewed_at' => now(),
+                'reviewed_by' => $reviewer->id,
                 'affiliate_reach_band_id' => $band?->id,
-                'points_awarded'          => $awarded,
-                'streak_day'              => $streakDay,
-                'streak_bonus_points'     => $bonusPoints,
-                'level_progress_value'    => $task->counts_toward_level ? $task->level_progress_value : null,
+                'points_awarded' => $awarded,
+                'streak_day' => $streakDay,
+                'streak_bonus_points' => $bonusPoints,
+                'level_progress_value' => $task->counts_toward_level ? $task->level_progress_value : null,
             ]);
 
             $bandName = $band?->name ?? 'no matching band';
@@ -219,10 +219,10 @@ class DailySocialShareService
                 ->causedBy($reviewer)
                 ->performedOn($locked)
                 ->withProperties([
-                    'band'        => $bandName,
-                    'points'      => $awarded,
-                    'streak_day'  => $streakDay,
-                    'bonus'       => $bonusPoints,
+                    'band' => $bandName,
+                    'points' => $awarded,
+                    'streak_day' => $streakDay,
+                    'bonus' => $bonusPoints,
                 ])
                 ->log('Daily share approved');
         });
@@ -243,11 +243,11 @@ class DailySocialShareService
             // No points, no band, no streak advance — a rejected day breaks the
             // chain exactly as a missed day does.
             $locked->update([
-                'status'          => 'rejected',
-                'reviewed_at'     => now(),
-                'reviewed_by'     => $reviewer->id,
+                'status' => 'rejected',
+                'reviewed_at' => now(),
+                'reviewed_by' => $reviewer->id,
                 'rejected_reason' => $reason,
-                'points_awarded'  => 0,
+                'points_awarded' => 0,
             ]);
 
             activity()
@@ -309,7 +309,7 @@ class DailySocialShareService
             return 0;
         }
 
-        $today     = $this->shareDateFor();
+        $today = $this->shareDateFor();
         $lastShare = Carbon::parse($latest->share_date)->startOfDay();
 
         // Today or yesterday keeps the chain alive — today's share may simply

@@ -3,6 +3,7 @@
 use App\Filament\Vendor\Resources\Procurements\Pages\ViewProcurement;
 use App\Models\Procurement;
 use App\Models\ProcurementItemCorrection;
+use App\Services\Procurement\ProcurementReview;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 require_once __DIR__.'/ReviewHelpers.php';
@@ -89,8 +90,8 @@ test('correcting a line from its own card sends the batch back', function () {
 
     reviewScreen($ctx, $delivery)
         ->callAction('correctLine', arguments: ['item' => $item->id], data: [
-            'quantity'        => 10,
-            'unit_cost'       => 5000,
+            'quantity' => 10,
+            'unit_cost' => 5000,
             'correction_note' => 'Two short on the pallet',
         ])
         ->assertHasNoActionErrors();
@@ -114,7 +115,7 @@ test('a corrected card shows both figures and the variance together', function (
     $item = $delivery->items->first();
 
     $this->actingAs($ctx['checker']);
-    app(App\Services\Procurement\ProcurementReview::class)
+    app(ProcurementReview::class)
         ->correct($delivery, $ctx['checker'], [$item->id => ['quantity' => 10]], 'Two short');
 
     // The recorder re-checking has to see what they are being asked to agree
@@ -137,7 +138,7 @@ test('the recorder can agree from the re-check screen and the stock lands', func
     $item = $delivery->items->first();
 
     $this->actingAs($ctx['checker']);
-    app(App\Services\Procurement\ProcurementReview::class)
+    app(ProcurementReview::class)
         ->correct($delivery, $ctx['checker'], [$item->id => ['quantity' => 10]]);
 
     $this->actingAs($ctx['keeper']);
@@ -157,14 +158,14 @@ test('the recorder can counter-correct from the re-check screen instead of agree
     $item = $delivery->items->first();
 
     $this->actingAs($ctx['checker']);
-    app(App\Services\Procurement\ProcurementReview::class)
+    app(ProcurementReview::class)
         ->correct($delivery, $ctx['checker'], [$item->id => ['quantity' => 10]]);
 
     $this->actingAs($ctx['keeper']);
 
     reviewScreen($ctx, $delivery->fresh())
         ->callAction('correctLine', arguments: ['item' => $item->id], data: [
-            'quantity'  => 11,
+            'quantity' => 11,
             'unit_cost' => 5000,
         ])
         ->assertHasNoActionErrors();
@@ -184,7 +185,7 @@ test('a second line can be corrected in the same review pass', function () {
     $two = reviewProduct($ctx, 'Line Two');
     $delivery = reviewDelivery($ctx, [[$one, 12, 5000], [$two, 4, 2000]]);
 
-    $firstLine  = $delivery->items->firstWhere('product_id', $one->id);
+    $firstLine = $delivery->items->firstWhere('product_id', $one->id);
     $secondLine = $delivery->items->firstWhere('product_id', $two->id);
 
     $this->actingAs($ctx['checker']);
@@ -207,7 +208,7 @@ test('a second line can be corrected in the same review pass', function () {
 
     // And the agreed figures are what land.
     $this->actingAs($ctx['keeper']);
-    app(App\Services\Procurement\ProcurementReview::class)
+    app(ProcurementReview::class)
         ->approve($delivery->fresh(), $ctx['keeper'], $ctx['store']->id);
 
     expect(reviewStock($one, $ctx['store']))->toBe(10)
@@ -220,7 +221,7 @@ test('several lines can be corrected at once from the batch form', function () {
     $two = reviewProduct($ctx, 'Line Two');
     $delivery = reviewDelivery($ctx, [[$one, 12, 5000], [$two, 4, 2000]]);
 
-    $firstLine  = $delivery->items->firstWhere('product_id', $one->id);
+    $firstLine = $delivery->items->firstWhere('product_id', $one->id);
     $secondLine = $delivery->items->firstWhere('product_id', $two->id);
 
     $this->actingAs($ctx['checker']);
@@ -230,7 +231,7 @@ test('several lines can be corrected at once from the batch form', function () {
     reviewScreen($ctx, $delivery)
         ->callAction('correct', data: [
             'lines' => [
-                $firstLine->id  => ['quantity' => 10, 'unit_cost' => 5000],
+                $firstLine->id => ['quantity' => 10, 'unit_cost' => 5000],
                 $secondLine->id => ['quantity' => 4, 'unit_cost' => 2500],
             ],
             'correction_note' => 'Checked against the waybill',
@@ -253,7 +254,7 @@ test('an approved delivery offers no further actions', function () {
     $delivery = reviewDelivery($ctx, [[$product, 12, 5000]]);
 
     $this->actingAs($ctx['checker']);
-    app(App\Services\Procurement\ProcurementReview::class)
+    app(ProcurementReview::class)
         ->approve($delivery, $ctx['checker'], $ctx['store']->id);
 
     $html = reviewScreen($ctx, $delivery->fresh())->assertOk()->html();

@@ -9,7 +9,6 @@ use App\Models\SupplierPayableEntry;
 use App\Services\VendorLink\SupplierPayable;
 use BackedEnum;
 use Filament\Actions\Action;
-use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Concerns\InteractsWithForms;
@@ -37,15 +36,20 @@ class SupplierPayablePage extends Page implements HasTable
     use InteractsWithForms;
     use InteractsWithTable;
 
-    protected static string|null|BackedEnum $navigationIcon  = 'heroicon-o-banknotes';
-    protected static string|null|UnitEnum   $navigationGroup = 'Money';
-    protected static ?string                $navigationLabel = 'Supplier Payable';
-    protected static ?string                $title           = 'What you owe your suppliers';
-    protected static ?int                   $navigationSort  = 3;
+    protected static string|null|BackedEnum $navigationIcon = 'heroicon-o-banknotes';
+
+    protected static string|null|UnitEnum $navigationGroup = 'Money';
+
+    protected static ?string $navigationLabel = 'Supplier Payable';
+
+    protected static ?string $title = 'What you owe your suppliers';
+
+    protected static ?int $navigationSort = 3;
 
     protected string $view = 'filament.vendor.pages.supplier-payable';
 
     public ?string $from = null;
+
     public ?string $to = null;
 
     public function mount(): void
@@ -66,12 +70,12 @@ class SupplierPayablePage extends Page implements HasTable
                 $summary = app(SupplierPayable::class)->summary($link);
 
                 return [
-                    'link'     => $link,
+                    'link' => $link,
                     'supplier' => $link->supplierName(),
-                    'active'   => $link->is_active,
-                    'charged'  => $summary['charged'],
-                    'paid'     => $summary['paid'],
-                    'balance'  => $summary['balance'],
+                    'active' => $link->is_active,
+                    'charged' => $summary['charged'],
+                    'paid' => $summary['paid'],
+                    'balance' => $summary['balance'],
                 ];
             })
             ->sortByDesc('balance')
@@ -145,14 +149,14 @@ class SupplierPayablePage extends Page implements HasTable
                     ->label('Entry')
                     ->badge()
                     ->color(fn (string $state) => match ($state) {
-                        SupplierPayableEntry::TYPE_CHARGE   => 'warning',
+                        SupplierPayableEntry::TYPE_CHARGE => 'warning',
                         SupplierPayableEntry::TYPE_REVERSAL => 'gray',
-                        default                             => 'success',
+                        default => 'success',
                     })
                     ->formatStateUsing(fn (string $state) => match ($state) {
-                        SupplierPayableEntry::TYPE_CHARGE   => 'Owed',
+                        SupplierPayableEntry::TYPE_CHARGE => 'Owed',
                         SupplierPayableEntry::TYPE_REVERSAL => 'Cancelled order',
-                        default                             => 'Paid',
+                        default => 'Paid',
                     }),
 
                 Tables\Columns\TextColumn::make('quantity')

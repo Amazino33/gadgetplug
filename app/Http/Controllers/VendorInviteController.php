@@ -15,16 +15,16 @@ class VendorInviteController extends Controller
     {
         $invite = cache()->get("vendor_invite_{$token}");
 
-        if (!$invite) {
+        if (! $invite) {
             abort(404, 'Invite link is invalid or has expired.');
         }
 
         $userExists = User::where('email', $invite['email'])->exists();
 
         return view('vendor-invite.accept', [
-            'token'      => $token,
-            'email'      => $invite['email'],
-            'vendorId'   => $invite['vendor_id'],
+            'token' => $token,
+            'email' => $invite['email'],
+            'vendorId' => $invite['vendor_id'],
             'userExists' => $userExists,
         ]);
     }
@@ -34,29 +34,29 @@ class VendorInviteController extends Controller
     {
         $invite = cache()->get("vendor_invite_{$token}");
 
-        if (!$invite) {
+        if (! $invite) {
             abort(404, 'Invite link is invalid or has expired.');
         }
 
         $vendor = Vendor::findOrFail($invite['vendor_id']);
         $user = User::where('email', $invite['email'])->first();
 
-        if (!$user) {
+        if (! $user) {
             // New user — validate and create
             $request->validate([
-                'name'     => 'required|string|max:255',
+                'name' => 'required|string|max:255',
                 'password' => 'required|min:8|confirmed',
             ]);
 
             $user = User::create([
-                'name'     => $request->name,
-                'email'    => $invite['email'],
+                'name' => $request->name,
+                'email' => $invite['email'],
                 'password' => Hash::make($request->password),
             ]);
         }
 
         // Attach to vendor
-        if (!$vendor->users()->where('user_id', $user->id)->exists()) {
+        if (! $vendor->users()->where('user_id', $user->id)->exists()) {
             $vendor->users()->attach($user->id);
         }
 
@@ -70,12 +70,12 @@ class VendorInviteController extends Controller
         // Log them in
         Auth::login($user);
 
-        session()->flash('success', 'Welcome to ' . $vendor->name . '! Your account has been set up successfully.');
+        session()->flash('success', 'Welcome to '.$vendor->name.'! Your account has been set up successfully.');
 
         // Queue a notification to show after redirect
         session()->put('filament.notification', [
-            'title' => 'Welcome to ' . $vendor->name . '!',
-            'body'  => 'Your account has been set up successfully.',
+            'title' => 'Welcome to '.$vendor->name.'!',
+            'body' => 'Your account has been set up successfully.',
             'status' => 'success',
         ]);
 

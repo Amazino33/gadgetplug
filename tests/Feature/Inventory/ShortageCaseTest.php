@@ -23,13 +23,13 @@ function caseContext(array $productAttributes = []): array
     $category = Category::firstOrCreate(['name' => 'Chargers']);
 
     $product = Product::create(array_merge([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'name'           => 'SHPLUS 60W Charger',
-        'price'          => 5300,
-        'cost_price'     => 2570,
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'SHPLUS 60W Charger',
+        'price' => 5300,
+        'cost_price' => 2570,
         'stock_quantity' => 10,
-        'status'         => 'published',
+        'status' => 'published',
     ], $productAttributes));
 
     return compact('owner', 'staff', 'vendor', 'product');
@@ -38,14 +38,14 @@ function caseContext(array $productAttributes = []): array
 function countLine(array $c, int $counted, int $systemQty = 10, string $status = 'verified'): AuditSession
 {
     return AuditSession::create([
-        'vendor_id'        => $c['vendor']->id,
-        'product_id'       => $c['product']->id,
-        'system_quantity'  => $systemQty,
+        'vendor_id' => $c['vendor']->id,
+        'product_id' => $c['product']->id,
+        'system_quantity' => $systemQty,
         'storekeeper_a_id' => $c['staff']->id,
-        'count_a'          => $counted,
+        'count_a' => $counted,
         'storekeeper_b_id' => $c['owner']->id,
-        'count_b'          => $counted,
-        'status'           => $status,
+        'count_b' => $counted,
+        'status' => $status,
     ]);
 }
 
@@ -81,7 +81,7 @@ it('does not open a second case when a count is re-committed', function () {
     $line = countLine($c, counted: 7);
     $service = app(ShortageCaseService::class);
 
-    $first  = $service->openForCountLine($line);
+    $first = $service->openForCountLine($line);
     $second = $service->openForCountLine($line);
 
     expect($second->id)->toBe($first->id)
@@ -124,7 +124,7 @@ it('charge writes exactly one ledger entry from the frozen split', function () {
         ->and((float) $entries->first()->cost_component)->toBe(7710.0)
         ->and($case->fresh()->status)->toBe('charged')
         ->and(AccountabilityLedgerEntry::outstandingForStorekeeper($c['staff']->id, $c['vendor']->id))
-            ->toBe(15900.0);
+        ->toBe(15900.0);
 });
 
 it('charging twice posts only one entry', function () {
@@ -167,7 +167,7 @@ it('write-off leaves the storekeeper owing nothing', function () {
     expect($case->fresh()->status)->toBe('written_off')
         ->and(AccountabilityLedgerEntry::count())->toBe(0)
         ->and(AccountabilityLedgerEntry::outstandingForStorekeeper($c['staff']->id, $c['vendor']->id))
-            ->toBe(0.0);
+        ->toBe(0.0);
 });
 
 it('requires a reason to charge or write off', function () {

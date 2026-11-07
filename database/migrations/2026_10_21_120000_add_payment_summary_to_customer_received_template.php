@@ -33,6 +33,7 @@ return new class extends Migration
 
             if (! str_contains((string) $row->body, self::OLD)) {
                 $custom++;
+
                 continue;
             }
 

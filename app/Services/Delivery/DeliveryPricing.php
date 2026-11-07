@@ -19,8 +19,8 @@ class DeliveryPricing
         $lga->loadMissing('state');
 
         $override = DeliveryRule::query()->where('lga_id', $lga->id)->first();
-        $default  = $override ? null : DeliveryRule::query()->where('state_id', $lga->state_id)->whereNull('lga_id')->first();
-        $rule     = $override ?? $default;
+        $default = $override ? null : DeliveryRule::query()->where('state_id', $lga->state_id)->whereNull('lga_id')->first();
+        $rule = $override ?? $default;
 
         return new DeliveryQuote(
             lga: $lga,

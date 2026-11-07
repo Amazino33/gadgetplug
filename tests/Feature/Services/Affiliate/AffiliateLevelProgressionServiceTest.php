@@ -21,7 +21,7 @@ function makeProgressionLevels(): array
     return [
         'bronze' => AffiliateLevel::create(['name' => 'Bronze', 'target' => 0,      'rate_value' => 1.0, 'sort_order' => 0]),
         'silver' => AffiliateLevel::create(['name' => 'Silver', 'target' => 50000,  'rate_value' => 1.1, 'sort_order' => 1]),
-        'gold'   => AffiliateLevel::create(['name' => 'Gold',   'target' => 200000, 'rate_value' => 1.2, 'sort_order' => 2]),
+        'gold' => AffiliateLevel::create(['name' => 'Gold',   'target' => 200000, 'rate_value' => 1.2, 'sort_order' => 2]),
     ];
 }
 
@@ -29,50 +29,50 @@ function makeProgressionLevels(): array
 // for the affiliate (rate/amount don't matter for progression, only base_amount).
 function makeAvailableSale(Affiliate $affiliate, float $baseAmount): AffiliateCommission
 {
-    $owner    = User::factory()->create();
-    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Progression Store ' . uniqid()]);
-    $category = Category::create(['name' => 'Progression Category ' . uniqid()]);
-    $product  = Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'name'           => 'Progression Product',
-        'price'          => $baseAmount,
+    $owner = User::factory()->create();
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Progression Store '.uniqid()]);
+    $category = Category::create(['name' => 'Progression Category '.uniqid()]);
+    $product = Product::create([
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'Progression Product',
+        'price' => $baseAmount,
         'stock_quantity' => 10,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
     $order = Order::create([
-        'reference'        => 'GP-' . uniqid(),
-        'customer_name'    => 'Test Buyer',
-        'customer_email'   => 'buyer@example.com',
-        'customer_phone'   => '08040000000',
+        'reference' => 'GP-'.uniqid(),
+        'customer_name' => 'Test Buyer',
+        'customer_email' => 'buyer@example.com',
+        'customer_phone' => '08040000000',
         'shipping_address' => 'Uyo',
-        'total_amount'     => $baseAmount,
-        'status'           => 'pending',
-        'payment_method'   => 'paystack',
+        'total_amount' => $baseAmount,
+        'status' => 'pending',
+        'payment_method' => 'paystack',
     ]);
 
     $orderItem = OrderItem::create([
-        'order_id'   => $order->id,
+        'order_id' => $order->id,
         'product_id' => $product->id,
-        'vendor_id'  => $product->vendor_id,
-        'quantity'   => 1,
+        'vendor_id' => $product->vendor_id,
+        'quantity' => 1,
         'unit_price' => $baseAmount,
     ]);
 
     $commission = AffiliateCommission::create([
         'affiliate_id' => $affiliate->id,
-        'order_id'     => $order->id,
-        'amount'       => 0,
-        'status'       => 'available',
+        'order_id' => $order->id,
+        'amount' => 0,
+        'status' => 'available',
         'available_at' => now(),
     ]);
 
     $commission->items()->create([
         'order_item_id' => $orderItem->id,
-        'rate'           => 10,
-        'base_amount'    => $baseAmount,
-        'amount'         => $baseAmount * 0.1,
+        'rate' => 10,
+        'base_amount' => $baseAmount,
+        'amount' => $baseAmount * 0.1,
     ]);
 
     return $commission;

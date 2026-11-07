@@ -55,7 +55,7 @@ class AffiliateTaskSubmissionsTable
                         }
 
                         if ($record->status === 'approved') {
-                            return ($record->reachBand?->name ?? 'no band') . ' → ' . $record->points_awarded . ' pts';
+                            return ($record->reachBand?->name ?? 'no band').' → '.$record->points_awarded.' pts';
                         }
 
                         $band = AffiliateReachBand::forReach((int) $record->reported_reach);
@@ -67,7 +67,7 @@ class AffiliateTaskSubmissionsTable
                     ->label('Streak')
                     ->placeholder('—')
                     ->formatStateUsing(fn ($state, AffiliateTaskSubmission $record) => $state
-                        ? "Day {$state}" . ($record->streak_bonus_points ? " (+{$record->streak_bonus_points} bonus)" : '')
+                        ? "Day {$state}".($record->streak_bonus_points ? " (+{$record->streak_bonus_points} bonus)" : '')
                         : '—')
                     ->toggleable(),
 
@@ -78,9 +78,9 @@ class AffiliateTaskSubmissionsTable
                     ->formatStateUsing(fn ($state) => ucfirst($state))
                     ->color(fn ($state) => match ($state) {
                         'submitted' => 'warning',
-                        'approved'  => 'success',
-                        'rejected'  => 'danger',
-                        default     => 'gray',
+                        'approved' => 'success',
+                        'rejected' => 'danger',
+                        default => 'gray',
                     }),
 
                 TextColumn::make('share_date')->label('Share Day')->date('d M Y')->placeholder('—')->sortable()->toggleable(),
@@ -105,7 +105,7 @@ class AffiliateTaskSubmissionsTable
                     ->requiresConfirmation()
                     ->modalDescription(function (AffiliateTaskSubmission $record): string {
                         if (! self::isDailyShare($record)) {
-                            return 'Approve this submission and credit ' . (int) $record->task->points_reward . ' Plug Points?';
+                            return 'Approve this submission and credit '.(int) $record->task->points_reward.' Plug Points?';
                         }
 
                         $band = AffiliateReachBand::forReach((int) $record->reported_reach);

@@ -12,17 +12,17 @@ use Livewire\Volt\Volt;
 
 function makeCheckoutPixelProduct(array $attrs = []): Product
 {
-    $owner    = User::factory()->create();
-    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Checkout Pixel Store ' . uniqid(), 'online_sales_enabled' => true]);
-    $category = Category::create(['name' => 'Checkout Pixel Category ' . uniqid()]);
+    $owner = User::factory()->create();
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Checkout Pixel Store '.uniqid(), 'online_sales_enabled' => true]);
+    $category = Category::create(['name' => 'Checkout Pixel Category '.uniqid()]);
 
     return Product::create(array_merge([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'name'           => 'Checkout Pixel Product',
-        'price'          => 5000,
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'Checkout Pixel Product',
+        'price' => 5000,
         'stock_quantity' => 10,
-        'status'         => 'published',
+        'status' => 'published',
     ], $attrs));
 }
 
@@ -54,16 +54,16 @@ test('loading the checkout form dispatches a queued InitiateCheckout CAPI event'
 // behavior that isn't this app's code.
 test('the orders table persists fbp and fbc for the server-side Purchase event to use later', function () {
     $order = Order::create([
-        'reference'        => 'GP-FBPFBCTEST',
-        'customer_name'    => 'Cookie Buyer',
-        'customer_email'   => 'cookie@example.com',
-        'customer_phone'   => '08012345678',
+        'reference' => 'GP-FBPFBCTEST',
+        'customer_name' => 'Cookie Buyer',
+        'customer_email' => 'cookie@example.com',
+        'customer_phone' => '08012345678',
         'shipping_address' => 'Uyo, Akwa Ibom State — Test Street',
-        'total_amount'     => 5000,
-        'status'           => 'pending',
-        'payment_method'   => 'pay_on_delivery',
-        'fbp'              => 'fb.1.111.222',
-        'fbc'              => 'fb.1.111.333',
+        'total_amount' => 5000,
+        'status' => 'pending',
+        'payment_method' => 'pay_on_delivery',
+        'fbp' => 'fb.1.111.222',
+        'fbc' => 'fb.1.111.333',
     ]);
 
     expect($order->fresh()->fbp)->toBe('fb.1.111.222')

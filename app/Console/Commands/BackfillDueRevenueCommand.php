@@ -50,7 +50,7 @@ class BackfillDueRevenueCommand extends Command
     /** Statuses at which the money has been received, per payment method. */
     private const PAID_STATUSES = [
         'paystack' => ['paid', 'packed', 'shipped', 'delivered'],
-        'wallet'   => ['confirmed', 'packed', 'shipped', 'delivered'],
+        'wallet' => ['confirmed', 'packed', 'shipped', 'delivered'],
     ];
 
     public function handle(): int
@@ -70,9 +70,9 @@ class BackfillDueRevenueCommand extends Command
         }
 
         $rows = $orders->map(fn (Order $order) => [
-            'order'  => $order,
+            'order' => $order,
             'vendor' => $order->items->first()?->vendor?->name ?? '(no vendor)',
-            'group'  => ucfirst($order->payment_method).' — '.$order->status,
+            'group' => ucfirst($order->payment_method).' — '.$order->status,
         ] + $this->paidDate($order));
 
         foreach ($rows->groupBy('group') as $group => $groupRows) {

@@ -6,9 +6,9 @@ use App\Filament\Vendor\Resources\ActivityLog\Pages\ListActivities;
 use App\Models\User;
 use App\Models\VendorActivity;
 use BackedEnum;
+use Filament\Forms\Components\DatePicker;
 use Filament\Resources\Resource;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Forms\Components\DatePicker;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -19,9 +19,12 @@ class ActivityLogResource extends Resource
 {
     protected static ?string $model = VendorActivity::class;
 
-    protected static string|null|BackedEnum $navigationIcon  = 'heroicon-o-clipboard-document-list';
-    protected static string|null|UnitEnum   $navigationGroup = 'Settings';
-    protected static ?string                $navigationLabel = 'Activity Log';
+    protected static string|null|BackedEnum $navigationIcon = 'heroicon-o-clipboard-document-list';
+
+    protected static string|null|UnitEnum $navigationGroup = 'Settings';
+
+    protected static ?string $navigationLabel = 'Activity Log';
+
     protected static ?int $navigationSort = 9;
 
     public static function isScopedToTenant(): bool
@@ -32,7 +35,7 @@ class ActivityLogResource extends Resource
     public static function canAccess(): bool
     {
         /** @var User $user */
-        $user   = auth()->user();
+        $user = auth()->user();
         $vendor = filament()->getTenant();
 
         // Owner and super admin keep blanket access; everyone else needs the
@@ -45,10 +48,25 @@ class ActivityLogResource extends Resource
         );
     }
 
-    public static function canCreate(): bool { return false; }
-    public static function canEdit(mixed $record): bool { return false; }
-    public static function canDelete(mixed $record): bool { return false; }
-    public static function canDeleteAny(): bool { return false; }
+    public static function canCreate(): bool
+    {
+        return false;
+    }
+
+    public static function canEdit(mixed $record): bool
+    {
+        return false;
+    }
+
+    public static function canDelete(mixed $record): bool
+    {
+        return false;
+    }
+
+    public static function canDeleteAny(): bool
+    {
+        return false;
+    }
 
     public static function getEloquentQuery(): Builder
     {
@@ -129,6 +147,7 @@ class ActivityLogResource extends Resource
                         }
 
                         $props = $record->properties->except(['old', 'attributes'])->toArray();
+
                         return $props
                             ? collect($props)->map(fn ($v, $k) => "{$k}: {$v}")->implode(', ')
                             : '—';
@@ -190,8 +209,13 @@ class ActivityLogResource extends Resource
                         ->when($data['until'] ?? null, fn ($q, $d) => $q->whereDate('created_at', '<=', $d)))
                     ->indicateUsing(function (array $data): array {
                         $out = [];
-                        if ($data['from'] ?? null)  { $out[] = 'From ' . $data['from']; }
-                        if ($data['until'] ?? null) { $out[] = 'Until ' . $data['until']; }
+                        if ($data['from'] ?? null) {
+                            $out[] = 'From '.$data['from'];
+                        }
+                        if ($data['until'] ?? null) {
+                            $out[] = 'Until '.$data['until'];
+                        }
+
                         return $out;
                     }),
             ])

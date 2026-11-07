@@ -50,21 +50,21 @@ class ShrinkageReadModel
             : 0.0;
 
         return [
-            'case_id'        => $case->id,
-            'vendor_id'      => $case->vendor_id,
-            'product_id'     => $case->product_id,
+            'case_id' => $case->id,
+            'vendor_id' => $case->vendor_id,
+            'product_id' => $case->product_id,
             'storekeeper_id' => $case->charged_storekeeper_id,
-            'status'         => $case->status,
+            'status' => $case->status,
 
             // COST-SENSITIVE — gate behind view_cost_price before display.
-            'charged_cost'   => round((float) $case->cost_component, 2),
+            'charged_cost' => round((float) $case->cost_component, 2),
             'charged_margin' => round((float) $case->margin_component, 2),
 
             // Retail. Safe to show without the cost permission.
-            'charge_total'   => round((float) $case->charge_amount, 2),
+            'charge_total' => round((float) $case->charge_amount, 2),
 
-            'recovered_total'  => $recoveredTotal,
-            'recovered_cost'   => $allocation['recovered_cost'],
+            'recovered_total' => $recoveredTotal,
+            'recovered_cost' => $allocation['recovered_cost'],
             'recovered_margin' => $allocation['recovered_margin'],
 
             // The only figure that is a real expense. Direction 'out'.
@@ -95,18 +95,18 @@ class ShrinkageReadModel
             ->when($to, fn ($q) => $q->whereDate('created_at', '<=', $to))
             ->get();
 
-        $shrinkage       = 0.0;
-        $recoveredCost   = 0.0;
+        $shrinkage = 0.0;
+        $recoveredCost = 0.0;
         $recoveredMargin = 0.0;
-        $marginForgone   = 0.0;
+        $marginForgone = 0.0;
 
         foreach ($cases as $case) {
             $row = $this->forCase($case);
 
-            $shrinkage       += $row['shrinkage_loss_at_cost'];
-            $recoveredCost   += $row['recovered_cost'];
+            $shrinkage += $row['shrinkage_loss_at_cost'];
+            $recoveredCost += $row['recovered_cost'];
             $recoveredMargin += $row['recovered_margin'];
-            $marginForgone   += $row['margin_forgone'];
+            $marginForgone += $row['margin_forgone'];
         }
 
         return [
@@ -115,7 +115,7 @@ class ShrinkageReadModel
 
             // Direction 'in' — both reduce the loss rather than being income,
             // because no sale took place.
-            'recovered_cost'   => round($recoveredCost, 2),
+            'recovered_cost' => round($recoveredCost, 2),
             'recovered_margin' => round($recoveredMargin, 2),
 
             // What the P&L should actually carry, once recoveries are applied.
@@ -131,8 +131,8 @@ class ShrinkageReadModel
 
             'direction' => [
                 'shrinkage_loss_at_cost' => 'out',
-                'recovered_cost'         => 'in',
-                'recovered_margin'       => 'in',
+                'recovered_cost' => 'in',
+                'recovered_margin' => 'in',
             ],
         ];
     }

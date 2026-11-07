@@ -20,10 +20,10 @@ uses(RefreshDatabase::class);
 
 function transferContext(): array
 {
-    $owner    = User::factory()->create();
-    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Zeelink Tech']);
-    $phones   = Store::create(['vendor_id' => $vendor->id, 'name' => 'Zeelink Phones', 'is_default' => true]);
-    $accs     = Store::create(['vendor_id' => $vendor->id, 'name' => 'Zeelink Accesories']);
+    $owner = User::factory()->create();
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Zeelink Tech']);
+    $phones = Store::create(['vendor_id' => $vendor->id, 'name' => 'Zeelink Phones', 'is_default' => true]);
+    $accs = Store::create(['vendor_id' => $vendor->id, 'name' => 'Zeelink Accesories']);
     $category = Category::create(['name' => 'Phones '.uniqid()]);
 
     return compact('owner', 'vendor', 'phones', 'accs', 'category');
@@ -52,13 +52,13 @@ it('moves every unit sitting in the wrong branch onto the right one', function (
 
     $this->artisan('stock:transfer', [
         'vendor' => $c['vendor']->id,
-        'from'   => $c['accs']->id,
-        '--to'   => $c['phones']->id,
+        'from' => $c['accs']->id,
+        '--to' => $c['phones']->id,
         '--force' => true,
     ])->assertSuccessful();
 
     $atPhones = ProductStoreStock::where('product_id', $product->id)->where('store_id', $c['phones']->id)->first();
-    $atAccs   = ProductStoreStock::where('product_id', $product->id)->where('store_id', $c['accs']->id)->first();
+    $atAccs = ProductStoreStock::where('product_id', $product->id)->where('store_id', $c['accs']->id)->first();
 
     expect($atPhones->quantity)->toBe(9)
         ->and($atAccs->quantity)->toBe(0);
@@ -158,10 +158,10 @@ it('can be pointed at a single product when only one line was wrong', function (
 });
 
 it('never touches another vendor stock sitting in their own store', function () {
-    $mine   = transferContext();
+    $mine = transferContext();
     $theirs = transferContext();
 
-    $myProduct    = misfiledProduct($mine, 'Mine', atPhones: 0, atAccessories: 5);
+    $myProduct = misfiledProduct($mine, 'Mine', atPhones: 0, atAccessories: 5);
     $theirProduct = misfiledProduct($theirs, 'Theirs', atPhones: 0, atAccessories: 5);
 
     $this->artisan('stock:transfer', [
@@ -174,13 +174,13 @@ it('never touches another vendor stock sitting in their own store', function () 
 });
 
 it('refuses a store that belongs to a different vendor', function () {
-    $mine   = transferContext();
+    $mine = transferContext();
     $theirs = transferContext();
 
     $this->artisan('stock:transfer', [
         'vendor' => $mine['vendor']->id,
-        'from'   => $theirs['accs']->id,
-        '--to'   => $mine['phones']->id,
+        'from' => $theirs['accs']->id,
+        '--to' => $mine['phones']->id,
         '--force' => true,
     ])->assertFailed();
 });

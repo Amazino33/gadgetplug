@@ -29,7 +29,7 @@ class OrdersTable
                 TextColumn::make('customer_name')
                     ->label('Customer')
                     ->searchable()
-                    ->description(fn(Order $record): string => $record->customer_phone),
+                    ->description(fn (Order $record): string => $record->customer_phone),
 
                 // The customer's own answer to "when do you want it", captured on
                 // the checkout success screen. Colour-coded because this column
@@ -44,32 +44,32 @@ class OrdersTable
                     ->placeholder('Not set')
                     ->formatStateUsing(fn ($state, Order $record) => $record->deliveryPreferenceLabel() ?? '—')
                     ->color(fn ($state, Order $record) => match (true) {
-                        $record->preferred_delivery_date === null     => 'gray',
-                        $record->preferred_delivery_date->isToday()   => 'danger',
-                        $record->preferred_delivery_date->isPast()    => 'danger',
-                        $record->preferred_delivery_date->isTomorrow()=> 'warning',
-                        default                                       => 'success',
+                        $record->preferred_delivery_date === null => 'gray',
+                        $record->preferred_delivery_date->isToday() => 'danger',
+                        $record->preferred_delivery_date->isPast() => 'danger',
+                        $record->preferred_delivery_date->isTomorrow() => 'warning',
+                        default => 'success',
                     }),
 
                 TextColumn::make('payment_method')
                     ->label('Payment')
                     ->badge()
-                    ->formatStateUsing(fn($state) => $state === 'pay_on_delivery' ? 'Pay on Delivery' : 'Paystack')
-                    ->color(fn($state) => $state === 'pay_on_delivery' ? 'warning' : 'success'),
+                    ->formatStateUsing(fn ($state) => $state === 'pay_on_delivery' ? 'Pay on Delivery' : 'Paystack')
+                    ->color(fn ($state) => $state === 'pay_on_delivery' ? 'warning' : 'success'),
 
                 TextColumn::make('status')
                     ->badge()
-                    ->formatStateUsing(fn($state) => OrderStatusService::LABELS[$state] ?? ucfirst($state))
-                    ->color(fn($state) => match($state) {
-                        'pending'               => 'gray',
-                        'confirmed'             => 'info',
-                        'paid'                  => 'success',
-                        'packed'                => 'info',
-                        'shipped'               => 'warning',
-                        'delivered'             => 'success',
-                        'cancelled'             => 'danger',
+                    ->formatStateUsing(fn ($state) => OrderStatusService::LABELS[$state] ?? ucfirst($state))
+                    ->color(fn ($state) => match ($state) {
+                        'pending' => 'gray',
+                        'confirmed' => 'info',
+                        'paid' => 'success',
+                        'packed' => 'info',
+                        'shipped' => 'warning',
+                        'delivered' => 'success',
+                        'cancelled' => 'danger',
                         'paid_but_failed_stock' => 'danger',
-                        default                 => 'gray',
+                        default => 'gray',
                     }),
 
                 TextColumn::make('total_amount')
@@ -90,7 +90,7 @@ class OrdersTable
                     ->label('Payment')
                     ->options([
                         'pay_on_delivery' => 'Pay on Delivery',
-                        'paystack'        => 'Paystack',
+                        'paystack' => 'Paystack',
                     ]),
             ])
             ->recordActions([
@@ -103,7 +103,7 @@ class OrdersTable
                         // The store's steps only — see OrderStatusService.
                         Select::make('status')
                             ->label('New Status')
-                            ->options(fn(Order $record) => OrderStatusService::storeOptionsFor($record))
+                            ->options(fn (Order $record) => OrderStatusService::storeOptionsFor($record))
                             ->live()
                             ->required(),
                     ])
@@ -114,7 +114,7 @@ class OrdersTable
                             Notification::make()->title($e instanceof AuthorizationException ? 'Only staff of the store holding this order can update it.' : $e->getMessage())->danger()->send();
                         }
                     })
-                    ->visible(fn(Order $record) => OrderStatusService::storeOptionsFor($record) !== []
+                    ->visible(fn (Order $record) => OrderStatusService::storeOptionsFor($record) !== []
                         && auth()->user()->can('fulfil', $record)),
             ]);
     }

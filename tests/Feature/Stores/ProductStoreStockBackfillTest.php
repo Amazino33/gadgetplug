@@ -7,6 +7,7 @@ use App\Models\ProductStoreStock;
 use App\Models\Store;
 use App\Models\User;
 use App\Models\Vendor;
+use App\Services\DefaultStore;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 
@@ -24,21 +25,21 @@ function makeStockVendor(): Vendor
 {
     return Vendor::create([
         'user_id' => User::factory()->create()->id,
-        'name'    => 'Stock Vendor '.uniqid(),
+        'name' => 'Stock Vendor '.uniqid(),
     ]);
 }
 
 function makeStockProduct(Vendor $vendor, int $quantity, int $reserved = 0): Product
 {
     return Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => Category::create(['name' => 'Cat '.uniqid()])->id,
-        'name'           => 'Stock Product '.uniqid(),
-        'price'          => 1000,
-        'cost_price'     => 600,
+        'vendor_id' => $vendor->id,
+        'category_id' => Category::create(['name' => 'Cat '.uniqid()])->id,
+        'name' => 'Stock Product '.uniqid(),
+        'price' => 1000,
+        'cost_price' => 600,
         'stock_quantity' => $quantity,
         'reserved_stock' => $reserved,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 }
 
@@ -59,8 +60,8 @@ test('a newly created vendor automatically gets exactly one default Main Store',
 test('seeding the default store twice does not create a second one', function () {
     $vendor = makeStockVendor();
 
-    $first = App\Services\DefaultStore::seedFor($vendor);
-    $second = App\Services\DefaultStore::seedFor($vendor);
+    $first = DefaultStore::seedFor($vendor);
+    $second = DefaultStore::seedFor($vendor);
 
     expect($second->id)->toBe($first->id)
         ->and(Store::where('vendor_id', $vendor->id)->count())->toBe(1);
@@ -207,10 +208,10 @@ test('existing ledger rows are backfilled to the vendor default store', function
     $product = makeStockProduct($vendor, 10);
 
     $ledger = InventoryLedger::create([
-        'vendor_id'        => $vendor->id,
-        'product_id'       => $product->id,
+        'vendor_id' => $vendor->id,
+        'product_id' => $product->id,
         'transaction_type' => 'restock',
-        'quantity_change'  => 10,
+        'quantity_change' => 10,
     ]);
 
     (require database_path('migrations/2026_08_15_110002_add_store_id_to_inventory_ledgers_table.php'))
@@ -225,10 +226,10 @@ test('the ledger store_id is nullable so untouched mutators keep writing', funct
     $product = makeStockProduct($vendor, 10);
 
     $ledger = InventoryLedger::create([
-        'vendor_id'        => $vendor->id,
-        'product_id'       => $product->id,
+        'vendor_id' => $vendor->id,
+        'product_id' => $product->id,
         'transaction_type' => 'pos_sale',
-        'quantity_change'  => -1,
+        'quantity_change' => -1,
     ]);
 
     expect($ledger->fresh()->store_id)->toBeNull();

@@ -15,21 +15,21 @@ uses(RefreshDatabase::class);
 
 function isolationVendor(string $name): array
 {
-    $owner  = User::factory()->create();
+    $owner = User::factory()->create();
     $vendor = Vendor::create(['user_id' => $owner->id, 'name' => $name, 'pos_min_margin_percent' => 0]);
-    $cat    = Category::create(['name' => 'Cat ' . uniqid()]);
+    $cat = Category::create(['name' => 'Cat '.uniqid()]);
 
     $product = Product::create([
-        'vendor_id'                => $vendor->id,
-        'category_id'              => $cat->id,
-        'name'                     => $name . ' Widget',
-        'price'                    => 10000,
-        'cost_price'               => 5000,
+        'vendor_id' => $vendor->id,
+        'category_id' => $cat->id,
+        'name' => $name.' Widget',
+        'price' => 10000,
+        'cost_price' => 5000,
         'allow_pos_price_override' => false,
-        'stock_quantity'           => 50,
-        'reserved_stock'           => 0,
-        'status'                   => 'published',
-        'show_in_pos'              => true,
+        'stock_quantity' => 50,
+        'reserved_stock' => 0,
+        'status' => 'published',
+        'show_in_pos' => true,
     ]);
 
     return compact('owner', 'vendor', 'product');
@@ -38,16 +38,16 @@ function isolationVendor(string $name): array
 function isolationSalePayload(int $vendorId, Product $product, int $qty = 1): array
 {
     return [
-        'vendor_id'      => $vendorId,
-        'items'          => [[
-            'product_id'   => $product->id,
+        'vendor_id' => $vendorId,
+        'items' => [[
+            'product_id' => $product->id,
             'product_name' => $product->name,
-            'unit_price'   => (float) $product->price,
-            'quantity'     => $qty,
+            'unit_price' => (float) $product->price,
+            'quantity' => $qty,
         ]],
-        'payment_method'  => 'cash',
+        'payment_method' => 'cash',
         'amount_tendered' => (float) $product->price * $qty,
-        'payments'        => null,
+        'payments' => null,
     ];
 }
 
@@ -58,7 +58,7 @@ it('does not let a cashier post a sale under a vendor they do not belong to', fu
     // Alpha's owner, authenticated, claims to be selling for Beta.
     Sanctum::actingAs($a['owner']);
 
-    $response = $this->postJson('/api/pos/sales', isolationSalePayload($b["vendor"]->id, $b['product']));
+    $response = $this->postJson('/api/pos/sales', isolationSalePayload($b['vendor']->id, $b['product']));
 
     expect($response->status())->toBeGreaterThanOrEqual(400);
     expect(PosSale::where('vendor_id', $b['vendor']->id)->count())->toBe(0);
@@ -71,7 +71,7 @@ it('does not let a cashier sell another vendor product through their own till', 
     Sanctum::actingAs($a['owner']);
 
     // Sale filed under Alpha, but the line item is Beta's product.
-    $response = $this->postJson('/api/pos/sales', isolationSalePayload($a["vendor"]->id, $b['product'], 5));
+    $response = $this->postJson('/api/pos/sales', isolationSalePayload($a['vendor']->id, $b['product'], 5));
 
     expect($response->status())->toBeGreaterThanOrEqual(400);
 
@@ -85,7 +85,7 @@ it('does not let a cashier void another vendor sale', function () {
 
     // Beta makes a legitimate sale.
     Sanctum::actingAs($b['owner']);
-    $this->postJson('/api/pos/sales', isolationSalePayload($b["vendor"]->id, $b['product']))->assertSuccessful();
+    $this->postJson('/api/pos/sales', isolationSalePayload($b['vendor']->id, $b['product']))->assertSuccessful();
     $betaSale = PosSale::where('vendor_id', $b['vendor']->id)->firstOrFail();
 
     // Alpha tries to void it.
@@ -102,8 +102,8 @@ it('does not leak another vendor product catalogue to the till', function () {
 
     Sanctum::actingAs($a['owner']);
 
-    $this->getJson('/api/pos/products?vendor_id=' . $b['vendor']->id)->assertForbidden();
-    $this->getJson('/api/pos/products/search?vendor_id=' . $b['vendor']->id . '&q=Beta')->assertForbidden();
+    $this->getJson('/api/pos/products?vendor_id='.$b['vendor']->id)->assertForbidden();
+    $this->getJson('/api/pos/products/search?vendor_id='.$b['vendor']->id.'&q=Beta')->assertForbidden();
 });
 
 it('does not leak another vendor sales history or customer list', function () {
@@ -112,8 +112,8 @@ it('does not leak another vendor sales history or customer list', function () {
 
     Sanctum::actingAs($a['owner']);
 
-    $this->getJson('/api/pos/sales/my-history?vendor_id=' . $b['vendor']->id)->assertForbidden();
-    $this->getJson('/api/pos/customers?vendor_id=' . $b['vendor']->id)->assertForbidden();
+    $this->getJson('/api/pos/sales/my-history?vendor_id='.$b['vendor']->id)->assertForbidden();
+    $this->getJson('/api/pos/customers?vendor_id='.$b['vendor']->id)->assertForbidden();
 });
 
 it('still lets a cashier work normally in their own store', function () {
@@ -121,8 +121,8 @@ it('still lets a cashier work normally in their own store', function () {
 
     Sanctum::actingAs($a['owner']);
 
-    $this->postJson('/api/pos/sales', isolationSalePayload($a["vendor"]->id, $a['product']))->assertSuccessful();
-    $this->getJson('/api/pos/products?vendor_id=' . $a['vendor']->id)->assertSuccessful();
+    $this->postJson('/api/pos/sales', isolationSalePayload($a['vendor']->id, $a['product']))->assertSuccessful();
+    $this->getJson('/api/pos/products?vendor_id='.$a['vendor']->id)->assertSuccessful();
 
     expect($a['product']->fresh()->stock_quantity)->toBe(49);
 });
@@ -139,7 +139,7 @@ it('lets a member of two vendors work in both, but no third', function () {
 
     Sanctum::actingAs($cashier);
 
-    $this->getJson('/api/pos/products?vendor_id=' . $a['vendor']->id)->assertSuccessful();
-    $this->getJson('/api/pos/products?vendor_id=' . $b['vendor']->id)->assertSuccessful();
-    $this->getJson('/api/pos/products?vendor_id=' . $c['vendor']->id)->assertForbidden();
+    $this->getJson('/api/pos/products?vendor_id='.$a['vendor']->id)->assertSuccessful();
+    $this->getJson('/api/pos/products?vendor_id='.$b['vendor']->id)->assertSuccessful();
+    $this->getJson('/api/pos/products?vendor_id='.$c['vendor']->id)->assertForbidden();
 });

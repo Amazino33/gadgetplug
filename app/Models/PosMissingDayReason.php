@@ -12,7 +12,7 @@ class PosMissingDayReason extends Model
 
     protected $casts = [
         'business_date' => 'date',
-        'given_on'      => 'date',
+        'given_on' => 'date',
     ];
 
     public function cashier(): BelongsTo

@@ -69,13 +69,13 @@ class RemindPackedOrdersCommand extends Command
 
         if (filled($to = config('messaging.ops_number'))) {
             $message = DeliveryMessage::create([
-                'vendor_id'      => null,
+                'vendor_id' => null,
                 'recipient_type' => 'ops',
-                'channel'        => 'whatsapp',
-                'to_number'      => $to,
-                'body'           => "*{$title}*\n\n{$lines}\n\nAssign a logistics company from the dispatch board.",
-                'status'         => 'queued',
-                'template_key'   => 'dispatch_packed_reminder',
+                'channel' => 'whatsapp',
+                'to_number' => $to,
+                'body' => "*{$title}*\n\n{$lines}\n\nAssign a logistics company from the dispatch board.",
+                'status' => 'queued',
+                'template_key' => 'dispatch_packed_reminder',
             ]);
 
             app(MessagingService::class)->dispatch($message);

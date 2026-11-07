@@ -31,7 +31,7 @@ class CustomerDebtOverview extends BaseWidget
     protected function getStats(): array
     {
         $vendor = Filament::getTenant();
-        $user   = auth()->user();
+        $user = auth()->user();
 
         if (! $vendor || ! $user) {
             return [];
@@ -43,13 +43,13 @@ class CustomerDebtOverview extends BaseWidget
             return [];
         }
 
-        $debt     = app(CustomerDebtService::class);
-        $url      = CustomerDebtResource::getUrl('index');
+        $debt = app(CustomerDebtService::class);
+        $url = CustomerDebtResource::getUrl('index');
         $vendorId = (int) $vendor->id;
 
         $stats = [
-            Stat::make('Still owed — all stores', '₦' . number_format($debt->vendorOutstanding($vendorId), 2))
-                ->description($this->customerCount($vendorId) . ' customer(s) yet to pay')
+            Stat::make('Still owed — all stores', '₦'.number_format($debt->vendorOutstanding($vendorId), 2))
+                ->description($this->customerCount($vendorId).' customer(s) yet to pay')
                 ->descriptionIcon('heroicon-m-banknotes')
                 ->color('danger')
                 ->url($url),
@@ -59,8 +59,8 @@ class CustomerDebtOverview extends BaseWidget
 
         if ($storeId) {
             $stats[] = Stat::make(
-                'Owed at ' . ($this->storeName($storeId) ?? 'this branch'),
-                '₦' . number_format($this->storeOutstanding($vendorId, $storeId), 2),
+                'Owed at '.($this->storeName($storeId) ?? 'this branch'),
+                '₦'.number_format($this->storeOutstanding($vendorId, $storeId), 2),
             )
                 // Said plainly: a customer who took credit at two branches is
                 // counted in both, so the branch figures can exceed the total
@@ -74,7 +74,7 @@ class CustomerDebtOverview extends BaseWidget
 
         $mine = $this->grantedBy($vendorId, (int) $user->id);
 
-        $stats[] = Stat::make('Credit you gave', '₦' . number_format($mine, 2))
+        $stats[] = Stat::make('Credit you gave', '₦'.number_format($mine, 2))
             ->description($mine > 0
                 ? 'Still outstanding from your sales'
                 : 'Nothing outstanding from your sales')

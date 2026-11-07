@@ -1,11 +1,19 @@
 <?php
 
+use App\Actions\VendorLink\PublishLinkedListingAction;
+use App\Models\Affiliate;
 use App\Models\FinancialLedgerEntry;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\Product;
+use App\Models\SupplierPayableEntry;
+use App\Models\User;
 use App\Models\WalletTransaction;
+use App\Services\VendorLink\SupplierPriceAtSale;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Artisan;
+use Spatie\Activitylog\Models\Activity;
 
 uses(RefreshDatabase::class);
 
@@ -60,7 +68,7 @@ it('books Paystack and wallet orders into Due with --force, dated when they were
     $this->travelTo(now()->addDays(5));
     $wallet = unbookedOrder($c, 'wallet', 'confirmed', 3000);
     WalletTransaction::create([
-        'affiliate_id' => App\Models\Affiliate::findOrCreateForUser(App\Models\User::factory()->create())->id,
+        'affiliate_id' => Affiliate::findOrCreateForUser(User::factory()->create())->id,
         'order_id' => $wallet->id, 'type' => 'debit', 'amount' => -3000, 'description' => 'Reseller purchase',
     ]);
     $debitAt = now()->toImmutable();
@@ -79,7 +87,7 @@ it('books Paystack and wallet orders into Due with --force, dated when they were
         ->and(Carbon::parse($wallet->revenue_recognized_at)->toDateTimeString())->toBe($debitAt->toDateTimeString())
         ->and($wallet->payment_channel)->toBe('wallet')
         ->and(Carbon::parse(FinancialLedgerEntry::where('source_id', $paystack->id)->where('source_type', $paystack->getMorphClass())->value('occurred_at'))->toDateString())
-            ->toBe($paidAt->toDateString());
+        ->toBe($paidAt->toDateString());
 });
 
 it('books nothing twice — a second run finds nothing to do', function () {
@@ -116,7 +124,7 @@ it('falls back to when stock was reserved on payment, then to the order date', f
     $order = unbookedOrder($c, 'paystack', 'paid', 7000);
 
     // No activity trail (e.g. imported data), but the payment reserved stock.
-    Spatie\Activitylog\Models\Activity::query()->delete();
+    Activity::query()->delete();
     $reservedAt = now()->subDays(3)->startOfMinute();
     $order->updateQuietly(['reserved_at' => $reservedAt]);
 
@@ -140,8 +148,8 @@ function unbookedResale(float $supplierPrice, ?float $lineSnapshot = null): arra
     $supplier = linkVendor('Backfill Wholesaler', online: false);
     $link = makeLink($reseller, $supplier, markup: 40);
     $source = linkProduct($supplier, price: $supplierPrice, stock: 20);
-    app(App\Actions\VendorLink\PublishLinkedListingAction::class)->execute($link, [$source->id]);
-    $listing = App\Models\Product::linked()->firstOrFail();
+    app(PublishLinkedListingAction::class)->execute($link, [$source->id]);
+    $listing = Product::linked()->firstOrFail();
 
     $order = Order::create([
         'reference' => 'BF-RS-'.uniqid(), 'customer_name' => 'Ada', 'customer_email' => 'ada@example.com',
@@ -163,7 +171,7 @@ it('books the supplier debt at the line\'s own snapshot when there is one', func
 
     $this->artisan('orders:backfill-due-revenue', ['--force' => true])->assertSuccessful();
 
-    expect((float) App\Models\SupplierPayableEntry::charges()->sole()->unit_cost)->toBe(9000.0);
+    expect((float) SupplierPayableEntry::charges()->sole()->unit_cost)->toBe(9000.0);
 });
 
 it('books the supplier debt at his price on the sale date, from his price history', function () {
@@ -175,13 +183,13 @@ it('books the supplier debt at his price on the sale date, from his price histor
     $r['source']->update(['price' => 15000]);
 
     $this->artisan('orders:backfill-due-revenue')
-        ->expectsOutputToContain(App\Services\VendorLink\SupplierPriceAtSale::FROM_HISTORY)
+        ->expectsOutputToContain(SupplierPriceAtSale::FROM_HISTORY)
         ->doesntExpectOutputToContain("would be booked at the supplier's price today")
         ->assertSuccessful();
 
     $this->artisan('orders:backfill-due-revenue', ['--force' => true])->assertSuccessful();
 
-    expect((float) App\Models\SupplierPayableEntry::charges()->sole()->unit_cost)->toBe(10000.0)
+    expect((float) SupplierPayableEntry::charges()->sole()->unit_cost)->toBe(10000.0)
         ->and((float) $r['item']->fresh()->unit_cost)->toBe(10000.0);
 });
 
@@ -189,11 +197,11 @@ it('falls back to today\'s price only with no record, and lists the line with bo
     $r = unbookedResale(supplierPrice: 10000);
 
     // No history at all for his product, and his price has moved.
-    Spatie\Activitylog\Models\Activity::query()->where('subject_id', $r['source']->id)->delete();
+    Activity::query()->where('subject_id', $r['source']->id)->delete();
     $r['source']->updateQuietly(['price' => 11500]);
 
-    Illuminate\Support\Facades\Artisan::call('orders:backfill-due-revenue');
-    $output = Illuminate\Support\Facades\Artisan::output();
+    Artisan::call('orders:backfill-due-revenue');
+    $output = Artisan::output();
 
     // One row: the order, today's price, the listing's last recorded cost,
     // and the difference per unit and per line (2 units).
@@ -202,5 +210,5 @@ it('falls back to today\'s price only with no record, and lists the line with bo
 
     $this->artisan('orders:backfill-due-revenue', ['--force' => true])->assertSuccessful();
 
-    expect((float) App\Models\SupplierPayableEntry::charges()->sole()->unit_cost)->toBe(11500.0);
+    expect((float) SupplierPayableEntry::charges()->sole()->unit_cost)->toBe(11500.0);
 });

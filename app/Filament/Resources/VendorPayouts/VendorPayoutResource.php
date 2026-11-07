@@ -28,6 +28,7 @@ class VendorPayoutResource extends Resource
     public static function getNavigationBadge(): ?string
     {
         $count = VendorPayout::where('status', 'pending')->count();
+
         return $count > 0 ? (string) $count : null;
     }
 

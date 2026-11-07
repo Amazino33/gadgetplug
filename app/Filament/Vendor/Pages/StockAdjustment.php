@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\Filament\Vendor\Pages;
 
-use App\Support\Quantity;
 use App\Actions\Inventory\AdjustStockAction;
 use App\Models\Product;
 use App\Models\ProductStoreStock;
+use App\Models\Store;
 use App\Services\ActiveStore;
+use App\Support\Quantity;
 use BackedEnum;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -41,11 +42,16 @@ class StockAdjustment extends Page
 {
     use WithPagination;
 
-    protected static null|string|BackedEnum $navigationIcon  = 'heroicon-o-adjustments-horizontal';
-    protected static string|null|UnitEnum   $navigationGroup = 'Inventory';
+    protected static null|string|BackedEnum $navigationIcon = 'heroicon-o-adjustments-horizontal';
+
+    protected static string|null|UnitEnum $navigationGroup = 'Inventory';
+
     protected static ?string $navigationLabel = 'Stock Adjustment';
-    protected static ?string $title           = 'Stock Adjustment';
+
+    protected static ?string $title = 'Stock Adjustment';
+
     protected static ?int $navigationSort = 3;
+
     protected string $view = 'filament.vendor.pages.stock-adjustment';
 
     /**
@@ -55,7 +61,7 @@ class StockAdjustment extends Page
      */
     public static function canAccess(): bool
     {
-        $user   = auth()->user();
+        $user = auth()->user();
         $vendor = filament()->getTenant();
 
         if (! $vendor) {
@@ -68,7 +74,8 @@ class StockAdjustment extends Page
     }
 
     public const REASON_SHEET = 'Opening stock from vendor sheet';
-    public const REASON_LIST  = 'Stock correction';
+
+    public const REASON_LIST = 'Stock correction';
 
     public const PER_PAGE = 25;
 
@@ -114,28 +121,30 @@ class StockAdjustment extends Page
     public function buildPreview(): void
     {
         $this->hasPreviewed = true;
-        $this->preview      = [];
+        $this->preview = [];
 
         $vendor = filament()->getTenant();
-        $lines  = preg_split('/\r\n|\r|\n/', trim($this->pasted)) ?: [];
-        $lines  = array_values(array_filter(array_map('trim', $lines), fn ($l) => $l !== ''));
+        $lines = preg_split('/\r\n|\r|\n/', trim($this->pasted)) ?: [];
+        $lines = array_values(array_filter(array_map('trim', $lines), fn ($l) => $l !== ''));
 
         if ($lines === []) {
             Notification::make()->title('Nothing pasted yet.')->warning()->send();
+
             return;
         }
 
         if (count($lines) > self::MAX_ROWS) {
             Notification::make()
                 ->title('That is a lot of rows')
-                ->body('Paste at most ' . self::MAX_ROWS . ' lines at a time so the page does not time out. ' . count($lines) . ' were pasted.')
+                ->body('Paste at most '.self::MAX_ROWS.' lines at a time so the page does not time out. '.count($lines).' were pasted.')
                 ->danger()
                 ->send();
+
             return;
         }
 
         // One query for the whole paste rather than one per line
-        $keys     = array_map(fn ($l) => $this->splitLine($l)[0], $lines);
+        $keys = array_map(fn ($l) => $this->splitLine($l)[0], $lines);
         $products = $this->lookup($vendor->id, array_filter($keys));
 
         $seen = [];
@@ -147,17 +156,20 @@ class StockAdjustment extends Page
 
             if ($key === '' || $qty === null) {
                 $this->preview[] = $this->row($line, null, null, 'Could not read this line');
+
                 continue;
             }
 
             if ($qty < 0) {
                 $this->preview[] = $this->row($line, null, null, 'Quantity cannot be negative');
+
                 continue;
             }
 
             // A half only for a shop that sells halves; 0 is a real count.
             if ($qty > 0 && ($error = Quantity::errorFor($vendor, $qty))) {
                 $this->preview[] = $this->row($line, null, null, $error);
+
                 continue;
             }
 
@@ -165,23 +177,25 @@ class StockAdjustment extends Page
 
             if (! $product) {
                 $this->preview[] = $this->row($line, null, $qty, 'No product with that SKU or barcode');
+
                 continue;
             }
 
             if (isset($seen[$product->id])) {
                 $this->preview[] = $this->row($line, $product, $qty, 'Listed more than once — only the first is applied');
+
                 continue;
             }
 
             $seen[$product->id] = true;
-            $this->preview[]    = $this->row($line, $product, $qty, null);
+            $this->preview[] = $this->row($line, $product, $qty, null);
         }
 
         $ok = collect($this->preview)->where('error', null)->count();
         $bad = count($this->preview) - $ok;
 
         Notification::make()
-            ->title("{$ok} ready to apply" . ($bad > 0 ? ", {$bad} need attention" : ''))
+            ->title("{$ok} ready to apply".($bad > 0 ? ", {$bad} need attention" : ''))
             ->body($bad > 0 ? 'Lines with a problem are skipped when you apply.' : 'Check the numbers, then apply.')
             ->{$bad > 0 ? 'warning' : 'success'}()
             ->send();
@@ -200,50 +214,54 @@ class StockAdjustment extends Page
 
         if (! $this->hasPreviewed) {
             Notification::make()->title('Preview the list first so you can see what will change.')->warning()->send();
+
             return;
         }
 
         if (trim($this->reason) === '') {
             $this->addError('reason', 'Give a reason — it is stored against every stock movement this creates.');
+
             return;
         }
 
-        $storeId  = ActiveStore::currentId();
-        $applied  = 0;
-        $skipped  = 0;
-        $failed   = [];
+        $storeId = ActiveStore::currentId();
+        $applied = 0;
+        $skipped = 0;
+        $failed = [];
 
         foreach ($this->preview as $row) {
             if ($row['error'] !== null || $row['product_id'] === null) {
                 $skipped++;
+
                 continue;
             }
 
             // Nothing to do when the sheet already agrees with the system
             if (Quantity::of($row['change']) === 0) {
                 $skipped++;
+
                 continue;
             }
 
             try {
                 $adjust->execute(
-                    productId:       (int) $row['product_id'],
+                    productId: (int) $row['product_id'],
                     quantityChanged: Quantity::of($row['change']),
                     transactionType: 'stock_adjustment',
-                    userId:          auth()->id(),
-                    reference:       'Stock adjustment',
-                    description:     trim($this->reason),
-                    store:           $storeId,
+                    userId: auth()->id(),
+                    reference: 'Stock adjustment',
+                    description: trim($this->reason),
+                    store: $storeId,
                 );
                 $applied++;
             } catch (\Throwable $e) {
-                $failed[] = $row['name'] . ': ' . $e->getMessage();
+                $failed[] = $row['name'].': '.$e->getMessage();
             }
         }
 
         if ($failed !== []) {
             Notification::make()
-                ->title(count($failed) . ' line(s) could not be applied')
+                ->title(count($failed).' line(s) could not be applied')
                 ->body(implode(' | ', array_slice($failed, 0, 3)))
                 ->danger()
                 ->send();
@@ -290,7 +308,7 @@ class StockAdjustment extends Page
     public function getProducts(): Paginator
     {
         $storeId = ActiveStore::currentId();
-        $term    = trim($this->search);
+        $term = trim($this->search);
 
         $query = Product::query()
             ->where('products.vendor_id', filament()->getTenant()->id)
@@ -326,18 +344,20 @@ class StockAdjustment extends Page
         abort_unless(static::canAccess(), 403);
 
         $vendor = filament()->getTenant();
-        $typed  = Quantity::parse($this->counts[$productId] ?? '');
+        $typed = Quantity::parse($this->counts[$productId] ?? '');
 
         // 0 or more; whole, or in halves (19½) for a shop that sells halves.
         if ($typed === null || $typed < 0 || ($typed > 0 && Quantity::errorFor($vendor, $typed))) {
             $this->addError("counts.{$productId}", Quantity::allowsHalves($vendor)
                 ? 'Enter 0 or more, in halves if needed — e.g. 19½.'
                 : 'Enter a whole number, 0 or more.');
+
             return;
         }
 
         if (trim($this->reason) === '') {
             $this->addError('reason', 'Give a reason — it is stored against every stock movement this creates.');
+
             return;
         }
 
@@ -351,7 +371,8 @@ class StockAdjustment extends Page
             ->find($productId);
 
         if (! $product) {
-            Notification::make()->title('That product is not stocked in ' . $this->getStoreName() . '.')->danger()->send();
+            Notification::make()->title('That product is not stocked in '.$this->getStoreName().'.')->danger()->send();
+
             return;
         }
 
@@ -362,16 +383,17 @@ class StockAdjustment extends Page
         if ($change !== 0) {
             try {
                 $adjust->execute(
-                    productId:       $product->id,
+                    productId: $product->id,
                     quantityChanged: $change,
                     transactionType: 'stock_adjustment',
-                    userId:          auth()->id(),
-                    reference:       'Stock adjustment',
-                    description:     trim($this->reason),
-                    store:           $storeId,
+                    userId: auth()->id(),
+                    reference: 'Stock adjustment',
+                    description: trim($this->reason),
+                    store: $storeId,
                 );
             } catch (\Throwable $e) {
                 Notification::make()->title("{$product->name} could not be updated")->body($e->getMessage())->danger()->send();
+
                 return;
             }
         }
@@ -388,8 +410,8 @@ class StockAdjustment extends Page
 
     public function clearAll(): void
     {
-        $this->pasted       = '';
-        $this->preview      = [];
+        $this->pasted = '';
+        $this->preview = [];
         $this->hasPreviewed = false;
     }
 
@@ -398,7 +420,7 @@ class StockAdjustment extends Page
         $id = ActiveStore::currentId();
 
         return $id
-            ? (\App\Models\Store::find($id)?->name ?? 'this store')
+            ? (Store::find($id)?->name ?? 'this store')
             : 'the default store';
     }
 
@@ -451,14 +473,14 @@ class StockAdjustment extends Page
         $current = $product ? $this->currentStock($product) : null;
 
         return [
-            'line'       => $line,
+            'line' => $line,
             'product_id' => $product?->id,
-            'name'       => $product?->name ?? $line,
-            'sku'        => $product?->sku ?? '',
-            'current'    => $current,
-            'target'     => $target,
-            'change'     => ($product && $target !== null) ? Quantity::sub($target, $current) : null,
-            'error'      => $error,
+            'name' => $product?->name ?? $line,
+            'sku' => $product?->sku ?? '',
+            'current' => $current,
+            'target' => $target,
+            'change' => ($product && $target !== null) ? Quantity::sub($target, $current) : null,
+            'error' => $error,
         ];
     }
 

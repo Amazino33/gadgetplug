@@ -12,8 +12,8 @@ class AffiliateClick extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'page_views'    => 'integer',
-        'qualified_at'  => 'datetime',
+        'page_views' => 'integer',
+        'qualified_at' => 'datetime',
         'reward_amount' => 'decimal:2',
     ];
 

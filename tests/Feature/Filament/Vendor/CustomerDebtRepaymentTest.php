@@ -8,13 +8,12 @@ use App\Models\FinancialAccount;
 use App\Models\FinancialLedgerEntry;
 use App\Models\PosCustomer;
 use App\Models\PosCustomerLedgerEntry;
-use App\Models\Store;
 use App\Models\User;
 use App\Services\Pos\CustomerDebtService;
 use App\Services\VendorRoles;
 use Database\Seeders\VendorPermissionsSeeder;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Filament\Facades\Filament;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -162,7 +161,7 @@ it('records a payment through the panel action, stamping the signed-in user', fu
 
     actAsDebtOwner($ctx);
 
-    $accountId = \App\Models\FinancialAccount::where('vendor_id', $ctx['vendor']->id)->where('type', 'cash')->value('id');
+    $accountId = FinancialAccount::where('vendor_id', $ctx['vendor']->id)->where('type', 'cash')->value('id');
 
     Livewire::test(ListCustomerDebts::class)
         ->callTableAction('recordPayment', $ctx['customer'], data: ['amount' => 4000, 'note' => 'Part payment', 'account_id' => $accountId])
@@ -194,7 +193,7 @@ it('renders the history with a running balance', function () {
 });
 
 it('never shows another vendor customer', function () {
-    $mine   = repaymentContext();
+    $mine = repaymentContext();
     $theirs = repaymentContext();
 
     actAsDebtOwner($mine);
@@ -216,7 +215,7 @@ it('never shows another vendor customer', function () {
 
 it('lets a store admin and a storekeeper in, and keeps a plain member out', function () {
     $ctx = repaymentContext();
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
     VendorRoles::seedFor($ctx['vendor']);
 
     $admin = User::factory()->create();
@@ -256,6 +255,6 @@ it('lets a store admin and a storekeeper in, and keeps a plain member out', func
 
 it('is never creatable, editable or deletable', function () {
     expect(CustomerDebtResource::canCreate())->toBeFalse()
-        ->and(CustomerDebtResource::canEdit(new PosCustomer()))->toBeFalse()
-        ->and(CustomerDebtResource::canDelete(new PosCustomer()))->toBeFalse();
+        ->and(CustomerDebtResource::canEdit(new PosCustomer))->toBeFalse()
+        ->and(CustomerDebtResource::canDelete(new PosCustomer))->toBeFalse();
 });

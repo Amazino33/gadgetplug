@@ -56,15 +56,15 @@ class WriteOffCustomerDebtAction
 
             return PosCustomerLedgerEntry::create([
                 'pos_customer_id' => $customer->id,
-                'vendor_id'       => $customer->vendor_id,
-                'direction'       => PosCustomerLedgerEntry::DIRECTION_WRITEOFF,
+                'vendor_id' => $customer->vendor_id,
+                'direction' => PosCustomerLedgerEntry::DIRECTION_WRITEOFF,
                 // Negative, like a payment: the sign convention is what keeps
                 // outstanding a plain SUM.
-                'amount'          => -1 * $outstanding,
-                'store_id'        => $storeId,
-                'created_by'      => $decidedBy->id,
-                'occurred_at'     => now()->toDateString(),
-                'description'     => 'Written off — ' . trim($reason),
+                'amount' => -1 * $outstanding,
+                'store_id' => $storeId,
+                'created_by' => $decidedBy->id,
+                'occurred_at' => now()->toDateString(),
+                'description' => 'Written off — '.trim($reason),
             ]);
         });
     }

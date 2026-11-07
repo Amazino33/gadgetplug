@@ -1,12 +1,15 @@
 <?php
 
 use App\Filament\Vendor\Resources\Products\Pages\CreateProduct;
+use App\Filament\Vendor\Resources\Products\Pages\EditProduct;
 use App\Filament\Vendor\Resources\Products\Pages\ListProducts;
 use App\Filament\Vendor\Resources\Products\Pages\ViewProduct;
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\Tag;
 use App\Models\User;
 use App\Models\Vendor;
+use Database\Factories\ProductFactory;
 use Database\Seeders\VendorPermissionsSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -16,10 +19,10 @@ uses(RefreshDatabase::class);
 
 function setUpProductVendor(): array
 {
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
 
-    $owner    = User::factory()->create();
-    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Pricing Test Store', 'online_sales_enabled' => true]);
+    $owner = User::factory()->create();
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Pricing Test Store', 'online_sales_enabled' => true]);
     $category = Category::create(['name' => 'Test Category']);
 
     return compact('owner', 'vendor', 'category');
@@ -29,13 +32,13 @@ test('profit, margin, and markup are computed correctly when cost price is set',
     $data = setUpProductVendor();
 
     $product = Product::create([
-        'vendor_id'      => $data['vendor']->id,
-        'category_id'    => $data['category']->id,
-        'name'           => 'Test Widget',
-        'price'          => 5000,
-        'cost_price'     => 3850,
+        'vendor_id' => $data['vendor']->id,
+        'category_id' => $data['category']->id,
+        'name' => 'Test Widget',
+        'price' => 5000,
+        'cost_price' => 3850,
         'stock_quantity' => 10,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
     expect($product->profit)->toEqualWithDelta(1150.0, 0.001)
@@ -47,13 +50,13 @@ test('profit, margin, and markup are null when cost price is missing, never fake
     $data = setUpProductVendor();
 
     $product = Product::create([
-        'vendor_id'      => $data['vendor']->id,
-        'category_id'    => $data['category']->id,
-        'name'           => 'No Cost Widget',
-        'price'          => 5000,
-        'cost_price'     => null,
+        'vendor_id' => $data['vendor']->id,
+        'category_id' => $data['category']->id,
+        'name' => 'No Cost Widget',
+        'price' => 5000,
+        'cost_price' => null,
         'stock_quantity' => 10,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
     expect($product->cost_price)->toBeNull()
@@ -72,9 +75,9 @@ test('the create form still blocks a selling price at or below cost price when c
     Livewire::test(CreateProduct::class)
         ->fillForm([
             'category_id' => $data['category']->id,
-            'name'        => 'Underpriced Widget',
-            'cost_price'  => 3000,
-            'price'       => 3000,
+            'name' => 'Underpriced Widget',
+            'cost_price' => 3000,
+            'price' => 3000,
         ])
         ->call('create')
         ->assertHasFormErrors(['price']);
@@ -92,9 +95,9 @@ test('the create form allows a price above cost price when cost price is visible
     Livewire::test(CreateProduct::class)
         ->fillForm([
             'category_id' => $data['category']->id,
-            'name'        => 'Properly Priced Widget',
-            'cost_price'  => 3000,
-            'price'       => 3001,
+            'name' => 'Properly Priced Widget',
+            'cost_price' => 3000,
+            'price' => 3001,
         ])
         ->call('create')
         ->assertHasNoFormErrors();
@@ -107,13 +110,13 @@ test('margin percent does not divide by zero when price is zero', function () {
     $data = setUpProductVendor();
 
     $product = Product::create([
-        'vendor_id'      => $data['vendor']->id,
-        'category_id'    => $data['category']->id,
-        'name'           => 'Free Sample',
-        'price'          => 0,
-        'cost_price'     => 100,
+        'vendor_id' => $data['vendor']->id,
+        'category_id' => $data['category']->id,
+        'name' => 'Free Sample',
+        'price' => 0,
+        'cost_price' => 100,
         'stock_quantity' => 10,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
     expect($product->margin_percent)->toBeNull();
@@ -138,15 +141,15 @@ test('the products table renders real rows in both table and grid mode without e
     $data = setUpProductVendor();
 
     Product::create([
-        'vendor_id'      => $data['vendor']->id,
-        'category_id'    => $data['category']->id,
-        'name'           => 'Table Render Widget',
-        'sku'            => 'TRW-001',
-        'brand'          => 'Acme',
-        'price'          => 4000,
-        'cost_price'     => 2500,
+        'vendor_id' => $data['vendor']->id,
+        'category_id' => $data['category']->id,
+        'name' => 'Table Render Widget',
+        'sku' => 'TRW-001',
+        'brand' => 'Acme',
+        'price' => 4000,
+        'cost_price' => 2500,
         'stock_quantity' => 5,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
     $this->actingAs($data['owner']);
@@ -171,13 +174,13 @@ test('grid mode renders a real multi-column CSS grid, and table mode does not', 
     $data = setUpProductVendor();
 
     Product::create([
-        'vendor_id'      => $data['vendor']->id,
-        'category_id'    => $data['category']->id,
-        'name'           => 'Grid Regression Widget',
-        'price'          => 1000,
-        'cost_price'     => 500,
+        'vendor_id' => $data['vendor']->id,
+        'category_id' => $data['category']->id,
+        'name' => 'Grid Regression Widget',
+        'price' => 1000,
+        'cost_price' => 500,
         'stock_quantity' => 5,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
     $this->actingAs($data['owner']);
@@ -258,15 +261,15 @@ test('the product view page shows pricing and stock data', function () {
     $data = setUpProductVendor();
 
     $product = Product::create([
-        'vendor_id'      => $data['vendor']->id,
-        'category_id'    => $data['category']->id,
-        'name'           => 'Viewable Widget',
-        'sku'            => 'VW-001',
-        'price'          => 5000,
-        'cost_price'     => 3850,
+        'vendor_id' => $data['vendor']->id,
+        'category_id' => $data['category']->id,
+        'name' => 'Viewable Widget',
+        'sku' => 'VW-001',
+        'price' => 5000,
+        'cost_price' => 3850,
         'stock_quantity' => 10,
         'reserved_stock' => 2,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
     $this->actingAs($data['owner']);
@@ -318,11 +321,11 @@ test('visibleOnline excludes products hidden from the storefront', function () {
 
     // Photo on both, so the only difference under test is show_online
     // (the photo rule has its own tests in Storefront/PhotoRequirementTest).
-    $onlineProduct = \Database\Factories\ProductFactory::new()->withPhoto()->create([
+    $onlineProduct = ProductFactory::new()->withPhoto()->create([
         'vendor_id' => $data['vendor']->id, 'category_id' => $data['category']->id,
         'name' => 'Online Widget', 'price' => 100, 'status' => 'published', 'show_online' => true,
     ]);
-    $hiddenProduct = \Database\Factories\ProductFactory::new()->withPhoto()->create([
+    $hiddenProduct = ProductFactory::new()->withPhoto()->create([
         'vendor_id' => $data['vendor']->id, 'category_id' => $data['category']->id,
         'name' => 'Hidden Widget', 'price' => 100, 'status' => 'published', 'show_online' => false,
     ]);
@@ -359,7 +362,7 @@ test('a product can be tagged and tags are scoped per vendor', function () {
         'name' => 'Tagged Widget', 'price' => 100, 'status' => 'published',
     ]);
 
-    $tag = \App\Models\Tag::create(['vendor_id' => $data['vendor']->id, 'name' => 'Premium']);
+    $tag = Tag::create(['vendor_id' => $data['vendor']->id, 'name' => 'Premium']);
     $product->tags()->attach($tag);
 
     expect($product->fresh()->tags->pluck('name')->all())->toBe(['Premium'])
@@ -379,7 +382,7 @@ test('the product edit form renders with the new pricing, inventory, channel, an
     Filament::setCurrentPanel(Filament::getPanel('vendor'));
     Filament::setTenant($data['vendor']);
 
-    Livewire::test(\App\Filament\Vendor\Resources\Products\Pages\EditProduct::class, ['record' => $product->getRouteKey()])
+    Livewire::test(EditProduct::class, ['record' => $product->getRouteKey()])
         ->assertOk()
         ->assertFormSet(['name' => 'Editable Widget', 'low_stock_threshold' => 7, 'show_online' => true, 'show_in_pos' => true]);
 });

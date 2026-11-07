@@ -14,17 +14,17 @@ uses(RefreshDatabase::class);
 
 function makeRateOverrideProduct(): Product
 {
-    $owner    = User::factory()->create();
-    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Rate Override Store ' . uniqid()]);
-    $category = Category::create(['name' => 'Rate Override Category ' . uniqid()]);
+    $owner = User::factory()->create();
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Rate Override Store '.uniqid()]);
+    $category = Category::create(['name' => 'Rate Override Category '.uniqid()]);
 
     return Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'name'           => 'Rate Override Product',
-        'price'          => 3000,
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'Rate Override Product',
+        'price' => 3000,
         'stock_quantity' => 10,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 }
 
@@ -48,7 +48,7 @@ test('a regular vendor owner cannot access the affiliate product rate resource',
 
 test('the affiliate product rate resource cannot create or delete', function () {
     expect(ProductResource::canCreate())->toBeFalse()
-        ->and(ProductResource::canDelete(new Product()))->toBeFalse();
+        ->and(ProductResource::canDelete(new Product))->toBeFalse();
 });
 
 test('a super admin can set a commission rate override on a product', function () {

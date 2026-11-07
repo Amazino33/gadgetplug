@@ -18,8 +18,8 @@ class LogisticsCompany extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'is_active'          => 'boolean',
-        'coverage_lga_ids'   => 'array',
+        'is_active' => 'boolean',
+        'coverage_lga_ids' => 'array',
         'coverage_state_ids' => 'array',
     ];
 

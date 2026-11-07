@@ -10,7 +10,6 @@ use App\Models\SupplierLink;
 use App\Services\VendorLink\Rounding\RoundingRules;
 use App\Services\VendorLink\SupplierCatalogue;
 use BackedEnum;
-use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Notifications\Notification;
@@ -20,6 +19,7 @@ use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Throwable;
 use UnitEnum;
 
@@ -39,11 +39,15 @@ class VendorLinkPage extends Page implements HasTable
     use InteractsWithForms;
     use InteractsWithTable;
 
-    protected static string|null|BackedEnum $navigationIcon  = 'heroicon-o-link';
-    protected static string|null|UnitEnum   $navigationGroup = 'Products';
-    protected static ?string                $navigationLabel = 'VendorLink';
-    protected static ?string                $title           = 'VendorLink — sell from a supplier';
-    protected static ?int                   $navigationSort  = 6;
+    protected static string|null|BackedEnum $navigationIcon = 'heroicon-o-link';
+
+    protected static string|null|UnitEnum $navigationGroup = 'Products';
+
+    protected static ?string $navigationLabel = 'VendorLink';
+
+    protected static ?string $title = 'VendorLink — sell from a supplier';
+
+    protected static ?int $navigationSort = 6;
 
     protected string $view = 'filament.vendor.pages.vendor-link';
 
@@ -61,9 +65,9 @@ class VendorLinkPage extends Page implements HasTable
      * Only ever links where this vendor is the RESELLER. A vendor must never
      * see, let alone publish from, a link somebody else was granted.
      *
-     * @return \Illuminate\Support\Collection<int, string>
+     * @return Collection<int, string>
      */
-    public function availableLinks(): \Illuminate\Support\Collection
+    public function availableLinks(): Collection
     {
         $vendor = filament()->getTenant();
 
@@ -71,7 +75,7 @@ class VendorLinkPage extends Page implements HasTable
             ->active()
             ->with('supplier')
             ->get();
-            
+
         return $links->mapWithKeys(function (SupplierLink $link) {
             return [$link->id => $link->supplierName()];
         });
@@ -203,7 +207,7 @@ class VendorLinkPage extends Page implements HasTable
     }
 
     /** Source products this vendor has already published from the current link. */
-    public function publishedSourceIds(): \Illuminate\Support\Collection
+    public function publishedSourceIds(): Collection
     {
         $link = $this->currentLink();
 

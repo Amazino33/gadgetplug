@@ -6,16 +6,18 @@ namespace App\Filament\Vendor\Widgets;
 
 use App\Models\Product;
 use App\Services\Pickings\PickingLedger;
+use App\Support\Quantity;
 use Filament\Facades\Filament;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
-use Livewire\Attributes\Reactive;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Support\Facades\DB;
+use Livewire\Attributes\Reactive;
 
 class InventoryOverviewWidget extends BaseWidget
 {
     protected static ?int $sort = 3;
-    protected null|string $pollingInterval = '30s';
+
+    protected ?string $pollingInterval = '30s';
 
     /**
      * The branch InventoryPage is reporting on, null for the whole business.
@@ -39,14 +41,14 @@ class InventoryOverviewWidget extends BaseWidget
         $base = Product::where('vendor_id', $vendorId)
             ->when($this->storeFilter, fn ($q) => $q->where('store_id', $this->storeFilter));
 
-        $totalSKUs   = (clone $base)->count();
-        $totalUnits  = \App\Support\Quantity::of((clone $base)->sum('stock_quantity'));
+        $totalSKUs = (clone $base)->count();
+        $totalUnits = Quantity::of((clone $base)->sum('stock_quantity'));
         $retailValue = (float) (clone $base)->sum(DB::raw('stock_quantity * price'));
-        $costValue   = (float) (clone $base)->sum(DB::raw('stock_quantity * cost_price'));
-        $profit      = $retailValue - $costValue;
-        $margin      = $retailValue > 0 ? ($profit / $retailValue) * 100 : 0.0;
-        $lowStock    = (clone $base)->where('stock_quantity', '>', 0)->where('stock_quantity', '<', 5)->count();
-        $outOfStock  = (clone $base)->where('stock_quantity', 0)->count();
+        $costValue = (float) (clone $base)->sum(DB::raw('stock_quantity * cost_price'));
+        $profit = $retailValue - $costValue;
+        $margin = $retailValue > 0 ? ($profit / $retailValue) * 100 : 0.0;
+        $lowStock = (clone $base)->where('stock_quantity', '>', 0)->where('stock_quantity', '<', 5)->count();
+        $outOfStock = (clone $base)->where('stock_quantity', 0)->count();
 
         // Goods out with pickers are still the vendor's — they can be asked for
         // back — so they belong in what the business owns. But they are not on
@@ -60,40 +62,40 @@ class InventoryOverviewWidget extends BaseWidget
                 ->descriptionIcon('heroicon-m-squares-2x2')
                 ->color('primary'),
 
-            Stat::make('Units in Stock', \App\Support\Quantity::display($totalUnits))
+            Stat::make('Units in Stock', Quantity::display($totalUnits))
                 ->description('Total individual items currently held')
                 ->descriptionIcon('heroicon-m-cube-transparent')
                 ->color('info'),
 
-            Stat::make('Stock Retail Value', '₦' . number_format($retailValue))
+            Stat::make('Stock Retail Value', '₦'.number_format($retailValue))
                 ->description('Revenue if all stock sells today')
                 ->descriptionIcon('heroicon-m-banknotes')
                 ->color('success'),
 
-            Stat::make('Stock Cost Value', '₦' . number_format($costValue))
+            Stat::make('Stock Cost Value', '₦'.number_format($costValue))
                 ->description('Capital tied up in current stock')
                 ->descriptionIcon('heroicon-m-receipt-percent')
                 ->color('warning'),
 
-            Stat::make('Gross Profit Potential', '₦' . number_format($profit))
-                ->description(number_format($margin, 1) . '% average gross margin on stock')
+            Stat::make('Gross Profit Potential', '₦'.number_format($profit))
+                ->description(number_format($margin, 1).'% average gross margin on stock')
                 ->descriptionIcon('heroicon-m-arrow-trending-up')
                 ->color($profit >= 0 ? 'success' : 'danger'),
 
-            Stat::make('Out on Picking', \App\Support\Quantity::display($onTrust['units']))
+            Stat::make('Out on Picking', Quantity::display($onTrust['units']))
                 ->description(
                     $onTrust['units'] > 0
-                        ? '₦' . number_format($onTrust['value']) . ' with pickers · ₦' . number_format($retailValue + $onTrust['value']) . ' owned in all'
+                        ? '₦'.number_format($onTrust['value']).' with pickers · ₦'.number_format($retailValue + $onTrust['value']).' owned in all'
                         : 'Nothing is out with pickers'
                 )
                 ->descriptionIcon('heroicon-m-hand-raised')
                 ->color($onTrust['units'] > 0 ? 'warning' : 'gray'),
 
-            Stat::make('Stock Alerts', $outOfStock . ' out of stock · ' . $lowStock . ' low')
+            Stat::make('Stock Alerts', $outOfStock.' out of stock · '.$lowStock.' low')
                 ->description(
                     $outOfStock > 0
-                        ? 'Restocking required on ' . $outOfStock . ' item(s)'
-                        : ($lowStock > 0 ? 'Running low on ' . $lowStock . ' item(s)' : 'All products well-stocked')
+                        ? 'Restocking required on '.$outOfStock.' item(s)'
+                        : ($lowStock > 0 ? 'Running low on '.$lowStock.' item(s)' : 'All products well-stocked')
                 )
                 ->descriptionIcon($outOfStock > 0 ? 'heroicon-m-exclamation-triangle' : 'heroicon-m-check-circle')
                 ->color($outOfStock > 0 ? 'danger' : ($lowStock > 0 ? 'warning' : 'success')),

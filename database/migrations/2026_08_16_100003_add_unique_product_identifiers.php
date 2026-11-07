@@ -63,7 +63,7 @@ return new class extends Migration
 
             throw new RuntimeException(
                 sprintf(
-                    "Cannot make %s unique: %d duplicate group(s) exist. %s. "
+                    'Cannot make %s unique: %d duplicate group(s) exist. %s. '
                     ."Run 'php artisan products:check-duplicates' for the full list, clear them, then migrate again. "
                     .'Nothing has been changed.',
                     $column,

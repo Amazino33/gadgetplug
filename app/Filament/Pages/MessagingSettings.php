@@ -2,18 +2,18 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Widgets\WhatsAppHealthWidget;
 use App\Models\PlatformMessagingSetting;
 use App\Models\Vendor;
 use App\Models\VendorNotificationSetting;
 use App\Services\Messaging\PhoneNumber;
 use App\Services\Messaging\WhatsAppGate;
-use Filament\Actions\Action;
 use BackedEnum;
+use Filament\Actions\Action;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
-use App\Filament\Widgets\WhatsAppHealthWidget;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Callout;
 use Filament\Schemas\Components\EmbeddedSchema;
@@ -22,6 +22,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Text;
 use Filament\Schemas\Components\UnorderedList;
 use Filament\Schemas\Schema;
+use Illuminate\Support\Collection;
 
 // Platform-owned WhatsApp settings, separate from each vendor's own page.
 // Exists because "was this online order announced to a store?" is GadgetPlug's
@@ -38,7 +39,6 @@ class MessagingSettings extends Page
     protected static ?string $title = 'Platform WhatsApp Settings';
 
     protected static ?int $navigationSort = 90;
-
 
     /** @var array<string, mixed> */
     public ?array $data = [];
@@ -116,8 +116,8 @@ class MessagingSettings extends Page
             ->statePath('data');
     }
 
-    /** @return \Illuminate\Support\Collection<int, string> */
-    private function unconfiguredVendors(): \Illuminate\Support\Collection
+    /** @return Collection<int, string> */
+    private function unconfiguredVendors(): Collection
     {
         $configured = VendorNotificationSetting::query()
             ->whereNotNull('storekeeper_whatsapp')
@@ -163,7 +163,7 @@ class MessagingSettings extends Page
     public function save(): void
     {
         $data = $this->form->getState();
-        $raw  = $data['fallback_storekeeper_whatsapp'] ?: null;
+        $raw = $data['fallback_storekeeper_whatsapp'] ?: null;
 
         if (filled($raw) && strlen((string) PhoneNumber::toNigerianInternational($raw)) !== 13) {
             Notification::make()

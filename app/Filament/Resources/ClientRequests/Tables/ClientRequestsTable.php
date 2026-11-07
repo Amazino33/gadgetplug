@@ -5,10 +5,10 @@ namespace App\Filament\Resources\ClientRequests\Tables;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
-use Filament\Tables\Table;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\ToggleColumn;
 use Filament\Tables\Filters\TernaryFilter;
+use Filament\Tables\Table;
 
 class ClientRequestsTable
 {
@@ -20,20 +20,20 @@ class ClientRequestsTable
                     ->searchable()
                     ->sortable()
                     ->weight('bold'),
-                
+
                 TextColumn::make('request_text')
                     ->label('The Task')
                     ->wrap()
                     ->searchable(),
-                
+
                 ToggleColumn::make('is_completed')
                     ->label('Done?')
                     ->sortable(),
-                
+
                 TextColumn::make('created_at')
                     ->label('Date')
                     ->date('M j, Y')
-                    ->sortable()
+                    ->sortable(),
             ])
             ->defaultSort('created_at', 'desc')
             ->filters([

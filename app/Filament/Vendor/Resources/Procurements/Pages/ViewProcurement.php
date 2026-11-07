@@ -3,14 +3,14 @@
 namespace App\Filament\Vendor\Resources\Procurements\Pages;
 
 use App\Filament\Support\QuantityInput;
-use App\Support\Quantity;
 use App\Filament\Vendor\Resources\Procurements\ProcurementResource;
 use App\Models\FinancialAccount;
 use App\Models\Procurement;
-use App\Models\ProcurementLogisticsLeg;
+use App\Models\ProcurementItem;
 use App\Services\ActiveStore;
 use App\Services\FinancialLedger;
 use App\Services\Procurement\ProcurementReview;
+use App\Support\Quantity;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
@@ -18,6 +18,7 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
+use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
@@ -35,7 +36,7 @@ class ViewProcurement extends ViewRecord
         return $schema->schema([
             Section::make('Procurement')->schema([
                 Placeholder::make('reference')->label('Reference')
-                    ->content(new HtmlString('<span class="font-bold font-mono">' . e($record->reference) . '</span>')),
+                    ->content(new HtmlString('<span class="font-bold font-mono">'.e($record->reference).'</span>')),
                 Placeholder::make('supplier')->label('Supplier')
                     ->content($record->supplier->name ?? '—'),
                 Placeholder::make('destination')->label('Deliver To')
@@ -45,22 +46,22 @@ class ViewProcurement extends ViewRecord
                 Placeholder::make('payment_status')->label('Payment')
                     ->content(new HtmlString($this->badge(
                         match ($record->payment_status) {
-                            'full'         => 'Fully Paid',
+                            'full' => 'Fully Paid',
                             'part_payment' => 'Part-Payment',
-                            'credit'       => 'Credit (₦0 paid)',
-                            default        => $record->payment_status,
+                            'credit' => 'Credit (₦0 paid)',
+                            default => $record->payment_status,
                         },
                         match ($record->payment_status) {
-                            'full'         => 'success',
+                            'full' => 'success',
                             'part_payment' => 'warning',
-                            'credit'       => 'danger',
-                            default        => 'gray',
+                            'credit' => 'danger',
+                            default => 'gray',
                         }
                     ))),
                 Placeholder::make('total_cost')->label('Total Cost')
-                    ->content('₦' . number_format($record->total_cost, 2)),
+                    ->content('₦'.number_format($record->total_cost, 2)),
                 Placeholder::make('amount_paid')->label('Amount Paid')
-                    ->content('₦' . number_format($record->amount_paid, 2)),
+                    ->content('₦'.number_format($record->amount_paid, 2)),
                 Placeholder::make('creator')->label('Logged By')
                     ->content($record->creator->name ?? '—'),
                 Placeholder::make('created_at')->label('Submitted')
@@ -84,7 +85,7 @@ class ViewProcurement extends ViewRecord
             Section::make('Waybill Image')->schema([
                 Placeholder::make('waybill')->label('')
                     ->content(new HtmlString(
-                        '<img src="' . asset('storage/' . $record->waybill_image) . '" class="max-h-72 rounded-xl object-contain border" />'
+                        '<img src="'.asset('storage/'.$record->waybill_image).'" class="max-h-72 rounded-xl object-contain border" />'
                     )),
             ])->visible((bool) $record->waybill_image),
 
@@ -93,12 +94,12 @@ class ViewProcurement extends ViewRecord
             // second frame around every line on a 360px screen.
             View::make('filament.vendor.procurement.review-cards')
                 ->viewData([
-                    'record'      => $record,
-                    'items'       => $record->items()->with(['product', 'corrections.correctedBy'])->get(),
+                    'record' => $record,
+                    'items' => $record->items()->with(['product', 'corrections.correctedBy'])->get(),
                     'statusBadge' => $this->statusBadgeHtml($record),
-                    'canApprove'  => auth()->user()->can('approve', $record)
+                    'canApprove' => auth()->user()->can('approve', $record)
                         && ProcurementResource::canApprove($record),
-                    'canCorrect'  => auth()->user()->can('correct', $record)
+                    'canCorrect' => auth()->user()->can('correct', $record)
                         && ProcurementResource::canApprove($record),
                 ]),
 
@@ -117,6 +118,7 @@ class ViewProcurement extends ViewRecord
     {
         $user = auth()->user();
         $vendor = filament()->getTenant();
+
         return
             [
                 Action::make('approve')
@@ -131,7 +133,7 @@ class ViewProcurement extends ViewRecord
                         $this->record->reference,
                         $this->record->verifiedQuantity(),
                         $this->record->store->name ?? 'the default store',
-                        '₦' . number_format($this->record->verifiedTotal(), 2),
+                        '₦'.number_format($this->record->verifiedTotal(), 2),
                     ))
                     // Visibility only mirrors the policy now. The policy is the
                     // gate — ProcurementReview refuses regardless of what this
@@ -147,7 +149,7 @@ class ViewProcurement extends ViewRecord
                             Notification::make()->title('Procurement Approved, Inventory Updated.')->success()->send();
                             $this->refreshFormData(['status', 'approved_by', 'approved_at', 'awaiting_user_id', 'total_cost']);
                         } catch (\Throwable $e) {
-                            Notification::make()->title('Error: ' . $e->getMessage())->danger()->send();
+                            Notification::make()->title('Error: '.$e->getMessage())->danger()->send();
                         }
                     }),
 
@@ -180,7 +182,7 @@ class ViewProcurement extends ViewRecord
                                 ->success()->send();
                             $this->refreshFormData(['status', 'awaiting_user_id']);
                         } catch (\Throwable $e) {
-                            Notification::make()->title('Error: ' . $e->getMessage())->danger()->send();
+                            Notification::make()->title('Error: '.$e->getMessage())->danger()->send();
                         }
                     }),
 
@@ -204,7 +206,7 @@ class ViewProcurement extends ViewRecord
                         && $user->hasVendorPermission($vendor->id, 'manage_procurement'))
                     ->action(function (array $data): void {
                         $account = FinancialAccount::findOrFail($data['financial_account_id']);
-                        $posted  = 0;
+                        $posted = 0;
 
                         foreach ($this->record->legs()->whereNull('posted_at')->get() as $leg) {
                             FinancialLedger::postEntry(
@@ -234,7 +236,7 @@ class ViewProcurement extends ViewRecord
                     ->form([
                         Textarea::make('void_reason')->label('Void Reason')
                             ->required()->minLength(10)
-                            ->placeholder('Explain why this record is being voided...')
+                            ->placeholder('Explain why this record is being voided...'),
                     ])
                     ->visible(fn () => $this->record->isOpen() && $user->hasVendorPermission($vendor->id, 'manage_inventory'))
                     ->action(function (array $data) {
@@ -251,12 +253,12 @@ class ViewProcurement extends ViewRecord
         $rows = '';
         foreach ($record->legs as $leg) {
             $status = $leg->isPosted()
-                ? $this->badge('Paid — ' . ($leg->financialAccount->name ?? '—'), 'success')
+                ? $this->badge('Paid — '.($leg->financialAccount->name ?? '—'), 'success')
                 : $this->badge('Unpaid', 'warning');
 
             $rows .= "<tr class='border-b border-gray-100 dark:border-gray-700'>
-                <td class='px-4 py-3 text-sm font-medium'>" . e($leg->route_label) . "</td>
-                <td class='px-4 py-3 text-sm'>₦" . number_format($leg->amount, 2) . "</td>
+                <td class='px-4 py-3 text-sm font-medium'>".e($leg->route_label)."</td>
+                <td class='px-4 py-3 text-sm'>₦".number_format($leg->amount, 2)."</td>
                 <td class='px-4 py-3 text-sm'>{$status}</td>
             </tr>";
         }
@@ -276,12 +278,12 @@ class ViewProcurement extends ViewRecord
                 <tfoot>
                     <tr>
                         <td class='px-4 py-3 text-sm font-bold'>Total</td>
-                        <td class='px-4 py-3 text-sm font-bold'>₦" . number_format($total, 2) . "</td>
+                        <td class='px-4 py-3 text-sm font-bold'>₦".number_format($total, 2).'</td>
                         <td></td>
                     </tr>
                 </tfoot>
             </table>
-        </div>";
+        </div>';
     }
 
     /**
@@ -296,7 +298,7 @@ class ViewProcurement extends ViewRecord
     {
         return Action::make('correctLine')
             ->modalHeading(fn (array $arguments) => 'Correct: '
-                . ($this->lineFor($arguments)?->product->name ?? 'Item'))
+                .($this->lineFor($arguments)?->product->name ?? 'Item'))
             ->modalDescription('Enter what you actually counted. The recorded figures are kept beside yours — nothing is overwritten — and the delivery goes back to the other party to agree.')
             ->modalSubmitActionLabel('Send Back')
             ->schema(fn (array $arguments) => $this->lineFields($this->lineFor($arguments)))
@@ -314,7 +316,7 @@ class ViewProcurement extends ViewRecord
                         $this->record,
                         auth()->user(),
                         [$item->id => [
-                            'quantity'  => $data['quantity'] ?? null,
+                            'quantity' => $data['quantity'] ?? null,
                             'unit_cost' => $data['unit_cost'] ?? null,
                         ]],
                         $data['correction_note'] ?? null,
@@ -327,13 +329,13 @@ class ViewProcurement extends ViewRecord
 
                     $this->refreshFormData(['status', 'awaiting_user_id']);
                 } catch (\Throwable $e) {
-                    Notification::make()->title('Error: ' . $e->getMessage())->danger()->send();
+                    Notification::make()->title('Error: '.$e->getMessage())->danger()->send();
                 }
             });
     }
 
     /** @param  array<string, mixed>  $arguments */
-    private function lineFor(array $arguments): ?\App\Models\ProcurementItem
+    private function lineFor(array $arguments): ?ProcurementItem
     {
         $id = $arguments['item'] ?? null;
 
@@ -347,9 +349,9 @@ class ViewProcurement extends ViewRecord
      * says. Nothing else is editable — the supplier and the product are facts
      * of the delivery, not opinions about it.
      *
-     * @return array<int, \Filament\Schemas\Components\Component>
+     * @return array<int, Component>
      */
-    private function lineFields(?\App\Models\ProcurementItem $item): array
+    private function lineFields(?ProcurementItem $item): array
     {
         if (! $item) {
             return [];
@@ -358,12 +360,12 @@ class ViewProcurement extends ViewRecord
         return [
             QuantityInput::apply(TextInput::make('quantity'), allowZero: true)
                 ->label('Quantity received')
-                ->helperText('Recorded: ' . Quantity::format($item->quantity, filament()->getTenant()))
+                ->helperText('Recorded: '.Quantity::format($item->quantity, filament()->getTenant()))
                 ->required()
                 ->default($item->verifiedQuantity()),
             TextInput::make('unit_cost')
                 ->label('Unit cost')
-                ->helperText('Recorded: ₦' . number_format((float) $item->unit_cost, 2))
+                ->helperText('Recorded: ₦'.number_format((float) $item->unit_cost, 2))
                 ->numeric()->minValue(0)->required()
                 ->prefix('₦')
                 ->default($item->verifiedUnitCost()),
@@ -378,16 +380,16 @@ class ViewProcurement extends ViewRecord
     {
         return $this->badge(
             match ($record->status) {
-                'pending'           => 'Awaiting Check',
+                'pending' => 'Awaiting Check',
                 'changes_requested' => 'Sent Back',
-                default             => ucfirst($record->status),
+                default => ucfirst($record->status),
             },
             match ($record->status) {
-                'pending'           => 'warning',
+                'pending' => 'warning',
                 'changes_requested' => 'info',
-                'approved'          => 'success',
-                'voided'            => 'danger',
-                default             => 'gray',
+                'approved' => 'success',
+                'voided' => 'danger',
+                default => 'gray',
             },
         );
     }
@@ -397,7 +399,7 @@ class ViewProcurement extends ViewRecord
      * to be, so agreeing with most of a delivery means changing only the line
      * that is wrong.
      *
-     * @return array<int, \Filament\Schemas\Components\Component>
+     * @return array<int, Component>
      */
     private function correctionFields(): array
     {
@@ -408,7 +410,7 @@ class ViewProcurement extends ViewRecord
                 ->description(sprintf(
                     'Recorded: %d @ %s',
                     $item->quantity,
-                    '₦' . number_format((float) $item->unit_cost, 2),
+                    '₦'.number_format((float) $item->unit_cost, 2),
                 ))
                 ->schema([
                     TextInput::make("lines.{$item->id}.quantity")
@@ -441,7 +443,7 @@ class ViewProcurement extends ViewRecord
 
         foreach ($data['lines'] ?? [] as $itemId => $values) {
             $lines[(int) $itemId] = [
-                'quantity'  => $values['quantity'] ?? null,
+                'quantity' => $values['quantity'] ?? null,
                 'unit_cost' => $values['unit_cost'] ?? null,
             ];
         }
@@ -454,10 +456,11 @@ class ViewProcurement extends ViewRecord
         $classes = match ($color) {
             'success' => 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
             'warning' => 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
-            'danger'  => 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-            'info'     => 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-            default   => 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
+            'danger' => 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+            'info' => 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+            default => 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
         };
+
         return "<span class='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold {$classes}'>{$label}</span>";
     }
 }

@@ -1,6 +1,8 @@
 <?php
 
 use App\Models\CashUpRectification;
+use App\Models\PosSession;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 require_once __DIR__.'/Helpers.php';
@@ -17,15 +19,15 @@ uses(RefreshDatabase::class);
 function rectify(array $ctx, array $attrs): CashUpRectification
 {
     $session = $attrs['session']
-        ?? App\Models\PosSession::forDay($ctx['cashier']->id, $ctx['store']->id, '2026-09-11')
+        ?? PosSession::forDay($ctx['cashier']->id, $ctx['store']->id, '2026-09-11')
         ?? openCashUp($ctx);
 
     unset($attrs['session']);
 
     return CashUpRectification::create(array_merge([
         'pos_session_id' => $session->id,
-        'vendor_id'          => $ctx['vendor']->id,
-        'created_by'         => $ctx['cashier']->id,
+        'vendor_id' => $ctx['vendor']->id,
+        'created_by' => $ctx['cashier']->id,
     ], $attrs));
 }
 
@@ -225,7 +227,7 @@ test('an idempotency key stops a retried push posting twice', function () {
 
     expect(fn () => rectify($ctx, [
         'session' => $session, 'kind' => 'expense', 'amount' => 1000, 'idempotency_key' => 'rect-abc',
-    ]))->toThrow(Illuminate\Database\QueryException::class);
+    ]))->toThrow(QueryException::class);
 });
 
 test('two genuine identical expenses are both kept', function () {

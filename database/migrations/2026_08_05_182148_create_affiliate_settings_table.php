@@ -26,13 +26,13 @@ return new class extends Migration
         });
 
         DB::table('affiliate_settings')->insert([
-            'id'                    => 1,
+            'id' => 1,
             'platform_default_rate' => 5.00,
-            'return_window_days'    => 3,
-            'cookie_window_days'    => 30,
-            'min_payout_amount'     => 2000.00,
-            'created_at'            => now(),
-            'updated_at'            => now(),
+            'return_window_days' => 3,
+            'cookie_window_days' => 30,
+            'min_payout_amount' => 2000.00,
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
     }
 

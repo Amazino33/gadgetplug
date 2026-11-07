@@ -3,25 +3,25 @@
 use App\Jobs\SendMetaConversionEventJob;
 use App\Models\Category;
 use App\Models\Product;
-use Database\Factories\ProductFactory;
 use App\Models\User;
 use App\Models\Vendor;
+use Database\Factories\ProductFactory;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Volt\Volt;
 
 function makeAddToCartPixelProduct(array $attrs = []): Product
 {
-    $owner    = User::factory()->create();
-    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Add To Cart Store ' . uniqid(), 'online_sales_enabled' => true]);
-    $category = Category::create(['name' => 'Add To Cart Category ' . uniqid()]);
+    $owner = User::factory()->create();
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Add To Cart Store '.uniqid(), 'online_sales_enabled' => true]);
+    $category = Category::create(['name' => 'Add To Cart Category '.uniqid()]);
 
     return ProductFactory::new()->withPhoto()->create(array_merge([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'name'           => 'Add To Cart Pixel Product',
-        'price'          => 4500,
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'Add To Cart Pixel Product',
+        'price' => 4500,
         'stock_quantity' => 10,
-        'status'         => 'published',
+        'status' => 'published',
     ], $attrs));
 }
 

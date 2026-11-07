@@ -31,7 +31,7 @@ class SettlementStatementController extends Controller
 
         return Pdf::loadView('settlements.statement', $this->payload($statement))
             ->setPaper('a4', 'portrait')
-            ->download($statement->reference . '.pdf');
+            ->download($statement->reference.'.pdf');
     }
 
     private function payload(StoreSettlementStatement $statement): array
@@ -48,7 +48,7 @@ class SettlementStatementController extends Controller
 
         return [
             'statement' => $statement,
-            'names'     => PosCustomer::whereIn('id', $ids)->pluck('name', 'id')->all(),
+            'names' => PosCustomer::whereIn('id', $ids)->pluck('name', 'id')->all(),
         ];
     }
 

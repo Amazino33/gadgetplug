@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Models\Vendor;
 use App\Services\Inventory\StoreStockMetrics;
 use App\Services\VendorRoles;
+use Database\Seeders\VendorPermissionsSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -19,20 +20,20 @@ function valuationVendor(): Vendor
 {
     return Vendor::create([
         'user_id' => User::factory()->create()->id,
-        'name'    => 'Valuation Vendor '.uniqid(),
+        'name' => 'Valuation Vendor '.uniqid(),
     ]);
 }
 
 function valuationProduct(Vendor $vendor, ?float $cost, float $price, int $qty, ?Store $store = null): Product
 {
     $product = Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => Category::create(['name' => 'Cat '.uniqid()])->id,
-        'name'           => 'Valuation Product '.uniqid(),
-        'price'          => $price,
-        'cost_price'     => $cost,
+        'vendor_id' => $vendor->id,
+        'category_id' => Category::create(['name' => 'Cat '.uniqid()])->id,
+        'name' => 'Valuation Product '.uniqid(),
+        'price' => $price,
+        'cost_price' => $cost,
         'stock_quantity' => 0,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
     $target = $store ?? $vendor->defaultStore;
@@ -151,7 +152,7 @@ test('an owner sees the cost value and the excluded-product warning', function (
 });
 
 test('a member without view_cost_price sees neither the cost value nor the warning', function () {
-    (new Database\Seeders\VendorPermissionsSeeder)->run();
+    (new VendorPermissionsSeeder)->run();
 
     $vendor = valuationVendor();
     valuationProduct($vendor, cost: null, price: 900.0, qty: 5);

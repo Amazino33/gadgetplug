@@ -3,12 +3,13 @@
 use App\Actions\CashUp\ApproveCashUpAction;
 use App\Actions\CashUp\RecordRectificationAction;
 use App\Models\AccountabilityLedgerEntry;
-use App\Models\PosSession;
+use App\Models\CashUpRectification;
 use App\Models\FinancialAccount;
 use App\Models\PosCustomer;
 use App\Models\PosCustomerLedgerEntry;
 use App\Models\PosSale;
 use App\Models\PosSalePayment;
+use App\Models\PosSession;
 use App\Models\User;
 use App\Services\Pos\CustomerDebtService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -23,19 +24,19 @@ function postingSale(array $ctx, array $over = []): PosSale
     $total = $over['total'] ?? 10000;
 
     return PosSale::create(array_merge([
-        'reference'       => 'POS-'.Str::random(10),
-        'vendor_id'       => $ctx['vendor']->id,
-        'store_id'        => $ctx['store']->id,
-        'cashier_id'      => $ctx['cashier']->id,
-        'subtotal'        => $total,
+        'reference' => 'POS-'.Str::random(10),
+        'vendor_id' => $ctx['vendor']->id,
+        'store_id' => $ctx['store']->id,
+        'cashier_id' => $ctx['cashier']->id,
+        'subtotal' => $total,
         'discount_amount' => 0,
-        'vat_amount'      => 0,
-        'total'           => $total,
-        'payment_method'  => 'cash',
+        'vat_amount' => 0,
+        'total' => $total,
+        'payment_method' => 'cash',
         'amount_tendered' => $total,
-        'change_given'    => 0,
-        'status'          => 'completed',
-        'completed_at'    => now(),
+        'change_given' => 0,
+        'status' => 'completed',
+        'completed_at' => now(),
     ], $over));
 }
 
@@ -51,7 +52,7 @@ function pendingCashUp(array $ctx, array $over = []): PosSession
     );
 }
 
-function rectifyAs(PosSession $session, User $manager, array $args): App\Models\CashUpRectification
+function rectifyAs(PosSession $session, User $manager, array $args): CashUpRectification
 {
     return app(RecordRectificationAction::class)->execute(
         session: $session,

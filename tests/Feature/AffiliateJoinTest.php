@@ -27,7 +27,7 @@ test('a guest visiting affiliate join and then logging in lands on the affiliate
 
     // Log in
     $response = $this->post(route('login.store'), [
-        'email'    => $user->email,
+        'email' => $user->email,
         'password' => 'password123',
     ]);
 
@@ -40,9 +40,9 @@ test('a guest visiting affiliate join and then registering lands on the affiliat
 
     // Register
     $response = $this->post(route('register.store'), [
-        'name'                  => 'Affiliate Applicant',
-        'email'                 => 'newaffiliate@example.com',
-        'password'              => 'Password123!',
+        'name' => 'Affiliate Applicant',
+        'email' => 'newaffiliate@example.com',
+        'password' => 'Password123!',
         'password_confirmation' => 'Password123!',
     ]);
 

@@ -16,18 +16,18 @@ use Laravel\Sanctum\Sanctum;
 
 function voidReturnContext(): array
 {
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
 
-    $owner    = User::factory()->create();
-    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Void Return Store']);
+    $owner = User::factory()->create();
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Void Return Store']);
     $category = Category::create(['name' => 'Void Return Category']);
-    $product  = Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'name'           => 'Void Return Product',
-        'price'          => 3000,
+    $product = Product::create([
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'Void Return Product',
+        'price' => 3000,
         'stock_quantity' => 10,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
     return compact('owner', 'vendor', 'product');
@@ -39,15 +39,15 @@ it('voids a completed sale and records a pos_void ledger entry without erroring'
 
     $sale = $this->postJson('/api/pos/sales', [
         'vendor_id' => $context['vendor']->id,
-        'items'     => [[
-            'product_id'   => $context['product']->id,
+        'items' => [[
+            'product_id' => $context['product']->id,
             'product_name' => 'Void Return Product',
-            'unit_price'   => 3000,
-            'quantity'     => 2,
+            'unit_price' => 3000,
+            'quantity' => 2,
         ]],
-        'payment_method'  => 'cash',
+        'payment_method' => 'cash',
         'amount_tendered' => 6000,
-        'vat_rate'        => 0,
+        'vat_rate' => 0,
     ])->json();
 
     $response = $this->postJson("/api/pos/sales/{$sale['id']}/void");
@@ -65,21 +65,21 @@ it('processes a return and records a pos_return ledger entry without erroring', 
 
     $sale = $this->postJson('/api/pos/sales', [
         'vendor_id' => $context['vendor']->id,
-        'items'     => [[
-            'product_id'   => $context['product']->id,
+        'items' => [[
+            'product_id' => $context['product']->id,
             'product_name' => 'Void Return Product',
-            'unit_price'   => 3000,
-            'quantity'     => 2,
+            'unit_price' => 3000,
+            'quantity' => 2,
         ]],
-        'payment_method'  => 'cash',
+        'payment_method' => 'cash',
         'amount_tendered' => 6000,
-        'vat_rate'        => 0,
+        'vat_rate' => 0,
     ])->json();
 
     $response = $this->postJson("/api/pos/sales/{$sale['id']}/return", [
         'items' => [[
             'product_id' => $context['product']->id,
-            'quantity'   => 1,
+            'quantity' => 1,
         ]],
         'refund_method' => 'cash',
     ]);

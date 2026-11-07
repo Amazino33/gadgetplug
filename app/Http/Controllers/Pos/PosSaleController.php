@@ -2,14 +2,11 @@
 
 namespace App\Http\Controllers\Pos;
 
-use App\Services\Pos\HalfPricing;
-use App\Rules\QuantityStep;
-use App\Support\Quantity;
 use App\Actions\Finance\RecognizePosSaleRevenueAction;
+use App\Actions\Inventory\AdjustStockAction;
 use App\Actions\Pos\ChargeCustomerDebtAction;
 use App\Actions\Pos\RecordSaleReversalAction;
 use App\Actions\Pos\ReverseCustomerDebtAction;
-use App\Actions\Inventory\AdjustStockAction;
 use App\Http\Controllers\Controller;
 use App\Models\PosCustomer;
 use App\Models\PosReturn;
@@ -19,10 +16,13 @@ use App\Models\PosSalePayment;
 use App\Models\Product;
 use App\Models\User;
 use App\Models\Vendor;
+use App\Rules\QuantityStep;
 use App\Services\Inventory\NegativeStock;
 use App\Services\Inventory\TillStore;
+use App\Services\Pos\HalfPricing;
 use App\Services\Pos\PosPriceFloor;
 use App\Services\Pos\SaleLineResolver;
+use App\Support\Quantity;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -48,15 +48,15 @@ class PosSaleController extends Controller
      */
     public static function exactRefund(PosSaleItem $line, int|float $alreadyReturned, int|float $quantity): float
     {
-        $sold   = Quantity::of($line->unit_qty ?? $line->quantity);
+        $sold = Quantity::of($line->unit_qty ?? $line->quantity);
         $factor = $line->unit_qty ? (float) $line->quantity / (float) $line->unit_qty : 1.0;
-        $price  = (float) ($line->sold_unit_price ?? $line->unit_price);
-        $half   = $line->half_unit_price !== null ? (float) $line->half_unit_price : null;
+        $price = (float) ($line->sold_unit_price ?? $line->unit_price);
+        $half = $line->half_unit_price !== null ? (float) $line->half_unit_price : null;
 
         $before = Quantity::of((float) $alreadyReturned / $factor);
-        $after  = Quantity::of(((float) $alreadyReturned + (float) $quantity) / $factor);
+        $after = Quantity::of(((float) $alreadyReturned + (float) $quantity) / $factor);
 
-        $gross    = HalfPricing::lineTotal($price, $half, $after) - HalfPricing::lineTotal($price, $half, $before);
+        $gross = HalfPricing::lineTotal($price, $half, $after) - HalfPricing::lineTotal($price, $half, $before);
         $discount = (float) $line->discount_amount * (($after - $before) / max($sold, 0.001));
 
         return round($gross - $discount, 2);
@@ -80,8 +80,8 @@ class PosSaleController extends Controller
     {
         return [
             'cost_estimated' => true,
-            'unit_cost'      => $costPrice,
-            'cost_total'     => $costPrice !== null
+            'unit_cost' => $costPrice,
+            'cost_total' => $costPrice !== null
                 ? round((float) $costPrice * Quantity::of($item['quantity']), 2)
                 : $batchCost,
         ];
@@ -104,54 +104,54 @@ class PosSaleController extends Controller
         $halvesVendor = Vendor::find($request->input('vendor_id'));
 
         $request->validate([
-            'vendor_id'                  => 'required|integer',
+            'vendor_id' => 'required|integer',
             // The till's own id for this checkout. Not required — an older
             // client may not send one — but when present it makes this endpoint
             // idempotent, which is what stops a lost response becoming a second
             // sale of the same goods.
-            'offline_id'                 => 'nullable|string|max:64',
+            'offline_id' => 'nullable|string|max:64',
             // Minted by the till so the QR on the paper can be printed before
             // the server has seen the sale. Uniqueness is checked below the
             // replay branch, not here: a replay carries its own token.
-            'public_token'               => ['nullable', 'string', 'regex:/\A[A-Za-z0-9]{16}\z/'],
+            'public_token' => ['nullable', 'string', 'regex:/\A[A-Za-z0-9]{16}\z/'],
             // Where and by whom the till says this sale was rung — the same
             // two fields the sync path honours.
-            'store_id'                   => 'nullable|integer',
-            'cashier_id'                 => 'nullable|integer',
-            'pos_session_id'             => 'nullable|integer',
-            'customer_id'                => 'nullable|integer',
-            'items'                      => 'required|array|min:1',
-            'items.*.product_id'         => 'required|integer',
-            'items.*.product_name'       => 'required|string',
-            'items.*.product_sku'        => 'nullable|string',
-            'items.*.unit_price'         => 'required|numeric|min:0',
+            'store_id' => 'nullable|integer',
+            'cashier_id' => 'nullable|integer',
+            'pos_session_id' => 'nullable|integer',
+            'customer_id' => 'nullable|integer',
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|integer',
+            'items.*.product_name' => 'required|string',
+            'items.*.product_sku' => 'nullable|string',
+            'items.*.unit_price' => 'required|numeric|min:0',
             // Whole, or a half-step for a shop that sells halves — by the
             // switch as it is right now. (Offline sync is kinder; see there.)
-            'items.*.quantity'           => ['required', 'numeric', new QuantityStep($halvesVendor)],
-            'items.*.discount_amount'    => 'nullable|numeric|min:0',
+            'items.*.quantity' => ['required', 'numeric', new QuantityStep($halvesVendor)],
+            'items.*.discount_amount' => 'nullable|numeric|min:0',
             // Selling units. All optional: a till without them sends the
             // lines it always did and they are read exactly as before.
-            'items.*.product_unit_id'    => 'nullable|integer',
-            'items.*.unit_qty'           => ['nullable', 'numeric', new QuantityStep($halvesVendor)],
-            'items.*.half_unit_price'    => 'nullable|numeric|min:0',
-            'items.*.price_type'         => 'nullable|in:retail,wholesale',
-            'discount_amount'            => 'nullable|numeric|min:0',
-            'discount_type'              => 'nullable|in:percentage,fixed',
-            'discount_scope'             => 'nullable|in:item,cart',
-            'discount_approved_by'       => 'nullable|integer',
-            'vat_rate'                   => 'nullable|numeric|min:0|max:100',
-            'payment_method'             => 'required|in:cash,card,bank_transfer,split,debt',
-            'amount_tendered'            => 'nullable|numeric|min:0',
-            'bank_transfer_reference'    => 'nullable|string|max:50',
+            'items.*.product_unit_id' => 'nullable|integer',
+            'items.*.unit_qty' => ['nullable', 'numeric', new QuantityStep($halvesVendor)],
+            'items.*.half_unit_price' => 'nullable|numeric|min:0',
+            'items.*.price_type' => 'nullable|in:retail,wholesale',
+            'discount_amount' => 'nullable|numeric|min:0',
+            'discount_type' => 'nullable|in:percentage,fixed',
+            'discount_scope' => 'nullable|in:item,cart',
+            'discount_approved_by' => 'nullable|integer',
+            'vat_rate' => 'nullable|numeric|min:0|max:100',
+            'payment_method' => 'required|in:cash,card,bank_transfer,split,debt',
+            'amount_tendered' => 'nullable|numeric|min:0',
+            'bank_transfer_reference' => 'nullable|string|max:50',
             // 'nullable' is required here even though 'required_if' is present:
             // every non-split sale sends `payments: null` explicitly (not
             // omitted), and without 'nullable' Laravel still runs 'array'/'min'
             // against that null value — rejecting EVERY plain cash/card/bank
             // transfer sale with "the payments field must be an array."
-            'payments'                   => 'nullable|required_if:payment_method,split|array|min:2',
-            'payments.*.method'          => 'required_if:payment_method,split|in:cash,card,bank_transfer,debt',
-            'payments.*.amount'          => 'required_if:payment_method,split|numeric|min:0.01',
-            'payments.*.reference'       => 'nullable|string|max:50',
+            'payments' => 'nullable|required_if:payment_method,split|array|min:2',
+            'payments.*.method' => 'required_if:payment_method,split|in:cash,card,bank_transfer,debt',
+            'payments.*.amount' => 'required_if:payment_method,split|numeric|min:0.01',
+            'payments.*.reference' => 'nullable|string|max:50',
         ]);
 
         // Debt has to be owed by somebody. The till blocks this at the payment
@@ -192,8 +192,8 @@ class PosSaleController extends Controller
         // twice. Both paths now name a sale the same way.
         $offlineId = $request->input('offline_id');
         $reference = $offlineId
-            ? 'POS-' . strtoupper(substr(md5($offlineId), 0, 8))
-            : 'POS-' . strtoupper(Str::random(8));
+            ? 'POS-'.strtoupper(substr(md5($offlineId), 0, 8))
+            : 'POS-'.strtoupper(Str::random(8));
 
         // A replay of a checkout that already landed returns the original sale
         // rather than ringing it up again.
@@ -216,7 +216,7 @@ class PosSaleController extends Controller
         // Lines sold in a unit become base quantities here, from the server's
         // own unit records. Lines without a unit come back untouched.
         $resolver = app(SaleLineResolver::class);
-        $lines    = $resolver->resolve($vendor, $request->items);
+        $lines = $resolver->resolve($vendor, $request->items);
         $products = $resolver->products();
 
         try {
@@ -225,182 +225,182 @@ class PosSaleController extends Controller
             // finish, and the killed one succeeds on a retry. Laravel re-runs
             // the closure for exactly this class of error.
             $sale = DB::transaction(function () use ($request, $adjustStock, $priceFloor, $vendor, $revenue, $reference, $storeId, $lines, $products) {
-            $subtotal = collect($lines)->sum(function ($item) {
-                return $item['line_gross'] - ($item['discount_amount'] ?? 0);
-            });
+                $subtotal = collect($lines)->sum(function ($item) {
+                    return $item['line_gross'] - ($item['discount_amount'] ?? 0);
+                });
 
-            $cartDiscount = (float) ($request->discount_amount ?? 0);
+                $cartDiscount = (float) ($request->discount_amount ?? 0);
 
-            // Prices arrive from the till, so they're a claim rather than a
-            // fact — nothing above this point stops a client posting any price
-            // it likes. Checked on the pre-VAT goods value: VAT is collected on
-            // the customer's behalf, not margin the store gets to give away.
-            $priceFloor->guard($vendor, $lines, $subtotal - $cartDiscount);
+                // Prices arrive from the till, so they're a claim rather than a
+                // fact — nothing above this point stops a client posting any price
+                // it likes. Checked on the pre-VAT goods value: VAT is collected on
+                // the customer's behalf, not margin the store gets to give away.
+                $priceFloor->guard($vendor, $lines, $subtotal - $cartDiscount);
 
-            $vatRate      = (float) ($request->vat_rate ?? 7.5);
-            $vatAmount    = round(($subtotal - $cartDiscount) * ($vatRate / 100), 2);
-            $total        = $subtotal - $cartDiscount + $vatAmount;
-            $isSplit      = $request->payment_method === 'split';
+                $vatRate = (float) ($request->vat_rate ?? 7.5);
+                $vatAmount = round(($subtotal - $cartDiscount) * ($vatRate / 100), 2);
+                $total = $subtotal - $cartDiscount + $vatAmount;
+                $isSplit = $request->payment_method === 'split';
 
-            // For split: cash tendered = sum of cash portions; change = cash tendered - cash owed
-            $cashTendered = $isSplit
-                ? collect($request->payments)->where('method', 'cash')->sum('amount')
-                : (float) ($request->amount_tendered ?? $total);
-            $change = max(0, $cashTendered - ($isSplit
-                ? collect($request->payments)->where('method', 'cash')->sum('amount') - max(0, collect($request->payments)->sum('amount') - $total)
-                : $total));
+                // For split: cash tendered = sum of cash portions; change = cash tendered - cash owed
+                $cashTendered = $isSplit
+                    ? collect($request->payments)->where('method', 'cash')->sum('amount')
+                    : (float) ($request->amount_tendered ?? $total);
+                $change = max(0, $cashTendered - ($isSplit
+                    ? collect($request->payments)->where('method', 'cash')->sum('amount') - max(0, collect($request->payments)->sum('amount') - $total)
+                    : $total));
 
-            // Simpler change calculation: total tendered minus total due
-            $totalTendered = $isSplit
-                ? collect($request->payments)->sum('amount')
-                : $cashTendered;
-            $change = max(0, $totalTendered - $total);
+                // Simpler change calculation: total tendered minus total due
+                $totalTendered = $isSplit
+                    ? collect($request->payments)->sum('amount')
+                    : $cashTendered;
+                $change = max(0, $totalTendered - $total);
 
-            $sale = PosSale::create([
-                'reference'               => $reference,
-                'public_token'            => $request->public_token,
-                'vendor_id'               => $request->vendor_id,
-                // The branch the till was rung in — see TillStore::forSale().
-                'store_id'                => $storeId,
-                'pos_session_id'          => $request->pos_session_id,
-                'cashier_id'              => $request->user()->id,
-                'customer_id'             => $request->customer_id,
-                'subtotal'                => $subtotal,
-                'discount_amount'         => $cartDiscount,
-                'discount_type'           => $request->discount_type,
-                'discount_scope'          => $request->discount_scope,
-                'discount_approved_by'    => $request->discount_approved_by,
-                'vat_amount'              => $vatAmount,
-                'total'                   => $total,
-                'payment_method'          => $request->payment_method,
-                'amount_tendered'         => $isSplit ? $totalTendered : $cashTendered,
-                'change_given'            => $change,
-                'bank_transfer_reference' => $isSplit ? null : $request->bank_transfer_reference,
-                'status'                  => 'completed',
-                'synced'                  => true,
-                'synced_at'               => now(),
-                'completed_at'            => now(),
-            ]);
+                $sale = PosSale::create([
+                    'reference' => $reference,
+                    'public_token' => $request->public_token,
+                    'vendor_id' => $request->vendor_id,
+                    // The branch the till was rung in — see TillStore::forSale().
+                    'store_id' => $storeId,
+                    'pos_session_id' => $request->pos_session_id,
+                    'cashier_id' => $request->user()->id,
+                    'customer_id' => $request->customer_id,
+                    'subtotal' => $subtotal,
+                    'discount_amount' => $cartDiscount,
+                    'discount_type' => $request->discount_type,
+                    'discount_scope' => $request->discount_scope,
+                    'discount_approved_by' => $request->discount_approved_by,
+                    'vat_amount' => $vatAmount,
+                    'total' => $total,
+                    'payment_method' => $request->payment_method,
+                    'amount_tendered' => $isSplit ? $totalTendered : $cashTendered,
+                    'change_given' => $change,
+                    'bank_transfer_reference' => $isSplit ? null : $request->bank_transfer_reference,
+                    'status' => 'completed',
+                    'synced' => true,
+                    'synced_at' => now(),
+                    'completed_at' => now(),
+                ]);
 
-            // Write split payment rows
-            if ($isSplit) {
-                foreach ($request->payments as $p) {
+                // Write split payment rows
+                if ($isSplit) {
+                    foreach ($request->payments as $p) {
+                        PosSalePayment::create([
+                            'pos_sale_id' => $sale->id,
+                            'method' => $p['method'],
+                            'amount' => $p['amount'],
+                            'reference' => $p['reference'] ?? null,
+                        ]);
+                    }
+                }
+
+                // A sale paid entirely on credit is not a split, but it still gets a
+                // tender row. Every downstream reader then answers "how much of this
+                // walked out unpaid?" the same way — by summing debt tenders —
+                // instead of special-casing the sale-level columns.
+                if ($request->payment_method === 'debt') {
                     PosSalePayment::create([
                         'pos_sale_id' => $sale->id,
-                        'method'      => $p['method'],
-                        'amount'      => $p['amount'],
-                        'reference'   => $p['reference'] ?? null,
+                        'method' => 'debt',
+                        'amount' => $total,
+                        'reference' => null,
                     ]);
                 }
-            }
 
-            // A sale paid entirely on credit is not a split, but it still gets a
-            // tender row. Every downstream reader then answers "how much of this
-            // walked out unpaid?" the same way — by summing debt tenders —
-            // instead of special-casing the sale-level columns.
-            if ($request->payment_method === 'debt') {
-                PosSalePayment::create([
-                    'pos_sale_id' => $sale->id,
-                    'method'      => 'debt',
-                    'amount'      => $total,
-                    'reference'   => null,
-                ]);
-            }
+                // Cost is read once up front rather than per line: profit reporting
+                // needs what each item cost AT THIS MOMENT, and a later restock must
+                // not retroactively change what this sale earned.
+                $costPrices = Product::whereIn('id', collect($lines)->pluck('product_id'))
+                    ->pluck('cost_price', 'id');
 
-            // Cost is read once up front rather than per line: profit reporting
-            // needs what each item cost AT THIS MOMENT, and a later restock must
-            // not retroactively change what this sale earned.
-            $costPrices = Product::whereIn('id', collect($lines)->pluck('product_id'))
-                ->pluck('cost_price', 'id');
+                // Kept against the payload's own line numbers, so the batch cost
+                // worked out during the stock pass below lands back on the right
+                // line even when the same product appears on the cart twice.
+                $saleItems = [];
 
-            // Kept against the payload's own line numbers, so the batch cost
-            // worked out during the stock pass below lands back on the right
-            // line even when the same product appears on the cart twice.
-            $saleItems = [];
+                foreach ($lines as $line => $item) {
+                    $lineDiscount = (float) ($item['discount_amount'] ?? 0);
+                    $lineTotal = $item['line_gross'] - $lineDiscount;
 
-            foreach ($lines as $line => $item) {
-                $lineDiscount = (float) ($item['discount_amount'] ?? 0);
-                $lineTotal    = $item['line_gross'] - $lineDiscount;
+                    $saleItems[$line] = PosSaleItem::create([
+                        'pos_sale_id' => $sale->id,
+                        'product_id' => $item['product_id'],
+                        'product_name' => $item['product_name'],
+                        'product_sku' => $item['product_sku'] ?? null,
+                        'product_unit_id' => $item['product_unit_id'],
+                        'unit_name' => $item['unit_name'],
+                        'unit_qty' => $item['unit_qty'],
+                        'sold_unit_price' => $item['sold_unit_price'],
+                        'half_unit_price' => $item['half_unit_price'] ?? null,
+                        'price_type' => $item['price_type'],
+                        'unit_price' => $item['unit_price'],
+                        'unit_cost' => $costPrices[$item['product_id']] ?? null,
+                        'quantity' => $item['quantity'],
+                        'discount_amount' => $lineDiscount,
+                        'total' => $lineTotal,
+                    ]);
 
-                $saleItems[$line] = PosSaleItem::create([
-                    'pos_sale_id'  => $sale->id,
-                    'product_id'   => $item['product_id'],
-                    'product_name' => $item['product_name'],
-                    'product_sku'  => $item['product_sku'] ?? null,
-                    'product_unit_id' => $item['product_unit_id'],
-                    'unit_name'       => $item['unit_name'],
-                    'unit_qty'        => $item['unit_qty'],
-                    'sold_unit_price' => $item['sold_unit_price'],
-                    'half_unit_price' => $item['half_unit_price'] ?? null,
-                    'price_type'      => $item['price_type'],
-                    'unit_price'   => $item['unit_price'],
-                    'unit_cost'    => $costPrices[$item['product_id']] ?? null,
-                    'quantity'     => $item['quantity'],
-                    'discount_amount' => $lineDiscount,
-                    'total'        => $lineTotal,
-                ]);
-
-            }
-
-            // Stock is deducted in a second pass, ordered by product id.
-            //
-            // AdjustStockAction takes a row lock on each product. Walking the
-            // cart in its own order means two tills selling the same two
-            // products in opposite orders each hold what the other needs — a
-            // deadlock, which MySQL resolves by killing one sale outright. That
-            // is the "Serialization failure: 1213" the cashiers were seeing.
-            // A single agreed order makes the cycle impossible to form.
-            // keys() rather than values(): the line numbers are what tie each
-            // movement back to the sale line it belongs to, and the sort still
-            // gives the single agreed product order the deadlock fix needs.
-            $stockOrder = collect($lines)->sortBy('product_id')->keys();
-
-            foreach ($stockOrder as $line) {
-                $item = $lines[$line];
-                $product = $products->get((int) $item['product_id']);
-
-                // Deduct physical stock immediately (POS = item leaves the shelf now)
-                $ledger = $adjustStock->execute(
-                    productId: $item['product_id'],
-                    quantityChanged: -$item['quantity'],
-                    transactionType: 'pos_sale',
-                    userId: $request->user()->id,
-                    reference: $sale->reference,
-                    description: self::stockDescription('Shop sale', $item),
-                    // Off the shelf the customer is standing at, not the
-                    // vendor's default branch.
-                    store: $sale->store_id,
-                    // Refused below zero unless the shop (or this product) has
-                    // chosen to allow it — in which case the sale goes through
-                    // and the shortfall shows on the Negative Stock report.
-                    allowNegative: $product ? NegativeStock::allowed($product, $vendor) : false,
-                );
-
-                // What these units genuinely cost, from the batches they came
-                // out of, rather than the product's current cost_price the line
-                // was provisionally stamped with above. Left alone when the
-                // batches could not say — the unit_cost snapshot still stands
-                // as the fallback, exactly as before.
-                if ($adjustStock->lastShortfall > 0) {
-                    $saleItems[$line]->update(self::estimatedCost($item, $costPrices[$item['product_id']] ?? null, $ledger?->cost_total));
-                } elseif ($ledger?->cost_total !== null) {
-                    $saleItems[$line]->update(['cost_total' => $ledger->cost_total]);
                 }
-            }
 
-            // Update customer spend stats
-            if ($sale->customer_id) {
-                PosCustomer::where('id', $sale->customer_id)->increment('total_spent', $total);
-                PosCustomer::where('id', $sale->customer_id)->increment('total_transactions');
-            }
+                // Stock is deducted in a second pass, ordered by product id.
+                //
+                // AdjustStockAction takes a row lock on each product. Walking the
+                // cart in its own order means two tills selling the same two
+                // products in opposite orders each hold what the other needs — a
+                // deadlock, which MySQL resolves by killing one sale outright. That
+                // is the "Serialization failure: 1213" the cashiers were seeing.
+                // A single agreed order makes the cycle impossible to form.
+                // keys() rather than values(): the line numbers are what tie each
+                // movement back to the sale line it belongs to, and the sort still
+                // gives the single agreed product order the deadlock fix needs.
+                $stockOrder = collect($lines)->sortBy('product_id')->keys();
 
-            // Inside the sale's transaction: goods leaving on credit and the
-            // debt that records it must land together or not at all.
-            app(ChargeCustomerDebtAction::class)->execute($sale);
+                foreach ($stockOrder as $line) {
+                    $item = $lines[$line];
+                    $product = $products->get((int) $item['product_id']);
 
-            $revenue->execute($sale);
+                    // Deduct physical stock immediately (POS = item leaves the shelf now)
+                    $ledger = $adjustStock->execute(
+                        productId: $item['product_id'],
+                        quantityChanged: -$item['quantity'],
+                        transactionType: 'pos_sale',
+                        userId: $request->user()->id,
+                        reference: $sale->reference,
+                        description: self::stockDescription('Shop sale', $item),
+                        // Off the shelf the customer is standing at, not the
+                        // vendor's default branch.
+                        store: $sale->store_id,
+                        // Refused below zero unless the shop (or this product) has
+                        // chosen to allow it — in which case the sale goes through
+                        // and the shortfall shows on the Negative Stock report.
+                        allowNegative: $product ? NegativeStock::allowed($product, $vendor) : false,
+                    );
 
-            return $sale;
+                    // What these units genuinely cost, from the batches they came
+                    // out of, rather than the product's current cost_price the line
+                    // was provisionally stamped with above. Left alone when the
+                    // batches could not say — the unit_cost snapshot still stands
+                    // as the fallback, exactly as before.
+                    if ($adjustStock->lastShortfall > 0) {
+                        $saleItems[$line]->update(self::estimatedCost($item, $costPrices[$item['product_id']] ?? null, $ledger?->cost_total));
+                    } elseif ($ledger?->cost_total !== null) {
+                        $saleItems[$line]->update(['cost_total' => $ledger->cost_total]);
+                    }
+                }
+
+                // Update customer spend stats
+                if ($sale->customer_id) {
+                    PosCustomer::where('id', $sale->customer_id)->increment('total_spent', $total);
+                    PosCustomer::where('id', $sale->customer_id)->increment('total_transactions');
+                }
+
+                // Inside the sale's transaction: goods leaving on credit and the
+                // debt that records it must land together or not at all.
+                app(ChargeCustomerDebtAction::class)->execute($sale);
+
+                $revenue->execute($sale);
+
+                return $sale;
             }, 5);
         } catch (ValidationException $e) {
             throw $e;
@@ -413,7 +413,7 @@ class PosSaleController extends Controller
             // or recorded. Report it plainly instead so the till can react to it now.
             return response()->json([
                 'message' => $e->getMessage(),
-                'code'    => 'sale_rejected',
+                'code' => 'sale_rejected',
             ], 422);
         }
 
@@ -422,8 +422,8 @@ class PosSaleController extends Controller
 
     public function void(Request $request, PosSale $sale, AdjustStockAction $adjustStock, RecognizePosSaleRevenueAction $revenue): JsonResponse
     {
-        $user   = $request->user();
-        $vendor = \App\Models\Vendor::find($sale->vendor_id);
+        $user = $request->user();
+        $vendor = Vendor::find($sale->vendor_id);
 
         if (! $vendor?->isOwner($user) && ! $user->hasVendorPermission($sale->vendor_id, 'void_sale')) {
             return response()->json(['message' => 'Insufficient permissions to void a sale.'], 403);
@@ -456,8 +456,8 @@ class PosSaleController extends Controller
             // so the record of who withdrew this sale exists even if a later
             // step in this transaction fails and takes them with it.
             app(RecordSaleReversalAction::class)->void(
-                sale:   $sale,
-                actor:  $request->user(),
+                sale: $sale,
+                actor: $request->user(),
                 // The till has never sent one. Recorded plainly rather than left
                 // blank, so an unexplained void is visible on the statement as
                 // exactly that instead of looking like any other reversal.
@@ -485,8 +485,8 @@ class PosSaleController extends Controller
 
     public function processReturn(Request $request, PosSale $sale, AdjustStockAction $adjustStock, RecognizePosSaleRevenueAction $revenue): JsonResponse
     {
-        $user   = $request->user();
-        $vendor = \App\Models\Vendor::find($sale->vendor_id);
+        $user = $request->user();
+        $vendor = Vendor::find($sale->vendor_id);
 
         if (! $vendor?->isOwner($user) && ! $user->hasVendorPermission($sale->vendor_id, 'process_return')) {
             return response()->json(['message' => 'Insufficient permissions to process a return.'], 403);
@@ -497,11 +497,11 @@ class PosSaleController extends Controller
         }
 
         $request->validate([
-            'items'              => 'required|array|min:1',
+            'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|integer',
-            'items.*.quantity'   => ['required', 'numeric', new QuantityStep($vendor)],
-            'refund_method'      => 'required|in:cash,card,bank_transfer,store_credit',
-            'reason'             => 'nullable|string|max:255',
+            'items.*.quantity' => ['required', 'numeric', new QuantityStep($vendor)],
+            'refund_method' => 'required|in:cash,card,bank_transfer,store_credit',
+            'reason' => 'nullable|string|max:255',
         ]);
 
         $sale->loadMissing('items');
@@ -535,46 +535,46 @@ class PosSaleController extends Controller
         $exactRefunds = Quantity::allowsHalves($vendor);
 
         $return = DB::transaction(function () use ($request, $sale, $adjustStock, $alreadyReturned, $revenue, $exactRefunds) {
-            $returnItems  = [];
+            $returnItems = [];
             $refundAmount = 0;
 
             foreach ($request->items as $item) {
-                $saleItem      = $sale->items->firstWhere('product_id', $item['product_id']);
+                $saleItem = $sale->items->firstWhere('product_id', $item['product_id']);
                 // A shop that sells halves refunds what the goods actually
                 // cost, half price included; everyone else exactly as before.
-                $itemTotal     = $exactRefunds
+                $itemTotal = $exactRefunds
                     ? self::exactRefund($saleItem, $alreadyReturned[$item['product_id']] ?? 0, $item['quantity'])
                     : $saleItem->unit_price * $item['quantity'];
                 $refundAmount += $itemTotal;
 
                 $returnItems[] = [
-                    'product_id'   => $item['product_id'],
+                    'product_id' => $item['product_id'],
                     'product_name' => $saleItem->product_name,
-                    'quantity'     => $item['quantity'],
-                    'unit_price'   => (float) $saleItem->unit_price,
-                    'total'        => $itemTotal,
+                    'quantity' => $item['quantity'],
+                    'unit_price' => (float) $saleItem->unit_price,
+                    'total' => $itemTotal,
                 ];
 
                 $adjustStock->execute(
-                    productId:       $item['product_id'],
+                    productId: $item['product_id'],
                     quantityChanged: $item['quantity'],
                     transactionType: 'pos_return',
-                    userId:          $request->user()->id,
-                    reference:       $sale->reference,
-                    description:     "Return — {$saleItem->product_name} x{$item['quantity']}",
+                    userId: $request->user()->id,
+                    reference: $sale->reference,
+                    description: "Return — {$saleItem->product_name} x{$item['quantity']}",
                 );
             }
 
             $posReturn = PosReturn::create([
-                'reference'        => 'RET-' . strtoupper(Str::random(8)),
-                'vendor_id'        => $sale->vendor_id,
+                'reference' => 'RET-'.strtoupper(Str::random(8)),
+                'vendor_id' => $sale->vendor_id,
                 'original_sale_id' => $sale->id,
-                'cashier_id'       => $request->user()->id,
-                'customer_id'      => $sale->customer_id,
-                'return_items'     => $returnItems,
-                'refund_amount'    => $refundAmount,
-                'refund_method'    => $request->refund_method,
-                'reason'           => $request->reason,
+                'cashier_id' => $request->user()->id,
+                'customer_id' => $sale->customer_id,
+                'return_items' => $returnItems,
+                'refund_amount' => $refundAmount,
+                'refund_method' => $request->refund_method,
+                'reason' => $request->reason,
             ]);
 
             // Check if ALL items from the original sale have now been fully returned
@@ -587,11 +587,11 @@ class PosSaleController extends Controller
             );
 
             app(RecordSaleReversalAction::class)->forReturn(
-                sale:          $sale,
-                actor:         $request->user(),
-                return:        $posReturn,
+                sale: $sale,
+                actor: $request->user(),
+                return: $posReturn,
                 fullyReturned: $fullyReturned,
-                reason:        $request->reason,
+                reason: $request->reason,
             );
 
             $revenue->reverseForReturn($sale, $posReturn);
@@ -636,9 +636,9 @@ class PosSaleController extends Controller
             ->map(fn ($rows) => $rows->sum('quantity'));
 
         $sale->items->each(function ($item) use ($alreadyReturned) {
-            $returned          = $alreadyReturned[$item->product_id] ?? 0;
-            $item->returnable  = $item->quantity - $returned;
-            $item->returned    = $returned;
+            $returned = $alreadyReturned[$item->product_id] ?? 0;
+            $item->returnable = $item->quantity - $returned;
+            $item->returned = $returned;
         });
 
         // Filter out items that have nothing left to return
@@ -680,16 +680,16 @@ class PosSaleController extends Controller
     public function approveDiscount(Request $request): JsonResponse
     {
         $request->validate([
-            'vendor_id'       => 'required|integer',
-            'manager_pin'     => 'required|string',
+            'vendor_id' => 'required|integer',
+            'manager_pin' => 'required|string',
             'discount_amount' => 'required|numeric|min:0',
-            'discount_type'   => 'required|in:percentage,fixed',
+            'discount_type' => 'required|in:percentage,fixed',
         ]);
 
         $manager = User::whereNotNull('pos_pin')
             ->where(fn ($q) => $q
                 ->whereHas('ownedVendors', fn ($q) => $q->where('vendors.id', $request->vendor_id))
-                ->orWhereHas('roles', fn ($q)=> $q
+                ->orWhereHas('roles', fn ($q) => $q
                     ->where('name', 'inventory_manager')
                     ->where('team_id', $request->vendor_id)
                 )
@@ -702,9 +702,9 @@ class PosSaleController extends Controller
         }
 
         return response()->json([
-            'approved'    => true,
+            'approved' => true,
             'approved_by' => $manager->id,
-            'approver'    => $manager->name,
+            'approver' => $manager->name,
         ]);
     }
 }

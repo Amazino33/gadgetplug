@@ -14,7 +14,7 @@ class LogNullDriver implements MessagingDriver
     {
         return DriverSendResult::sent([
             'driver' => 'log_null',
-            'note'   => 'No real message was sent — this is the development/testing driver.',
+            'note' => 'No real message was sent — this is the development/testing driver.',
         ]);
     }
 }

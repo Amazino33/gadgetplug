@@ -8,9 +8,9 @@ use Filament\Actions\Action;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\Layout\Panel;
-use Filament\Tables\Columns\Layout\View as LayoutView;
 use Filament\Tables\Columns\Layout\Split;
 use Filament\Tables\Columns\Layout\Stack;
+use Filament\Tables\Columns\Layout\View as LayoutView;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -22,9 +22,12 @@ class ProcurementResource extends Resource
 
     protected static ?string $tenantOwnershipRelationshipName = 'vendor';
 
-    protected static string|null|\BackedEnum $navigationIcon  = 'heroicon-o-inbox-arrow-down';
-    protected static string|null|\UnitEnum  $navigationGroup = 'Procurement';
-    protected static ?string                $navigationLabel = 'Procurements';
+    protected static string|null|\BackedEnum $navigationIcon = 'heroicon-o-inbox-arrow-down';
+
+    protected static string|null|\UnitEnum $navigationGroup = 'Procurement';
+
+    protected static ?string $navigationLabel = 'Procurements';
+
     protected static ?int $navigationSort = 2;
 
     /**
@@ -49,7 +52,7 @@ class ProcurementResource extends Resource
     public static function reachableBy(Builder $query): Builder
     {
         $vendor = filament()->getTenant();
-        $user   = auth()->user();
+        $user = auth()->user();
 
         if (! $vendor || ! $user) {
             return $query;
@@ -73,7 +76,7 @@ class ProcurementResource extends Resource
     public static function canApprove(Procurement $procurement): bool
     {
         $vendor = filament()->getTenant();
-        $user   = auth()->user();
+        $user = auth()->user();
 
         if (! $vendor || ! $user) {
             return false;
@@ -147,20 +150,29 @@ class ProcurementResource extends Resource
             return false;
         }
 
-        $user   = auth()->user();
+        $user = auth()->user();
         $vendor = filament()->getTenant();
+
         return $vendor && $user->hasVendorPermission($vendor->id, 'manage_procurement');
     }
 
     public static function canCreate(): bool
     {
-        $user   = auth()->user();
+        $user = auth()->user();
         $vendor = filament()->getTenant();
+
         return $vendor && $user->hasVendorPermission($vendor->id, 'manage_procurement');
     }
 
-    public static function canEdit($record): bool   { return false; }
-    public static function canDelete($record): bool { return false; }
+    public static function canEdit($record): bool
+    {
+        return false;
+    }
+
+    public static function canDelete($record): bool
+    {
+        return false;
+    }
 
     public static function form(Schema $schema): Schema
     {
@@ -215,37 +227,37 @@ class ProcurementResource extends Resource
                         TextColumn::make('status')
                             ->badge()
                             ->color(fn (?string $state) => match ($state) {
-                                'pending'           => 'warning',
+                                'pending' => 'warning',
                                 'changes_requested' => 'info',
-                                'approved'          => 'success',
-                                'voided'            => 'danger',
-                                default             => 'gray',
+                                'approved' => 'success',
+                                'voided' => 'danger',
+                                default => 'gray',
                             })
                             ->formatStateUsing(fn (?string $state) => match ($state) {
-                                'pending'           => 'Awaiting Check',
+                                'pending' => 'Awaiting Check',
                                 // Named for what somebody has to do about it
                                 // rather than for the state it is in. "Changes
                                 // requested" describes the record; "sent back"
                                 // tells the person reading the list that it is
                                 // moving, and which way.
                                 'changes_requested' => 'Sent Back',
-                                default             => ucfirst((string) $state),
+                                default => ucfirst((string) $state),
                             }),
 
                         TextColumn::make('payment_status')
                             ->label('Payment')
                             ->badge()
                             ->color(fn (?string $state) => match ($state) {
-                                'full'         => 'success',
+                                'full' => 'success',
                                 'part_payment' => 'warning',
-                                'credit'       => 'danger',
-                                default        => 'gray',
+                                'credit' => 'danger',
+                                default => 'gray',
                             })
                             ->formatStateUsing(fn (?string $state) => match ($state) {
-                                'full'         => 'Fully Paid',
+                                'full' => 'Fully Paid',
                                 'part_payment' => 'Part-Payment',
-                                'credit'       => 'Credit',
-                                default        => $state ?? '-',
+                                'credit' => 'Credit',
+                                default => $state ?? '-',
                             }),
                     ]),
                 ])->from('md'),
@@ -299,10 +311,10 @@ class ProcurementResource extends Resource
             ->filters([
                 SelectFilter::make('status')
                     ->options([
-                        'pending'           => 'Awaiting Check',
+                        'pending' => 'Awaiting Check',
                         'changes_requested' => 'Sent Back',
-                        'approved'          => 'Approved',
-                        'voided'            => 'Voided',
+                        'approved' => 'Approved',
+                        'voided' => 'Voided',
                     ]),
                 SelectFilter::make('payment_status')
                     ->label('Payment')
@@ -319,8 +331,8 @@ class ProcurementResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index'  => Pages\ListProcurements::route('/'),
-            'view'   => Pages\ViewProcurement::route('/{record}'),
+            'index' => Pages\ListProcurements::route('/'),
+            'view' => Pages\ViewProcurement::route('/{record}'),
         ];
     }
 }

@@ -18,9 +18,9 @@ class DiagnoseRoleConstraintsCommand extends Command
 
     public function handle(): int
     {
-        $tables  = config('permission.table_names');
+        $tables = config('permission.table_names');
         $teamKey = config('permission.column_names.team_foreign_key', 'team_id');
-        $driver  = DB::connection()->getDriverName();
+        $driver = DB::connection()->getDriverName();
 
         $this->line("Driver: {$driver}");
         $this->line('Configured table names: '.json_encode($tables));
@@ -69,7 +69,7 @@ class DiagnoseRoleConstraintsCommand extends Command
         $this->line('<options=bold>Rows in each referencing table</>');
 
         foreach ($fks as $fk) {
-            $total   = DB::table($fk->TABLE_NAME)->count();
+            $total = DB::table($fk->TABLE_NAME)->count();
             $blocking = $orphanIds->isEmpty() ? 0 : DB::table($fk->TABLE_NAME)
                 ->whereIn($fk->COLUMN_NAME, $orphanIds->all())
                 ->count();

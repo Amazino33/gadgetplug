@@ -50,9 +50,9 @@ class VendorObserver
                 ->performedOn($vendor)
                 ->withProperties([
                     'from' => $vendor->getOriginal('online_sales_enabled'),
-                    'to'   => $vendor->online_sales_enabled,
+                    'to' => $vendor->online_sales_enabled,
                 ])
-                ->log('Online sales ' . ($vendor->online_sales_enabled ? 'enabled' : 'disabled') . ' for vendor');
+                ->log('Online sales '.($vendor->online_sales_enabled ? 'enabled' : 'disabled').' for vendor');
         }
 
         // Logged with the reason attached: a block is an account action someone
@@ -63,11 +63,11 @@ class VendorObserver
                 ->causedBy(auth()->user())
                 ->performedOn($vendor)
                 ->withProperties([
-                    'from'   => (bool) $vendor->getOriginal('dashboard_blocked'),
-                    'to'     => $vendor->dashboard_blocked,
+                    'from' => (bool) $vendor->getOriginal('dashboard_blocked'),
+                    'to' => $vendor->dashboard_blocked,
                     'reason' => $vendor->dashboard_blocked_reason,
                 ])
-                ->log('Dashboard access ' . ($vendor->dashboard_blocked ? 'blocked' : 'restored') . ' for vendor');
+                ->log('Dashboard access '.($vendor->dashboard_blocked ? 'blocked' : 'restored').' for vendor');
         }
     }
 }

@@ -17,7 +17,7 @@ class AffiliateLevelsTable
                 TextColumn::make('sort_order')->label('Rank')->sortable(),
                 TextColumn::make('name')->weight('bold')->searchable(),
                 TextColumn::make('target')->label('Target')->money('NGN')->sortable(),
-                TextColumn::make('rate_value')->label('Rate Multiplier')->formatStateUsing(fn ($state) => number_format((float) $state, 2) . '×'),
+                TextColumn::make('rate_value')->label('Rate Multiplier')->formatStateUsing(fn ($state) => number_format((float) $state, 2).'×'),
                 TextColumn::make('affiliates_count')->label('Affiliates')->counts('affiliates')->alignCenter(),
                 IconColumn::make('is_active')->label('Active')->boolean(),
             ])

@@ -17,8 +17,8 @@ function negotiationContext(array $vendorAttributes = [], array $productAttribut
     $owner = User::factory()->create();
 
     $vendor = Vendor::create(array_merge([
-        'user_id'                => $owner->id,
-        'name'                   => 'Leisure Hub',
+        'user_id' => $owner->id,
+        'name' => 'Leisure Hub',
         'pos_min_margin_percent' => 0,
         // Haggling is the vendor's choice; these cover how it behaves when allowed.
         'pos_allow_price_change' => true,
@@ -27,17 +27,17 @@ function negotiationContext(array $vendorAttributes = [], array $productAttribut
     $category = Category::create(['name' => 'Chargers']);
 
     $product = Product::create(array_merge([
-        'vendor_id'                => $vendor->id,
-        'category_id'              => $category->id,
-        'name'                     => 'SHPLUS 60W Charger',
-        'price'                    => 5300,
-        'cost_price'               => 2570,
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'SHPLUS 60W Charger',
+        'price' => 5300,
+        'cost_price' => 2570,
         'allow_pos_price_override' => true,
-        'stock_quantity'           => 50,
-        'reserved_stock'           => 0,
-        'status'                   => 'published',
-        'show_in_pos'              => true,
-        'show_online'              => true,
+        'stock_quantity' => 50,
+        'reserved_stock' => 0,
+        'status' => 'published',
+        'show_in_pos' => true,
+        'show_online' => true,
     ], $productAttributes));
 
     return ['owner' => $owner, 'vendor' => $vendor, 'product' => $product];
@@ -46,16 +46,16 @@ function negotiationContext(array $vendorAttributes = [], array $productAttribut
 function salePayload(array $context, array $overrides = []): array
 {
     return array_merge([
-        'vendor_id'       => $context['vendor']->id,
-        'items'           => [[
-            'product_id'   => $context['product']->id,
+        'vendor_id' => $context['vendor']->id,
+        'items' => [[
+            'product_id' => $context['product']->id,
             'product_name' => $context['product']->name,
-            'unit_price'   => 5300,
-            'quantity'     => 1,
+            'unit_price' => 5300,
+            'quantity' => 1,
         ]],
-        'payment_method'  => 'cash',
+        'payment_method' => 'cash',
         'amount_tendered' => 100000,
-        'vat_rate'        => 0,
+        'vat_rate' => 0,
     ], $overrides);
 }
 
@@ -67,10 +67,10 @@ it('lets a price be haggled down to cost but not a naira below it', function () 
 
     $atCost = salePayload($context, [
         'items' => [[
-            'product_id'   => $context['product']->id,
+            'product_id' => $context['product']->id,
             'product_name' => 'SHPLUS 60W Charger',
-            'unit_price'   => 2570,
-            'quantity'     => 1,
+            'unit_price' => 2570,
+            'quantity' => 1,
         ]],
     ]);
 
@@ -78,10 +78,10 @@ it('lets a price be haggled down to cost but not a naira below it', function () 
 
     $belowCost = salePayload($context, [
         'items' => [[
-            'product_id'   => $context['product']->id,
+            'product_id' => $context['product']->id,
             'product_name' => 'SHPLUS 60W Charger',
-            'unit_price'   => 2569,
-            'quantity'     => 1,
+            'unit_price' => 2569,
+            'quantity' => 1,
         ]],
     ]);
 
@@ -97,19 +97,19 @@ it('keeps the margin the vendor insists on, not just the cost', function () {
 
     $this->postJson('/api/pos/sales', salePayload($context, [
         'items' => [[
-            'product_id'   => $context['product']->id,
+            'product_id' => $context['product']->id,
             'product_name' => 'SHPLUS 60W Charger',
-            'unit_price'   => 2800,
-            'quantity'     => 1,
+            'unit_price' => 2800,
+            'quantity' => 1,
         ]],
     ]))->assertStatus(422);
 
     $this->postJson('/api/pos/sales', salePayload($context, [
         'items' => [[
-            'product_id'   => $context['product']->id,
+            'product_id' => $context['product']->id,
             'product_name' => 'SHPLUS 60W Charger',
-            'unit_price'   => 2827,
-            'quantity'     => 1,
+            'unit_price' => 2827,
+            'quantity' => 1,
         ]],
     ]))->assertSuccessful();
 });
@@ -125,14 +125,14 @@ it('stops a cart discount dragging a sale under the floor every line just passed
     // the money actually leaks if nothing re-checks the total.
     $response = $this->postJson('/api/pos/sales', salePayload($context, [
         'items' => [[
-            'product_id'   => $context['product']->id,
+            'product_id' => $context['product']->id,
             'product_name' => 'SHPLUS 60W Charger',
-            'unit_price'   => 2570,
-            'quantity'     => 3,
+            'unit_price' => 2570,
+            'quantity' => 3,
         ]],
         'discount_amount' => 1000,
-        'discount_type'   => 'fixed',
-        'discount_scope'  => 'cart',
+        'discount_type' => 'fixed',
+        'discount_scope' => 'cart',
     ]));
 
     $response->assertStatus(422)->assertJsonValidationErrors('discount_amount');
@@ -148,14 +148,14 @@ it('still allows a cart discount that leaves the sale above the floor', function
     // discount has plenty of room and must not be blocked.
     $this->postJson('/api/pos/sales', salePayload($context, [
         'items' => [[
-            'product_id'   => $context['product']->id,
+            'product_id' => $context['product']->id,
             'product_name' => 'SHPLUS 60W Charger',
-            'unit_price'   => 5300,
-            'quantity'     => 3,
+            'unit_price' => 5300,
+            'quantity' => 3,
         ]],
         'discount_amount' => 1000,
-        'discount_type'   => 'fixed',
-        'discount_scope'  => 'cart',
+        'discount_type' => 'fixed',
+        'discount_scope' => 'cart',
     ]))->assertSuccessful();
 });
 
@@ -167,10 +167,10 @@ it('refuses to discount a product whose price is locked', function () {
 
     $this->postJson('/api/pos/sales', salePayload($context, [
         'items' => [[
-            'product_id'   => $context['product']->id,
+            'product_id' => $context['product']->id,
             'product_name' => 'SHPLUS 60W Charger',
-            'unit_price'   => 5000,
-            'quantity'     => 1,
+            'unit_price' => 5000,
+            'quantity' => 1,
         ]],
     ]))->assertStatus(422);
 });
@@ -182,10 +182,10 @@ it('refuses to negotiate a product that has no recorded cost', function () {
 
     $this->postJson('/api/pos/sales', salePayload($context, [
         'items' => [[
-            'product_id'   => $context['product']->id,
+            'product_id' => $context['product']->id,
             'product_name' => 'SHPLUS 60W Charger',
-            'unit_price'   => 4000,
-            'quantity'     => 1,
+            'unit_price' => 4000,
+            'quantity' => 1,
         ]],
     ]))->assertStatus(422);
 });
@@ -198,10 +198,10 @@ it('still sells at list price when the vendor prices at or below cost', function
 
     $this->postJson('/api/pos/sales', salePayload($context, [
         'items' => [[
-            'product_id'   => $context['product']->id,
+            'product_id' => $context['product']->id,
             'product_name' => 'SHPLUS 60W Charger',
-            'unit_price'   => 2000,
-            'quantity'     => 1,
+            'unit_price' => 2000,
+            'quantity' => 1,
         ]],
     ]))->assertSuccessful();
 });
@@ -214,32 +214,32 @@ it('rejects a below-floor offline sale without losing the good ones beside it', 
 
     $response = $this->postJson('/api/pos/sync', [
         'vendor_id' => $context['vendor']->id,
-        'sales'     => [
+        'sales' => [
             [
-                'offline_id'     => 'good-one',
-                'items'          => [[
-                    'product_id'   => $context['product']->id,
+                'offline_id' => 'good-one',
+                'items' => [[
+                    'product_id' => $context['product']->id,
                     'product_name' => 'SHPLUS 60W Charger',
-                    'unit_price'   => 5300,
-                    'quantity'     => 1,
-                    'total'        => 5300,
+                    'unit_price' => 5300,
+                    'quantity' => 1,
+                    'total' => 5300,
                 ]],
                 'payment_method' => 'cash',
-                'total'          => 5300,
-                'completed_at'   => now()->toDateTimeString(),
+                'total' => 5300,
+                'completed_at' => now()->toDateTimeString(),
             ],
             [
-                'offline_id'     => 'below-floor',
-                'items'          => [[
-                    'product_id'   => $context['product']->id,
+                'offline_id' => 'below-floor',
+                'items' => [[
+                    'product_id' => $context['product']->id,
                     'product_name' => 'SHPLUS 60W Charger',
-                    'unit_price'   => 1000,
-                    'quantity'     => 1,
-                    'total'        => 1000,
+                    'unit_price' => 1000,
+                    'quantity' => 1,
+                    'total' => 1000,
                 ]],
                 'payment_method' => 'cash',
-                'total'          => 1000,
-                'completed_at'   => now()->toDateTimeString(),
+                'total' => 1000,
+                'completed_at' => now()->toDateTimeString(),
             ],
         ],
     ]);

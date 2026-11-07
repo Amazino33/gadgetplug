@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services\Reporting;
 
-use App\Support\Quantity;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\OrderItemStoreAllocation;
@@ -15,8 +14,9 @@ use App\Models\PosSaleItem;
 use App\Models\PosSalePayment;
 use App\Models\Store;
 use App\Support\Pos\BusinessDate;
-use Carbon\CarbonPeriod;
+use App\Support\Quantity;
 use Carbon\CarbonInterface;
+use Carbon\CarbonPeriod;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -451,11 +451,11 @@ class SalesReportService
                 $summary = $this->summary($vendorId, $from, $to, $store->id);
 
                 return [
-                    'store_id'   => $store->id,
+                    'store_id' => $store->id,
                     'store_name' => $store->name,
-                    'orders'     => $summary['orders'],
-                    'units'      => $summary['units'],
-                    'revenue'    => $summary['revenue'],
+                    'orders' => $summary['orders'],
+                    'units' => $summary['units'],
+                    'revenue' => $summary['revenue'],
                 ];
             })
             ->sortByDesc('revenue')
@@ -468,11 +468,11 @@ class SalesReportService
         // remainder of a fraction of a kobo would show as a phantom row.
         if ($gap > 0.01) {
             $rows->push([
-                'store_id'   => null,
+                'store_id' => null,
                 'store_name' => 'Not tied to a branch',
-                'orders'     => max(0, $total['orders'] - $rows->sum('orders')),
-                'units'      => max(0, $total['units'] - $rows->sum('units')),
-                'revenue'    => $gap,
+                'orders' => max(0, $total['orders'] - $rows->sum('orders')),
+                'units' => max(0, $total['units'] - $rows->sum('units')),
+                'revenue' => $gap,
             ]);
         }
 

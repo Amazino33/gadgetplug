@@ -2,31 +2,33 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Vendor\Widgets\CustomerDebtOverview;
+use App\Filament\Vendor\Widgets\EarningsWidget;
+use App\Filament\Vendor\Widgets\InventoryOverviewWidget;
+use App\Filament\Vendor\Widgets\RevenueTrendChart;
+use App\Filament\Vendor\Widgets\SalesChannelChart;
+use App\Filament\Vendor\Widgets\StoreMetricsOverview;
+use App\Http\Middleware\EnsureUserBelongsToVendor;
+use App\Http\Middleware\TrackStorePresence;
 use App\Models\Vendor;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use Filament\Navigation\NavigationGroup;
+use Filament\Navigation\NavigationItem;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
 use Filament\View\PanelsRenderHook;
-use Illuminate\Support\Facades\Blade;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
-use Filament\Navigation\NavigationGroup;
-use Filament\Navigation\NavigationItem;
-use App\Filament\Vendor\Widgets\StoreMetricsOverview;
-use App\Filament\Vendor\Widgets\SalesChannelChart;
-use App\Filament\Vendor\Widgets\InventoryOverviewWidget;
-use App\Filament\Vendor\Widgets\CustomerDebtOverview;
-use App\Filament\Vendor\Widgets\EarningsWidget;
-use App\Filament\Vendor\Widgets\RevenueTrendChart;
 
 class VendorPanelProvider extends PanelProvider
 {
@@ -65,7 +67,7 @@ class VendorPanelProvider extends PanelProvider
                 SubstituteBindings::class,
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
-                \App\Http\Middleware\TrackStorePresence::class,
+                TrackStorePresence::class,
             ])
             ->authMiddleware([
                 Authenticate::class,
@@ -82,7 +84,10 @@ class VendorPanelProvider extends PanelProvider
             // without it a blocked vendor keeps driving the panel over AJAX on
             // a page that was already open.
             ->tenantMiddleware([
-                \App\Http\Middleware\EnsureUserBelongsToVendor::class,
+                EnsureUserBelongsToVendor::class,
+                // After the membership/block check. A no-op for every vendor
+                // that is not on the free (self-signup) plan.
+                \App\Http\Middleware\EnforceFreePlan::class,
             ], isPersistent: true)
             ->tenant(Vendor::class, slugAttribute: 'slug', ownershipRelationship: 'vendors')
             // No ->icon() on the groups: Filament refuses to render a sidebar
@@ -108,17 +113,22 @@ class VendorPanelProvider extends PanelProvider
             ])
             ->navigationItems([
                 NavigationItem::make('Sales Point Terminal')
-                    ->url(fn(): string => url('/sales-point/' . (filament()->getTenant()?->slug ?? '')))
+                    ->url(fn (): string => url('/sales-point/'.(filament()->getTenant()?->slug ?? '')))
                     ->icon('heroicon-o-computer-desktop')
                     ->group('Sales Point')
                     ->sort(1)
                     ->visible(function () {
                         $user = auth()->user();
                         $vendor = filament()->getTenant();
-                        if (! $user || ! $vendor) return false;
-                        if ($user->isSuperAdmin()) return true;
+                        if (! $user || ! $vendor) {
+                            return false;
+                        }
+                        if ($user->isSuperAdmin()) {
+                            return true;
+                        }
                         setPermissionsTeamId($vendor->id);
                         $user->unsetRelation('roles');
+
                         return $user->hasPermissionTo('access_pos');
                     }),
 
@@ -134,28 +144,39 @@ class VendorPanelProvider extends PanelProvider
             // the selector grid.
             ->renderHook(
                 PanelsRenderHook::TOPBAR_END,
-                fn() => Blade::render('@livewire(\App\Livewire\ActiveStoreSwitcher::class)'),
+                fn () => Blade::render('@livewire(\App\Livewire\ActiveStoreSwitcher::class)'),
             )
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
-                fn() => Blade::render("@include('partials.meta-pixel')"),
+                fn () => Blade::render("@include('partials.meta-pixel')"),
             )
             ->renderHook(
                 PanelsRenderHook::BODY_END,
-                fn() => Blade::render('<x-barcode-scanner />'),
+                fn () => Blade::render('<x-barcode-scanner />'),
+            )
+            // The review banner on every page of a free shop's panel: under
+            // review, more info asked for, or live. Renders nothing for paid
+            // vendors.
+            ->renderHook(
+                PanelsRenderHook::CONTENT_START,
+                fn() => view('filament.vendor.partials.free-shop-banner', ['vendor' => filament()->getTenant()]),
             )
             // driver.js and the tour registry, scoped to this panel. Deliberately
             // not in resources/js/app.js: that bundle is shared with the
             // storefront, and shoppers have no use for a staff tour engine.
             ->renderHook(
                 PanelsRenderHook::BODY_END,
-                fn() => Blade::render('<x-vendor-tours />'),
+                fn () => Blade::render('<x-vendor-tours />'),
+            )
+            ->renderHook(
+                PanelsRenderHook::BODY_END,
+                fn () => Blade::render('@livewire(\App\Livewire\Assistant\ChatBubble::class)'),
             )
             // Replaces the global search removed above: filters the sidebar itself
             // so staff can jump to a page without scrolling the whole menu.
             ->renderHook(
                 PanelsRenderHook::SIDEBAR_NAV_START,
-                fn() => view('filament.vendor.partials.nav-search'),
+                fn () => view('filament.vendor.partials.nav-search'),
             );
     }
 }

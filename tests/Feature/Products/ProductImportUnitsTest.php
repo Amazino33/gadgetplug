@@ -69,9 +69,9 @@ function unitsRow(array $base, array $units = []): string
 
 function importUnits(string $path, Vendor $vendor): ImportLog
 {
-    $reader  = app(SpreadsheetReader::class);
+    $reader = app(SpreadsheetReader::class);
     $mapping = app(ColumnMapper::class)->guess($reader->headers($path));
-    $rows    = app(ImportPreparer::class)->prepare($path, $mapping, $vendor);
+    $rows = app(ImportPreparer::class)->prepare($path, $mapping, $vendor);
 
     return app(ProductImporter::class)->commit($rows, $vendor, null, basename($path));
 }
@@ -110,9 +110,9 @@ it('imports the Egg row with its Crate and Half Crate at their own prices', func
 
     $log = importUnits(unitsCsv(eggRow()), $vendor);
 
-    $egg   = Product::where('sku', 'EGG-01')->firstOrFail();
+    $egg = Product::where('sku', 'EGG-01')->firstOrFail();
     $crate = ProductUnit::where('product_id', $egg->id)->where('name', 'Crate')->firstOrFail();
-    $half  = ProductUnit::where('product_id', $egg->id)->where('name', 'Half Crate')->firstOrFail();
+    $half = ProductUnit::where('product_id', $egg->id)->where('name', 'Half Crate')->firstOrFail();
 
     expect($log->created_count)->toBe(1)
         ->and($log->units_created_count)->toBe(2)
@@ -275,7 +275,7 @@ it('exports the unit columns so export, edit and re-import round-trips', functio
     $vendor = unitsVendor();
     importUnits(unitsCsv(eggRow(['units' => ['Alt Barcode' => '9001', 'Unit 2 Wholesale Price' => '5500']])), $vendor);
 
-    $path   = app(ProductExporter::class)->export($vendor);
+    $path = app(ProductExporter::class)->export($vendor);
     $record = iterator_to_array(app(SpreadsheetReader::class)->records($path))[2];
 
     expect($record)->toMatchArray([
@@ -294,10 +294,10 @@ it('exports the unit columns so export, edit and re-import round-trips', functio
 });
 
 it('on the import page, a row that fails is named by line and the rest of the batch still goes in, with a downloadable report', function () {
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
     Storage::fake('local');
 
-    $owner  = User::factory()->create();
+    $owner = User::factory()->create();
     $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Batch Store']);
     VendorRoles::seedFor($vendor);
 

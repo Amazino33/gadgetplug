@@ -53,6 +53,6 @@ class PhoneNumber
             return $digits;
         }
 
-        return '+' . ltrim($digits, '+');
+        return '+'.ltrim($digits, '+');
     }
 }

@@ -1,9 +1,11 @@
 <?php
 
+use App\Actions\CashUp\RecordRectificationAction;
 use App\Filament\Vendor\Resources\CashUps\CashUpResource;
 use App\Filament\Vendor\Resources\CashUps\Pages\ListCashUps;
 use App\Models\AccountabilityLedgerEntry;
 use App\Models\PosSession;
+use App\Models\Store;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -94,7 +96,7 @@ test('a branch-assigned manager is told which branches are left out', function (
     $manager = cashUpManager($ctx);
     reviewable($ctx);
 
-    App\Models\Store::create([
+    Store::create([
         'vendor_id' => $ctx['vendor']->id, 'name' => 'Second Branch', 'is_default' => false,
     ]);
 
@@ -112,7 +114,7 @@ test('even an owner is looking at one branch at a time', function () {
     $ctx = cashUpContext();
     reviewable($ctx);
 
-    App\Models\Store::create([
+    Store::create([
         'vendor_id' => $ctx['vendor']->id, 'name' => 'Second Branch', 'is_default' => false,
     ]);
 
@@ -312,7 +314,7 @@ test('the working shows what has already been accounted for', function () {
     $manager = cashUpManager($ctx);
     $session = reviewable($ctx);
 
-    app(App\Actions\CashUp\RecordRectificationAction::class)->execute(
+    app(RecordRectificationAction::class)->execute(
         session: $session, manager: $manager, kind: 'expense',
         amount: 3000, note: 'Transport for the driver',
     );

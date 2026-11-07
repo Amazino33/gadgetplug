@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Filament\Vendor\Resources\StockAccountability;
 
 use App\Filament\Vendor\Resources\Products\Schemas\ProductForm;
-use App\Filament\Vendor\Resources\StockAccountability\Pages;
 use App\Models\StockAccountabilityEntry;
 use App\Models\User;
 use App\Services\StockAccountabilityLedger;
@@ -28,26 +27,38 @@ class StockAccountabilityResource extends Resource
 
     protected static ?string $tenantOwnershipRelationshipName = 'vendor';
 
-    protected static string|null|\BackedEnum $navigationIcon  = 'heroicon-o-scale';
-    protected static string|null|UnitEnum    $navigationGroup = 'Inventory';
-    protected static ?string                 $navigationLabel = 'Stock Accountability';
+    protected static string|null|\BackedEnum $navigationIcon = 'heroicon-o-scale';
+
+    protected static string|null|UnitEnum $navigationGroup = 'Inventory';
+
+    protected static ?string $navigationLabel = 'Stock Accountability';
+
     protected static ?int $navigationSort = 6;
 
     // Reuses the same gate as the audit screen this is the consequence of —
     // anyone trusted to review counts can see what came of them.
     public static function canAccess(): bool
     {
-        $user   = auth()->user();
+        $user = auth()->user();
         $vendor = filament()->getTenant();
 
         return $vendor && $user?->hasVendorPermission($vendor->id, 'view_audit_sessions');
     }
 
-    public static function canCreate(): bool { return false; }
+    public static function canCreate(): bool
+    {
+        return false;
+    }
 
-    public static function canEdit($record): bool { return false; }
+    public static function canEdit($record): bool
+    {
+        return false;
+    }
 
-    public static function canDelete($record): bool { return false; }
+    public static function canDelete($record): bool
+    {
+        return false;
+    }
 
     // Reversing withdraws an accusation, so it sits with the owner for the same
     // reason attributing does.
@@ -65,8 +76,8 @@ class StockAccountabilityResource extends Resource
     private const DISPOSITION_LABELS = [
         'written_off' => 'Written off',
         'recoverable' => 'Recoverable',
-        'recorded'    => 'Recorded only',
-        'reversal'    => 'Reversal',
+        'recorded' => 'Recorded only',
+        'reversal' => 'Reversal',
     ];
 
     public static function table(Table $table): Table
@@ -103,7 +114,7 @@ class StockAccountabilityResource extends Resource
                     ->color(fn (int $state): string => match (true) {
                         $state < 0 => 'danger',
                         $state > 0 => 'warning',
-                        default    => 'gray',
+                        default => 'gray',
                     }),
 
                 // Derived from cost price, so it is behind the same gate as cost
@@ -122,9 +133,9 @@ class StockAccountabilityResource extends Resource
                     ->color(fn (string $state): string => match ($state) {
                         'written_off' => 'warning',
                         'recoverable' => 'danger',
-                        'recorded'    => 'gray',
-                        'reversal'    => 'success',
-                        default       => 'gray',
+                        'recorded' => 'gray',
+                        'reversal' => 'success',
+                        default => 'gray',
                     }),
 
                 TextColumn::make('reason_code')
@@ -174,8 +185,7 @@ class StockAccountabilityResource extends Resource
                     ])
                     // A reversal cannot itself be reversed, and an entry already
                     // cancelled should not offer the button again.
-                    ->visible(fn (StockAccountabilityEntry $record): bool =>
-                        $record->disposition !== 'reversal'
+                    ->visible(fn (StockAccountabilityEntry $record): bool => $record->disposition !== 'reversal'
                         && ! StockAccountabilityEntry::where('audit_session_id', $record->audit_session_id)
                             ->where('disposition', 'reversal')
                             ->exists()

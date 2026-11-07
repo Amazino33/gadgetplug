@@ -11,17 +11,17 @@ use App\Services\Affiliate\RateResolver;
 
 function makeLevelBoostProduct(array $productAttrs = []): Product
 {
-    $owner    = User::factory()->create();
-    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Level Boost Store ' . uniqid()]);
-    $category = Category::create(['name' => 'Level Boost Category ' . uniqid()]);
+    $owner = User::factory()->create();
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Level Boost Store '.uniqid()]);
+    $category = Category::create(['name' => 'Level Boost Category '.uniqid()]);
 
     return Product::create(array_merge([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'name'           => 'Level Boost Product',
-        'price'          => 1000,
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'Level Boost Product',
+        'price' => 1000,
         'stock_quantity' => 10,
-        'status'         => 'published',
+        'status' => 'published',
     ], $productAttrs));
 }
 
@@ -39,7 +39,7 @@ function makeLevelBoostAffiliate(?AffiliateLevel $level = null): Affiliate
 test('an affiliate with no level gets the plain unboosted base rate', function () {
     AffiliateSetting::current()->update(['platform_default_rate' => 5.0]);
 
-    $product   = makeLevelBoostProduct();
+    $product = makeLevelBoostProduct();
     $affiliate = makeLevelBoostAffiliate();
 
     expect(app(RateResolver::class)->resolveForProduct($product->fresh('category'), $affiliate))->toBe(5.0);
@@ -48,8 +48,8 @@ test('an affiliate with no level gets the plain unboosted base rate', function (
 test('an affiliate with a level multiplies the resolved base rate', function () {
     AffiliateSetting::current()->update(['platform_default_rate' => 10.0]);
 
-    $level     = AffiliateLevel::create(['name' => 'Gold', 'target' => 0, 'rate_value' => 1.2, 'sort_order' => 1]);
-    $product   = makeLevelBoostProduct();
+    $level = AffiliateLevel::create(['name' => 'Gold', 'target' => 0, 'rate_value' => 1.2, 'sort_order' => 1]);
+    $product = makeLevelBoostProduct();
     $affiliate = makeLevelBoostAffiliate($level);
 
     // 10% base * 1.2 multiplier = 12%

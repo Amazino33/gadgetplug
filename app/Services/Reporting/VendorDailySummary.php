@@ -40,36 +40,36 @@ class VendorDailySummary
     public function build(Vendor $vendor, CarbonInterface $date): array
     {
         $from = $date->copy()->startOfDay();
-        $to   = $date->copy()->endOfDay();
+        $to = $date->copy()->endOfDay();
 
         $vendorTotals = StoreSalesQuery::totals($vendor->id, null, $from, $to);
-        $stores       = $this->storeRows($vendor, $from, $to);
-        $payments     = $this->paymentBreakdown($vendor->id, $from, $to);
-        $pnl          = $this->financials->report($vendor->id, $from, $to);
-        $expenses     = $this->expensesRecorded($vendor->id, $date);
-        $procurement  = $this->procurementRecorded($vendor->id, $date);
+        $stores = $this->storeRows($vendor, $from, $to);
+        $payments = $this->paymentBreakdown($vendor->id, $from, $to);
+        $pnl = $this->financials->report($vendor->id, $from, $to);
+        $expenses = $this->expensesRecorded($vendor->id, $date);
+        $procurement = $this->procurementRecorded($vendor->id, $date);
 
         // Online lines can reach revenue recognition without a store allocation
         // (see StoreSalesQuery::onlineTotals), so branches can legitimately sum
         // to less than the vendor total. Surfaced rather than hidden: an owner
         // who adds up the branch lines and finds a shortfall should see the gap
         // named, not be left assuming a branch under-reported.
-        $attributed   = array_sum(array_column($stores, 'revenue'));
+        $attributed = array_sum(array_column($stores, 'revenue'));
         $unattributed = max(0.0, $vendorTotals['revenue'] - $attributed);
 
         return [
-            'vendor'       => $vendor,
-            'date'         => $date,
-            'stores'       => $stores,
+            'vendor' => $vendor,
+            'date' => $date,
+            'stores' => $stores,
             'unattributed' => $unattributed,
-            'totals'       => $vendorTotals,
-            'payments'     => $payments,
-            'pnl'          => $pnl,
-            'expenses'     => $expenses,
-            'procurement'  => $procurement,
+            'totals' => $vendorTotals,
+            'payments' => $payments,
+            'pnl' => $pnl,
+            'expenses' => $expenses,
+            'procurement' => $procurement,
             // Nothing sold, nothing spent, nothing bought. Lets the caller skip a
             // message whose only content would be zero repeated six times.
-            'is_empty'     => $vendorTotals['orders'] === 0
+            'is_empty' => $vendorTotals['orders'] === 0
                 && $expenses['total'] <= 0
                 && $procurement['count'] === 0,
         ];
@@ -89,9 +89,9 @@ class VendorDailySummary
                 $totals = StoreSalesQuery::totals($vendor->id, $store->id, $from, $to);
 
                 return [
-                    'name'    => $store->name,
-                    'orders'  => $totals['orders'],
-                    'units'   => $totals['units'],
+                    'name' => $store->name,
+                    'orders' => $totals['orders'],
+                    'units' => $totals['units'],
                     'revenue' => $totals['revenue'],
                 ];
             })
@@ -171,7 +171,7 @@ class VendorDailySummary
         }
 
         return [
-            'total'       => array_sum($byCategory),
+            'total' => array_sum($byCategory),
             'by_category' => $byCategory,
         ];
     }
@@ -194,12 +194,12 @@ class VendorDailySummary
             ->selectRaw('COALESCE(SUM(amount_paid), 0) as amount_paid')
             ->first();
 
-        $totalCost  = (float) $row->total_cost;
+        $totalCost = (float) $row->total_cost;
         $amountPaid = (float) $row->amount_paid;
 
         return [
-            'count'       => (int) $row->row_count,
-            'total_cost'  => $totalCost,
+            'count' => (int) $row->row_count,
+            'total_cost' => $totalCost,
             'amount_paid' => $amountPaid,
             'outstanding' => max(0.0, $totalCost - $amountPaid),
         ];

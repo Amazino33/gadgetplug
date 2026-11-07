@@ -64,6 +64,11 @@ return [
     // (Admin → WhatsApp settings) when unset.
     'support_whatsapp' => env('SUPPORT_WHATSAPP'),
 
+    // The public address a free shop's link is shown under, as
+    // "gadgetplug.com.ng/joy-gadgets". Kept separate from storefront_url so the
+    // two can point at different hosts if the shop pages move.
+    'shop_link_base' => env('SHOP_LINK_BASE', 'https://gadgetplug.com.ng'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Timezone

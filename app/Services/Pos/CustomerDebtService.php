@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Pos;
 
-use App\Models\PosCustomer;
 use App\Models\PosCustomerLedgerEntry;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
 /**
@@ -70,13 +70,13 @@ class CustomerDebtService
             ->groupBy('direction')
             ->pluck('total', 'direction');
 
-        $charged    = round((float) ($rows[PosCustomerLedgerEntry::DIRECTION_CHARGE] ?? 0), 2);
-        $paid       = round(abs((float) ($rows[PosCustomerLedgerEntry::DIRECTION_PAYMENT] ?? 0)), 2);
+        $charged = round((float) ($rows[PosCustomerLedgerEntry::DIRECTION_CHARGE] ?? 0), 2);
+        $paid = round(abs((float) ($rows[PosCustomerLedgerEntry::DIRECTION_PAYMENT] ?? 0)), 2);
         $writtenOff = round(abs((float) ($rows[PosCustomerLedgerEntry::DIRECTION_WRITEOFF] ?? 0)), 2);
 
         return [
-            'charged'     => $charged,
-            'paid'        => $paid,
+            'charged' => $charged,
+            'paid' => $paid,
             'written_off' => $writtenOff,
             'outstanding' => round($charged - $paid - $writtenOff, 2),
         ];
@@ -133,7 +133,7 @@ class CustomerDebtService
      */
     public function aged(int $vendorId, ?int $storeId = null, ?\DateTimeInterface $asOf = null): array
     {
-        $asOf = $asOf ? \Illuminate\Support\Carbon::parse($asOf) : now();
+        $asOf = $asOf ? Carbon::parse($asOf) : now();
 
         $entries = PosCustomerLedgerEntry::forVendor($vendorId)
             ->where('occurred_at', '<=', $asOf)
@@ -161,27 +161,27 @@ class CustomerDebtService
             $oldest = $open->min('occurred_at');
 
             foreach ($open as $slice) {
-                $days = (int) \Illuminate\Support\Carbon::parse($slice['occurred_at'])->diffInDays($asOf);
+                $days = (int) Carbon::parse($slice['occurred_at'])->diffInDays($asOf);
                 $key = match (true) {
-                    $days <= 7  => 'current',
+                    $days <= 7 => 'current',
                     $days <= 30 => '8_30',
                     $days <= 60 => '31_60',
-                    default     => 'over_60',
+                    default => 'over_60',
                 };
 
                 $buckets[$key] = round($buckets[$key] + $slice['amount'], 2);
             }
 
             $debtors->push([
-                'customer_id'  => (int) $customerId,
-                'outstanding'  => $owed,
-                'oldest_at'    => $oldest,
-                'days_oldest'  => $oldest ? (int) \Illuminate\Support\Carbon::parse($oldest)->diffInDays($asOf) : 0,
+                'customer_id' => (int) $customerId,
+                'outstanding' => $owed,
+                'oldest_at' => $oldest,
+                'days_oldest' => $oldest ? (int) Carbon::parse($oldest)->diffInDays($asOf) : 0,
             ]);
         }
 
         return [
-            'total'   => round($debtors->sum('outstanding'), 2),
+            'total' => round($debtors->sum('outstanding'), 2),
             'buckets' => $buckets,
             'debtors' => $debtors->sortByDesc('days_oldest')->values(),
         ];
@@ -202,9 +202,9 @@ class CustomerDebtService
 
             if ($amount > 0) {
                 $open->push([
-                    'amount'      => $amount,
+                    'amount' => $amount,
                     'occurred_at' => $row->occurred_at,
-                    'store_id'    => $row->store_id,
+                    'store_id' => $row->store_id,
                 ]);
 
                 continue;

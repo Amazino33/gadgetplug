@@ -39,12 +39,12 @@ return new class extends Migration
                 $now = now();
 
                 DB::table('product_barcodes')->insert($products->map(fn ($p) => [
-                    'vendor_id'       => $p->vendor_id,
-                    'product_id'      => $p->id,
+                    'vendor_id' => $p->vendor_id,
+                    'product_id' => $p->id,
                     'product_unit_id' => null,
-                    'barcode'         => $p->barcode,
-                    'created_at'      => $now,
-                    'updated_at'      => $now,
+                    'barcode' => $p->barcode,
+                    'created_at' => $now,
+                    'updated_at' => $now,
                 ])->all());
             });
     }

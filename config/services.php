@@ -56,7 +56,7 @@ return [
     'messaging' => [
         // Blank = auto-select based on which provider below has real credentials.
         'whatsapp_driver' => env('MESSAGING_WHATSAPP_DRIVER'),
-        'sms_driver'      => env('MESSAGING_SMS_DRIVER'),
+        'sms_driver' => env('MESSAGING_SMS_DRIVER'),
 
         // The clock the vendor-facing schedule times are read in — quiet hours and
         // the daily summary send time. app.timezone is UTC, so without this a
@@ -73,30 +73,36 @@ return [
     ],
 
     'termii' => [
-        'api_key'   => env('TERMII_API_KEY'),
+        'api_key' => env('TERMII_API_KEY'),
         'sender_id' => env('TERMII_SENDER_ID'),
     ],
 
     'whatsapp_cloud' => [
-        'token'           => env('WHATSAPP_CLOUD_TOKEN'),
+        'token' => env('WHATSAPP_CLOUD_TOKEN'),
         'phone_number_id' => env('WHATSAPP_CLOUD_PHONE_NUMBER_ID'),
-        'api_version'     => env('WHATSAPP_CLOUD_API_VERSION', 'v21.0'),
+        'api_version' => env('WHATSAPP_CLOUD_API_VERSION', 'v21.0'),
     ],
 
     'wawp' => [
-        'instance_id'  => env('WAWP_INSTANCE_ID'),
+        'instance_id' => env('WAWP_INSTANCE_ID'),
         'access_token' => env('WAWP_ACCESS_TOKEN'),
     ],
 
     'meta' => [
-        'pixel_id'          => env('META_PIXEL_ID'),
+        'pixel_id' => env('META_PIXEL_ID'),
         'capi_access_token' => env('META_CAPI_ACCESS_TOKEN'),
         // Set only in Events Manager → Test Events while verifying. Leave
         // unset in production — every event sent with it attached is
         // diverted to the Test Events tab instead of counting toward the
         // real dataset.
-        'test_event_code'  => env('META_TEST_EVENT_CODE'),
-        'graph_version'    => env('META_GRAPH_VERSION', 'v26.0'),
+        'test_event_code' => env('META_TEST_EVENT_CODE'),
+        'graph_version' => env('META_GRAPH_VERSION', 'v26.0'),
+    ],
+
+    'openrouter' => [
+        'key' => env('OPENROUTER_API_KEY'),
+        'referer' => env('APP_URL', 'http://localhost'),
+        'title' => env('APP_NAME', 'GadgetPlug'),
     ],
 
 ];

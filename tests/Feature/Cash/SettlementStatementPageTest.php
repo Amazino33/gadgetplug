@@ -5,7 +5,7 @@ use App\Models\User;
 use App\Models\Vendor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
-require_once __DIR__ . '/Helpers.php';
+require_once __DIR__.'/Helpers.php';
 
 uses(RefreshDatabase::class);
 
@@ -13,9 +13,9 @@ function statementFor(array $ctx)
 {
     return app(GenerateSettlementStatementAction::class)->execute(
         generatedBy: $ctx['owner'],
-        store:       $ctx['store'],
-        from:        now()->subMonth(),
-        to:          now()->addDay(),
+        store: $ctx['store'],
+        from: now()->subMonth(),
+        to: now()->addDay(),
     );
 }
 
@@ -54,7 +54,7 @@ test('the statement downloads as a pdf', function () {
         ->assertHeader('content-type', 'application/pdf');
 
     expect($response->headers->get('content-disposition'))
-        ->toContain($statement->reference . '.pdf');
+        ->toContain($statement->reference.'.pdf');
 });
 
 test('a statement cannot be read by somebody from another business', function () {

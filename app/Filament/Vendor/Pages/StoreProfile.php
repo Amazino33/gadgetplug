@@ -3,22 +3,23 @@
 namespace App\Filament\Vendor\Pages;
 
 use App\Services\Products\SkuGenerator;
-use Illuminate\Validation\ValidationException;
 use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
-use Filament\Forms\Components\Select;
 use Filament\Forms\Concerns\InteractsWithForms;
-use Filament\Schemas\Components\Section;
-use Filament\Schemas\Schema;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Validation\ValidationException;
 
 class StoreProfile extends Page
 {
     protected static string|null|\UnitEnum $navigationGroup = 'Settings';
+
     use InteractsWithForms;
 
     protected string $view = 'filament.vendor.pages.store-profile';
@@ -45,26 +46,26 @@ class StoreProfile extends Page
         $vendor = filament()->getTenant();
 
         $this->form->fill([
-            'name'            => $vendor->name,
-            'description'     => $vendor->description,
-            'whatsapp'        => $vendor->whatsapp,
-            'city'            => $vendor->city,
-            'state'           => $vendor->state,
-            'bank_name'       => $vendor->bank_name,
-            'account_number'  => $vendor->account_number,
-            'account_name'    => $vendor->account_name,
-            'pos_vat_enabled'              => $vendor->pos_vat_enabled ?? true,
-            'pos_vat_rate'                 => $vendor->pos_vat_rate ?? 7.5,
+            'name' => $vendor->name,
+            'description' => $vendor->description,
+            'whatsapp' => $vendor->whatsapp,
+            'city' => $vendor->city,
+            'state' => $vendor->state,
+            'bank_name' => $vendor->bank_name,
+            'account_number' => $vendor->account_number,
+            'account_name' => $vendor->account_name,
+            'pos_vat_enabled' => $vendor->pos_vat_enabled ?? true,
+            'pos_vat_rate' => $vendor->pos_vat_rate ?? 7.5,
             'pos_blind_count_participants' => $vendor->pos_blind_count_participants ?? 2,
-            'pos_min_margin_percent'       => $vendor->pos_min_margin_percent ?? 0,
-            'allow_negative_stock'         => (bool) $vendor->allow_negative_stock,
-            'pos_ask_quantity'             => $vendor->pos_ask_quantity ?? true,
-            'pos_allow_price_change'       => (bool) $vendor->pos_allow_price_change,
-            'allow_half_quantities'        => (bool) $vendor->allow_half_quantities,
-            'pos_blind_count_frequency'    => $vendor->pos_blind_count_frequency ?? 'daily',
-            'pos_blind_count_custom_days'  => $vendor->pos_blind_count_custom_days ?? 3,
-            'sku_style'                    => $vendor->sku_style ?: SkuGenerator::STYLE_CATEGORY_NAME,
-            'sku_prefix'                   => $vendor->sku_prefix,
+            'pos_min_margin_percent' => $vendor->pos_min_margin_percent ?? 0,
+            'allow_negative_stock' => (bool) $vendor->allow_negative_stock,
+            'pos_ask_quantity' => $vendor->pos_ask_quantity ?? true,
+            'pos_allow_price_change' => (bool) $vendor->pos_allow_price_change,
+            'allow_half_quantities' => (bool) $vendor->allow_half_quantities,
+            'pos_blind_count_frequency' => $vendor->pos_blind_count_frequency ?? 'daily',
+            'pos_blind_count_custom_days' => $vendor->pos_blind_count_custom_days ?? 3,
+            'sku_style' => $vendor->sku_style ?: SkuGenerator::STYLE_CATEGORY_NAME,
+            'sku_prefix' => $vendor->sku_prefix,
         ]);
     }
 
@@ -131,11 +132,11 @@ class StoreProfile extends Page
                         Select::make('pos_blind_count_frequency')
                             ->label('Inventory Count Frequency')
                             ->options([
-                                'none'    => 'No restriction — count any time',
-                                'daily'   => 'Once a day',
-                                'weekly'  => 'Once a week',
+                                'none' => 'No restriction — count any time',
+                                'daily' => 'Once a day',
+                                'weekly' => 'Once a week',
                                 'monthly' => 'Once a month',
-                                'custom'  => 'Custom number of days',
+                                'custom' => 'Custom number of days',
                             ])
                             ->default('daily')
                             ->helperText('How often the same person may count. This is set here, by you — not by the counter — so a storekeeper cannot shorten their own waiting period. A manager can still authorise an early re-count.')
@@ -218,9 +219,9 @@ class StoreProfile extends Page
                             ->label('SKU style')
                             ->options([
                                 SkuGenerator::STYLE_CATEGORY_NAME => 'Category + name + number — e.g. ALC-CASTLI-0042',
-                                SkuGenerator::STYLE_SERIAL        => 'Serial number — 1, 2, 3 … continuing from your highest',
+                                SkuGenerator::STYLE_SERIAL => 'Serial number — 1, 2, 3 … continuing from your highest',
                                 SkuGenerator::STYLE_PREFIX_SERIAL => 'Prefix + serial number — e.g. VWD-8226',
-                                SkuGenerator::STYLE_MANUAL        => 'I type every SKU myself',
+                                SkuGenerator::STYLE_MANUAL => 'I type every SKU myself',
                             ])
                             ->default(SkuGenerator::STYLE_CATEGORY_NAME)
                             ->required()
@@ -245,7 +246,7 @@ class StoreProfile extends Page
                         Placeholder::make('sku_example')
                             ->label('The next product would get')
                             ->content(function ($get): string {
-                                $style  = $get('sku_style');
+                                $style = $get('sku_style');
                                 $prefix = $get('sku_prefix');
 
                                 if ($style === SkuGenerator::STYLE_MANUAL) {
@@ -286,27 +287,27 @@ class StoreProfile extends Page
 
     public function save(): void
     {
-        $data   = $this->form->getState();
+        $data = $this->form->getState();
         $vendor = filament()->getTenant();
 
         $updateData = [
-            'description'     => $data['description'],
-            'whatsapp'        => $data['whatsapp'],
-            'city'            => $data['city'] ?: null,
-            'state'           => $data['state'] ?: null,
-            'bank_name'       => $data['bank_name'],
-            'account_number'  => $data['account_number'],
-            'account_name'    => $data['account_name'],
-            'pos_vat_enabled'              => $data['pos_vat_enabled'] ?? false,
-            'pos_vat_rate'                 => $data['pos_vat_enabled'] ? ($data['pos_vat_rate'] ?? 7.5) : 0,
+            'description' => $data['description'],
+            'whatsapp' => $data['whatsapp'],
+            'city' => $data['city'] ?: null,
+            'state' => $data['state'] ?: null,
+            'bank_name' => $data['bank_name'],
+            'account_number' => $data['account_number'],
+            'account_name' => $data['account_name'],
+            'pos_vat_enabled' => $data['pos_vat_enabled'] ?? false,
+            'pos_vat_rate' => $data['pos_vat_enabled'] ? ($data['pos_vat_rate'] ?? 7.5) : 0,
             'pos_blind_count_participants' => (int) ($data['pos_blind_count_participants'] ?? 2),
-            'pos_min_margin_percent'       => (float) ($data['pos_min_margin_percent'] ?? 0),
-            'allow_negative_stock'         => (bool) ($data['allow_negative_stock'] ?? false),
-            'pos_ask_quantity'             => (bool) ($data['pos_ask_quantity'] ?? true),
-            'pos_allow_price_change'       => (bool) ($data['pos_allow_price_change'] ?? false),
-            'allow_half_quantities'        => (bool) ($data['allow_half_quantities'] ?? false),
-            'pos_blind_count_frequency'    => $data['pos_blind_count_frequency'] ?? 'daily',
-            'pos_blind_count_custom_days'  => ($data['pos_blind_count_frequency'] ?? 'daily') === 'custom'
+            'pos_min_margin_percent' => (float) ($data['pos_min_margin_percent'] ?? 0),
+            'allow_negative_stock' => (bool) ($data['allow_negative_stock'] ?? false),
+            'pos_ask_quantity' => (bool) ($data['pos_ask_quantity'] ?? true),
+            'pos_allow_price_change' => (bool) ($data['pos_allow_price_change'] ?? false),
+            'allow_half_quantities' => (bool) ($data['allow_half_quantities'] ?? false),
+            'pos_blind_count_frequency' => $data['pos_blind_count_frequency'] ?? 'daily',
+            'pos_blind_count_custom_days' => ($data['pos_blind_count_frequency'] ?? 'daily') === 'custom'
                 ? (int) ($data['pos_blind_count_custom_days'] ?? 3)
                 : null,
         ];
@@ -345,7 +346,7 @@ class StoreProfile extends Page
                 : SkuGenerator::STYLE_CATEGORY_NAME;
 
             $vendor->forceFill([
-                'sku_style'  => $style,
+                'sku_style' => $style,
                 'sku_prefix' => $style === SkuGenerator::STYLE_PREFIX_SERIAL
                     ? app(SkuGenerator::class)->cleanPrefix($data['sku_prefix'] ?? null)
                     : null,
@@ -360,7 +361,7 @@ class StoreProfile extends Page
 
     private static function isOwner(): bool
     {
-        $user   = auth()->user();
+        $user = auth()->user();
         $vendor = filament()->getTenant();
 
         return $user && $vendor && $vendor->isOwner($user);

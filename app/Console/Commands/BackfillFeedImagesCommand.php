@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\Product;
 use Illuminate\Console\Command;
+use Spatie\MediaLibrary\Conversions\FileManipulator;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Throwable;
 
@@ -69,7 +70,7 @@ class BackfillFeedImagesCommand extends Command
         Media::query()
             ->where('model_type', Product::class)
             ->where('collection_name', 'product-images')
-            ->chunkById($chunk, function ($batch) use (&$done, &$failed, $bar, $sync): void {
+            ->chunkById($chunk, function ($batch) use (&$done, &$failed, $bar): void {
                 foreach ($batch as $media) {
                     if ($media->hasGeneratedConversion('feed')) {
                         continue;
@@ -82,7 +83,7 @@ class BackfillFeedImagesCommand extends Command
                         //
                         // onlyMissing so a re-run after a partial pass costs
                         // nothing for the images already done.
-                        app(\Spatie\MediaLibrary\Conversions\FileManipulator::class)
+                        app(FileManipulator::class)
                             ->createDerivedFiles($media, ['feed', 'feed_small'], onlyMissing: true);
 
                         $done++;

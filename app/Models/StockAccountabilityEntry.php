@@ -18,9 +18,9 @@ class StockAccountabilityEntry extends Model
 
     protected $casts = [
         'quantity_variance' => AsQuantity::class,
-        'unit_cost'         => 'decimal:2',
-        'amount'            => 'decimal:2',
-        'occurred_at'       => 'date',
+        'unit_cost' => 'decimal:2',
+        'amount' => 'decimal:2',
+        'occurred_at' => 'date',
     ];
 
     public const DISPOSITIONS = ['written_off', 'recoverable', 'recorded', 'reversal'];

@@ -25,9 +25,7 @@ use Throwable;
  */
 class FeedActionController extends Controller
 {
-    public function __construct(private readonly ProductInteractions $interactions)
-    {
-    }
+    public function __construct(private readonly ProductInteractions $interactions) {}
 
     /** A like. Guests may, by device token — it is cheap and reveals nothing. */
     public function like(Request $request, Product $product): JsonResponse
@@ -52,7 +50,7 @@ class FeedActionController extends Controller
         // wrong — two devices, a double tap, a lost request — corrects itself
         // rather than drifting further with every tap.
         return response()->json([
-            'liked'      => $liked,
+            'liked' => $liked,
             'like_count' => (int) $product->fresh()->like_count,
         ]);
     }
@@ -74,13 +72,13 @@ class FeedActionController extends Controller
 
         if (! $request->user()) {
             session([ClaimGuestFeedActivity::PENDING_SAVE => [
-                'action'     => 'save',
+                'action' => 'save',
                 'product_id' => $product->id,
             ]]);
 
             return response()->json([
                 'requires_login' => true,
-                'login_url'      => route('login'),
+                'login_url' => route('login'),
             ], 401);
         }
 
@@ -109,7 +107,7 @@ class FeedActionController extends Controller
         return response()->json([
             'share_count' => (int) $product->fresh()->share_count,
             // The deep link the OG tags already render a preview for.
-            'url'         => route('product.show', $product->slug),
+            'url' => route('product.show', $product->slug),
         ]);
     }
 

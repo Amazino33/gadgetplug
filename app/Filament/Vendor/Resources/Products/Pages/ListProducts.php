@@ -130,6 +130,7 @@ class ListProducts extends ListRecords
 
         if (! ProductResource::canDelete($product)) {
             Notification::make()->title('You are not authorized to delete this product.')->danger()->send();
+
             return;
         }
 
@@ -212,8 +213,8 @@ class ListProducts extends ListRecords
                         filament()->getTenant(),
                         $data['format'] ?? 'csv',
                         [
-                            'category_id'    => $data['category_id'] ?? null,
-                            'status'         => $data['status'] ?? null,
+                            'category_id' => $data['category_id'] ?? null,
+                            'status' => $data['status'] ?? null,
                             'low_stock_only' => (bool) ($data['low_stock_only'] ?? false),
                         ],
                     );
@@ -225,7 +226,9 @@ class ListProducts extends ListRecords
                 ->label('Import')
                 ->icon('heroicon-o-arrow-up-tray')
                 ->color('gray')
-                ->visible(fn (): bool => static::canBulkMove('import_products'))
+                // Not offered on the free plan: the import page is outside it,
+                // and a spreadsheet of hundreds would only run into the cap.
+                ->visible(fn (): bool => static::canBulkMove('import_products') && ! filament()->getTenant()?->isFreePlan())
                 ->url(fn (): string => ImportProducts::getUrl()),
 
             CreateAction::make()
@@ -246,7 +249,7 @@ class ListProducts extends ListRecords
     protected static function canBulkMove(string $permission): bool
     {
         $vendor = filament()->getTenant();
-        $user   = auth()->user();
+        $user = auth()->user();
 
         if ($vendor === null || $user === null) {
             return false;

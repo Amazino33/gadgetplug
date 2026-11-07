@@ -48,12 +48,12 @@ test('an admin can add a reach band from the panel', function () {
 
     Livewire::test(ManageAffiliateReachBands::class)
         ->callAction('create', data: [
-            'name'       => 'Mega (50k+)',
-            'min_reach'  => 50000,
-            'max_reach'  => null,
-            'points'     => 250,
+            'name' => 'Mega (50k+)',
+            'min_reach' => 50000,
+            'max_reach' => null,
+            'points' => 250,
             'sort_order' => 9,
-            'is_active'  => true,
+            'is_active' => true,
         ])
         ->assertHasNoActionErrors();
 
@@ -66,10 +66,10 @@ test('an admin can add marketing material with a caption template', function () 
 
     Livewire::test(ManageMarketingMaterials::class)
         ->callAction('create', data: [
-            'name'             => 'August Promo',
+            'name' => 'August Promo',
             'caption_template' => 'Grab it: :link (code :code)',
-            'sort_order'       => 1,
-            'is_active'        => true,
+            'sort_order' => 1,
+            'is_active' => true,
         ])
         ->assertHasNoActionErrors();
 

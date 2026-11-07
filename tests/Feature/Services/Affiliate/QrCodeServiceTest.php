@@ -9,17 +9,17 @@ use App\Services\Affiliate\QrCodeService;
 
 function makeQrTestProduct(array $attrs = []): Product
 {
-    $owner    = User::factory()->create();
-    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'QR Test Store ' . uniqid()]);
-    $category = Category::create(['name' => 'QR Test Category ' . uniqid()]);
+    $owner = User::factory()->create();
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'QR Test Store '.uniqid()]);
+    $category = Category::create(['name' => 'QR Test Category '.uniqid()]);
 
     return Product::create(array_merge([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'name'           => 'QR Test Product',
-        'price'          => 1500,
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'QR Test Product',
+        'price' => 1500,
         'stock_quantity' => 10,
-        'status'         => 'published',
+        'status' => 'published',
     ], $attrs));
 }
 
@@ -33,7 +33,7 @@ test('the referral link url points at the existing /r/{code} route with no query
 
 test('the product link url carries the code and the product slug as ?to=', function () {
     $affiliate = Affiliate::findOrCreateForUser(User::factory()->create());
-    $product   = makeQrTestProduct();
+    $product = makeQrTestProduct();
 
     $url = app(QrCodeService::class)->productLinkUrl($affiliate, $product);
 
@@ -50,13 +50,13 @@ test('the referral QR renders a valid SVG document', function () {
 
 test('requesting the same referral QR twice reuses the cached media instead of regenerating', function () {
     $affiliate = Affiliate::findOrCreateForUser(User::factory()->create());
-    $service   = app(QrCodeService::class);
+    $service = app(QrCodeService::class);
 
     // Each call uses a freshly-loaded Affiliate instance, mirroring how a
     // real page load fetches the model anew each request — Spatie's media
     // relation is cached per-instance, so reusing the same in-memory object
     // across calls isn't representative of real usage.
-    $first  = $service->referralQrSvg($affiliate->fresh());
+    $first = $service->referralQrSvg($affiliate->fresh());
     $second = $service->referralQrSvg($affiliate->fresh());
 
     expect($first)->toBe($second)
@@ -65,9 +65,9 @@ test('requesting the same referral QR twice reuses the cached media instead of r
 
 test('a product QR is cached separately from the referral QR and from other products', function () {
     $affiliate = Affiliate::findOrCreateForUser(User::factory()->create());
-    $productA  = makeQrTestProduct(['name' => 'Product A']);
-    $productB  = makeQrTestProduct(['name' => 'Product B']);
-    $service   = app(QrCodeService::class);
+    $productA = makeQrTestProduct(['name' => 'Product A']);
+    $productB = makeQrTestProduct(['name' => 'Product B']);
+    $service = app(QrCodeService::class);
 
     $service->referralQrSvg($affiliate);
     $service->productQrSvg($affiliate, $productA);
@@ -78,8 +78,8 @@ test('a product QR is cached separately from the referral QR and from other prod
 
 test('a cached QR whose stored url no longer matches the current one is regenerated, not accumulated', function () {
     $affiliate = Affiliate::findOrCreateForUser(User::factory()->create());
-    $product   = makeQrTestProduct();
-    $service   = app(QrCodeService::class);
+    $product = makeQrTestProduct();
+    $service = app(QrCodeService::class);
 
     $service->productQrSvg($affiliate, $product);
     $original = $affiliate->fresh()->getMedia('qr-codes')->first();

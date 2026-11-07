@@ -4,7 +4,6 @@ namespace App\Filament\Resources\VendorPayouts\Tables;
 
 use App\Models\VendorPayout;
 use Filament\Actions\Action;
-use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
 use Filament\Tables\Columns\TextColumn;
@@ -24,7 +23,7 @@ class VendorPayoutsTable
 
                 TextColumn::make('amount')
                     ->label('Amount')
-                    ->formatStateUsing(fn($state) => '₦' . number_format($state, 2))
+                    ->formatStateUsing(fn ($state) => '₦'.number_format($state, 2))
                     ->sortable(),
 
                 TextColumn::make('bank_name')->label('Bank'),
@@ -35,12 +34,12 @@ class VendorPayoutsTable
 
                 TextColumn::make('status')
                     ->badge()
-                    ->color(fn(string $state) => match ($state) {
-                        'pending'  => 'warning',
+                    ->color(fn (string $state) => match ($state) {
+                        'pending' => 'warning',
                         'approved' => 'info',
-                        'paid'     => 'success',
+                        'paid' => 'success',
                         'rejected' => 'danger',
-                        default    => 'gray',
+                        default => 'gray',
                     })
                     ->sortable(),
 
@@ -72,9 +71,9 @@ class VendorPayoutsTable
             ->filters([
                 SelectFilter::make('status')
                     ->options([
-                        'pending'  => 'Pending',
+                        'pending' => 'Pending',
                         'approved' => 'Approved',
-                        'paid'     => 'Paid',
+                        'paid' => 'Paid',
                         'rejected' => 'Rejected',
                     ]),
             ])
@@ -83,10 +82,10 @@ class VendorPayoutsTable
                     ->label('Approve')
                     ->icon('heroicon-m-check')
                     ->color('success')
-                    ->visible(fn(VendorPayout $record) => $record->status === 'pending')
+                    ->visible(fn (VendorPayout $record) => $record->status === 'pending')
                     ->requiresConfirmation()
                     ->modalHeading('Approve payout request?')
-                    ->modalDescription(fn(VendorPayout $record) => 'Approve ₦' . number_format($record->amount, 2) . ' to ' . $record->account_name . ' (' . $record->bank_name . ')?')
+                    ->modalDescription(fn (VendorPayout $record) => 'Approve ₦'.number_format($record->amount, 2).' to '.$record->account_name.' ('.$record->bank_name.')?')
                     ->action(function (VendorPayout $record) {
                         $record->update(['status' => 'approved']);
                         Notification::make()->title('Payout approved')->success()->send();
@@ -96,7 +95,7 @@ class VendorPayoutsTable
                     ->label('Mark Paid')
                     ->icon('heroicon-m-banknotes')
                     ->color('primary')
-                    ->visible(fn(VendorPayout $record) => $record->status === 'approved')
+                    ->visible(fn (VendorPayout $record) => $record->status === 'approved')
                     ->form([
                         Textarea::make('admin_notes')
                             ->label('Payment reference / note')
@@ -112,7 +111,7 @@ class VendorPayoutsTable
                     ->label('Reject')
                     ->icon('heroicon-m-x-mark')
                     ->color('danger')
-                    ->visible(fn(VendorPayout $record) => in_array($record->status, ['pending', 'approved']))
+                    ->visible(fn (VendorPayout $record) => in_array($record->status, ['pending', 'approved']))
                     ->form([
                         Textarea::make('admin_notes')
                             ->label('Reason for rejection')
@@ -120,7 +119,7 @@ class VendorPayoutsTable
                     ])
                     ->action(function (VendorPayout $record, array $data) {
                         $record->update([
-                            'status'      => 'rejected',
+                            'status' => 'rejected',
                             'admin_notes' => $data['admin_notes'],
                         ]);
                         Notification::make()->title('Payout rejected')->danger()->send();

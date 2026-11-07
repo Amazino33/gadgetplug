@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Actions\Finance;
 
 use App\Models\FinancialAccount;
-use Carbon\CarbonInterface;
 use App\Models\Order;
 use App\Services\FinancialLedger;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -47,8 +47,8 @@ class RecognizeOrderRevenueAction
         // cash variant, so the caller's channel is ignored rather than trusted.
         $channel = match ($order->payment_method) {
             'paystack' => 'bank_transfer',
-            'wallet'   => 'wallet',
-            default    => $channel ?? $order->payment_channel,
+            'wallet' => 'wallet',
+            default => $channel ?? $order->payment_channel,
         };
 
         if (! in_array($channel, ['cash', 'bank_transfer', 'wallet'], true)) {
@@ -98,7 +98,7 @@ class RecognizeOrderRevenueAction
             // other side effect) recursively.
             $order->updateQuietly([
                 'revenue_recognized_at' => $occurredAt ?? now(),
-                'payment_channel'       => $channel,
+                'payment_channel' => $channel,
             ]);
         } catch (Throwable $e) {
             Log::error("Revenue recognition failed for order {$order->id}: ".$e->getMessage());

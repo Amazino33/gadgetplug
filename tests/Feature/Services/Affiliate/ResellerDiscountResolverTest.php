@@ -9,17 +9,17 @@ use App\Services\Affiliate\ResellerDiscountResolver;
 
 function makeResellerDiscountProduct(array $productAttrs = [], array $categoryAttrs = []): Product
 {
-    $owner    = User::factory()->create();
-    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Reseller Discount Store']);
-    $category = Category::create(array_merge(['name' => 'Reseller Discount Category ' . uniqid()], $categoryAttrs));
+    $owner = User::factory()->create();
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Reseller Discount Store']);
+    $category = Category::create(array_merge(['name' => 'Reseller Discount Category '.uniqid()], $categoryAttrs));
 
     return Product::create(array_merge([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'name'           => 'Reseller Discount Product',
-        'price'          => 1000,
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'Reseller Discount Product',
+        'price' => 1000,
         'stock_quantity' => 10,
-        'status'         => 'published',
+        'status' => 'published',
     ], $productAttrs));
 }
 

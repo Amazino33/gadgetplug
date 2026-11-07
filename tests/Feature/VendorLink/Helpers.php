@@ -16,8 +16,8 @@ use Illuminate\Support\Str;
 function linkVendor(string $name, bool $online = true): Vendor
 {
     return Vendor::create([
-        'user_id'              => User::factory()->create()->id,
-        'name'                 => $name.' '.uniqid(),
+        'user_id' => User::factory()->create()->id,
+        'name' => $name.' '.uniqid(),
         'online_sales_enabled' => $online,
     ]);
 }
@@ -25,14 +25,14 @@ function linkVendor(string $name, bool $online = true): Vendor
 function linkProduct(Vendor $vendor, float $price = 10000, int $stock = 5): Product
 {
     return Product::create([
-        'vendor_id'      => $vendor->id,
-        'store_id'       => $vendor->defaultStore->id,
-        'category_id'    => Category::firstOrCreate(['name' => 'VendorLink Cat'])->id,
-        'name'           => 'Linked Widget '.Str::random(5),
-        'price'          => $price,
-        'cost_price'     => $price * 0.6,
+        'vendor_id' => $vendor->id,
+        'store_id' => $vendor->defaultStore->id,
+        'category_id' => Category::firstOrCreate(['name' => 'VendorLink Cat'])->id,
+        'name' => 'Linked Widget '.Str::random(5),
+        'price' => $price,
+        'cost_price' => $price * 0.6,
         'stock_quantity' => $stock,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 }
 
@@ -41,6 +41,6 @@ function makeLink(Vendor $reseller, Vendor $supplier, float $markup = 40): Suppl
     return SupplierLink::create([
         'reseller_vendor_id' => $reseller->id,
         'supplier_vendor_id' => $supplier->id,
-        'markup_percent'     => $markup,
+        'markup_percent' => $markup,
     ]);
 }

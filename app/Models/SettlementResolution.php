@@ -22,7 +22,7 @@ class SettlementResolution extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'amount'     => 'decimal:2',
+        'amount' => 'decimal:2',
         'created_at' => 'datetime',
     ];
 
@@ -52,7 +52,7 @@ class SettlementResolution extends Model
     {
         static::creating(function (self $resolution) {
             if (! in_array($resolution->outcome, self::OUTCOMES, true)) {
-                throw new LogicException('Resolution outcome must be one of: ' . implode(', ', self::OUTCOMES) . '.');
+                throw new LogicException('Resolution outcome must be one of: '.implode(', ', self::OUTCOMES).'.');
             }
 
             if (blank($resolution->note)) {

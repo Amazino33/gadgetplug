@@ -7,7 +7,6 @@ use App\Models\Product;
 use App\Models\ProductUnit;
 use App\Models\User;
 use App\Models\Vendor;
-use App\Services\Products\SkuGenerator;
 use App\Services\VendorRoles;
 use Database\Seeders\VendorPermissionsSeeder;
 use Filament\Facades\Filament;
@@ -20,9 +19,9 @@ uses(RefreshDatabase::class);
 
 function styleShop(array $vendorAttributes = []): array
 {
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
 
-    $owner  = User::factory()->create();
+    $owner = User::factory()->create();
     $vendor = Vendor::create(array_merge(['user_id' => $owner->id, 'name' => 'Style Shop '.uniqid()], $vendorAttributes));
     VendorRoles::seedFor($vendor);
 
@@ -32,11 +31,11 @@ function styleShop(array $vendorAttributes = []): array
 function styleProduct(Vendor $vendor, array $attributes = []): Product
 {
     return Product::create(array_merge([
-        'vendor_id'   => $vendor->id,
+        'vendor_id' => $vendor->id,
         'category_id' => Category::firstOrCreate(['name' => 'Alcohol'])->id,
-        'name'        => 'Castile lite',
-        'price'       => 10100,
-        'status'      => 'published',
+        'name' => 'Castile lite',
+        'price' => 10100,
+        'status' => 'published',
     ], $attributes));
 }
 
@@ -147,7 +146,7 @@ test('the create form requires a SKU for a manual shop and keeps the one typed',
 
 test('the backfill command leaves manual shops alone', function () {
     [, $manual] = styleShop(['sku_style' => 'manual']);
-    [, $auto]   = styleShop();
+    [, $auto] = styleShop();
 
     $a = styleProduct($manual, ['sku' => 'X']);
     $b = styleProduct($auto);

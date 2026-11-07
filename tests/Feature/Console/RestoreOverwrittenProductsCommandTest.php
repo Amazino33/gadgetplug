@@ -8,6 +8,7 @@ use App\Models\Store;
 use App\Models\User;
 use App\Models\Vendor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 
 uses(RefreshDatabase::class);
 
@@ -19,8 +20,8 @@ uses(RefreshDatabase::class);
 
 function restoreContext(): array
 {
-    $owner    = User::factory()->create();
-    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Zelink Tech']);
+    $owner = User::factory()->create();
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Zelink Tech']);
     $itelHome = Store::create(['vendor_id' => $vendor->id, 'name' => 'Itel Home', 'is_default' => true]);
     $oraimoStore = Store::create(['vendor_id' => $vendor->id, 'name' => 'Oraimo Store']);
     $category = Category::firstOrCreate(['name' => 'Powerbank'], ['slug' => 'restore-test-powerbank']);
@@ -44,7 +45,7 @@ function overwrittenProduct(array $c): Product
     // than through the whole import pipeline, since it's the update itself
     // being tested, not how it was triggered. Pinned to the real incident's
     // timestamp so the command's time-window lookup has something real to find.
-    test()->travelTo(\Illuminate\Support\Carbon::parse(BAD_IMPORT_TIME)->addSeconds(4));
+    test()->travelTo(Carbon::parse(BAD_IMPORT_TIME)->addSeconds(4));
     $product->update(['name' => 'O', 'price' => 1, 'cost_price' => 0, 'brand' => 'Oraimo', 'store_id' => $c['oraimoStore']->id]);
     test()->travelBack();
 
@@ -92,7 +93,7 @@ it('leaves stock exactly as it is, since real counts happened against it', funct
         'stock_quantity' => 6,
     ]);
 
-    test()->travelTo(\Illuminate\Support\Carbon::parse(BAD_IMPORT_TIME)->addSeconds(4));
+    test()->travelTo(Carbon::parse(BAD_IMPORT_TIME)->addSeconds(4));
     $product->update(['name' => 'O', 'price' => 1, 'cost_price' => 0, 'brand' => 'Oraimo', 'store_id' => $c['oraimoStore']->id]);
     test()->travelBack();
 
@@ -147,7 +148,7 @@ it('only restores fields the overwrite actually changed', function () {
     ]);
 
     // Only price changes this time -- name is untouched by the collision.
-    test()->travelTo(\Illuminate\Support\Carbon::parse(BAD_IMPORT_TIME));
+    test()->travelTo(Carbon::parse(BAD_IMPORT_TIME));
     $product->update(['price' => 1]);
     test()->travelBack();
 
@@ -190,7 +191,7 @@ it('sets stock to a named count session\'s figure, not whatever followed the pro
 
     // The collision, then a completely unrelated evening count at a different
     // physical store finds 31 units of whatever is sitting there.
-    test()->travelTo(\Illuminate\Support\Carbon::parse(BAD_IMPORT_TIME)->addSeconds(4));
+    test()->travelTo(Carbon::parse(BAD_IMPORT_TIME)->addSeconds(4));
     $product->update(['name' => 'P204 20000MAH', 'store_id' => $c['oraimoStore']->id]);
     test()->travelBack();
     $product->update(['stock_quantity' => 31]);
@@ -235,10 +236,10 @@ it('leaves stock alone when the named count has no line for this product', funct
 });
 
 it('never touches another vendor\'s products', function () {
-    $c     = restoreContext();
+    $c = restoreContext();
     $other = restoreContext();
 
-    $mine   = overwrittenProduct($c);
+    $mine = overwrittenProduct($c);
     $theirs = overwrittenProduct($other);
 
     $this->artisan('products:restore-overwritten', [

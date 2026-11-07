@@ -30,12 +30,12 @@ function ossVendor(): array
 {
     config(['services.messaging.whatsapp_driver' => 'log_null', 'services.messaging.sms_driver' => 'log_null']);
 
-    $owner    = User::factory()->create();
-    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'OSS Store '.uniqid(), 'online_sales_enabled' => true]);
-    $main     = $vendor->defaultStore ?? Store::create(['vendor_id' => $vendor->id, 'name' => 'Main', 'is_default' => true]);
-    $branch   = Store::create(['vendor_id' => $vendor->id, 'name' => 'Branch']);
+    $owner = User::factory()->create();
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'OSS Store '.uniqid(), 'online_sales_enabled' => true]);
+    $main = $vendor->defaultStore ?? Store::create(['vendor_id' => $vendor->id, 'name' => 'Main', 'is_default' => true]);
+    $branch = Store::create(['vendor_id' => $vendor->id, 'name' => 'Branch']);
     $category = Category::create(['name' => 'OSS Category '.uniqid()]);
-    $product  = Product::create([
+    $product = Product::create([
         'vendor_id' => $vendor->id, 'category_id' => $category->id, 'store_id' => $main->id,
         'name' => 'OSS Widget', 'price' => 5000, 'cost_price' => 3000,
         'stock_quantity' => 10, 'status' => 'published',

@@ -102,11 +102,11 @@ class OnlineNameSuggester
 
             // Whole words: "Frame" is not RAM and "Chrome" is not ROM.
             match (true) {
-                (bool) preg_match('/\b(ram|memory)\b/', $key)              => $found['ram'] ??= $value,
-                (bool) preg_match('/\b(storage|rom|capacity)\b/', $key)    => $found['storage'] ??= $value,
+                (bool) preg_match('/\b(ram|memory)\b/', $key) => $found['ram'] ??= $value,
+                (bool) preg_match('/\b(storage|rom|capacity)\b/', $key) => $found['storage'] ??= $value,
                 (bool) preg_match('/\b(network|sim|connectivity)\b/', $key) => $found['network'] ??= $value,
-                (bool) preg_match('/\b(colou?r)\b/', $key)                 => $found['colour'] ??= Str::title($value),
-                default                                                     => null,
+                (bool) preg_match('/\b(colou?r)\b/', $key) => $found['colour'] ??= Str::title($value),
+                default => null,
             };
         }
 

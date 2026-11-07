@@ -52,12 +52,12 @@ class LogTillExpenseAction
         }
 
         return TillExpense::create([
-            'vendor_id'      => $store->vendor_id,
-            'store_id'       => $store->id,
-            'logged_by'      => $loggedBy->id,
-            'amount'         => round($amount, 2),
-            'reason'         => $reason,
-            'spent_at'       => $spentAt,
+            'vendor_id' => $store->vendor_id,
+            'store_id' => $store->id,
+            'logged_by' => $loggedBy->id,
+            'amount' => round($amount, 2),
+            'reason' => $reason,
+            'spent_at' => $spentAt,
             // Only so a cash-up can see what has already been declared and not
             // ask for the same money to be explained a second time.
             'pos_session_id' => $this->openSessionAt($store->id, $loggedBy->id),

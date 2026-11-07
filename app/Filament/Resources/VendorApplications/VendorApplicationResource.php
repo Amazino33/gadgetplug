@@ -31,6 +31,7 @@ class VendorApplicationResource extends Resource
     public static function getNavigationBadge(): ?string
     {
         $count = VendorApplication::where('status', 'pending')->count();
+
         return $count > 0 ? (string) $count : null;
     }
 
@@ -53,7 +54,7 @@ class VendorApplicationResource extends Resource
     {
         return [
             'index' => ListVendorApplications::route('/'),
-            'view'  => ViewVendorApplication::route('/{record}'),
+            'view' => ViewVendorApplication::route('/{record}'),
         ];
     }
 

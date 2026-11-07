@@ -5,10 +5,10 @@ namespace App\Filament\Resources\Categories\Tables;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
-use Filament\Tables\Table;
-use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\SpatieMediaLibraryImageColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Table;
 
 class CategoriesTable
 {
@@ -25,11 +25,11 @@ class CategoriesTable
                 TextColumn::make('slug'),
                 TextColumn::make('commission_rate')
                     ->label('Commission Rate')
-                    ->formatStateUsing(fn ($state) => $state !== null ? number_format((float) $state, 2) . '%' : '—')
+                    ->formatStateUsing(fn ($state) => $state !== null ? number_format((float) $state, 2).'%' : '—')
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('reseller_discount')
                     ->label('Reseller Discount')
-                    ->formatStateUsing(fn ($state) => $state !== null ? number_format((float) $state, 2) . '%' : '—')
+                    ->formatStateUsing(fn ($state) => $state !== null ? number_format((float) $state, 2).'%' : '—')
                     ->toggleable(isToggledHiddenByDefault: true),
                 IconColumn::make('is_active')->boolean(),
                 TextColumn::make('created_at')->dateTime()->sortable()->toggleable(isToggledHiddenByDefault: true),

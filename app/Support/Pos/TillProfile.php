@@ -33,16 +33,16 @@ class TillProfile
     public static function for(User $cashier, ?Vendor $vendor): array
     {
         return [
-            'vat_enabled'  => (bool) ($vendor->pos_vat_enabled ?? true),
-            'vat_rate'     => (float) ($vendor->pos_vat_rate ?? 7.5),
+            'vat_enabled' => (bool) ($vendor->pos_vat_enabled ?? true),
+            'vat_rate' => (float) ($vendor->pos_vat_rate ?? 7.5),
             'ask_quantity' => (bool) ($vendor->pos_ask_quantity ?? true),
             // Off unless the vendor turns it on; the server enforces it either way.
             'allow_price_change' => (bool) ($vendor->pos_allow_price_change ?? false),
             // ½, 1½ crates. Off for every shop but the few that split crates;
             // the server refuses a half from anyone else whatever a till sends.
             'allow_half_quantities' => (bool) ($vendor->allow_half_quantities ?? false),
-            'vendor_name'  => $vendor?->name,
-            'receipt'      => self::receipt($vendor),
+            'vendor_name' => $vendor?->name,
+            'receipt' => self::receipt($vendor),
             // The public receipt address with {token} where the sale's token
             // goes, derived from the real route so it can never drift from it.
             // The till owns the token, so it can print a working QR offline.
@@ -51,10 +51,10 @@ class TillProfile
                 '{token}',
                 route('receipt.public', ['token' => '__TOKEN__']),
             ),
-            'store'        => self::store($cashier, $vendor),
+            'store' => self::store($cashier, $vendor),
             // Which till screens to offer. Only decides what is shown — every
             // endpoint behind them checks the same permission again.
-            'can'          => [
+            'can' => [
                 'view_sales_history' => $vendor !== null
                     && $cashier->hasVendorPermission((int) $vendor->id, 'view_sales_history'),
             ],
@@ -78,30 +78,30 @@ class TillProfile
         $settings = VendorReceiptSetting::forVendor($vendor);
 
         return [
-            'header_name'          => $settings->displayName($vendor),
-            'header_alignment'     => $settings->header_alignment ?? 'center',
-            'header_tagline'       => $settings->header_tagline,
-            'header_address'       => $settings->header_address,
-            'header_phone'         => $settings->header_phone,
-            'header_extra'         => $settings->header_extra,
-            'show_logo'            => (bool) $settings->show_logo,
+            'header_name' => $settings->displayName($vendor),
+            'header_alignment' => $settings->header_alignment ?? 'center',
+            'header_tagline' => $settings->header_tagline,
+            'header_address' => $settings->header_address,
+            'header_phone' => $settings->header_phone,
+            'header_extra' => $settings->header_extra,
+            'show_logo' => (bool) $settings->show_logo,
             // Absolute, because the receipt is written into an iframe of its
             // own. Offline it resolves only if the service worker already
             // cached it, which is why the document drops a logo that fails.
-            'logo_url'             => $vendor->logo ? asset('storage/'.$vendor->logo) : null,
-            'show_receipt_number'  => (bool) $settings->show_receipt_number,
-            'show_datetime'        => (bool) $settings->show_datetime,
-            'show_cashier'         => (bool) $settings->show_cashier,
-            'show_customer'        => (bool) $settings->show_customer,
+            'logo_url' => $vendor->logo ? asset('storage/'.$vendor->logo) : null,
+            'show_receipt_number' => (bool) $settings->show_receipt_number,
+            'show_datetime' => (bool) $settings->show_datetime,
+            'show_cashier' => (bool) $settings->show_cashier,
+            'show_customer' => (bool) $settings->show_customer,
             'show_item_unit_price' => (bool) $settings->show_item_unit_price,
-            'footer_text'          => $settings->footer_text,
-            'footer_alignment'     => $settings->footer_alignment ?? 'center',
-            'feed_lines'           => (int) ($settings->feed_lines ?? 2),
+            'footer_text' => $settings->footer_text,
+            'footer_alignment' => $settings->footer_alignment ?? 'center',
+            'feed_lines' => (int) ($settings->feed_lines ?? 2),
             // The till mints each sale's token itself and draws the QR in the
             // browser, so a receipt printed offline carries a code that starts
             // working the moment the sale syncs.
-            'show_qr'              => (bool) ($settings->show_qr ?? true),
-            'qr_caption'           => $settings->qr_caption,
+            'show_qr' => (bool) ($settings->show_qr ?? true),
+            'qr_caption' => $settings->qr_caption,
         ];
     }
 
@@ -121,13 +121,13 @@ class TillProfile
         }
 
         $storeId = TillStore::resolve($cashier, (int) $vendor->id);
-        $store   = $storeId ? Store::find($storeId) : null;
+        $store = $storeId ? Store::find($storeId) : null;
 
         return [
-            'name'    => $store?->name,
+            'name' => $store?->name,
             'address' => $store?->address,
-            'phone'   => $store?->phone,
-            'show'    => $store !== null
+            'phone' => $store?->phone,
+            'show' => $store !== null
                 && Store::where('vendor_id', $vendor->id)->count() > 1,
         ];
     }

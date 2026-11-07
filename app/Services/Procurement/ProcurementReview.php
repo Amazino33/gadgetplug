@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Services\Procurement;
 
-use App\Support\Quantity;
 use App\Actions\Procurement\ApproveProcurementAction;
 use App\Models\Procurement;
 use App\Models\ProcurementItem;
 use App\Models\ProcurementItemCorrection;
 use App\Models\User;
+use App\Support\Quantity;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\UnauthorizedException;
@@ -40,7 +40,7 @@ class ProcurementReview
     /**
      * Both sides agree. Receive the goods at the figures they agreed on.
      */
-    public function approve(Procurement $procurement, User $user, int|null $store = null): Procurement
+    public function approve(Procurement $procurement, User $user, ?int $store = null): Procurement
     {
         if (! $user->can('approve', $procurement)) {
             throw new UnauthorizedException($this->refusal($procurement, $user));
@@ -61,8 +61,8 @@ class ProcurementReview
 
             $row->forceFill([
                 'awaiting_user_id' => null,
-                'approved_by'      => $user->id,
-                'approved_at'      => now(),
+                'approved_by' => $user->id,
+                'approved_at' => now(),
             ])->save();
 
             return $row->fresh(['items.corrections']);
@@ -96,7 +96,7 @@ class ProcurementReview
                 throw new RuntimeException('That delivery has already been answered.');
             }
 
-            $items   = $row->items()->with('corrections')->get()->keyBy('id');
+            $items = $row->items()->with('corrections')->get()->keyBy('id');
             $changed = 0;
 
             foreach ($lines as $itemId => $values) {
@@ -132,7 +132,7 @@ class ProcurementReview
                 }
 
                 ProcurementItemCorrection::create([
-                    'procurement_id'      => $row->id,
+                    'procurement_id' => $row->id,
                     'procurement_item_id' => $item->id,
                     // Always the storekeeper's original figures, never the
                     // previous correction's. Variance on a line means
@@ -140,13 +140,13 @@ class ProcurementReview
                     // chaining it against the last counter-offer instead would
                     // make the number mean something different on every pass
                     // of the argument.
-                    'recorded_quantity'   => Quantity::of($item->quantity),
-                    'recorded_unit_cost'  => (float) $item->unit_cost,
-                    'verified_quantity'   => $quantity,
-                    'verified_unit_cost'  => $unitCost,
-                    'corrected_by'        => $user->id,
-                    'corrected_at'        => now(),
-                    'note'                => $note,
+                    'recorded_quantity' => Quantity::of($item->quantity),
+                    'recorded_unit_cost' => (float) $item->unit_cost,
+                    'verified_quantity' => $quantity,
+                    'verified_unit_cost' => $unitCost,
+                    'corrected_by' => $user->id,
+                    'corrected_at' => now(),
+                    'note' => $note,
                 ]);
 
                 $changed++;
@@ -160,7 +160,7 @@ class ProcurementReview
             // is agreed or it is not; there is no half-agreed batch where some
             // lines are settled and the rest are still in dispute.
             $row->forceFill([
-                'status'           => Procurement::STATUS_CHANGES_REQUESTED,
+                'status' => Procurement::STATUS_CHANGES_REQUESTED,
                 'awaiting_user_id' => $this->counterpartyOf($row, $user),
             ])->save();
 

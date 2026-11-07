@@ -54,7 +54,7 @@ class TillBranchUnclear extends RuntimeException
     {
         return response()->json([
             'message' => $this->getMessage(),
-            'code'    => self::CODE,
+            'code' => self::CODE,
         ], 422);
     }
 }

@@ -15,6 +15,7 @@ use App\Models\User;
 use App\Models\Vendor;
 use App\Services\Inventory\StoreAllocator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
@@ -23,7 +24,7 @@ function allocVendor(): Vendor
 {
     return Vendor::create([
         'user_id' => User::factory()->create()->id,
-        'name'    => 'Alloc Vendor '.uniqid(),
+        'name' => 'Alloc Vendor '.uniqid(),
     ]);
 }
 
@@ -31,13 +32,13 @@ function allocVendor(): Vendor
 function allocProduct(Vendor $vendor, int $defaultQty, array $branches = []): Product
 {
     $product = Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => Category::create(['name' => 'Cat '.uniqid()])->id,
-        'name'           => 'Alloc Product '.uniqid(),
-        'price'          => 1000,
-        'cost_price'     => 600,
+        'vendor_id' => $vendor->id,
+        'category_id' => Category::create(['name' => 'Cat '.uniqid()])->id,
+        'name' => 'Alloc Product '.uniqid(),
+        'price' => 1000,
+        'cost_price' => 600,
         'stock_quantity' => 0,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
     ProductStoreStock::where('product_id', $product->id)->first()->update(['quantity' => $defaultQty]);
@@ -65,7 +66,7 @@ function allocOrderItem(Product $product, int $quantity): OrderItem
     ]);
 }
 
-function rowsFor(Product $product): \Illuminate\Support\Collection
+function rowsFor(Product $product): Collection
 {
     return ProductStoreStock::where('product_id', $product->id)->get()->keyBy('store_id');
 }

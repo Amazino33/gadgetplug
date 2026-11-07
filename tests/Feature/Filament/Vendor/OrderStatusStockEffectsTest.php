@@ -10,9 +10,11 @@ use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\User;
 use App\Models\Vendor;
+use App\Services\Orders\OrderStatusService;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Spatie\Permission\Models\Role;
 
 uses(RefreshDatabase::class);
 
@@ -20,35 +22,35 @@ function setUpStockEffectsFixture(string $initialStatus = 'paid'): array
 {
     config(['services.messaging.whatsapp_driver' => 'log_null', 'services.messaging.sms_driver' => 'log_null']);
 
-    $owner    = User::factory()->create();
-    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Stock Effects Store', 'online_sales_enabled' => true]);
+    $owner = User::factory()->create();
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Stock Effects Store', 'online_sales_enabled' => true]);
     $category = Category::create(['name' => 'Stock Effects Category']);
-    $product  = Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'name'           => 'Stock Effects Product',
-        'price'          => 2000,
+    $product = Product::create([
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'Stock Effects Product',
+        'price' => 2000,
         'stock_quantity' => 10,
         'reserved_stock' => 3,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
     $order = Order::create([
-        'reference'        => 'ORD-STOCK-' . uniqid(),
-        'customer_name'    => 'Jane Customer',
-        'customer_email'   => 'jane@example.com',
-        'customer_phone'   => '08040000000',
+        'reference' => 'ORD-STOCK-'.uniqid(),
+        'customer_name' => 'Jane Customer',
+        'customer_email' => 'jane@example.com',
+        'customer_phone' => '08040000000',
         'shipping_address' => '1 Test Street',
-        'total_amount'     => 2000,
-        'status'           => $initialStatus,
-        'payment_method'   => 'paystack',
+        'total_amount' => 2000,
+        'status' => $initialStatus,
+        'payment_method' => 'paystack',
     ]);
 
     $item = OrderItem::create([
-        'order_id'   => $order->id,
+        'order_id' => $order->id,
         'product_id' => $product->id,
-        'vendor_id'  => $vendor->id,
-        'quantity'   => 3,
+        'vendor_id' => $vendor->id,
+        'quantity' => 3,
         'unit_price' => 2000,
     ]);
 
@@ -93,11 +95,11 @@ test('cancelling through the status service releases the reservation without tou
     $data = setUpStockEffectsFixture('paid');
 
     $admin = User::factory()->create();
-    Spatie\Permission\Models\Role::firstOrCreate(['name' => 'super_admin', 'guard_name' => 'web', 'team_id' => null]);
+    Role::firstOrCreate(['name' => 'super_admin', 'guard_name' => 'web', 'team_id' => null]);
     setPermissionsTeamId(null);
     $admin->assignRole('super_admin');
 
-    app(App\Services\Orders\OrderStatusService::class)->cancel($data['order'], $admin, 'Customer cancelled');
+    app(OrderStatusService::class)->cancel($data['order'], $admin, 'Customer cancelled');
 
     $product = $data['product']->fresh();
 

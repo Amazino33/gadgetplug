@@ -2,11 +2,12 @@
 
 namespace App\Models;
 
-use App\Support\Quantity;
 use App\Casts\AsQuantity;
 use App\Services\ActiveStore;
+use App\Support\Quantity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
@@ -31,7 +32,7 @@ class AuditSession extends Model
     ];
 
     protected $casts = [
-        'loss_value'      => 'decimal:2',
+        'loss_value' => 'decimal:2',
         'system_quantity' => AsQuantity::class,
         'count_a' => AsQuantity::class,
         'count_b' => AsQuantity::class,
@@ -48,7 +49,7 @@ class AuditSession extends Model
         return $this->belongsTo(BlindCountSession::class, 'blind_count_session_id');
     }
 
-    public function shortageCase(): \Illuminate\Database\Eloquent\Relations\HasOne
+    public function shortageCase(): HasOne
     {
         return $this->hasOne(InventoryShortageCase::class, 'count_line_id');
     }
@@ -161,6 +162,6 @@ class AuditSession extends Model
             ->logOnly(['status', 'product_id', 'count_a', 'count_b', 'manager_override_count', 'storekeeper_a_id', 'storekeeper_b_id', 'manager_id'])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
-            ->setDescriptionForEvent(fn (string $event) => 'Stock count ' . $event);
+            ->setDescriptionForEvent(fn (string $event) => 'Stock count '.$event);
     }
 }

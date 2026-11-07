@@ -21,10 +21,10 @@ class UserSeeder extends Seeder
         $admin = User::firstOrCreate(
             ['email' => 'admin@gadgetplug.com'],
             [
-                'name'              => 'Super Admin',
-                'password'          => Hash::make('password'),
+                'name' => 'Super Admin',
+                'password' => Hash::make('password'),
                 'email_verified_at' => now(),
-                'phone'             => '08000000000',
+                'phone' => '08000000000',
             ]
         );
         $admin->assignRole('super_admin');
@@ -33,39 +33,39 @@ class UserSeeder extends Seeder
         User::firstOrCreate(
             ['email' => 'vendor@gadgetplug.com'],
             [
-                'name'              => 'Chidi Okonkwo',
-                'password'          => Hash::make('password'),
+                'name' => 'Chidi Okonkwo',
+                'password' => Hash::make('password'),
                 'email_verified_at' => now(),
-                'phone'             => '08012345678',
-                'pos_pin'           => Hash::make('1234'),
+                'phone' => '08012345678',
+                'pos_pin' => Hash::make('1234'),
             ]
         );
 
         // Team members
         $teamMembers = [
             [
-                'email'    => 'pm@gadgetplug.com',
-                'name'     => 'Amaka Eze',
-                'phone'    => '08023456789',
-                'pos_pin'  => Hash::make('1111'),
+                'email' => 'pm@gadgetplug.com',
+                'name' => 'Amaka Eze',
+                'phone' => '08023456789',
+                'pos_pin' => Hash::make('1111'),
             ],
             [
-                'email'    => 'om@gadgetplug.com',
-                'name'     => 'Emeka Nwosu',
-                'phone'    => '08034567890',
-                'pos_pin'  => Hash::make('2222'),
+                'email' => 'om@gadgetplug.com',
+                'name' => 'Emeka Nwosu',
+                'phone' => '08034567890',
+                'pos_pin' => Hash::make('2222'),
             ],
             [
-                'email'    => 'im@gadgetplug.com',
-                'name'     => 'Tunde Adeyemi',
-                'phone'    => '08045678901',
-                'pos_pin'  => Hash::make('3333'),
+                'email' => 'im@gadgetplug.com',
+                'name' => 'Tunde Adeyemi',
+                'phone' => '08045678901',
+                'pos_pin' => Hash::make('3333'),
             ],
             [
-                'email'    => 'storekeeper@gadgetplug.com',
-                'name'     => 'Ngozi Obi',
-                'phone'    => '08056789012',
-                'pos_pin'  => Hash::make('4444'),
+                'email' => 'storekeeper@gadgetplug.com',
+                'name' => 'Ngozi Obi',
+                'phone' => '08056789012',
+                'pos_pin' => Hash::make('4444'),
             ],
         ];
 
@@ -73,7 +73,7 @@ class UserSeeder extends Seeder
             User::firstOrCreate(
                 ['email' => $data['email']],
                 array_merge($data, [
-                    'password'          => Hash::make('password'),
+                    'password' => Hash::make('password'),
                     'email_verified_at' => now(),
                 ])
             );
@@ -90,7 +90,7 @@ class UserSeeder extends Seeder
             User::firstOrCreate(
                 ['email' => $data['email']],
                 array_merge($data, [
-                    'password'          => Hash::make('password'),
+                    'password' => Hash::make('password'),
                     'email_verified_at' => now(),
                 ])
             );

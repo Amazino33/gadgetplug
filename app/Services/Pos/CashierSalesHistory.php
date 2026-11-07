@@ -139,22 +139,22 @@ class CashierSalesHistory
         $refunds = $this->refunds($vendorId, $cashierId, $from, $to, $filters);
 
         return [
-            'sales_count'   => (int) $row->sales_count,
-            'collected'     => $collected,
-            'credit'        => $tenders['debt'],
-            'tenders'       => $tenders,
-            'vat'           => round((float) $row->vat, 2),
-            'discounts'     => round((float) $row->discounts, 2),
+            'sales_count' => (int) $row->sales_count,
+            'collected' => $collected,
+            'credit' => $tenders['debt'],
+            'tenders' => $tenders,
+            'vat' => round((float) $row->vat, 2),
+            'discounts' => round((float) $row->discounts, 2),
             // Whole-sale figure, so it means nothing once a single tender has
             // been picked out of a mixed sale.
-            'revenue'       => $method === null
+            'revenue' => $method === null
                 ? round((float) $row->revenue - ($refunds['total'] ?? 0), 2)
                 : null,
-            'voided'        => [
+            'voided' => [
                 'count' => (int) $row->voided_count,
                 'total' => round((float) $row->voided_total, 2),
             ],
-            'refunds'       => $refunds,
+            'refunds' => $refunds,
             'net_collected' => round($collected - ($refunds['money_out'] ?? 0), 2),
         ];
     }
@@ -173,7 +173,7 @@ class CashierSalesHistory
             return null;
         }
 
-        $moneyMethods = "'" . implode("','", self::MONEY_METHODS) . "'";
+        $moneyMethods = "'".implode("','", self::MONEY_METHODS)."'";
 
         $row = PosReturn::query()
             ->where('vendor_id', $vendorId)
@@ -189,8 +189,8 @@ class CashierSalesHistory
             ->first();
 
         return [
-            'count'     => (int) $row->refund_count,
-            'total'     => round((float) $row->total, 2),
+            'count' => (int) $row->refund_count,
+            'total' => round((float) $row->total, 2),
             'money_out' => round((float) $row->money_out, 2),
         ];
     }

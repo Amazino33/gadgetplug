@@ -16,8 +16,8 @@ uses(RefreshDatabase::class);
 function topSellerVendor(): array
 {
     $owner = User::factory()->create();
-    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Top Seller Store ' . uniqid()]);
-    $category = Category::create(['name' => 'Top Seller Category ' . uniqid()]);
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Top Seller Store '.uniqid()]);
+    $category = Category::create(['name' => 'Top Seller Category '.uniqid()]);
 
     return compact('owner', 'vendor', 'category');
 }
@@ -26,7 +26,7 @@ function topSellerProduct(array $data, array $overrides = []): Product
 {
     return Product::create(array_merge([
         'vendor_id' => $data['vendor']->id, 'category_id' => $data['category']->id,
-        'name' => 'Seller Widget ' . uniqid(), 'price' => 1000, 'cost_price' => 400,
+        'name' => 'Seller Widget '.uniqid(), 'price' => 1000, 'cost_price' => 400,
         'stock_quantity' => 50, 'status' => 'published',
     ], $overrides));
 }
@@ -34,7 +34,7 @@ function topSellerProduct(array $data, array $overrides = []): Product
 function deliverTopSellerOnline(array $data, Product $product, int $quantity, $recognizedAt): void
 {
     $order = Order::create([
-        'reference' => 'ORD-TS-' . uniqid(), 'customer_name' => 'Buyer', 'customer_email' => 'b@example.com',
+        'reference' => 'ORD-TS-'.uniqid(), 'customer_name' => 'Buyer', 'customer_email' => 'b@example.com',
         'customer_phone' => '0804', 'shipping_address' => 'Uyo', 'total_amount' => $product->price * $quantity,
         'status' => 'delivered', 'payment_method' => 'pay_on_delivery', 'revenue_recognized_at' => $recognizedAt,
     ]);
@@ -48,7 +48,7 @@ function deliverTopSellerOnline(array $data, Product $product, int $quantity, $r
 function deliverTopSellerPos(array $data, Product $product, int $quantity, $completedAt, string $status = 'completed'): void
 {
     $sale = PosSale::create([
-        'reference' => 'POS-TS-' . uniqid(), 'vendor_id' => $data['vendor']->id, 'cashier_id' => $data['owner']->id,
+        'reference' => 'POS-TS-'.uniqid(), 'vendor_id' => $data['vendor']->id, 'cashier_id' => $data['owner']->id,
         'subtotal' => $product->price * $quantity, 'total' => $product->price * $quantity,
         'payment_method' => 'cash', 'status' => $status, 'completed_at' => $completedAt,
     ]);
@@ -119,7 +119,7 @@ test('sales outside the requested period are not counted', function () {
 
 test('the category filter scopes the ranking to one category', function () {
     $data = topSellerVendor();
-    $otherCategory = Category::create(['name' => 'Other Top Seller Category ' . uniqid()]);
+    $otherCategory = Category::create(['name' => 'Other Top Seller Category '.uniqid()]);
     $inCategory = topSellerProduct($data);
     $outOfCategory = topSellerProduct($data, ['category_id' => $otherCategory->id]);
 

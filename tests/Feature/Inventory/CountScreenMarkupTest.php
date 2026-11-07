@@ -32,14 +32,14 @@ uses(RefreshDatabase::class);
  */
 function countScreenHtml(): string
 {
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
 
     $owner = User::factory()->create();
     $staff = User::factory()->create();
 
     $vendor = Vendor::create([
-        'user_id'                      => $owner->id,
-        'name'                         => 'Markup Guard Store',
+        'user_id' => $owner->id,
+        'name' => 'Markup Guard Store',
         'pos_blind_count_participants' => 1,
     ]);
     $vendor->users()->attach($staff->id);
@@ -49,15 +49,15 @@ function countScreenHtml(): string
     $staff->assignRole('storekeeper');
 
     Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => Category::firstOrCreate(['name' => 'Chargers'])->id,
-        'name'           => 'SHPLUS 60W Charger',
-        'price'          => 5300,
-        'cost_price'     => 2570,
+        'vendor_id' => $vendor->id,
+        'category_id' => Category::firstOrCreate(['name' => 'Chargers'])->id,
+        'name' => 'SHPLUS 60W Charger',
+        'price' => 5300,
+        'cost_price' => 2570,
         'stock_quantity' => 10,
         'reserved_stock' => 0,
-        'status'         => 'published',
-        'show_in_pos'    => true,
+        'status' => 'published',
+        'show_in_pos' => true,
     ]);
 
     test()->actingAs($staff);

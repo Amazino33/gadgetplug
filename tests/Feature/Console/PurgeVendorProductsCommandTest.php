@@ -1,12 +1,16 @@
 <?php
 
+use App\Models\BlindCountEntry;
+use App\Models\BlindCountSession;
 use App\Models\Category;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
+use App\Models\Store;
 use App\Models\User;
 use App\Models\Vendor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 uses(RefreshDatabase::class);
 
@@ -20,12 +24,12 @@ function purgeProductsVendor(): Vendor
 function purgeProductsProduct(Vendor $vendor, string $name): Product
 {
     return Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => Category::firstOrCreate(['name' => 'Purge Cat'])->id,
-        'name'           => $name,
-        'price'          => 1000,
+        'vendor_id' => $vendor->id,
+        'category_id' => Category::firstOrCreate(['name' => 'Purge Cat'])->id,
+        'name' => $name,
+        'price' => 1000,
         'stock_quantity' => 3,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 }
 
@@ -52,7 +56,7 @@ test('force deletes a clean catalogue', function () {
 });
 
 test('it never touches another vendor', function () {
-    $mine  = purgeProductsVendor();
+    $mine = purgeProductsVendor();
     $other = Vendor::create(['user_id' => User::factory()->create()->id, 'name' => 'Other', 'slug' => 'other']);
     purgeProductsProduct($mine, 'A');
     purgeProductsProduct($other, 'Theirs');
@@ -67,8 +71,8 @@ test('it never touches another vendor', function () {
 // silently destroy the order line it belongs to.
 test('a product with order history is kept back by default', function () {
     $vendor = purgeProductsVendor();
-    $clean  = purgeProductsProduct($vendor, 'Clean');
-    $sold   = purgeProductsProduct($vendor, 'Sold');
+    $clean = purgeProductsProduct($vendor, 'Clean');
+    $sold = purgeProductsProduct($vendor, 'Sold');
 
     $order = Order::create([
         'reference' => 'GP-PURGE1', 'customer_name' => 'A', 'customer_email' => 'a@b.c',
@@ -89,7 +93,7 @@ test('a product with order history is kept back by default', function () {
 
 test('with-history removes them too', function () {
     $vendor = purgeProductsVendor();
-    $sold   = purgeProductsProduct($vendor, 'Sold');
+    $sold = purgeProductsProduct($vendor, 'Sold');
 
     $order = Order::create([
         'reference' => 'GP-PURGE2', 'customer_name' => 'A', 'customer_email' => 'a@b.c',
@@ -115,8 +119,8 @@ test('an unknown vendor fails cleanly', function () {
 test('a vendor can be found by name fragment', function () {
     $vendor = Vendor::create([
         'user_id' => User::factory()->create()->id,
-        'name'    => 'Chip Gadget',
-        'slug'    => 'chip-gadget',
+        'name' => 'Chip Gadget',
+        'slug' => 'chip-gadget',
     ]);
     purgeProductsProduct($vendor, 'A');
 
@@ -143,7 +147,7 @@ test('an ambiguous name refuses to delete anything', function () {
 // Product implements HasMedia; Spatie cleans images from the model's deleting
 // event, which a mass whereIn()->delete() would skip entirely.
 test('deleting a product also removes its media rows', function () {
-    $vendor  = purgeProductsVendor();
+    $vendor = purgeProductsVendor();
     $product = purgeProductsProduct($vendor, 'With Image');
 
     // A real 1x1 PNG: Spatie generates conversions on add, so fake bytes fail.
@@ -160,7 +164,7 @@ test('deleting a product also removes its media rows', function () {
         ->assertSuccessful();
 
     expect(Product::find($product->id))->toBeNull()
-        ->and(Spatie\MediaLibrary\MediaCollections\Models\Media::find($mediaId))->toBeNull();
+        ->and(Media::find($mediaId))->toBeNull();
 });
 
 // ── Restricting history, and clearing one branch ───────────────────────────
@@ -174,27 +178,27 @@ function purgeCountedProduct(Vendor $vendor, string $name): Product
 {
     $product = purgeProductsProduct($vendor, $name);
 
-    $session = App\Models\BlindCountSession::create([
-        'vendor_id'        => $vendor->id,
-        'status'           => 'a_counting',
-        'frequency'        => 'daily',
-        'product_order'    => [$product->id],
+    $session = BlindCountSession::create([
+        'vendor_id' => $vendor->id,
+        'status' => 'a_counting',
+        'frequency' => 'daily',
+        'product_order' => [$product->id],
         'storekeeper_a_id' => $vendor->user_id,
     ]);
 
-    App\Models\BlindCountEntry::create([
+    BlindCountEntry::create([
         'blind_count_session_id' => $session->id,
-        'user_id'                => $vendor->user_id,
-        'product_id'             => $product->id,
-        'position'               => 1,
-        'count'                  => 3,
+        'user_id' => $vendor->user_id,
+        'product_id' => $product->id,
+        'position' => 1,
+        'count' => 3,
     ]);
 
     return $product;
 }
 
 test('a counted product is held back by default, and named as a blocker', function () {
-    $vendor  = purgeProductsVendor();
+    $vendor = purgeProductsVendor();
     $counted = purgeCountedProduct($vendor, 'Counted');
 
     $this->artisan('products:purge', ['vendor' => $vendor->slug, '--force' => true])
@@ -205,7 +209,7 @@ test('a counted product is held back by default, and named as a blocker', functi
 });
 
 test('with-history clears the count entries and removes the product', function () {
-    $vendor  = purgeProductsVendor();
+    $vendor = purgeProductsVendor();
     $counted = purgeCountedProduct($vendor, 'Counted');
 
     // Before the fix this threw a foreign-key violation and rolled back.
@@ -214,13 +218,13 @@ test('with-history clears the count entries and removes the product', function (
     ])->assertSuccessful();
 
     expect(Product::find($counted->id))->toBeNull()
-        ->and(App\Models\BlindCountEntry::where('product_id', $counted->id)->count())->toBe(0);
+        ->and(BlindCountEntry::where('product_id', $counted->id)->count())->toBe(0);
 });
 
 test('only the named branch is cleared, never its neighbours', function () {
     $vendor = purgeProductsVendor();
-    $here   = App\Models\Store::where('vendor_id', $vendor->id)->where('is_default', true)->first();
-    $there  = App\Models\Store::create([
+    $here = Store::where('vendor_id', $vendor->id)->where('is_default', true)->first();
+    $there = Store::create([
         'vendor_id' => $vendor->id, 'name' => 'Itel Home', 'is_default' => false,
     ]);
 
@@ -240,7 +244,7 @@ test('only the named branch is cleared, never its neighbours', function () {
 
 test('a branch can be cleared without naming its vendor', function () {
     $vendor = purgeProductsVendor();
-    $there  = App\Models\Store::create([
+    $there = Store::create([
         'vendor_id' => $vendor->id, 'name' => 'Itel Home', 'is_default' => false,
     ]);
 
@@ -256,9 +260,9 @@ test('a branch can be cleared without naming its vendor', function () {
 test('a branch belonging to another vendor is refused', function () {
     $vendor = purgeProductsVendor();
 
-    $otherOwner  = User::factory()->create();
+    $otherOwner = User::factory()->create();
     $otherVendor = Vendor::create(['user_id' => $otherOwner->id, 'name' => 'Other Co', 'slug' => 'other-co']);
-    $foreign     = App\Models\Store::create([
+    $foreign = Store::create([
         'vendor_id' => $otherVendor->id, 'name' => 'Foreign Branch', 'is_default' => false,
     ]);
 
@@ -266,7 +270,7 @@ test('a branch belonging to another vendor is refused', function () {
         'vendor' => $vendor->slug, '--store' => 'Foreign Branch', '--force' => true,
     ])->assertFailed();
 
-    expect(App\Models\Store::find($foreign->id))->not->toBeNull();
+    expect(Store::find($foreign->id))->not->toBeNull();
 });
 
 test('an unknown branch fails cleanly and deletes nothing', function () {

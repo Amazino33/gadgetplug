@@ -16,18 +16,18 @@ uses(RefreshDatabase::class);
 
 function setUpLedgerVendor(): array
 {
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
 
-    $owner    = User::factory()->create();
-    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Ledger Test Store']);
+    $owner = User::factory()->create();
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Ledger Test Store']);
     $category = Category::create(['name' => 'Ledger Category']);
-    $product  = Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'name'           => 'Ledger Test Product',
-        'price'          => 5000,
+    $product = Product::create([
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'Ledger Test Product',
+        'price' => 5000,
         'stock_quantity' => 10,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
     return compact('owner', 'vendor', 'product');
@@ -53,21 +53,21 @@ test('the stock movement list only shows ledger rows for the current tenant', fu
     $dataB = setUpLedgerVendor();
 
     InventoryLedger::create([
-        'vendor_id'        => $dataA['vendor']->id,
-        'product_id'       => $dataA['product']->id,
+        'vendor_id' => $dataA['vendor']->id,
+        'product_id' => $dataA['product']->id,
         'transaction_type' => 'pos_sale',
-        'quantity_change'  => -2,
-        'reference'        => 'POS-AAA',
-        'description'      => 'Sold via till A',
+        'quantity_change' => -2,
+        'reference' => 'POS-AAA',
+        'description' => 'Sold via till A',
     ]);
 
     InventoryLedger::create([
-        'vendor_id'        => $dataB['vendor']->id,
-        'product_id'       => $dataB['product']->id,
+        'vendor_id' => $dataB['vendor']->id,
+        'product_id' => $dataB['product']->id,
         'transaction_type' => 'pos_sale',
-        'quantity_change'  => -3,
-        'reference'        => 'POS-BBB',
-        'description'      => 'Sold via till B',
+        'quantity_change' => -3,
+        'reference' => 'POS-BBB',
+        'description' => 'Sold via till B',
     ]);
 
     actAsLedgerVendor($dataA);
@@ -81,12 +81,12 @@ test('the stock movement list shows quantity changes with the correct sign', fun
     $data = setUpLedgerVendor();
 
     InventoryLedger::create([
-        'vendor_id'        => $data['vendor']->id,
-        'product_id'       => $data['product']->id,
+        'vendor_id' => $data['vendor']->id,
+        'product_id' => $data['product']->id,
         'transaction_type' => 'restock',
-        'quantity_change'  => 20,
-        'reference'        => 'RESTOCK-1',
-        'description'      => 'Delivery received',
+        'quantity_change' => 20,
+        'reference' => 'RESTOCK-1',
+        'description' => 'Delivery received',
     ]);
 
     actAsLedgerVendor($data);
@@ -98,6 +98,6 @@ test('the stock movement list shows quantity changes with the correct sign', fun
 
 test('the stock movement resource is read-only', function () {
     expect(InventoryLedgerResource::canCreate())->toBeFalse()
-        ->and(InventoryLedgerResource::canEdit(new InventoryLedger()))->toBeFalse()
-        ->and(InventoryLedgerResource::canDelete(new InventoryLedger()))->toBeFalse();
+        ->and(InventoryLedgerResource::canEdit(new InventoryLedger))->toBeFalse()
+        ->and(InventoryLedgerResource::canDelete(new InventoryLedger))->toBeFalse();
 });

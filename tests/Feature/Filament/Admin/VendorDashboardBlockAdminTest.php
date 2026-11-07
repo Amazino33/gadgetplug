@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Models\Vendor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Spatie\Activitylog\Models\Activity;
 use Spatie\Permission\Models\Role;
 
 uses(RefreshDatabase::class);
@@ -20,7 +21,7 @@ beforeEach(function () {
 
     $this->vendor = Vendor::create([
         'user_id' => User::factory()->create()->id,
-        'name'    => 'Admin Block Store',
+        'name' => 'Admin Block Store',
     ]);
 });
 
@@ -50,7 +51,7 @@ it('will not block without a reason, since the vendor is shown it', function () 
 
 it('restores access from the list action and forgets the old reason', function () {
     $this->vendor->update([
-        'dashboard_blocked'        => true,
+        'dashboard_blocked' => true,
         'dashboard_blocked_reason' => 'Unpaid commission for August.',
     ]);
 
@@ -70,7 +71,7 @@ it('blocks from the edit form too', function () {
     Livewire::test(EditVendor::class, ['record' => $this->vendor->slug])
         ->assertFormFieldExists('dashboard_blocked')
         ->fillForm([
-            'dashboard_blocked'        => true,
+            'dashboard_blocked' => true,
             'dashboard_blocked_reason' => 'Terms breach: reselling outside the agreement.',
         ])
         ->call('save')
@@ -81,11 +82,11 @@ it('blocks from the edit form too', function () {
 
 it('records who blocked the vendor and why in the activity log', function () {
     $this->vendor->update([
-        'dashboard_blocked'        => true,
+        'dashboard_blocked' => true,
         'dashboard_blocked_reason' => 'Unpaid commission for August.',
     ]);
 
-    $activity = \Spatie\Activitylog\Models\Activity::query()
+    $activity = Activity::query()
         ->where('description', 'like', 'Dashboard access blocked%')
         ->latest('id')
         ->first();

@@ -2,16 +2,17 @@
 
 namespace App\Http\Controllers\Pos;
 
-use App\Models\Vendor;
-use App\Rules\QuantityStep;
-use App\Support\Quantity;
 use App\Actions\Pickings\RecordPickingPaymentAction;
 use App\Actions\Pickings\ReleaseToPickerAction;
+use App\Actions\Pickings\ReturnFromPickerAction;
 use App\Http\Controllers\Controller;
 use App\Models\Picker;
 use App\Models\PickingItem;
+use App\Models\Vendor;
+use App\Rules\QuantityStep;
 use App\Services\Inventory\TillStore;
 use App\Services\Pickings\PickingLedger;
+use App\Support\Quantity;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -74,26 +75,26 @@ class PosPickingController extends Controller
             ]);
 
         $pickers = $lines->groupBy('picker_id')->map(fn ($rows) => [
-            'id'    => (int) $rows->first()->picker_id,
-            'name'  => $rows->first()->picker_name,
+            'id' => (int) $rows->first()->picker_id,
+            'name' => $rows->first()->picker_name,
             'phone' => $rows->first()->picker_phone,
             'lines' => $rows->map(fn ($row) => [
-                'id'           => (int) $row->id,
+                'id' => (int) $row->id,
                 'product_name' => $row->product_name,
-                'reference'    => $row->picking_reference,
-                'taken_at'     => $row->taken_at,
-                'held'         => Quantity::of($row->held),
-                'unit_price'   => (float) $row->unit_price,
+                'reference' => $row->picking_reference,
+                'taken_at' => $row->taken_at,
+                'held' => Quantity::of($row->held),
+                'unit_price' => (float) $row->unit_price,
                 // Already paid toward the next unit, so the till can show what
                 // is really left to pay rather than the full price again.
-                'credit'       => round((float) $row->credit, 2),
-                'outstanding'  => round(Quantity::of($row->held) * (float) $row->unit_price - (float) $row->credit, 2),
+                'credit' => round((float) $row->credit, 2),
+                'outstanding' => round(Quantity::of($row->held) * (float) $row->unit_price - (float) $row->credit, 2),
             ])->values(),
         ])->values();
 
         return response()->json([
             'store_id' => $storeId,
-            'pickers'  => $pickers,
+            'pickers' => $pickers,
             // Everyone who could take goods, not only those already holding
             // some. The payment list above is the wrong source for the release
             // dropdown: a picker holding nothing is correctly absent there, and
@@ -121,12 +122,12 @@ class PosPickingController extends Controller
     public function release(Request $request, ReleaseToPickerAction $release): JsonResponse
     {
         $request->validate([
-            'vendor_id'         => 'required|integer',
-            'picker_id'         => 'required|integer',
-            'items'             => 'required|array|min:1',
+            'vendor_id' => 'required|integer',
+            'picker_id' => 'required|integer',
+            'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|integer',
-            'items.*.quantity'  => ['required', 'numeric', new QuantityStep(Vendor::find($request->input('vendor_id')))],
-            'notes'             => 'nullable|string|max:500',
+            'items.*.quantity' => ['required', 'numeric', new QuantityStep(Vendor::find($request->input('vendor_id')))],
+            'notes' => 'nullable|string|max:500',
         ]);
 
         $vendorId = (int) $request->vendor_id;
@@ -142,7 +143,7 @@ class PosPickingController extends Controller
                 store: TillStore::resolve($request->user(), $vendorId),
                 lines: array_map(fn ($row) => [
                     'product_id' => (int) $row['product_id'],
-                    'quantity'   => Quantity::of($row['quantity']),
+                    'quantity' => Quantity::of($row['quantity']),
                 ], $request->items),
                 userId: $request->user()->id,
                 notes: $request->notes,
@@ -155,8 +156,8 @@ class PosPickingController extends Controller
 
         return response()->json([
             'reference' => $picking->reference,
-            'picker'    => $picker->name,
-            'lines'     => $picking->items->count(),
+            'picker' => $picker->name,
+            'lines' => $picking->items->count(),
         ]);
     }
 
@@ -168,13 +169,13 @@ class PosPickingController extends Controller
     public function pay(Request $request, RecordPickingPaymentAction $record): JsonResponse
     {
         $request->validate([
-            'vendor_id'      => 'required|integer',
-            'picker_id'      => 'required|integer',
-            'amount'         => 'required|numeric|min:0.01',
-            'item_ids'       => 'required|array|min:1',
-            'item_ids.*'     => 'integer',
+            'vendor_id' => 'required|integer',
+            'picker_id' => 'required|integer',
+            'amount' => 'required|numeric|min:0.01',
+            'item_ids' => 'required|array|min:1',
+            'item_ids.*' => 'integer',
             'payment_method' => 'nullable|in:cash,card,bank_transfer',
-            'reference'      => 'nullable|string|max:64',
+            'reference' => 'nullable|string|max:64',
         ]);
 
         $vendorId = (int) $request->vendor_id;
@@ -199,13 +200,13 @@ class PosPickingController extends Controller
         }
 
         return response()->json([
-            'duplicate'     => $result['duplicate'],
-            'allocated'     => $result['allocated'],
+            'duplicate' => $result['duplicate'],
+            'allocated' => $result['allocated'],
             // Hand this back: it completed no unit, so it is still the picker's.
-            'change'        => $result['unallocated'],
+            'change' => $result['unallocated'],
             'settled_units' => $result['settled_units'],
-            'sale_id'       => $result['sale']?->id,
-            'reference'     => $result['sale']?->reference,
+            'sale_id' => $result['sale']?->id,
+            'reference' => $result['sale']?->reference,
         ]);
     }
 
@@ -213,12 +214,12 @@ class PosPickingController extends Controller
      * Accept goods returned by the picker unsold.
      * All held units for the specified picking lines are returned to stock.
      */
-    public function returnItems(Request $request, \App\Actions\Pickings\ReturnFromPickerAction $returnAction): JsonResponse
+    public function returnItems(Request $request, ReturnFromPickerAction $returnAction): JsonResponse
     {
         $request->validate([
             'vendor_id' => 'required|integer',
             'picker_id' => 'required|integer',
-            'item_ids'  => 'required|array|min:1',
+            'item_ids' => 'required|array|min:1',
             'item_ids.*' => 'integer',
         ]);
 
@@ -256,6 +257,7 @@ class PosPickingController extends Controller
             DB::commit();
         } catch (Throwable $e) {
             DB::rollBack();
+
             return response()->json(['message' => $e->getMessage()], 422);
         }
 

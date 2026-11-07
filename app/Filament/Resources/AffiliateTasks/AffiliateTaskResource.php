@@ -10,15 +10,16 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use UnitEnum;
 
 class AffiliateTaskResource extends Resource
 {
     protected static ?string $model = AffiliateTask::class;
 
-    protected static string|null|BackedEnum $navigationIcon  = 'heroicon-o-clipboard-document-check';
-    protected static ?string                $navigationLabel = 'Tasks';
-    protected static ?int                   $navigationSort  = 5;
+    protected static string|null|BackedEnum $navigationIcon = 'heroicon-o-clipboard-document-check';
+
+    protected static ?string $navigationLabel = 'Tasks';
+
+    protected static ?int $navigationSort = 5;
 
     public static function getNavigationGroup(): ?string
     {
@@ -48,9 +49,9 @@ class AffiliateTaskResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index'  => Pages\ListAffiliateTasks::route('/'),
+            'index' => Pages\ListAffiliateTasks::route('/'),
             'create' => Pages\CreateAffiliateTask::route('/create'),
-            'edit'   => Pages\EditAffiliateTask::route('/{record}/edit'),
+            'edit' => Pages\EditAffiliateTask::route('/{record}/edit'),
         ];
     }
 }

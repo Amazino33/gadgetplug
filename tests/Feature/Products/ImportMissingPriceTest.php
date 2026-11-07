@@ -6,6 +6,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
+use App\Models\Category;
 use App\Models\User;
 use App\Models\Vendor;
 use App\Services\Import\ColumnMapper;
@@ -29,7 +30,7 @@ function priceTestCsv(string $contents): string
         mkdir($dir, 0755, true);
     }
 
-    $path = $dir . '/' . uniqid() . '-missing-price.csv';
+    $path = $dir.'/'.uniqid().'-missing-price.csv';
     file_put_contents($path, $contents);
 
     return $path;
@@ -37,7 +38,7 @@ function priceTestCsv(string $contents): string
 
 function priceTestPrepare(string $path, Vendor $vendor)
 {
-    $reader  = app(SpreadsheetReader::class);
+    $reader = app(SpreadsheetReader::class);
     $mapping = app(ColumnMapper::class)->guess($reader->headers($path));
 
     return app(ImportPreparer::class)->prepare($path, $mapping, $vendor);
@@ -50,7 +51,6 @@ function priceTestRun(string $path, Vendor $vendor)
     );
 }
 
-
 // products.price is NOT NULL with no default. A blank price cell raises no
 // parse error — an empty cell rightly means "column not supplied" rather than
 // bad data — so before this check the row previewed as a healthy Create and
@@ -60,7 +60,7 @@ function priceTestRun(string $path, Vendor $vendor)
 it('flags a new product with no price instead of letting it reach the database', function () {
     $vendor = priceTestVendor();
 
-    $path = priceTestCsv(<<<CSV
+    $path = priceTestCsv(<<<'CSV'
     name,sku,price,cost_price
     Good Charger,SHP-0001,2000,700
     Shplus Charger SH A432T,SHP-0153,,
@@ -80,7 +80,7 @@ it('flags a new product with no price instead of letting it reach the database',
 it('imports the good rows and skips only the priceless one', function () {
     $vendor = priceTestVendor();
 
-    $path = priceTestCsv(<<<CSV
+    $path = priceTestCsv(<<<'CSV'
     name,sku,price,cost_price
     Good Charger,SHP-0001,2000,700
     Shplus Charger SH A432T,SHP-0153,,
@@ -101,7 +101,7 @@ it('imports the good rows and skips only the priceless one', function () {
 it('reports every priceless row at once, not one per attempt', function () {
     $vendor = priceTestVendor();
 
-    $path = priceTestCsv(<<<CSV
+    $path = priceTestCsv(<<<'CSV'
     name,sku,price
     First Bad,BAD-1,
     Fine One,OK-1,1500
@@ -123,22 +123,22 @@ it('still lets an update through without a price, leaving the existing one alone
     $vendor = priceTestVendor();
 
     $existing = Product::create([
-        'vendor_id'   => $vendor->id,
-        'category_id' => App\Models\Category::create(['name' => 'C' . uniqid()])->id,
-        'name'        => 'Existing Charger',
-        'sku'         => 'SHP-0500',
-        'price'       => 4500,
-        'status'      => 'published',
+        'vendor_id' => $vendor->id,
+        'category_id' => Category::create(['name' => 'C'.uniqid()])->id,
+        'name' => 'Existing Charger',
+        'sku' => 'SHP-0500',
+        'price' => 4500,
+        'status' => 'published',
     ]);
 
     // A stock-only update file: no price column at all.
-    $path = priceTestCsv(<<<CSV
+    $path = priceTestCsv(<<<'CSV'
     name,sku,stock_quantity
     Existing Charger,SHP-0500,25
     CSV);
 
     $rows = priceTestPrepare($path, $vendor);
-    $row  = $rows->first();
+    $row = $rows->first();
 
     expect($row->action())->toBe(ParsedRow::ACTION_UPDATE);
 
@@ -151,7 +151,7 @@ it('still lets an update through without a price, leaving the existing one alone
 it('still treats a malformed price as bad data rather than a missing one', function () {
     $vendor = priceTestVendor();
 
-    $path = priceTestCsv(<<<CSV
+    $path = priceTestCsv(<<<'CSV'
     name,sku,price
     Nonsense Price,NON-1,not a number
     CSV);

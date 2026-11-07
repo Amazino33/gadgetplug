@@ -3,7 +3,6 @@
 use App\Filament\Vendor\Resources\Orders\Pages\ViewOrder;
 use App\Models\Category;
 use App\Models\FinancialAccount;
-use App\Models\FinancialLedgerEntry;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
@@ -24,19 +23,19 @@ uses(RefreshDatabase::class);
 
 function setUpDeliveryCostVendor(): array
 {
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
 
     $owner = User::factory()->create();
-    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Delivery Cost Store ' . uniqid(), 'online_sales_enabled' => true]);
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Delivery Cost Store '.uniqid(), 'online_sales_enabled' => true]);
     VendorRoles::seedFor($vendor);
-    $category = Category::create(['name' => 'Delivery Cost Category ' . uniqid()]);
+    $category = Category::create(['name' => 'Delivery Cost Category '.uniqid()]);
     $product = Product::create([
         'vendor_id' => $vendor->id, 'category_id' => $category->id,
         'name' => 'Delivery Cost Product', 'price' => 5000, 'stock_quantity' => 10, 'status' => 'published',
     ]);
 
     $order = Order::create([
-        'reference' => 'ORD-DC-' . uniqid(),
+        'reference' => 'ORD-DC-'.uniqid(),
         'customer_name' => 'Jane Customer', 'customer_email' => 'jane@example.com',
         'customer_phone' => '08040000000', 'shipping_address' => '1 Test Street',
         'total_amount' => 5000, 'status' => 'paid', 'payment_method' => 'paystack',
@@ -86,5 +85,5 @@ test('a posted delivery cost cannot be changed directly on the model', function 
     $data['order']->update(['delivery_cost' => 2000, 'financial_account_id' => FinancialAccount::where('vendor_id', $data['vendor']->id)->first()->id, 'posted_at' => now()]);
 
     expect(fn () => $data['order']->update(['delivery_cost' => 9999]))
-        ->toThrow(\LogicException::class);
+        ->toThrow(LogicException::class);
 });

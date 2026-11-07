@@ -10,14 +10,15 @@ use Database\Seeders\VendorPermissionsSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 uses(RefreshDatabase::class);
 
 function setUpPriceListVendor(): array
 {
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
 
-    $owner  = User::factory()->create();
+    $owner = User::factory()->create();
     $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Price List Store']);
 
     VendorRoles::seedFor($vendor);
@@ -27,7 +28,7 @@ function setUpPriceListVendor(): array
     $staff->assignRole('storekeeper');
     $vendor->users()->attach($staff->id);
 
-    $phones      = Category::create(['name' => 'Phones']);
+    $phones = Category::create(['name' => 'Phones']);
     $accessories = Category::create(['name' => 'Accessories']);
 
     $published = Product::create([
@@ -131,9 +132,9 @@ test('the generated file is a real pdf containing the products', function () {
     $this->actingAs($data['staff']);
     actAsPriceListStaff($data);
 
-    $response = (new PriceList())->downloadPdf();
+    $response = (new PriceList)->downloadPdf();
 
-    expect($response)->toBeInstanceOf(\Symfony\Component\HttpFoundation\StreamedResponse::class);
+    expect($response)->toBeInstanceOf(StreamedResponse::class);
 
     ob_start();
     $response->sendContent();
@@ -167,7 +168,7 @@ test('every column opens with a heading, carried over when a category spills', f
 
     bulkProducts($data, 60);
 
-    $page  = new PriceList();
+    $page = new PriceList;
     $pages = $page->buildPages($page->getGroupedProducts());
 
     expect($pages)->not->toBeEmpty();
@@ -189,7 +190,7 @@ test('a short list is balanced across the three columns rather than crammed into
 
     bulkProducts($data, 30);
 
-    $page  = new PriceList();
+    $page = new PriceList;
     $pages = $page->buildPages($page->getGroupedProducts());
 
     expect($pages)->toHaveCount(1);
@@ -210,7 +211,7 @@ test('no column exceeds the calibrated height budget', function () {
 
     bulkProducts($data, 250, 'Long Product Name Number %02d 128GB Dual SIM');
 
-    $page  = new PriceList();
+    $page = new PriceList;
     $pages = $page->buildPages($page->getGroupedProducts());
 
     expect(count($pages))->toBeGreaterThan(1);

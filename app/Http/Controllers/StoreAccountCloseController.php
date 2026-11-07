@@ -32,7 +32,7 @@ class StoreAccountCloseController extends Controller
 
         return Pdf::loadView('settlements.close', $this->payload($close))
             ->setPaper('a4', 'portrait')
-            ->download($close->reference . '.pdf');
+            ->download($close->reference.'.pdf');
     }
 
     /** @return array<string, mixed> */

@@ -30,7 +30,7 @@ class FinancialAccount extends Model
 
     protected $casts = [
         'opening_balance' => 'decimal:2',
-        'is_active'       => 'boolean',
+        'is_active' => 'boolean',
     ];
 
     public function vendor(): BelongsTo
@@ -75,7 +75,7 @@ class FinancialAccount extends Model
         $entries = $this->ledgerEntries()
             ->when($asOf, fn ($query) => $query->where('occurred_at', '<=', $asOf->toDateString()));
 
-        $in  = (clone $entries)->where('direction', 'in')->sum('amount');
+        $in = (clone $entries)->where('direction', 'in')->sum('amount');
         $out = (clone $entries)->where('direction', 'out')->sum('amount');
 
         return (float) $this->opening_balance + (float) $in - (float) $out;

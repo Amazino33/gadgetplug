@@ -2,8 +2,6 @@
 
 namespace App\Http\Controllers\Pos;
 
-use Illuminate\Support\Facades\Log;
-use App\Support\Quantity;
 use App\Actions\Finance\RecognizePosSaleRevenueAction;
 use App\Actions\Inventory\AdjustStockAction;
 use App\Actions\Pos\ChargeCustomerDebtAction;
@@ -19,10 +17,11 @@ use App\Services\Inventory\NegativeStock;
 use App\Services\Inventory\TillStore;
 use App\Services\Pos\PosPriceFloor;
 use App\Services\Pos\SaleLineResolver;
+use App\Support\Quantity;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class PosSyncController extends Controller
@@ -40,62 +39,63 @@ class PosSyncController extends Controller
     {
         $subtotal = collect($lines)->sum(fn ($l) => $l['line_gross'] - (float) ($l['discount_amount'] ?? 0));
         $discount = (float) ($payload['discount_amount'] ?? 0);
-        $vatRate  = (float) ($payload['vat_amount'] ?? 0) > 0
+        $vatRate = (float) ($payload['vat_amount'] ?? 0) > 0
             ? (float) ($payload['vat_rate'] ?? $vendor->pos_vat_rate ?? 7.5)
             : 0.0;
         $vat = round(($subtotal - $discount) * ($vatRate / 100), 2);
 
         return array_merge($payload, [
-            'subtotal'   => round($subtotal, 2),
+            'subtotal' => round($subtotal, 2),
             'vat_amount' => $vat,
-            'total'      => round($subtotal - $discount + $vat, 2),
+            'total' => round($subtotal - $discount + $vat, 2),
         ]);
     }
 
     public function sync(Request $request, AdjustStockAction $adjustStock, PosPriceFloor $priceFloor): JsonResponse
     {
         $request->validate([
-            'vendor_id'         => 'required|integer',
-            'sales'             => 'required|array',
-            'sales.*.offline_id'      => 'required|string',
-            'sales.*.customer_id'     => 'nullable|integer',
-            'sales.*.items'           => 'required|array|min:1',
-            'sales.*.payment_method'  => 'required|in:cash,card,bank_transfer,split,debt',
-            'sales.*.total'           => 'required|numeric|min:0',
-            'sales.*.vat_amount'      => 'nullable|numeric|min:0',
+            'vendor_id' => 'required|integer',
+            'sales' => 'required|array',
+            'sales.*.offline_id' => 'required|string',
+            'sales.*.customer_id' => 'nullable|integer',
+            'sales.*.items' => 'required|array|min:1',
+            'sales.*.payment_method' => 'required|in:cash,card,bank_transfer,split,debt',
+            'sales.*.total' => 'required|numeric|min:0',
+            'sales.*.vat_amount' => 'nullable|numeric|min:0',
             'sales.*.discount_amount' => 'nullable|numeric|min:0',
             'sales.*.amount_tendered' => 'nullable|numeric|min:0',
-            'sales.*.completed_at'    => 'required|date',
+            'sales.*.completed_at' => 'required|date',
             // Recorded by the till when the sale was rung. Absent only on a
             // sale queued before the till started recording them.
-            'sales.*.store_id'        => 'nullable|integer',
-            'sales.*.cashier_id'      => 'nullable|integer',
+            'sales.*.store_id' => 'nullable|integer',
+            'sales.*.cashier_id' => 'nullable|integer',
             // 'nullable' matters here even with 'required_if' present — see the
             // identical fix in PosSaleController::store() for why a present-but-
             // null 'payments' otherwise fails 'array'/'min' on every plain sale.
-            'sales.*.payments'                  => 'nullable|required_if:sales.*.payment_method,split|array|min:2',
-            'sales.*.payments.*.method'         => 'required_if:sales.*.payment_method,split|in:cash,card,bank_transfer,debt',
-            'sales.*.payments.*.amount'         => 'required_if:sales.*.payment_method,split|numeric|min:0.01',
-            'sales.*.payments.*.reference'      => 'nullable|string|max:50',
+            'sales.*.payments' => 'nullable|required_if:sales.*.payment_method,split|array|min:2',
+            'sales.*.payments.*.method' => 'required_if:sales.*.payment_method,split|in:cash,card,bank_transfer,debt',
+            'sales.*.payments.*.amount' => 'required_if:sales.*.payment_method,split|numeric|min:0.01',
+            'sales.*.payments.*.reference' => 'nullable|string|max:50',
         ]);
 
         $results = [];
-        $vendor  = Vendor::findOrFail($request->vendor_id);
+        $vendor = Vendor::findOrFail($request->vendor_id);
 
         foreach ($request->sales as $payload) {
             // Skip if already synced (reference derived from offline_id)
-            $existingRef = 'POS-' . strtoupper(substr(md5($payload['offline_id']), 0, 8));
+            $existingRef = 'POS-'.strtoupper(substr(md5($payload['offline_id']), 0, 8));
 
             // A replay hands back the identity it was given the first time —
             // including the token, which is never rewritten — so a till that
             // missed the first response still learns the server id.
             if ($already = PosSale::where('reference', $existingRef)->first(['id', 'public_token'])) {
                 $results[] = [
-                    'offline_id'   => $payload['offline_id'],
-                    'status'       => 'duplicate',
-                    'id'           => $already->id,
+                    'offline_id' => $payload['offline_id'],
+                    'status' => 'duplicate',
+                    'id' => $already->id,
                     'public_token' => $already->public_token,
                 ];
+
                 continue;
             }
 
@@ -108,9 +108,10 @@ class PosSyncController extends Controller
             if ($clientToken !== null && ! PosSale::isValidPublicToken($clientToken)) {
                 $results[] = [
                     'offline_id' => $payload['offline_id'],
-                    'status'     => 'rejected',
-                    'message'    => 'This sale carries a malformed receipt token.',
+                    'status' => 'rejected',
+                    'message' => 'This sale carries a malformed receipt token.',
                 ];
+
                 continue;
             }
 
@@ -121,9 +122,10 @@ class PosSyncController extends Controller
                 // customer's hand and cannot be corrected.
                 $results[] = [
                     'offline_id' => $payload['offline_id'],
-                    'status'     => 'rejected',
-                    'message'    => 'The receipt token on this sale already belongs to a different sale.',
+                    'status' => 'rejected',
+                    'message' => 'The receipt token on this sale already belongs to a different sale.',
                 ];
+
                 continue;
             }
 
@@ -163,11 +165,11 @@ class PosSyncController extends Controller
                 // only found signal afterwards; its clock cannot say which came
                 // first, so the sale is not dropped over it — only noted.
                 $acceptHalves = Quantity::acceptsHalvesOnSync($vendor);
-                $lines        = $resolver->resolve($vendor, $payload['items'], $acceptHalves);
+                $lines = $resolver->resolve($vendor, $payload['items'], $acceptHalves);
 
                 if (! Quantity::allowsHalves($vendor) && collect($lines)->contains(fn ($l) => ! Quantity::isWhole($l['unit_qty'] ?? $l['quantity']))) {
                     Log::warning('Offline sale with half quantities synced after the vendor turned halves off.', [
-                        'vendor_id'  => $vendor->id,
+                        'vendor_id' => $vendor->id,
                         'offline_id' => $payload['offline_id'] ?? null,
                     ]);
                 }
@@ -191,25 +193,25 @@ class PosSyncController extends Controller
 
                 DB::transaction(function () use ($payload, $request, $adjustStock, $existingRef, $storeId, $lines, $products, $vendor, $clientToken, &$savedSale) {
                     $sale = PosSale::create([
-                        'public_token'            => $clientToken,
-                        'reference'               => $existingRef,
-                        'vendor_id'               => $request->vendor_id,
-                        'store_id'                => $storeId,
-                        'pos_session_id'          => null,
-                        'cashier_id'              => $request->user()->id,
-                        'customer_id'             => $payload['customer_id'] ?? null,
-                        'subtotal'                => $payload['subtotal'] ?? $payload['total'],
-                        'discount_amount'         => $payload['discount_amount'] ?? 0,
-                        'vat_amount'              => $payload['vat_amount'] ?? 0,
-                        'total'                   => $payload['total'],
-                        'payment_method'          => $payload['payment_method'],
-                        'amount_tendered'         => $payload['amount_tendered'] ?? $payload['total'],
-                        'change_given'            => max(0, ($payload['amount_tendered'] ?? 0) - $payload['total']),
+                        'public_token' => $clientToken,
+                        'reference' => $existingRef,
+                        'vendor_id' => $request->vendor_id,
+                        'store_id' => $storeId,
+                        'pos_session_id' => null,
+                        'cashier_id' => $request->user()->id,
+                        'customer_id' => $payload['customer_id'] ?? null,
+                        'subtotal' => $payload['subtotal'] ?? $payload['total'],
+                        'discount_amount' => $payload['discount_amount'] ?? 0,
+                        'vat_amount' => $payload['vat_amount'] ?? 0,
+                        'total' => $payload['total'],
+                        'payment_method' => $payload['payment_method'],
+                        'amount_tendered' => $payload['amount_tendered'] ?? $payload['total'],
+                        'change_given' => max(0, ($payload['amount_tendered'] ?? 0) - $payload['total']),
                         'bank_transfer_reference' => $payload['bank_transfer_reference'] ?? null,
-                        'status'                  => 'completed',
-                        'synced'                  => true,
-                        'synced_at'               => now(),
-                        'completed_at'            => $payload['completed_at'],
+                        'status' => 'completed',
+                        'synced' => true,
+                        'synced_at' => now(),
+                        'completed_at' => $payload['completed_at'],
                     ]);
 
                     $savedSale = $sale;
@@ -218,9 +220,9 @@ class PosSyncController extends Controller
                         foreach ($payload['payments'] as $p) {
                             PosSalePayment::create([
                                 'pos_sale_id' => $sale->id,
-                                'method'      => $p['method'],
-                                'amount'      => $p['amount'],
-                                'reference'   => $p['reference'] ?? null,
+                                'method' => $p['method'],
+                                'amount' => $p['amount'],
+                                'reference' => $p['reference'] ?? null,
                             ]);
                         }
                     }
@@ -231,9 +233,9 @@ class PosSyncController extends Controller
                     if ($payload['payment_method'] === 'debt') {
                         PosSalePayment::create([
                             'pos_sale_id' => $sale->id,
-                            'method'      => 'debt',
-                            'amount'      => $payload['total'],
-                            'reference'   => null,
+                            'method' => 'debt',
+                            'amount' => $payload['total'],
+                            'reference' => null,
                         ]);
                     }
 
@@ -261,24 +263,24 @@ class PosSyncController extends Controller
 
                     foreach ($lines as $item) {
                         $saleItem = PosSaleItem::create([
-                            'pos_sale_id'     => $sale->id,
-                            'product_id'      => $item['product_id'],
-                            'product_name'    => $item['product_name'],
-                            'product_sku'     => $item['product_sku'] ?? null,
+                            'pos_sale_id' => $sale->id,
+                            'product_id' => $item['product_id'],
+                            'product_name' => $item['product_name'],
+                            'product_sku' => $item['product_sku'] ?? null,
                             'product_unit_id' => $item['product_unit_id'],
-                            'unit_name'       => $item['unit_name'],
-                            'unit_qty'        => $item['unit_qty'],
+                            'unit_name' => $item['unit_name'],
+                            'unit_qty' => $item['unit_qty'],
                             'sold_unit_price' => $item['sold_unit_price'],
                             'half_unit_price' => $item['half_unit_price'] ?? null,
-                            'price_type'      => $item['price_type'],
-                            'unit_price'      => $item['unit_price'],
-                            'unit_cost'       => $costPrices[$item['product_id']] ?? null,
-                            'quantity'        => $item['quantity'],
+                            'price_type' => $item['price_type'],
+                            'unit_price' => $item['unit_price'],
+                            'unit_cost' => $costPrices[$item['product_id']] ?? null,
+                            'quantity' => $item['quantity'],
                             'discount_amount' => $item['discount_amount'] ?? 0,
                             // A line from a till without units keeps the total
                             // it sent, exactly as before. A unit line's money is
                             // the unit price times the units sold.
-                            'total'           => $item['product_unit_id'] || $item['price_forced']
+                            'total' => $item['product_unit_id'] || $item['price_forced']
                                 ? $item['line_gross'] - (float) ($item['discount_amount'] ?? 0)
                                 : $item['total'],
                         ]);
@@ -308,10 +310,10 @@ class PosSyncController extends Controller
                 });
 
                 $results[] = [
-                    'offline_id'   => $payload['offline_id'],
-                    'status'       => 'synced',
-                    'reference'    => $existingRef,
-                    'id'           => $savedSale?->id,
+                    'offline_id' => $payload['offline_id'],
+                    'status' => 'synced',
+                    'reference' => $existingRef,
+                    'id' => $savedSale?->id,
                     'public_token' => $savedSale?->public_token,
                 ];
             } catch (TillBranchUnclear $e) {
@@ -319,8 +321,8 @@ class PosSyncController extends Controller
                 // again unchanged would only be refused again.
                 $results[] = [
                     'offline_id' => $payload['offline_id'],
-                    'status'     => 'rejected',
-                    'message'    => $e->getMessage(),
+                    'status' => 'rejected',
+                    'message' => $e->getMessage(),
                 ];
             } catch (ValidationException $e) {
                 // Reported separately from a crash: this sale was understood
@@ -328,8 +330,8 @@ class PosSyncController extends Controller
                 // needs a human to reconcile rather than a blind retry.
                 $results[] = [
                     'offline_id' => $payload['offline_id'],
-                    'status'     => 'rejected',
-                    'message'    => $e->validator->errors()->first(),
+                    'status' => 'rejected',
+                    'message' => $e->validator->errors()->first(),
                 ];
             } catch (\Throwable $e) {
                 $results[] = ['offline_id' => $payload['offline_id'], 'status' => 'error', 'message' => $e->getMessage()];

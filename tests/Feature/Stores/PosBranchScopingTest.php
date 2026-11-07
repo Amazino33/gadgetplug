@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\TillBranchUnclear;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\ProductStoreStock;
@@ -7,6 +8,7 @@ use App\Models\Store;
 use App\Models\User;
 use App\Models\Vendor;
 use App\Services\VendorRoles;
+use Database\Seeders\VendorPermissionsSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 
@@ -16,7 +18,7 @@ function posVendor(): Vendor
 {
     return Vendor::create([
         'user_id' => User::factory()->create()->id,
-        'name'    => 'POS Vendor '.uniqid(),
+        'name' => 'POS Vendor '.uniqid(),
     ]);
 }
 
@@ -35,16 +37,16 @@ function posCashier(Vendor $vendor, ?Store $store = null): User
 function posProduct(Vendor $vendor, Store $home, int $qty, ?string $name = null): Product
 {
     return Product::create([
-        'vendor_id'      => $vendor->id,
-        'store_id'       => $home->id,
-        'category_id'    => Category::create(['name' => 'Cat '.uniqid()])->id,
-        'name'           => $name ?? 'POS Product '.uniqid(),
-        'sku'            => 'SKU-'.strtoupper(uniqid()),
-        'barcode'        => (string) random_int(1000000000000, 9999999999999),
-        'price'          => 1000,
-        'cost_price'     => 400,
+        'vendor_id' => $vendor->id,
+        'store_id' => $home->id,
+        'category_id' => Category::create(['name' => 'Cat '.uniqid()])->id,
+        'name' => $name ?? 'POS Product '.uniqid(),
+        'sku' => 'SKU-'.strtoupper(uniqid()),
+        'barcode' => (string) random_int(1000000000000, 9999999999999),
+        'price' => 1000,
+        'cost_price' => 400,
         'stock_quantity' => $qty,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 }
 
@@ -96,7 +98,7 @@ test('a cashier with no store assignment is refused, not sent to the default bra
 
     $this->getJson("/api/pos/products?vendor_id={$vendor->id}")
         ->assertStatus(422)
-        ->assertJsonPath('code', App\Exceptions\TillBranchUnclear::CODE);
+        ->assertJsonPath('code', TillBranchUnclear::CODE);
 });
 
 test('a product with nothing left at the branch is not offered', function () {
@@ -151,7 +153,7 @@ test('search never returns another branch product', function () {
 // ─── The server stays the authority on selling ──────────────────────
 
 test('the server refuses a sale larger than the branch holds', function () {
-    (new Database\Seeders\VendorPermissionsSeeder)->run();
+    (new VendorPermissionsSeeder)->run();
 
     $vendor = posVendor();
     VendorRoles::seedFor($vendor);
@@ -164,14 +166,14 @@ test('the server refuses a sale larger than the branch holds', function () {
     $response = $this->postJson('/api/pos/sales', [
         'vendor_id' => $vendor->id,
         'items' => [[
-            'product_id'   => $product->id,
+            'product_id' => $product->id,
             'product_name' => $product->name,
-            'unit_price'   => 1000,
-            'quantity'     => 5,
+            'unit_price' => 1000,
+            'quantity' => 5,
         ]],
-        'payment_method'  => 'cash',
+        'payment_method' => 'cash',
         'amount_tendered' => 5000,
-        'payments'        => null,
+        'payments' => null,
     ]);
 
     // Rejected, and nothing moved: the guard is the store row, not the mirror.
@@ -180,7 +182,7 @@ test('the server refuses a sale larger than the branch holds', function () {
 });
 
 test('a sale within the branch stock succeeds and decrements that branch', function () {
-    (new Database\Seeders\VendorPermissionsSeeder)->run();
+    (new VendorPermissionsSeeder)->run();
 
     $vendor = posVendor();
     VendorRoles::seedFor($vendor);
@@ -193,14 +195,14 @@ test('a sale within the branch stock succeeds and decrements that branch', funct
     $this->postJson('/api/pos/sales', [
         'vendor_id' => $vendor->id,
         'items' => [[
-            'product_id'   => $product->id,
+            'product_id' => $product->id,
             'product_name' => $product->name,
-            'unit_price'   => 1000,
-            'quantity'     => 2,
+            'unit_price' => 1000,
+            'quantity' => 2,
         ]],
-        'payment_method'  => 'cash',
+        'payment_method' => 'cash',
         'amount_tendered' => 3000,
-        'payments'        => null,
+        'payments' => null,
     ])->assertSuccessful();
 
     expect(ProductStoreStock::where('product_id', $product->id)

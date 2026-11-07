@@ -29,13 +29,13 @@ function debtRepaymentContext(float $owed = 10000.0): array
 
     PosCustomerLedgerEntry::create([
         'pos_customer_id' => $ctx['customer']->id,
-        'vendor_id'       => $ctx['vendor']->id,
-        'direction'       => 'charge',
-        'amount'          => $owed,
-        'store_id'        => $ctx['store']->id,
-        'created_by'      => $ctx['owner']->id,
-        'occurred_at'     => now()->subDays(3)->toDateString(),
-        'description'     => 'Credit sale — seed',
+        'vendor_id' => $ctx['vendor']->id,
+        'direction' => 'charge',
+        'amount' => $owed,
+        'store_id' => $ctx['store']->id,
+        'created_by' => $ctx['owner']->id,
+        'occurred_at' => now()->subDays(3)->toDateString(),
+        'description' => 'Credit sale — seed',
     ]);
 
     Sanctum::actingAs($ctx['cashier']);
@@ -47,8 +47,8 @@ function collectRepayment(array $ctx, array $over = [])
 {
     return test()->postJson("/api/pos/customers/{$ctx['customer']->id}/repayments", array_merge([
         'vendor_id' => $ctx['vendor']->id,
-        'amount'    => 4000,
-        'method'    => 'cash',
+        'amount' => 4000,
+        'method' => 'cash',
     ], $over));
 }
 
@@ -176,16 +176,16 @@ test('another cashier collecting a repayment does not raise this drawer', functi
     $ctx['vendor']->users()->syncWithoutDetaching([$mate->id]);
 
     PosDebtPayment::create([
-        'pos_customer_id'              => $ctx['customer']->id,
-        'vendor_id'                    => $ctx['vendor']->id,
-        'store_id'                     => $ctx['store']->id,
-        'collected_by'                 => $mate->id,
+        'pos_customer_id' => $ctx['customer']->id,
+        'vendor_id' => $ctx['vendor']->id,
+        'store_id' => $ctx['store']->id,
+        'collected_by' => $mate->id,
         'pos_customer_ledger_entry_id' => PosCustomerLedgerEntry::create([
             'pos_customer_id' => $ctx['customer']->id, 'vendor_id' => $ctx['vendor']->id,
             'direction' => 'payment', 'amount' => -5000, 'occurred_at' => BusinessDate::today(),
         ])->id,
-        'method'       => 'cash',
-        'amount'       => 5000,
+        'method' => 'cash',
+        'amount' => 5000,
         'collected_at' => BusinessDate::today(),
     ]);
 
@@ -201,16 +201,16 @@ test('yesterday repayment does not follow the cashier into today', function () {
     $ctx = debtRepaymentContext();
 
     PosDebtPayment::create([
-        'pos_customer_id'              => $ctx['customer']->id,
-        'vendor_id'                    => $ctx['vendor']->id,
-        'store_id'                     => $ctx['store']->id,
-        'collected_by'                 => $ctx['cashier']->id,
+        'pos_customer_id' => $ctx['customer']->id,
+        'vendor_id' => $ctx['vendor']->id,
+        'store_id' => $ctx['store']->id,
+        'collected_by' => $ctx['cashier']->id,
         'pos_customer_ledger_entry_id' => PosCustomerLedgerEntry::create([
             'pos_customer_id' => $ctx['customer']->id, 'vendor_id' => $ctx['vendor']->id,
             'direction' => 'payment', 'amount' => -5000, 'occurred_at' => now()->subDay()->toDateString(),
         ])->id,
-        'method'       => 'cash',
-        'amount'       => 5000,
+        'method' => 'cash',
+        'amount' => 5000,
         'collected_at' => now()->subDay()->toDateString(),
     ]);
 

@@ -12,6 +12,7 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use UnitEnum;
 
 // Where an owner opens, renames and closes branches. Every prior phase assumed
@@ -45,11 +46,15 @@ class StoreResource extends Resource
     // one now does too.
     protected static bool $isScopedToTenant = false;
 
-    protected static string|null|\BackedEnum $navigationIcon  = Heroicon::OutlinedBuildingStorefront;
-    protected static string|null|UnitEnum    $navigationGroup = 'Settings';
-    protected static ?string                 $navigationLabel = 'Manage Stores';
+    protected static string|null|\BackedEnum $navigationIcon = Heroicon::OutlinedBuildingStorefront;
+
+    protected static string|null|UnitEnum $navigationGroup = 'Settings';
+
+    protected static ?string $navigationLabel = 'Manage Stores';
+
     protected static ?int $navigationSort = 5;
-    protected static ?string                 $modelLabel      = 'store';
+
+    protected static ?string $modelLabel = 'store';
 
     public static function canAccess(): bool
     {
@@ -84,7 +89,7 @@ class StoreResource extends Resource
         return false;
     }
 
-    public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder
+    public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
             ->where('vendor_id', filament()->getTenant()?->id);
@@ -103,9 +108,9 @@ class StoreResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index'  => ListStores::route('/'),
+            'index' => ListStores::route('/'),
             'create' => CreateStore::route('/create'),
-            'edit'   => EditStore::route('/{record}/edit'),
+            'edit' => EditStore::route('/{record}/edit'),
         ];
     }
 }

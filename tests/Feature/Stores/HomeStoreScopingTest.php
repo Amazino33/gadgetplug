@@ -18,21 +18,21 @@ function scopeVendor(): Vendor
 {
     return Vendor::create([
         'user_id' => User::factory()->create()->id,
-        'name'    => 'Scope Vendor '.uniqid(),
+        'name' => 'Scope Vendor '.uniqid(),
     ]);
 }
 
-function scopeProduct(Vendor $vendor, Store $home, int $qty = 0, string $name = null): Product
+function scopeProduct(Vendor $vendor, Store $home, int $qty = 0, ?string $name = null): Product
 {
     return Product::create([
-        'vendor_id'      => $vendor->id,
-        'store_id'       => $home->id,
-        'category_id'    => Category::create(['name' => 'Cat '.uniqid()])->id,
-        'name'           => $name ?? 'Scoped '.uniqid(),
-        'price'          => 1000,
-        'cost_price'     => 400,
+        'vendor_id' => $vendor->id,
+        'store_id' => $home->id,
+        'category_id' => Category::create(['name' => 'Cat '.uniqid()])->id,
+        'name' => $name ?? 'Scoped '.uniqid(),
+        'price' => 1000,
+        'cost_price' => 400,
         'stock_quantity' => $qty,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 }
 
@@ -142,7 +142,7 @@ test('a count session records the branch it covered', function () {
 
     $session = BlindCountSession::create([
         'vendor_id' => $vendor->id,
-        'store_id'  => $branch->id,
+        'store_id' => $branch->id,
         'storekeeper_a_id' => $vendor->user_id,
         'status' => 'a_counting',
         'frequency' => 'daily',

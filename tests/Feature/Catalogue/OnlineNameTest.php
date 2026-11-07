@@ -1,6 +1,8 @@
 <?php
 
+use App\Actions\VendorLink\PublishLinkedListingAction;
 use App\Filament\Resources\Products\Pages\ListProducts;
+use App\Filament\Vendor\Resources\Products\Pages\EditProduct;
 use App\Jobs\SendMetaConversionEventJob;
 use App\Models\Category;
 use App\Models\DeliveryMessage;
@@ -18,16 +20,17 @@ use App\Support\Import\ProductField;
 use Database\Factories\ProductFactory;
 use Database\Seeders\CatalogueEditorRoleSeeder;
 use Database\Seeders\MessageTemplateSeeder;
+use Database\Seeders\VendorPermissionsSeeder;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Queue;
 use Laravel\Sanctum\Sanctum;
-use Filament\Actions\Testing\TestAction;
 use Livewire\Livewire;
 use Livewire\Volt\Volt;
 use Spatie\Activitylog\Models\Activity;
-use Spatie\Permission\Models\Role;
 
 require_once __DIR__.'/../VendorLink/Helpers.php';
 
@@ -38,7 +41,7 @@ uses(RefreshDatabase::class);
 // receipts, stock and the storekeeper's messages.
 
 const INTERNAL = 'ITEL 2160 OLD ONE';
-const ONLINE   = 'itel 2160 Dual SIM Keypad Phone – Black';
+const ONLINE = 'itel 2160 Dual SIM Keypad Phone – Black';
 
 function namedVendor(): Vendor
 {
@@ -55,14 +58,14 @@ function namedProduct2(?Vendor $vendor = null, ?string $online = ONLINE): Produc
     $vendor ??= namedVendor();
 
     return ProductFactory::new()->withPhoto()->create([
-        'vendor_id'      => $vendor->id,
-        'store_id'       => $vendor->defaultStore->id,
-        'name'           => INTERNAL,
-        'online_name'    => $online,
-        'brand'          => 'itel',
-        'price'          => 9500,
+        'vendor_id' => $vendor->id,
+        'store_id' => $vendor->defaultStore->id,
+        'name' => INTERNAL,
+        'online_name' => $online,
+        'brand' => 'itel',
+        'price' => 9500,
         'stock_quantity' => 20,
-        'show_in_pos'    => true,
+        'show_in_pos' => true,
     ]);
 }
 
@@ -134,7 +137,7 @@ describe('which name each audience sees', function () {
         $source = linkProduct($supplier);
         $source->update(['online_name' => 'Supplier Online Name']);
         ProductFactory::attachPhoto($source);
-        app(\App\Actions\VendorLink\PublishLinkedListingAction::class)->execute($link, [$source->id]);
+        app(PublishLinkedListingAction::class)->execute($link, [$source->id]);
 
         expect(Product::linked()->firstOrFail()->displayName())->toBe('Supplier Online Name');
     });
@@ -290,7 +293,7 @@ describe('the catalogue editor sets it', function () {
         $product = namedProduct2(online: null);
         $owner = User::find($product->vendor->user_id);
 
-        expect(\Illuminate\Support\Facades\Gate::forUser($owner)->allows('updateOnlineName', $product))->toBeFalse();
+        expect(Gate::forUser($owner)->allows('updateOnlineName', $product))->toBeFalse();
 
         $this->actingAs($owner);
         $row = new ParsedRow(2, [ProductField::Name->value => INTERNAL, ProductField::OnlineName->value => 'Vendor Sneaked Name'], matchedProductId: $product->id);
@@ -310,7 +313,7 @@ describe('the catalogue editor sets it', function () {
 
         expect(Product::findOrFail($product->id)->online_name)->toBe(ONLINE)
             ->and(collect(ProductField::exportColumns())->map->value->all())
-                ->toContain('online_name', 'meta_description');
+            ->toContain('online_name', 'meta_description');
     });
 });
 
@@ -321,7 +324,7 @@ describe('panels', function () {
         $link = makeLink($reseller, $supplier);
         $source = linkProduct($supplier);
         ProductFactory::attachPhoto($source);
-        app(\App\Actions\VendorLink\PublishLinkedListingAction::class)->execute($link, [$source->id]);
+        app(PublishLinkedListingAction::class)->execute($link, [$source->id]);
         $listing = Product::linked()->firstOrFail();
 
         $this->actingAs(editorUser());
@@ -334,7 +337,7 @@ describe('panels', function () {
     });
 
     test('the vendor sees the online name read-only and saving their form leaves it alone', function () {
-        (new \Database\Seeders\VendorPermissionsSeeder)->run();
+        (new VendorPermissionsSeeder)->run();
         $product = namedProduct2();
         $owner = User::find($product->vendor->user_id);
 
@@ -342,7 +345,7 @@ describe('panels', function () {
         Filament::setCurrentPanel(Filament::getPanel('vendor'));
         Filament::setTenant($product->vendor);
 
-        Livewire::test(\App\Filament\Vendor\Resources\Products\Pages\EditProduct::class, ['record' => $product->getRouteKey()])
+        Livewire::test(EditProduct::class, ['record' => $product->getRouteKey()])
             ->assertSee('Set by GadgetPlug for online search')
             ->assertSee(ONLINE)
             ->assertFormFieldDoesNotExist('online_name')

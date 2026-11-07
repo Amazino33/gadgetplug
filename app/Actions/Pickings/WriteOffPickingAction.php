@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace App\Actions\Pickings;
 
 use App\Models\Picking;
-use App\Models\Vendor;
-use App\Support\Quantity;
 use App\Models\PickingItem;
 use App\Models\PickingLedgerEntry;
+use App\Models\User;
+use App\Models\Vendor;
 use App\Services\Pickings\PickingLedger;
+use App\Support\Quantity;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -54,21 +55,21 @@ class WriteOffPickingAction
             $price = (float) $item->product()->value('price');
 
             $entry = PickingLedgerEntry::create([
-                'vendor_id'       => $picking->vendor_id,
+                'vendor_id' => $picking->vendor_id,
                 'picking_item_id' => $item->id,
-                'direction'       => PickingLedgerEntry::DIRECTION_WRITEOFF,
-                'quantity'        => $quantity,
-                'amount'          => round($price * $quantity, 2),
-                'unit_price'      => $price,
-                'user_id'         => $userId,
-                'note'            => $note,
+                'direction' => PickingLedgerEntry::DIRECTION_WRITEOFF,
+                'quantity' => $quantity,
+                'amount' => round($price * $quantity, 2),
+                'unit_price' => $price,
+                'user_id' => $userId,
+                'note' => $note,
             ]);
 
             $product = $item->product()->first();
 
             activity()
                 ->performedOn($picking->picker)
-                ->causedBy($userId ? \App\Models\User::find($userId) : null)
+                ->causedBy($userId ? User::find($userId) : null)
                 ->tap(fn ($activity) => $activity->store_id = $picking->store_id)
                 ->event('picking_write_off')
                 ->withProperties(['quantity' => $quantity, 'product' => $product?->name])

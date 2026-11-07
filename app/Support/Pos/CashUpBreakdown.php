@@ -78,12 +78,12 @@ final class CashUpBreakdown
     public function toArray(): array
     {
         return [
-            'expected_cash'     => $this->expectedCash,
+            'expected_cash' => $this->expectedCash,
             'expected_terminal' => $this->expectedTerminal,
-            'cash_lines'        => $this->cashLines,
-            'terminal_lines'    => $this->terminalLines,
-            'context'           => $this->context,
-            'warnings'          => $this->warnings(),
+            'cash_lines' => $this->cashLines,
+            'terminal_lines' => $this->terminalLines,
+            'context' => $this->context,
+            'warnings' => $this->warnings(),
         ];
     }
 }

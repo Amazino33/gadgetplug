@@ -4,19 +4,18 @@ namespace App\Filament\Resources\LogisticsCompanies;
 
 use App\Models\Lga;
 use App\Models\LogisticsCompany;
-use App\Support\Plural;
 use App\Models\State;
+use App\Support\Plural;
 use BackedEnum;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
-use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -35,9 +34,11 @@ class LogisticsCompanyResource extends Resource
 {
     protected static ?string $model = LogisticsCompany::class;
 
-    protected static string|BackedEnum|null $navigationIcon  = Heroicon::OutlinedTruck;
-    protected static ?string                $navigationLabel = 'Logistics companies';
-    protected static ?int                   $navigationSort  = 4;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedTruck;
+
+    protected static ?string $navigationLabel = 'Logistics companies';
+
+    protected static ?int $navigationSort = 4;
 
     public static function getNavigationGroup(): ?string
     {
@@ -51,11 +52,30 @@ class LogisticsCompanyResource extends Resource
         return (bool) ($user?->isSuperAdmin() || $user?->hasGlobalPermission('manage_dispatch'));
     }
 
-    public static function canViewAny(): bool { return static::canAccess(); }
-    public static function canCreate(): bool { return static::canAccess(); }
-    public static function canEdit(Model $record): bool { return static::canAccess() && $record->vendor_id === null; }
-    public static function canDelete(Model $record): bool { return false; }
-    public static function canDeleteAny(): bool { return false; }
+    public static function canViewAny(): bool
+    {
+        return static::canAccess();
+    }
+
+    public static function canCreate(): bool
+    {
+        return static::canAccess();
+    }
+
+    public static function canEdit(Model $record): bool
+    {
+        return static::canAccess() && $record->vendor_id === null;
+    }
+
+    public static function canDelete(Model $record): bool
+    {
+        return false;
+    }
+
+    public static function canDeleteAny(): bool
+    {
+        return false;
+    }
 
     public static function getEloquentQuery(): Builder
     {

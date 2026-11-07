@@ -19,17 +19,17 @@ test('an affiliate\'s task submission history is visible on their detail page', 
 
     $affiliate = Affiliate::findOrCreateForUser(User::factory()->create());
     $task = AffiliateTask::create([
-        'name'               => 'Post to Instagram',
-        'task_type'          => 'manual',
-        'verification_type'  => 'manual',
-        'points_reward'      => 300,
-        'is_active'          => true,
+        'name' => 'Post to Instagram',
+        'task_type' => 'manual',
+        'verification_type' => 'manual',
+        'points_reward' => 300,
+        'is_active' => true,
     ]);
 
     app(AffiliateTaskService::class)->submit($task, $affiliate);
 
     Livewire::test(TaskSubmissionsRelationManager::class, [
         'ownerRecord' => $affiliate,
-        'pageClass'   => ViewAffiliate::class,
+        'pageClass' => ViewAffiliate::class,
     ])->assertSee('Post to Instagram');
 });

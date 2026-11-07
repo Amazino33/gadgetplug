@@ -1,14 +1,18 @@
 <?php
 
 use App\Filament\Vendor\Pages\AccountClose;
+use App\Models\PhysicalStockCount;
+use App\Models\Procurement;
 use App\Models\Store;
 use App\Models\StoreAccountClose;
+use App\Models\Supplier;
 use App\Models\User;
+use App\Models\Vendor;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
-require_once __DIR__ . '/CloseHelpers.php';
+require_once __DIR__.'/CloseHelpers.php';
 
 uses(RefreshDatabase::class);
 
@@ -43,8 +47,8 @@ function closeScreen(array $ctx, array $filters = [])
     return Livewire::test(AccountClose::class)
         ->set('filters', array_merge([
             'store_id' => $ctx['store']->id,
-            'from'     => now()->subMonth()->toDateString(),
-            'to'       => now()->toDateString(),
+            'from' => now()->subMonth()->toDateString(),
+            'to' => now()->toDateString(),
         ], $filters));
 }
 
@@ -151,18 +155,18 @@ test('the goods block and the handover list render on screen', function () {
     closeSale($ctx, 'cash', 100000);
     closeRemit($ctx, 70000);
 
-    App\Models\Procurement::create([
-        'vendor_id'  => $ctx['vendor']->id,
-        'store_id'   => $ctx['store']->id,
-        'supplier_id' => App\Models\Supplier::create([
+    Procurement::create([
+        'vendor_id' => $ctx['vendor']->id,
+        'store_id' => $ctx['store']->id,
+        'supplier_id' => Supplier::create([
             'vendor_id' => $ctx['vendor']->id, 'name' => 'Lagos Wholesale',
         ])->id,
         'total_cost' => 180000,
         'amount_paid' => 180000,
         'payment_status' => 'full',
         'payment_method' => 'bank_transfer',
-        'status'      => App\Models\Procurement::STATUS_APPROVED,
-        'created_by'  => $ctx['cashier']->id,
+        'status' => Procurement::STATUS_APPROVED,
+        'created_by' => $ctx['cashier']->id,
         'approved_by' => $ctx['owner']->id,
         'approved_at' => now(),
     ]);
@@ -204,7 +208,7 @@ test('an inventory count can be pulled in and used to close', function () {
         ->callAction('useAuditCount', ['session_id' => $session->id, 'role' => 'closing'])
         ->assertHasNoActionErrors();
 
-    $count = App\Models\PhysicalStockCount::where('blind_count_session_id', $session->id)->first();
+    $count = PhysicalStockCount::where('blind_count_session_id', $session->id)->first();
 
     expect($count)->not->toBeNull();
 
@@ -214,7 +218,7 @@ test('an inventory count can be pulled in and used to close', function () {
         ->callAction('close')
         ->assertHasNoActionErrors();
 
-    expect(App\Models\StoreAccountClose::latestFor($ctx['store']->id)->closing_count_id)
+    expect(StoreAccountClose::latestFor($ctx['store']->id)->closing_count_id)
         ->toBe($count->id);
 });
 
@@ -222,7 +226,7 @@ test('an inventory count from another branch cannot be pulled in', function () {
     $ctx = closeContext(onShelf: 10);
     closePanel($ctx);
 
-    $other = App\Models\Store::create([
+    $other = Store::create([
         'vendor_id' => $ctx['vendor']->id, 'name' => 'Second Branch', 'is_default' => false,
     ]);
 
@@ -234,7 +238,7 @@ test('an inventory count from another branch cannot be pulled in', function () {
 
     closeScreen($ctx)->callAction('useAuditCount', ['session_id' => $session->id, 'role' => 'closing']);
 
-    expect(App\Models\PhysicalStockCount::count())->toBe(0);
+    expect(PhysicalStockCount::count())->toBe(0);
 });
 
 test('closing freezes the figures and carries the baseline forward', function () {
@@ -364,7 +368,7 @@ test('switching branch leaves no totals from the branch before it', function () 
 
     $other = Store::create([
         'vendor_id' => $ctx['vendor']->id,
-        'name'      => 'Second Branch',
+        'name' => 'Second Branch',
         'is_default' => false,
     ]);
 
@@ -441,7 +445,7 @@ test('the close downloads as a pdf', function () {
 
     $response->assertOk()->assertHeader('content-type', 'application/pdf');
 
-    expect($response->headers->get('content-disposition'))->toContain($close->reference . '.pdf');
+    expect($response->headers->get('content-disposition'))->toContain($close->reference.'.pdf');
 });
 
 test('a close cannot be read by somebody from another business', function () {
@@ -452,7 +456,7 @@ test('a close cannot be read by somebody from another business', function () {
     $close = closePeriod($ctx, closeCount($ctx, 7));
 
     $outsider = User::factory()->create();
-    App\Models\Vendor::create(['user_id' => $outsider->id, 'name' => 'Someone Else Ltd']);
+    Vendor::create(['user_id' => $outsider->id, 'name' => 'Someone Else Ltd']);
 
     // It names people and says what a branch is short, so the only thing that
     // matters is that none of it comes back.

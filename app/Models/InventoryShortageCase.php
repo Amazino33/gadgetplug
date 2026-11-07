@@ -2,9 +2,9 @@
 
 namespace App\Models;
 
-use App\Support\Quantity;
 use App\Casts\AsQuantity;
 use App\Support\Accountability\FrozenLossSnapshot;
+use App\Support\Quantity;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -23,14 +23,14 @@ class InventoryShortageCase extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'shortage_qty'        => AsQuantity::class,
-        'unit_cost_snapshot'  => 'decimal:2',
+        'shortage_qty' => AsQuantity::class,
+        'unit_cost_snapshot' => 'decimal:2',
         'unit_price_snapshot' => 'decimal:2',
-        'charge_amount'       => 'decimal:2',
-        'cost_component'      => 'decimal:2',
-        'margin_component'    => 'decimal:2',
-        'price_fallback'      => 'boolean',
-        'disposed_at'         => 'datetime',
+        'charge_amount' => 'decimal:2',
+        'cost_component' => 'decimal:2',
+        'margin_component' => 'decimal:2',
+        'price_fallback' => 'boolean',
+        'disposed_at' => 'datetime',
     ];
 
     /** Gate these behind view_cost_price — see ProductForm::canSeeCostPrice(). */
@@ -111,6 +111,6 @@ class InventoryShortageCase extends Model
             ->logOnly(['status', 'shortage_qty', 'charge_amount', 'charged_storekeeper_id', 'disposed_by', 'disposed_at', 'disposition_reason'])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
-            ->setDescriptionForEvent(fn (string $event) => 'Shortage case ' . $event);
+            ->setDescriptionForEvent(fn (string $event) => 'Shortage case '.$event);
     }
 }

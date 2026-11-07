@@ -1,11 +1,11 @@
 <?php
 
 use App\Models\PosSession;
-use App\Models\User;
+use App\Models\Store;
 use App\Support\Pos\BusinessDate;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Carbon\CarbonImmutable;
 
 require_once __DIR__.'/Helpers.php';
 
@@ -33,7 +33,7 @@ test('the same cashier may open a session at a different branch on the same day'
     $ctx = cashUpContext();
     openCashUp($ctx);
 
-    $other = App\Models\Store::create([
+    $other = Store::create([
         'vendor_id' => $ctx['vendor']->id, 'name' => 'Second Branch', 'is_default' => false,
     ]);
 
@@ -119,10 +119,10 @@ test('review may still be recorded on a closed session', function () {
     $session = closeCashUp(openCashUp($ctx));
 
     $session->update([
-        'status'      => PosSession::STATUS_APPROVED,
+        'status' => PosSession::STATUS_APPROVED,
         'reviewed_by' => $ctx['owner']->id,
         'reviewed_at' => now(),
-        'notes'       => 'Counted with me present.',
+        'notes' => 'Counted with me present.',
     ]);
 
     expect($session->refresh()->isApproved())->toBeTrue();

@@ -72,9 +72,9 @@ class StoreStock
 
         return ProductStoreStock::create([
             'product_id' => $product->id,
-            'store_id'   => $storeId,
-            'quantity'   => 0,
-            'reserved'   => 0,
+            'store_id' => $storeId,
+            'quantity' => 0,
+            'reserved' => 0,
         ]);
     }
 }

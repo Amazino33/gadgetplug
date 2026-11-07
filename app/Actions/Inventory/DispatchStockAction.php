@@ -26,12 +26,12 @@ class DispatchStockAction
      * stranding the first branch's reservation forever.
      */
     public function execute(
-        int     $productId,
-        int     $quantity,
-        ?int    $userId      = null,
-        ?string $reference   = null,
+        int $productId,
+        int $quantity,
+        ?int $userId = null,
+        ?string $reference = null,
         ?string $description = null,
-        ?int    $orderItemId = null,
+        ?int $orderItemId = null,
         Store|int|null $store = null,
     ): InventoryLedger {
         return DB::transaction(function () use ($productId, $quantity, $userId, $reference, $description, $orderItemId, $store) {
@@ -67,15 +67,15 @@ class DispatchStockAction
                 $dispatchedCost += $movement['cost'];
 
                 $ledger = InventoryLedger::create([
-                    'vendor_id'        => $product->vendor_id,
-                    'store_id'         => $storeId,
-                    'product_id'       => $product->id,
-                    'user_id'          => $userId,
+                    'vendor_id' => $product->vendor_id,
+                    'store_id' => $storeId,
+                    'product_id' => $product->id,
+                    'user_id' => $userId,
                     'transaction_type' => 'dispatched',
-                    'quantity_change'  => -$units,
-                    'cost_total'       => $movement['cost'],
-                    'reference'        => $reference,
-                    'description'      => $description ?? 'Physical deduction on dispatch to rider.',
+                    'quantity_change' => -$units,
+                    'cost_total' => $movement['cost'],
+                    'reference' => $reference,
+                    'description' => $description ?? 'Physical deduction on dispatch to rider.',
                 ]);
             }
 
@@ -86,7 +86,7 @@ class DispatchStockAction
             // the same line rather than overwritten.
             if ($orderItemId !== null) {
                 OrderItem::whereKey($orderItemId)->update([
-                    'cost_total' => DB::raw('COALESCE(cost_total, 0) + ' . number_format($dispatchedCost, 2, '.', '')),
+                    'cost_total' => DB::raw('COALESCE(cost_total, 0) + '.number_format($dispatchedCost, 2, '.', '')),
                 ]);
             }
 

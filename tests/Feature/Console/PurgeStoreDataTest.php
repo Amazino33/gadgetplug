@@ -23,35 +23,35 @@ function purgeVendor(string $name): Vendor
 function purgeProduct(Vendor $vendor, ?Store $store, string $name): Product
 {
     return Product::create([
-        'vendor_id'      => $vendor->id,
-        'store_id'       => $store?->id,
-        'category_id'    => Category::create(['name' => 'C' . uniqid()])->id,
-        'name'           => $name,
-        'price'          => 1000,
-        'cost_price'     => 500,
+        'vendor_id' => $vendor->id,
+        'store_id' => $store?->id,
+        'category_id' => Category::create(['name' => 'C'.uniqid()])->id,
+        'name' => $name,
+        'price' => 1000,
+        'cost_price' => 500,
         'stock_quantity' => 10,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 }
 
 function purgeSale(Vendor $vendor, ?Store $store, string $ref, string $when, ?Product $product = null): PosSale
 {
     // pos_sale_items.product_id is NOT NULL, so a sale always needs a real line.
-    $product ??= purgeProduct($vendor, $store, 'Line for ' . $ref);
+    $product ??= purgeProduct($vendor, $store, 'Line for '.$ref);
 
     $sale = PosSale::create([
-        'reference'       => $ref,
-        'vendor_id'       => $vendor->id,
-        'store_id'        => $store?->id,
-        'cashier_id'      => User::factory()->create()->id,
-        'subtotal'        => 1000,
-        'vat_amount'      => 0,
-        'total'           => 1000,
-        'payment_method'  => 'cash',
+        'reference' => $ref,
+        'vendor_id' => $vendor->id,
+        'store_id' => $store?->id,
+        'cashier_id' => User::factory()->create()->id,
+        'subtotal' => 1000,
+        'vat_amount' => 0,
+        'total' => 1000,
+        'payment_method' => 'cash',
         'amount_tendered' => 1000,
-        'status'          => 'completed',
-        'synced'          => true,
-        'completed_at'    => Carbon::parse($when),
+        'status' => 'completed',
+        'synced' => true,
+        'completed_at' => Carbon::parse($when),
     ]);
 
     PosSaleItem::create([
@@ -64,7 +64,7 @@ function purgeSale(Vendor $vendor, ?Store $store, string $ref, string $when, ?Pr
 
 test('a dry run reports the damage and deletes nothing', function () {
     $vendor = purgeVendor('Dry Run Store');
-    $main   = Store::where('vendor_id', $vendor->id)->where('is_default', true)->first();
+    $main = Store::where('vendor_id', $vendor->id)->where('is_default', true)->first();
 
     purgeProduct($vendor, $main, 'Test Widget');
     purgeSale($vendor, $main, 'POS-DRY1', '2026-08-10 10:00');
@@ -78,7 +78,7 @@ test('a dry run reports the damage and deletes nothing', function () {
 
 test('with --force it removes this store products and dated POS sales', function () {
     $vendor = purgeVendor('Purge Store');
-    $main   = Store::where('vendor_id', $vendor->id)->where('is_default', true)->first();
+    $main = Store::where('vendor_id', $vendor->id)->where('is_default', true)->first();
 
     purgeProduct($vendor, $main, 'Test Widget');
     purgeSale($vendor, $main, 'POS-OLD', '2026-08-10 10:00');
@@ -102,8 +102,8 @@ test('with --force it removes this store products and dated POS sales', function
 
 test('another store under the same vendor is untouched', function () {
     $vendor = purgeVendor('Two Branch Store');
-    $main   = Store::where('vendor_id', $vendor->id)->where('is_default', true)->first();
-    $other  = Store::create(['vendor_id' => $vendor->id, 'name' => 'Branch Two']);
+    $main = Store::where('vendor_id', $vendor->id)->where('is_default', true)->first();
+    $other = Store::create(['vendor_id' => $vendor->id, 'name' => 'Branch Two']);
 
     purgeProduct($vendor, $main, 'Main Widget');
     $safeProduct = purgeProduct($vendor, $other, 'Branch Widget');
@@ -119,9 +119,9 @@ test('another store under the same vendor is untouched', function () {
 });
 
 test('another vendor is untouched entirely', function () {
-    $mine   = purgeVendor('Mine');
+    $mine = purgeVendor('Mine');
     $theirs = purgeVendor('Theirs');
-    $main   = Store::where('vendor_id', $mine->id)->where('is_default', true)->first();
+    $main = Store::where('vendor_id', $mine->id)->where('is_default', true)->first();
     $theirMain = Store::where('vendor_id', $theirs->id)->where('is_default', true)->first();
 
     purgeProduct($mine, $main, 'My Widget');
@@ -137,11 +137,11 @@ test('another vendor is untouched entirely', function () {
 });
 
 test('a shared online order keeps another vendor lines and survives', function () {
-    $mine   = purgeVendor('Shared Mine');
+    $mine = purgeVendor('Shared Mine');
     $theirs = purgeVendor('Shared Theirs');
-    $main   = Store::where('vendor_id', $mine->id)->where('is_default', true)->first();
+    $main = Store::where('vendor_id', $mine->id)->where('is_default', true)->first();
 
-    $myProduct    = purgeProduct($mine, $main, 'My Line');
+    $myProduct = purgeProduct($mine, $main, 'My Line');
     $theirProduct = purgeProduct($theirs, null, 'Their Line');
 
     $order = Order::create([
@@ -167,7 +167,7 @@ test('a shared online order keeps another vendor lines and survives', function (
 
 test('an order left with nothing in it is removed', function () {
     $vendor = purgeVendor('Sole Vendor');
-    $main   = Store::where('vendor_id', $vendor->id)->where('is_default', true)->first();
+    $main = Store::where('vendor_id', $vendor->id)->where('is_default', true)->first();
     $product = purgeProduct($vendor, $main, 'Only Line');
 
     $order = Order::create([
@@ -187,8 +187,8 @@ test('an order left with nothing in it is removed', function () {
 
 test('financial ledger entries for the deleted sales go with them', function () {
     $vendor = purgeVendor('Ledger Store');
-    $main   = Store::where('vendor_id', $vendor->id)->where('is_default', true)->first();
-    $sale   = purgeSale($vendor, $main, 'POS-LEDGER', '2026-08-10 10:00');
+    $main = Store::where('vendor_id', $vendor->id)->where('is_default', true)->first();
+    $sale = purgeSale($vendor, $main, 'POS-LEDGER', '2026-08-10 10:00');
 
     $accountId = DB::table('financial_accounts')->insertGetId([
         'vendor_id' => $vendor->id, 'name' => 'Cash', 'type' => 'cash',
@@ -214,7 +214,7 @@ test('financial ledger entries for the deleted sales go with them', function () 
 
 test('--keep-products removes trading data but leaves the catalogue', function () {
     $vendor = purgeVendor('Keep Catalogue');
-    $main   = Store::where('vendor_id', $vendor->id)->where('is_default', true)->first();
+    $main = Store::where('vendor_id', $vendor->id)->where('is_default', true)->first();
 
     $product = purgeProduct($vendor, $main, 'Kept Widget');
     purgeSale($vendor, $main, 'POS-KEEP', '2026-08-10 10:00');
@@ -229,7 +229,7 @@ test('--keep-products removes trading data but leaves the catalogue', function (
 
 test('answering no to the confirmation deletes nothing', function () {
     $vendor = purgeVendor('Chickened Out');
-    $main   = Store::where('vendor_id', $vendor->id)->where('is_default', true)->first();
+    $main = Store::where('vendor_id', $vendor->id)->where('is_default', true)->first();
     purgeProduct($vendor, $main, 'Safe Widget');
 
     $this->artisan("store:purge {$vendor->id} {$main->id} --force")
@@ -247,8 +247,8 @@ test('an unknown store is refused rather than guessed at', function () {
 
 test('the ledger lookup uses the same source_type the app writes, not a guess', function () {
     $vendor = purgeVendor('Morph Store');
-    $main   = Store::where('vendor_id', $vendor->id)->where('is_default', true)->first();
-    $sale   = purgeSale($vendor, $main, 'POS-MORPH', '2026-08-10 10:00');
+    $main = Store::where('vendor_id', $vendor->id)->where('is_default', true)->first();
+    $sale = purgeSale($vendor, $main, 'POS-MORPH', '2026-08-10 10:00');
 
     $accountId = DB::table('financial_accounts')->insertGetId([
         'vendor_id' => $vendor->id, 'name' => 'Cash', 'type' => 'cash',

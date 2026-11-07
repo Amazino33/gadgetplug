@@ -39,9 +39,9 @@ class MoveProductsBetweenStoresCommand extends Command
     public function handle(): int
     {
         $vendorId = (int) $this->argument('vendor');
-        $fromId   = (int) $this->argument('from');
-        $toId     = (int) $this->argument('to');
-        $brand    = $this->option('brand');
+        $fromId = (int) $this->argument('from');
+        $toId = (int) $this->argument('to');
+        $brand = $this->option('brand');
 
         if ($fromId === $toId) {
             $this->error('Source and destination are the same store.');
@@ -75,7 +75,7 @@ class MoveProductsBetweenStoresCommand extends Command
             return self::SUCCESS;
         }
 
-        $moved  = 0;
+        $moved = 0;
         $failed = [];
 
         foreach ($products as $product) {

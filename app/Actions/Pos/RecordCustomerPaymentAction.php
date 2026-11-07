@@ -47,13 +47,13 @@ class RecordCustomerPaymentAction
             // plain SUM, and the model enforces it on the way in.
             $payment = PosCustomerLedgerEntry::create([
                 'pos_customer_id' => $customer->id,
-                'vendor_id'       => $customer->vendor_id,
-                'direction'       => PosCustomerLedgerEntry::DIRECTION_PAYMENT,
-                'amount'          => -1 * round($amount, 2),
-                'store_id'        => $storeId,
-                'created_by'      => $collectedBy->id,
-                'occurred_at'     => now()->toDateString(),
-                'description'     => $note ?: 'Debt repayment',
+                'vendor_id' => $customer->vendor_id,
+                'direction' => PosCustomerLedgerEntry::DIRECTION_PAYMENT,
+                'amount' => -1 * round($amount, 2),
+                'store_id' => $storeId,
+                'created_by' => $collectedBy->id,
+                'occurred_at' => now()->toDateString(),
+                'description' => $note ?: 'Debt repayment',
             ]);
 
             $this->postCash($customer, $payment, round($amount, 2), $collectedBy, $storeId, $accountId);
@@ -75,7 +75,7 @@ class RecordCustomerPaymentAction
         ?int $storeId,
         ?int $accountId,
     ): void {
-        $account = $accountId 
+        $account = $accountId
             ? FinancialAccount::find($accountId)
             : FinancialAccount::where('vendor_id', $customer->vendor_id)
                 ->where('type', 'cash')

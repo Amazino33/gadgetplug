@@ -47,7 +47,7 @@ class SendMetaConversionEventJob implements ShouldQueue
         Log::error('Meta CAPI event permanently failed after all retries.', [
             'exception' => $exception->getMessage(),
             'event_name' => $this->payload['data'][0]['event_name'] ?? null,
-            'event_id'   => $this->payload['data'][0]['event_id'] ?? null,
+            'event_id' => $this->payload['data'][0]['event_id'] ?? null,
         ]);
     }
 }

@@ -16,32 +16,32 @@ uses(RefreshDatabase::class);
 
 function makeOrderForVendor(Vendor $vendor, string $reference): Order
 {
-    $category = Category::create(['name' => 'Oversight Category ' . uniqid()]);
-    $product  = Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'name'           => 'Oversight Product',
-        'price'          => 4000,
+    $category = Category::create(['name' => 'Oversight Category '.uniqid()]);
+    $product = Product::create([
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'Oversight Product',
+        'price' => 4000,
         'stock_quantity' => 5,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
     $order = Order::create([
-        'reference'        => $reference,
-        'customer_name'    => 'Jane Customer',
-        'customer_email'   => 'jane@example.com',
-        'customer_phone'   => '08040000000',
+        'reference' => $reference,
+        'customer_name' => 'Jane Customer',
+        'customer_email' => 'jane@example.com',
+        'customer_phone' => '08040000000',
         'shipping_address' => '1 Test Street',
-        'total_amount'     => 4000,
-        'status'           => 'paid',
-        'payment_method'   => 'paystack',
+        'total_amount' => 4000,
+        'status' => 'paid',
+        'payment_method' => 'paystack',
     ]);
 
     OrderItem::create([
-        'order_id'   => $order->id,
+        'order_id' => $order->id,
         'product_id' => $product->id,
-        'vendor_id'  => $vendor->id,
-        'quantity'   => 1,
+        'vendor_id' => $vendor->id,
+        'quantity' => 1,
         'unit_price' => 4000,
     ]);
 
@@ -75,8 +75,8 @@ test('the admin orders list shows orders from every vendor with their store name
     $ownerB = User::factory()->create();
     $vendorB = Vendor::create(['user_id' => $ownerB->id, 'name' => 'Beta Store']);
 
-    makeOrderForVendor($vendorA, 'ORD-ALPHA-' . uniqid());
-    makeOrderForVendor($vendorB, 'ORD-BETA-' . uniqid());
+    makeOrderForVendor($vendorA, 'ORD-ALPHA-'.uniqid());
+    makeOrderForVendor($vendorB, 'ORD-BETA-'.uniqid());
 
     $this->actingAs($admin);
 
@@ -87,6 +87,6 @@ test('the admin orders list shows orders from every vendor with their store name
 
 test('the admin orders resource has no create, edit, or delete capability', function () {
     expect(OrderResource::canCreate())->toBeFalse()
-        ->and(OrderResource::canEdit(new Order()))->toBeFalse()
-        ->and(OrderResource::canDelete(new Order()))->toBeFalse();
+        ->and(OrderResource::canEdit(new Order))->toBeFalse()
+        ->and(OrderResource::canDelete(new Order))->toBeFalse();
 });

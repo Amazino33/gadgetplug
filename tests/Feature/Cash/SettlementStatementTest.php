@@ -2,22 +2,23 @@
 
 use App\Actions\Cash\GenerateSettlementStatementAction;
 use App\Actions\Inventory\RecordPhysicalCountAction;
-use App\Models\PhysicalStockCount;
+use App\Models\Category;
+use App\Models\Product;
+use App\Models\ProductStoreStock;
 use App\Models\SettlementResolution;
 use App\Models\StoreSettlementStatement;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Carbon;
 
-require_once __DIR__ . '/Helpers.php';
+require_once __DIR__.'/Helpers.php';
 
 uses(RefreshDatabase::class);
 
 function statementContext(): array
 {
-    $vendor  = cashVendor();
-    $store   = $vendor->defaultStore;
-    $owner   = User::find($vendor->user_id);
+    $vendor = cashVendor();
+    $store = $vendor->defaultStore;
+    $owner = User::find($vendor->user_id);
     $cashier = User::factory()->create();
 
     return compact('vendor', 'store', 'owner', 'cashier');
@@ -27,9 +28,9 @@ function generateStatement(array $ctx): StoreSettlementStatement
 {
     return app(GenerateSettlementStatementAction::class)->execute(
         generatedBy: $ctx['owner'],
-        store:       $ctx['store'],
-        from:        now()->subMonth(),
-        to:          now()->addDay(),
+        store: $ctx['store'],
+        from: now()->subMonth(),
+        to: now()->addDay(),
     );
 }
 
@@ -91,19 +92,19 @@ test('what was agreed is appended beside the statement, never into it', function
     SettlementResolution::create([
         'store_settlement_statement_id' => $statement->id,
         'recorded_by' => $ctx['owner']->id,
-        'outcome'     => SettlementResolution::OUTCOME_REPAYMENT_PLAN,
-        'concerns'    => 'true_shortage',
-        'amount'      => 5000,
-        'note'        => 'Agreed 2,500 a week for two weeks',
+        'outcome' => SettlementResolution::OUTCOME_REPAYMENT_PLAN,
+        'concerns' => 'true_shortage',
+        'amount' => 5000,
+        'note' => 'Agreed 2,500 a week for two weeks',
     ]);
 
     // A second conversation about the same statement does not erase the first.
     SettlementResolution::create([
         'store_settlement_statement_id' => $statement->id,
         'recorded_by' => $ctx['owner']->id,
-        'outcome'     => SettlementResolution::OUTCOME_RESOLVED_NO_ISSUE,
-        'concerns'    => 'disputed',
-        'note'        => 'Envelope turned up in the safe',
+        'outcome' => SettlementResolution::OUTCOME_RESOLVED_NO_ISSUE,
+        'concerns' => 'disputed',
+        'note' => 'Envelope turned up in the safe',
     ]);
 
     expect($statement->fresh()->resolutions)->toHaveCount(2)
@@ -117,8 +118,8 @@ test('a resolution has to say what was agreed', function () {
     expect(fn () => SettlementResolution::create([
         'store_settlement_statement_id' => $statement->id,
         'recorded_by' => $ctx['owner']->id,
-        'outcome'     => SettlementResolution::OUTCOME_RESOLVED_NO_ISSUE,
-        'note'        => '',
+        'outcome' => SettlementResolution::OUTCOME_RESOLVED_NO_ISSUE,
+        'note' => '',
     ]))->toThrow(LogicException::class);
 });
 
@@ -131,30 +132,30 @@ test('a statement says plainly when no stock was counted', function () {
 test('a physical count is compared against what the system believed at that moment', function () {
     $ctx = statementContext();
 
-    $product = App\Models\Product::create([
-        'vendor_id'   => $ctx['vendor']->id,
-        'store_id'    => $ctx['store']->id,
-        'category_id' => App\Models\Category::create(['name' => 'C' . uniqid()])->id,
-        'name'        => 'Counted Widget',
-        'price'       => 10000,
-        'cost_price'  => 6000,
+    $product = Product::create([
+        'vendor_id' => $ctx['vendor']->id,
+        'store_id' => $ctx['store']->id,
+        'category_id' => Category::create(['name' => 'C'.uniqid()])->id,
+        'name' => 'Counted Widget',
+        'price' => 10000,
+        'cost_price' => 6000,
         'stock_quantity' => 20,
         'reserved_stock' => 0,
-        'status'      => 'published',
+        'status' => 'published',
     ]);
 
-    App\Models\ProductStoreStock::updateOrCreate(
+    ProductStoreStock::updateOrCreate(
         ['product_id' => $product->id, 'store_id' => $ctx['store']->id],
         ['quantity' => 20, 'reserved' => 0],
     );
 
     // Twenty on the books, seventeen on the shelf.
     $count = app(RecordPhysicalCountAction::class)->execute(
-        countedBy:   $ctx['owner'],
-        store:       $ctx['store'],
+        countedBy: $ctx['owner'],
+        store: $ctx['store'],
         periodStart: now()->subMonth(),
-        periodEnd:   now(),
-        counts:      [$product->id => 17],
+        periodEnd: now(),
+        counts: [$product->id => 17],
     );
 
     $variance = $count->variance();
@@ -170,16 +171,16 @@ test('a physical count is compared against what the system believed at that mome
 test('a count is evidence and does not quietly correct the stock it disagrees with', function () {
     $ctx = statementContext();
 
-    $product = App\Models\Product::create([
-        'vendor_id'   => $ctx['vendor']->id,
-        'store_id'    => $ctx['store']->id,
-        'category_id' => App\Models\Category::create(['name' => 'C' . uniqid()])->id,
-        'name'        => 'Untouched Widget',
-        'price'       => 5000, 'cost_price' => 3000,
+    $product = Product::create([
+        'vendor_id' => $ctx['vendor']->id,
+        'store_id' => $ctx['store']->id,
+        'category_id' => Category::create(['name' => 'C'.uniqid()])->id,
+        'name' => 'Untouched Widget',
+        'price' => 5000, 'cost_price' => 3000,
         'stock_quantity' => 10, 'reserved_stock' => 0, 'status' => 'published',
     ]);
 
-    App\Models\ProductStoreStock::updateOrCreate(
+    ProductStoreStock::updateOrCreate(
         ['product_id' => $product->id, 'store_id' => $ctx['store']->id],
         ['quantity' => 10, 'reserved' => 0],
     );
@@ -191,7 +192,7 @@ test('a count is evidence and does not quietly correct the stock it disagrees wi
     );
 
     // Adjusting here would erase the very gap the count just found.
-    expect(App\Models\ProductStoreStock::where('product_id', $product->id)
+    expect(ProductStoreStock::where('product_id', $product->id)
         ->where('store_id', $ctx['store']->id)->value('quantity'))->toBe(10);
 });
 
@@ -199,14 +200,14 @@ test('a count names the products that did not add up, and what they would have s
     $ctx = statementContext();
 
     $make = function (string $name, float $cost, float $price, int $qty) use ($ctx) {
-        $product = App\Models\Product::create([
+        $product = Product::create([
             'vendor_id' => $ctx['vendor']->id, 'store_id' => $ctx['store']->id,
-            'category_id' => App\Models\Category::create(['name' => 'C' . uniqid()])->id,
+            'category_id' => Category::create(['name' => 'C'.uniqid()])->id,
             'name' => $name, 'price' => $price, 'cost_price' => $cost,
             'stock_quantity' => $qty, 'reserved_stock' => 0, 'status' => 'published',
         ]);
 
-        App\Models\ProductStoreStock::updateOrCreate(
+        ProductStoreStock::updateOrCreate(
             ['product_id' => $product->id, 'store_id' => $ctx['store']->id],
             ['quantity' => $qty, 'reserved' => 0],
         );
@@ -216,7 +217,7 @@ test('a count names the products that did not add up, and what they would have s
 
     $phone = $make('Galaxy', 400000, 650000, 10);
     $cable = $make('Type-C cable', 2000, 3500, 40);
-    $case  = $make('Phone case', 1000, 2500, 25);
+    $case = $make('Phone case', 1000, 2500, 25);
 
     $count = app(RecordPhysicalCountAction::class)->execute(
         countedBy: $ctx['owner'], store: $ctx['store'],
@@ -240,21 +241,21 @@ test('a count names the products that did not add up, and what they would have s
 test('finding extra of one product does not cancel out another that is missing', function () {
     $ctx = statementContext();
 
-    $short = App\Models\Product::create([
+    $short = Product::create([
         'vendor_id' => $ctx['vendor']->id, 'store_id' => $ctx['store']->id,
-        'category_id' => App\Models\Category::create(['name' => 'C' . uniqid()])->id,
+        'category_id' => Category::create(['name' => 'C'.uniqid()])->id,
         'name' => 'Missing item', 'price' => 10000, 'cost_price' => 6000,
         'stock_quantity' => 10, 'reserved_stock' => 0, 'status' => 'published',
     ]);
-    $over = App\Models\Product::create([
+    $over = Product::create([
         'vendor_id' => $ctx['vendor']->id, 'store_id' => $ctx['store']->id,
-        'category_id' => App\Models\Category::create(['name' => 'C' . uniqid()])->id,
+        'category_id' => Category::create(['name' => 'C'.uniqid()])->id,
         'name' => 'Extra item', 'price' => 10000, 'cost_price' => 6000,
         'stock_quantity' => 10, 'reserved_stock' => 0, 'status' => 'published',
     ]);
 
     foreach ([$short, $over] as $p) {
-        App\Models\ProductStoreStock::updateOrCreate(
+        ProductStoreStock::updateOrCreate(
             ['product_id' => $p->id, 'store_id' => $ctx['store']->id],
             ['quantity' => 10, 'reserved' => 0],
         );
@@ -279,9 +280,9 @@ test('finding extra of one product does not cancel out another that is missing',
 test('a recorded count cannot be edited afterwards', function () {
     $ctx = statementContext();
 
-    $product = App\Models\Product::create([
+    $product = Product::create([
         'vendor_id' => $ctx['vendor']->id, 'store_id' => $ctx['store']->id,
-        'category_id' => App\Models\Category::create(['name' => 'C' . uniqid()])->id,
+        'category_id' => Category::create(['name' => 'C'.uniqid()])->id,
         'name' => 'Frozen Widget', 'price' => 1000, 'cost_price' => 500,
         'stock_quantity' => 5, 'reserved_stock' => 0, 'status' => 'published',
     ]);

@@ -26,12 +26,12 @@ function setUpFinancialReportStore(): array
     $category = Category::firstOrCreate(['name' => 'Financial Report Category']);
     $product = Product::create([
         'vendor_id' => $vendor->id, 'category_id' => $category->id,
-        'name' => 'Report Widget', 'sku' => 'FRW-' . Str::random(6),
+        'name' => 'Report Widget', 'sku' => 'FRW-'.Str::random(6),
         'price' => 5000, 'cost_price' => 3000, 'stock_quantity' => 10, 'status' => 'published',
     ]);
 
     $order = Order::create([
-        'reference' => 'ORD-FR-' . Str::random(8),
+        'reference' => 'ORD-FR-'.Str::random(8),
         'customer_name' => 'Buyer', 'customer_email' => 'buyer@example.com',
         'customer_phone' => '08040000000', 'shipping_address' => 'Uyo',
         'total_amount' => 5000, 'status' => 'delivered', 'payment_method' => 'pay_on_delivery',

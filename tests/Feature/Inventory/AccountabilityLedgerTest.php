@@ -23,13 +23,13 @@ function ledgerContext(array $productAttributes = []): array
     $category = Category::firstOrCreate(['name' => 'Chargers']);
 
     $product = Product::create(array_merge([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'name'           => 'SHPLUS 60W Charger',
-        'price'          => 5300,
-        'cost_price'     => 2570,
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'SHPLUS 60W Charger',
+        'price' => 5300,
+        'cost_price' => 2570,
         'stock_quantity' => 10,
-        'status'         => 'published',
+        'status' => 'published',
     ], $productAttributes));
 
     return compact('owner', 'staff', 'vendor', 'product');
@@ -145,15 +145,15 @@ it('refuses an entry whose sign contradicts its type', function () {
     $c = ledgerContext();
 
     expect(fn () => AccountabilityLedgerEntry::create([
-        'vendor_id'  => $c['vendor']->id,
+        'vendor_id' => $c['vendor']->id,
         'entry_type' => 'charge',
-        'amount'     => -100,
+        'amount' => -100,
     ]))->toThrow(LogicException::class, 'cannot be negative');
 
     expect(fn () => AccountabilityLedgerEntry::create([
-        'vendor_id'  => $c['vendor']->id,
+        'vendor_id' => $c['vendor']->id,
         'entry_type' => 'recovery_cash',
-        'amount'     => 100,
+        'amount' => 100,
     ]))->toThrow(LogicException::class, 'cannot be positive');
 });
 
@@ -161,9 +161,9 @@ it('rejects an unknown entry type', function () {
     $c = ledgerContext();
 
     expect(fn () => AccountabilityLedgerEntry::create([
-        'vendor_id'  => $c['vendor']->id,
+        'vendor_id' => $c['vendor']->id,
         'entry_type' => 'invented',
-        'amount'     => 0,
+        'amount' => 0,
     ]))->toThrow(LogicException::class, 'entry_type must be one of');
 });
 
@@ -173,13 +173,13 @@ it('does not post the same charge twice', function () {
     $c = ledgerContext();
     $ledger = app(AccountabilityLedger::class);
 
-    $first  = $ledger->postCharge($c['vendor']->id, $c['product'], 3, 'charge:case:41', $c['staff']->id);
+    $first = $ledger->postCharge($c['vendor']->id, $c['product'], 3, 'charge:case:41', $c['staff']->id);
     $second = $ledger->postCharge($c['vendor']->id, $c['product'], 3, 'charge:case:41', $c['staff']->id);
 
     expect($second->id)->toBe($first->id)
         ->and(AccountabilityLedgerEntry::count())->toBe(1)
         ->and(AccountabilityLedgerEntry::outstandingForStorekeeper($c['staff']->id, $c['vendor']->id))
-            ->toBe(15900.0);
+        ->toBe(15900.0);
 });
 
 it('does not post the same recovery twice', function () {
@@ -193,7 +193,7 @@ it('does not post the same recovery twice', function () {
 
     expect(AccountabilityLedgerEntry::where('entry_type', 'recovery_cash')->count())->toBe(1)
         ->and(AccountabilityLedgerEntry::outstandingForStorekeeper($c['staff']->id, $c['vendor']->id))
-            ->toBe(10900.0);
+        ->toBe(10900.0);
 });
 
 it('requires a natural key', function () {
@@ -288,7 +288,7 @@ it('does not move when the product is repriced afterwards', function () {
         ->and((float) $fresh->unit_cost_snapshot)->toBe(2570.0)
         ->and((float) $fresh->charge_amount)->toBe(15900.0)
         ->and(AccountabilityLedgerEntry::outstandingForStorekeeper($c['staff']->id, $c['vendor']->id))
-            ->toBe(15900.0);
+        ->toBe(15900.0);
 });
 
 it('can rebuild a snapshot from frozen values without touching the product', function () {

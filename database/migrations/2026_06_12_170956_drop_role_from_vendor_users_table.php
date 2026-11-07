@@ -16,7 +16,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('vendor_users', function (Blueprint $table) {
-            $table->enum('role', ['owner', 'member', 'product_manager', 'order_manager', 'inventory_manager', 'storekeeper',])->default('member');
+            $table->enum('role', ['owner', 'member', 'product_manager', 'order_manager', 'inventory_manager', 'storekeeper'])->default('member');
         });
     }
 };

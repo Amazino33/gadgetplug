@@ -12,15 +12,15 @@ uses(RefreshDatabase::class);
 
 function debtVendor(): Vendor
 {
-    return Vendor::create(['user_id' => User::factory()->create()->id, 'name' => 'Debt Store ' . uniqid()]);
+    return Vendor::create(['user_id' => User::factory()->create()->id, 'name' => 'Debt Store '.uniqid()]);
 }
 
 function debtCustomer(Vendor $vendor, string $name = 'Ada Obi'): PosCustomer
 {
     return PosCustomer::create([
         'vendor_id' => $vendor->id,
-        'name'      => $name,
-        'phone'     => '0800' . random_int(1000000, 9999999),
+        'name' => $name,
+        'phone' => '0800'.random_int(1000000, 9999999),
     ]);
 }
 
@@ -28,10 +28,10 @@ function debtEntry(PosCustomer $customer, string $direction, float $amount, arra
 {
     return PosCustomerLedgerEntry::create(array_merge([
         'pos_customer_id' => $customer->id,
-        'vendor_id'       => $customer->vendor_id,
-        'direction'       => $direction,
-        'amount'          => $amount,
-        'occurred_at'     => now()->toDateString(),
+        'vendor_id' => $customer->vendor_id,
+        'direction' => $direction,
+        'amount' => $amount,
+        'occurred_at' => now()->toDateString(),
     ], $attrs));
 }
 
@@ -105,8 +105,8 @@ test('the summary agrees with the individual figures', function () {
     debtEntry($customer, 'payment', -2500.25);
 
     expect(app(CustomerDebtService::class)->summary($customer->id))->toBe([
-        'charged'     => 7500.50,
-        'paid'        => 2500.25,
+        'charged' => 7500.50,
+        'paid' => 2500.25,
         'written_off' => 0.0,
         'outstanding' => 5000.25,
     ]);
@@ -114,7 +114,7 @@ test('the summary agrees with the individual figures', function () {
 
 test('a customer with no history owes nothing rather than erroring', function () {
     $customer = debtCustomer(debtVendor());
-    $debt     = app(CustomerDebtService::class);
+    $debt = app(CustomerDebtService::class);
 
     expect($debt->outstanding($customer->id))->toBe(0.0)
         ->and($debt->owesAnything($customer->id))->toBeFalse()
@@ -150,7 +150,7 @@ test('an overpayment reads as credit, not as a debt to chase', function () {
 test('outstanding by customer lists only those who still owe', function () {
     $vendor = debtVendor();
 
-    $owes    = debtCustomer($vendor, 'Owes Money');
+    $owes = debtCustomer($vendor, 'Owes Money');
     $settled = debtCustomer($vendor, 'All Square');
 
     debtEntry($owes, 'charge', 8000);
@@ -181,10 +181,10 @@ test('one vendor debt never appears under another', function () {
 // ─── History ────────────────────────────────────────────────────────────
 
 test('history reads oldest first with a running balance after each line', function () {
-    $vendor   = debtVendor();
+    $vendor = debtVendor();
     $customer = debtCustomer($vendor);
-    $store    = Store::where('vendor_id', $vendor->id)->where('is_default', true)->first();
-    $staff    = User::factory()->create();
+    $store = Store::where('vendor_id', $vendor->id)->where('is_default', true)->first();
+    $staff = User::factory()->create();
 
     debtEntry($customer, 'charge', 10000, [
         'occurred_at' => '2026-08-01', 'store_id' => $store->id, 'created_by' => $staff->id,
@@ -218,9 +218,9 @@ test('a customer can hold an address, shop location and notes', function () {
     $customer = debtCustomer(debtVendor());
 
     $customer->update([
-        'address'       => '12 Allen Avenue, Ikeja',
+        'address' => '12 Allen Avenue, Ikeja',
         'shop_location' => 'Phone shop opposite the bank',
-        'notes'         => 'Pays weekly on Fridays.',
+        'notes' => 'Pays weekly on Fridays.',
     ]);
 
     expect($customer->fresh()->shop_location)->toBe('Phone shop opposite the bank');

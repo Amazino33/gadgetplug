@@ -13,15 +13,15 @@ use Laravel\Sanctum\Sanctum;
 function historyContext(): array
 {
     $vendorOwner = User::factory()->create();
-    $vendor      = Vendor::create(['user_id' => $vendorOwner->id, 'name' => 'History Test Store']);
-    $category    = Category::create(['name' => 'History Category']);
-    $product     = Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'name'           => 'History Product',
-        'price'          => 4000,
+    $vendor = Vendor::create(['user_id' => $vendorOwner->id, 'name' => 'History Test Store']);
+    $category = Category::create(['name' => 'History Category']);
+    $product = Product::create([
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'History Product',
+        'price' => 4000,
         'stock_quantity' => 20,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
     $cashierA = User::factory()->create();
@@ -39,26 +39,26 @@ function historyContext(): array
 function makeHistorySale(Vendor $vendor, User $cashier, Product $product, string $reference): PosSale
 {
     $sale = PosSale::create([
-        'reference'       => $reference,
-        'vendor_id'       => $vendor->id,
-        'cashier_id'      => $cashier->id,
-        'subtotal'        => 4000,
-        'vat_amount'      => 0,
-        'total'           => 4000,
-        'payment_method'  => 'cash',
+        'reference' => $reference,
+        'vendor_id' => $vendor->id,
+        'cashier_id' => $cashier->id,
+        'subtotal' => 4000,
+        'vat_amount' => 0,
+        'total' => 4000,
+        'payment_method' => 'cash',
         'amount_tendered' => 4000,
-        'status'          => 'completed',
-        'synced'          => true,
-        'completed_at'    => now(),
+        'status' => 'completed',
+        'synced' => true,
+        'completed_at' => now(),
     ]);
 
     PosSaleItem::create([
-        'pos_sale_id'  => $sale->id,
-        'product_id'   => $product->id,
+        'pos_sale_id' => $sale->id,
+        'product_id' => $product->id,
         'product_name' => $product->name,
-        'unit_price'   => 4000,
-        'quantity'     => 1,
-        'total'        => 4000,
+        'unit_price' => 4000,
+        'quantity' => 1,
+        'total' => 4000,
     ]);
 
     return $sale;
@@ -71,7 +71,7 @@ it('only returns sales rung up by the authenticated cashier', function () {
 
     Sanctum::actingAs($context['cashierA']);
 
-    $response = $this->getJson('/api/pos/sales/my-history?vendor_id=' . $context['vendor']->id);
+    $response = $this->getJson('/api/pos/sales/my-history?vendor_id='.$context['vendor']->id);
 
     $response->assertSuccessful();
 
@@ -87,7 +87,7 @@ it('includes items on each sale so a receipt can be reprinted', function () {
 
     Sanctum::actingAs($context['cashierA']);
 
-    $response = $this->getJson('/api/pos/sales/my-history?vendor_id=' . $context['vendor']->id);
+    $response = $this->getJson('/api/pos/sales/my-history?vendor_id='.$context['vendor']->id);
 
     $sale = collect($response->json('data'))->firstWhere('reference', 'POS-WITH-ITEMS');
 
@@ -96,7 +96,7 @@ it('includes items on each sale so a receipt can be reprinted', function () {
 });
 
 it('does not leak sales from a different vendor', function () {
-    $context  = historyContext();
+    $context = historyContext();
     $otherVendorOwner = User::factory()->create();
     $otherVendor = Vendor::create(['user_id' => $otherVendorOwner->id, 'name' => 'Other Store']);
 
@@ -105,7 +105,7 @@ it('does not leak sales from a different vendor', function () {
 
     Sanctum::actingAs($context['cashierA']);
 
-    $response = $this->getJson('/api/pos/sales/my-history?vendor_id=' . $context['vendor']->id);
+    $response = $this->getJson('/api/pos/sales/my-history?vendor_id='.$context['vendor']->id);
 
     $references = collect($response->json('data'))->pluck('reference');
 

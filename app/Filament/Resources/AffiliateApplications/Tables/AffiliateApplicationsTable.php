@@ -30,10 +30,10 @@ class AffiliateApplicationsTable
                 TextColumn::make('status')
                     ->badge()
                     ->color(fn ($state) => match ($state) {
-                        'pending'  => 'warning',
+                        'pending' => 'warning',
                         'approved' => 'success',
                         'rejected' => 'danger',
-                        default    => 'gray',
+                        default => 'gray',
                     }),
 
                 TextColumn::make('created_at')->label('Applied')->dateTime('d M Y')->sortable(),
@@ -42,7 +42,7 @@ class AffiliateApplicationsTable
             ->filters([
                 SelectFilter::make('status')
                     ->options([
-                        'pending'  => 'Pending',
+                        'pending' => 'Pending',
                         'approved' => 'Approved',
                         'rejected' => 'Rejected',
                     ]),
@@ -75,7 +75,7 @@ class AffiliateApplicationsTable
                             $affiliate = Affiliate::findOrCreateForUser($locked->user);
 
                             $locked->update([
-                                'status'      => 'approved',
+                                'status' => 'approved',
                                 'admin_notes' => $data['admin_notes'] ?? null,
                             ]);
 
@@ -93,7 +93,7 @@ class AffiliateApplicationsTable
                         }
 
                         Notification::make()
-                            ->title('Approved — referral code ' . $affiliate->code)
+                            ->title('Approved — referral code '.$affiliate->code)
                             ->success()
                             ->send();
                     })
@@ -111,7 +111,7 @@ class AffiliateApplicationsTable
                     ])
                     ->action(function (AffiliateApplication $record, array $data): void {
                         $record->update([
-                            'status'      => 'rejected',
+                            'status' => 'rejected',
                             'admin_notes' => $data['admin_notes'],
                         ]);
 

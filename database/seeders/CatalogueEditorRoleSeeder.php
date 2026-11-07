@@ -37,9 +37,9 @@ class CatalogueEditorRoleSeeder extends Seeder
             }
 
             $role = Role::firstOrCreate([
-                'name'       => self::ROLE,
+                'name' => self::ROLE,
                 'guard_name' => 'web',
-                'team_id'    => null,
+                'team_id' => null,
             ]);
 
             $role->givePermissionTo(self::PERMISSIONS);

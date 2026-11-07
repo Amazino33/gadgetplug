@@ -28,7 +28,7 @@ function collisionVendor(): Vendor
 
 function collisionPrepare(string $path, Vendor $vendor)
 {
-    $reader  = app(SpreadsheetReader::class);
+    $reader = app(SpreadsheetReader::class);
     $mapping = app(ColumnMapper::class)->guess($reader->headers($path));
 
     return app(ImportPreparer::class)->prepare($path, $mapping, $vendor);
@@ -49,7 +49,7 @@ function collisionCsvFile(string $contents): string
 }
 
 it('warns when a matched SKU belongs to a product with an unrelated name', function () {
-    $vendor   = collisionVendor();
+    $vendor = collisionVendor();
     $category = Category::create(['name' => 'Batteries', 'slug' => 'batteries-'.uniqid()]);
 
     Product::create([
@@ -65,7 +65,7 @@ it('warns when a matched SKU belongs to a product with an unrelated name', funct
 });
 
 it('does not warn on a genuine rename or small wording change', function () {
-    $vendor   = collisionVendor();
+    $vendor = collisionVendor();
     $category = Category::create(['name' => 'Cases', 'slug' => 'cases-'.uniqid()]);
 
     Product::create([

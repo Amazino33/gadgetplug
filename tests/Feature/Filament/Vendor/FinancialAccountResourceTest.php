@@ -1,6 +1,9 @@
 <?php
 
 use App\Filament\Vendor\Resources\FinancialAccounts\FinancialAccountResource;
+use App\Filament\Vendor\Resources\FinancialAccounts\Pages\EditFinancialAccount;
+use App\Filament\Vendor\Resources\FinancialAccounts\Pages\ListFinancialAccounts;
+use App\Filament\Vendor\Resources\FinancialAccounts\RelationManagers\LedgerEntriesRelationManager;
 use App\Models\FinancialAccount;
 use App\Models\User;
 use App\Models\Vendor;
@@ -16,10 +19,10 @@ uses(RefreshDatabase::class);
 
 function setUpFinancialAccountsVendor(): array
 {
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
 
     $owner = User::factory()->create();
-    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Financial Accounts Store ' . uniqid()]);
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Financial Accounts Store '.uniqid()]);
     VendorRoles::seedFor($vendor);
 
     return compact('owner', 'vendor');
@@ -66,7 +69,7 @@ test('the vendor owner can always access the resource', function () {
     $data = setUpFinancialAccountsVendor();
     actAsFinancialAccountsOwner($data);
 
-    Livewire::test(\App\Filament\Vendor\Resources\FinancialAccounts\Pages\ListFinancialAccounts::class)
+    Livewire::test(ListFinancialAccounts::class)
         ->assertSuccessful();
 });
 
@@ -78,7 +81,7 @@ test('the list page shows both accounts with their live derived balance', functi
     $bank->update(['opening_balance' => 10000]);
     FinancialLedger::postEntry($bank, 'in', 5000, description: 'Test sale');
 
-    Livewire::test(\App\Filament\Vendor\Resources\FinancialAccounts\Pages\ListFinancialAccounts::class)
+    Livewire::test(ListFinancialAccounts::class)
         ->assertSee('Bank Account')
         ->assertSee('Cash Account')
         ->assertSee('15,000.00');
@@ -90,7 +93,7 @@ test('the owner can update the opening balance', function () {
 
     $cash = FinancialAccount::where('vendor_id', $data['vendor']->id)->where('type', 'cash')->first();
 
-    Livewire::test(\App\Filament\Vendor\Resources\FinancialAccounts\Pages\EditFinancialAccount::class, ['record' => $cash->getRouteKey()])
+    Livewire::test(EditFinancialAccount::class, ['record' => $cash->getRouteKey()])
         ->fillForm(['opening_balance' => 25000])
         ->call('save')
         ->assertHasNoFormErrors();
@@ -115,9 +118,9 @@ test('the ledger tab shows entries for that account, newest first', function () 
     FinancialLedger::postEntry($bank, 'in', 1000, description: 'Older entry', occurredAt: now()->subDays(2));
     FinancialLedger::postEntry($bank, 'out', 300, description: 'Newer entry', occurredAt: now());
 
-    Livewire::test(\App\Filament\Vendor\Resources\FinancialAccounts\RelationManagers\LedgerEntriesRelationManager::class, [
+    Livewire::test(LedgerEntriesRelationManager::class, [
         'ownerRecord' => $bank,
-        'pageClass'   => \App\Filament\Vendor\Resources\FinancialAccounts\Pages\EditFinancialAccount::class,
+        'pageClass' => EditFinancialAccount::class,
     ])
         ->assertSee('Older entry')
         ->assertSee('Newer entry');

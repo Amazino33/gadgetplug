@@ -36,7 +36,7 @@ class ResellerCheckoutService
     ) {}
 
     /**
-     * @param array<int, array{product: Product, quantity: int}> $lines
+     * @param  array<int, array{product: Product, quantity: int}>  $lines
      */
     public function purchase(Affiliate $affiliate, array $lines, string $shippingAddress, ?string $localGovernment = null): Checkout
     {
@@ -60,21 +60,21 @@ class ResellerCheckoutService
             $total = 0.0;
 
             foreach ($lines as $line) {
-                $product  = $line['product'];
+                $product = $line['product'];
                 $quantity = $line['quantity'];
 
                 if ($quantity < 1) {
                     throw new RuntimeException("Quantity must be at least 1 for {$product->name}.");
                 }
 
-                $discount             = $this->discountResolver->resolveForProduct($product);
-                $discountedUnitPrice  = round((float) $product->price * (1 - $discount / 100), 2);
-                $total               += $discountedUnitPrice * $quantity;
+                $discount = $this->discountResolver->resolveForProduct($product);
+                $discountedUnitPrice = round((float) $product->price * (1 - $discount / 100), 2);
+                $total += $discountedUnitPrice * $quantity;
 
                 $preparedLines[] = [
-                    'product'                => $product,
-                    'quantity'                => $quantity,
-                    'discounted_unit_price'   => $discountedUnitPrice,
+                    'product' => $product,
+                    'quantity' => $quantity,
+                    'discounted_unit_price' => $discountedUnitPrice,
                 ];
             }
 
@@ -89,20 +89,20 @@ class ResellerCheckoutService
             // Created already 'confirmed' as before (the wallet pays up front),
             // so no status transition — and none of its side effects — fires.
             $checkout = $this->placeCheckout->execute([
-                'user_id'          => $lockedAffiliate->user_id,
-                'reference'        => 'GP-RS-' . strtoupper(Str::random(10)),
-                'customer_name'    => $lockedAffiliate->user->name,
-                'customer_email'   => $lockedAffiliate->user->email,
-                'customer_phone'   => $lockedAffiliate->user->phone,
+                'user_id' => $lockedAffiliate->user_id,
+                'reference' => 'GP-RS-'.strtoupper(Str::random(10)),
+                'customer_name' => $lockedAffiliate->user->name,
+                'customer_email' => $lockedAffiliate->user->email,
+                'customer_phone' => $lockedAffiliate->user->phone,
                 'shipping_address' => $shippingAddress,
                 'local_government' => $localGovernment,
-                'delivery_fee'     => 0,
-                'payment_method'   => 'wallet',
+                'delivery_fee' => 0,
+                'payment_method' => 'wallet',
             ], array_map(fn (array $line) => [
-                'product'    => $line['product'],
-                'quantity'   => $line['quantity'],
+                'product' => $line['product'],
+                'quantity' => $line['quantity'],
                 'unit_price' => $line['discounted_unit_price'],
-                'unit_cost'  => $line['product']->cost_price,
+                'unit_cost' => $line['product']->cost_price,
             ], $preparedLines), orderStatus: 'confirmed');
 
             foreach ($checkout->orders as $order) {
@@ -125,10 +125,10 @@ class ResellerCheckoutService
                 // every order keeps exactly one wallet debit behind it.
                 WalletTransaction::create([
                     'affiliate_id' => $lockedAffiliate->id,
-                    'order_id'     => $order->id,
-                    'type'         => 'debit',
-                    'amount'       => -(float) $order->total_amount,
-                    'description'  => "Reseller purchase — order #{$order->reference}.",
+                    'order_id' => $order->id,
+                    'type' => 'debit',
+                    'amount' => -(float) $order->total_amount,
+                    'description' => "Reseller purchase — order #{$order->reference}.",
                 ]);
 
                 // The debit is the payment: revenue into the selling vendor's

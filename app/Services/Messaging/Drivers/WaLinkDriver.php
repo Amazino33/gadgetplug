@@ -13,11 +13,11 @@ class WaLinkDriver implements MessagingDriver
     public function send(DeliveryMessage $message): DriverSendResult
     {
         $phone = preg_replace('/\D/', '', $message->to_number);
-        $url   = 'https://api.whatsapp.com/send?phone=' . $phone . '&text=' . rawurlencode($message->body);
+        $url = 'https://api.whatsapp.com/send?phone='.$phone.'&text='.rawurlencode($message->body);
 
         return DriverSendResult::linkGenerated([
             'driver' => 'wa_link',
-            'url'    => $url,
+            'url' => $url,
         ]);
     }
 }

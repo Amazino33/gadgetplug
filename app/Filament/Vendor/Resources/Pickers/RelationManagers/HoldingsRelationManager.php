@@ -2,15 +2,15 @@
 
 namespace App\Filament\Vendor\Resources\Pickers\RelationManagers;
 
-use App\Filament\Support\QuantityInput;
-use App\Support\Quantity;
 use App\Actions\Pickings\ReturnFromPickerAction;
 use App\Actions\Pickings\WriteOffPickingAction;
+use App\Filament\Support\QuantityInput;
 use App\Models\PickingItem;
 use App\Policies\PickingWriteOffPolicy;
+use App\Support\Quantity;
 use Filament\Actions\Action;
-use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Columns\TextColumn;
@@ -36,10 +36,10 @@ class HoldingsRelationManager extends RelationManager
             ->modifyQueryUsing(fn (Builder $query) => $query
                 ->with(['product', 'picking.store'])
                 ->selectRaw('picking_items.*')
-                ->selectRaw(self::sumOf(null) . ' as accounted_units')
-                ->selectRaw(self::sumOf('return') . ' as returned_units')
-                ->selectRaw(self::sumOf('payment') . ' as paid_units')
-                ->selectRaw(self::sumOf('writeoff') . ' as written_units'))
+                ->selectRaw(self::sumOf(null).' as accounted_units')
+                ->selectRaw(self::sumOf('return').' as returned_units')
+                ->selectRaw(self::sumOf('payment').' as paid_units')
+                ->selectRaw(self::sumOf('writeoff').' as written_units'))
             ->columns([
                 TextColumn::make('product.name')
                     ->label('Product')
@@ -94,10 +94,10 @@ class HoldingsRelationManager extends RelationManager
      */
     private static function sumOf(?string $direction): string
     {
-        $filter = $direction ? " and direction = '" . $direction . "'" : '';
+        $filter = $direction ? " and direction = '".$direction."'" : '';
 
         return '(select coalesce(sum(quantity), 0) from picking_ledger_entries'
-            . ' where picking_item_id = picking_items.id' . $filter . ')';
+            .' where picking_item_id = picking_items.id'.$filter.')';
     }
 
     private static function stillHeld(PickingItem $record): int|float

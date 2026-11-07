@@ -5,11 +5,13 @@ use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\ProductStoreStock;
+use App\Models\Vendor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Session;
+use Livewire\Features\SupportTesting\Testable;
 use Livewire\Volt\Volt;
 
-require_once __DIR__ . '/Helpers.php';
+require_once __DIR__.'/Helpers.php';
 
 uses(RefreshDatabase::class);
 
@@ -26,7 +28,7 @@ function linkedListing(float $price = 10000, int $stock = 5): array
     return [Product::linked()->firstOrFail(), $source];
 }
 
-function placeLinkedOrder(): Livewire\Features\SupportTesting\Testable
+function placeLinkedOrder(): Testable
 {
     return Volt::test('checkout')
         ->set('name', 'Jane Tester')
@@ -83,12 +85,12 @@ test('the line carries no cost yet, because the supplier is paid at delivery', f
 
 test('an ordinary product in the same order still reserves as it always did', function () {
     [$listing] = linkedListing(stock: 5);
-    $reseller = App\Models\Vendor::find($listing->vendor_id);
+    $reseller = Vendor::find($listing->vendor_id);
     $own = linkProduct($reseller, price: 5000, stock: 10);
 
     Session::put('cart', [
         $listing->id => ['quantity' => 1, 'max' => 5],
-        $own->id     => ['quantity' => 2, 'max' => 10],
+        $own->id => ['quantity' => 2, 'max' => 10],
     ]);
 
     placeLinkedOrder();

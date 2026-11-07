@@ -2,19 +2,21 @@
 
 namespace App\Http\Controllers;
 
-use App\Support\Quantity;
-use App\Rules\QuantityStep;
-use App\Models\ProductStoreStock;
-use App\Models\Store;
-use App\Models\Supplier;
-use App\Models\Product;
-use App\Models\ProductUnit;
+use App\Filament\Vendor\Resources\Procurements\ProcurementResource;
 use App\Models\Procurement;
 use App\Models\ProcurementItem;
 use App\Models\ProcurementLogisticsLeg;
+use App\Models\Product;
+use App\Models\ProductStoreStock;
+use App\Models\ProductUnit;
+use App\Models\Store;
+use App\Models\Supplier;
 use App\Models\Vendor;
-use Illuminate\Http\Request;
+use App\Rules\QuantityStep;
 use App\Services\ActiveStore;
+use App\Support\Quantity;
+use Filament\Notifications\Notification;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
@@ -44,6 +46,11 @@ class ProcurementWizardController extends Controller
         // ends up on the customer account page saying the wrong thing.
         if ($vendor->isDashboardBlocked() && ! $user->isSuperAdmin()) {
             abort(response()->view('vendor.blocked', ['vendor' => $vendor], 403));
+        }
+
+        // Procurement is not part of the free (self-signup) plan.
+        if ($vendor->isFreePlan() && ! $user->isSuperAdmin()) {
+            abort(redirect()->to(route('filament.vendor.pages.dashboard', ['tenant' => $vendor])));
         }
 
         return $vendor;
@@ -83,9 +90,9 @@ class ProcurementWizardController extends Controller
 
         $supplier = Supplier::create([
             'vendor_id' => $vendor->id,
-            'name'      => $validated['name'],
-            'phone'     => $validated['phone'] ?? null,
-            'address'   => $validated['address'] ?? null,
+            'name' => $validated['name'],
+            'phone' => $validated['phone'] ?? null,
+            'address' => $validated['address'] ?? null,
         ]);
 
         return response()->json([
@@ -93,7 +100,7 @@ class ProcurementWizardController extends Controller
             'name' => $supplier->name,
             'location' => $supplier->address ?? 'N/A',
             'rating' => 0,
-            'avg_delivery_days' => '—'
+            'avg_delivery_days' => '—',
         ]);
     }
 
@@ -102,20 +109,20 @@ class ProcurementWizardController extends Controller
         $vendor = $this->resolveAuthorizedVendor($request);
 
         $request->validate([
-            'supplier_id'   => 'required|exists:suppliers,id',
+            'supplier_id' => 'required|exists:suppliers,id',
             // Checked against the branches this user can reach rather than
             // exists:stores,id, so a posted id cannot name another vendor's
             // branch or one this user was never assigned to.
-            'store_id'      => ['required', Rule::in(ActiveStore::accessibleFor($vendor, $request->user())->pluck('id'))],
-            'receipt_image'  => 'nullable|image|max:5120',
+            'store_id' => ['required', Rule::in(ActiveStore::accessibleFor($vendor, $request->user())->pluck('id'))],
+            'receipt_image' => 'nullable|image|max:5120',
         ], [
             'store_id.required' => 'Choose which branch these goods are being delivered to.',
-            'store_id.in'       => 'You cannot receive goods into that branch.',
+            'store_id.in' => 'You cannot receive goods into that branch.',
         ]);
 
         session([
             'procurement.supplier_id' => $request->supplier_id,
-            'procurement.store_id'    => (int) $request->store_id,
+            'procurement.store_id' => (int) $request->store_id,
         ]);
 
         if ($request->hasFile('receipt_image')) {
@@ -158,7 +165,7 @@ class ProcurementWizardController extends Controller
 
         $storeNames = Store::where('vendor_id', $vendor->id)->pluck('name', 'id');
 
-        $productsJson = $products->map(fn($p) => [
+        $productsJson = $products->map(fn ($p) => [
             'id' => $p->id, 'name' => $p->name,
             'price' => $p->price ?? 0, 'cost_price' => $p->cost_price ?? 0,
             // Receivable here if it is already homed at this branch, or holds
@@ -170,13 +177,13 @@ class ProcurementWizardController extends Controller
             // cost can be entered the way the invoice states them.
             'base_unit' => $p->base_unit ?: 'Piece',
             'units' => $p->units->where('is_active', true)->map(fn ($u) => [
-                'id'     => $u->id,
-                'name'   => $u->name,
+                'id' => $u->id,
+                'name' => $u->name,
                 'factor' => (int) $u->conversion_factor,
                 'is_base' => (bool) $u->is_base,
             ])->values(),
         ])->values();
-        $items    = session('procurement.items', []);
+        $items = session('procurement.items', []);
 
         return view('procurement.items', compact('vendor', 'supplier', 'products', 'productsJson', 'items', 'destination'));
     }
@@ -184,12 +191,12 @@ class ProcurementWizardController extends Controller
     public function storeItems(Request $request)
     {
         $request->validate([
-            'items'                  => 'required|array|min:1',
-            'items.*.product_id'     => 'required|exists:products,id',
-            'items.*.barcode'        => 'nullable|string',
-            'items.*.quantity'       => ['required', 'numeric', new QuantityStep($this->resolveAuthorizedVendor($request))],
-            'items.*.unit_cost'      => 'required|numeric|min:0',
-            'items.*.selling_price'  => 'required|numeric|min:0',
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.barcode' => 'nullable|string',
+            'items.*.quantity' => ['required', 'numeric', new QuantityStep($this->resolveAuthorizedVendor($request))],
+            'items.*.unit_cost' => 'required|numeric|min:0',
+            'items.*.selling_price' => 'required|numeric|min:0',
             // The unit bought in. Quantity and unit_cost above are then per
             // that unit (5 cartons at ₦10,000), converted on submit.
             'items.*.product_unit_id' => 'nullable|integer',
@@ -217,7 +224,7 @@ class ProcurementWizardController extends Controller
         $vendor = $this->resolveAuthorizedVendor($request);
 
         $supplier = Supplier::findOrFail(session('procurement.supplier_id'));
-        $legs     = session('procurement.logistics', []);
+        $legs = session('procurement.logistics', []);
 
         return view('procurement.logistics', compact('vendor', 'supplier', 'legs'));
     }
@@ -225,9 +232,9 @@ class ProcurementWizardController extends Controller
     public function storeLogistics(Request $request)
     {
         $request->validate([
-            'legs'                 => 'nullable|array',
-            'legs.*.route_label'   => 'required|string|max:255',
-            'legs.*.amount'        => 'required|numeric|min:0',
+            'legs' => 'nullable|array',
+            'legs.*.route_label' => 'required|string|max:255',
+            'legs.*.amount' => 'required|numeric|min:0',
         ]);
 
         session(['procurement.logistics' => $request->legs ?? []]);
@@ -243,13 +250,13 @@ class ProcurementWizardController extends Controller
 
         $vendor = $this->resolveAuthorizedVendor($request);
 
-        $supplier   = Supplier::findOrFail(session('procurement.supplier_id'));
-        $items      = session('procurement.items', []);
-        $products   = Product::whereIn('id', array_column($items, 'product_id'))->get()->keyBy('id');
+        $supplier = Supplier::findOrFail(session('procurement.supplier_id'));
+        $items = session('procurement.items', []);
+        $products = Product::whereIn('id', array_column($items, 'product_id'))->get()->keyBy('id');
         $financials = session('procurement.financials', []);
 
-        $subtotal       = collect($items)->sum(fn($i) => $i['quantity'] * $i['unit_cost']);
-        $logisticsTotal = collect(session('procurement.logistics', []))->sum(fn($l) => (float) $l['amount']);
+        $subtotal = collect($items)->sum(fn ($i) => $i['quantity'] * $i['unit_cost']);
+        $logisticsTotal = collect(session('procurement.logistics', []))->sum(fn ($l) => (float) $l['amount']);
 
         return view('procurement.financials', compact('vendor', 'supplier', 'items', 'products', 'subtotal', 'financials', 'logisticsTotal'));
     }
@@ -257,8 +264,8 @@ class ProcurementWizardController extends Controller
     public function storeFinancials(Request $request)
     {
         $request->validate([
-            'payment_method'   => 'required|in:bank_transfer,cash,credit',
-            'amount_paid'      => 'required|numeric|min:0',
+            'payment_method' => 'required|in:bank_transfer,cash,credit',
+            'amount_paid' => 'required|numeric|min:0',
             'reference_number' => 'nullable|string|max:255',
         ]);
 
@@ -274,14 +281,14 @@ class ProcurementWizardController extends Controller
         }
 
         $vendor = $this->resolveAuthorizedVendor($request);
-        $supplier   = Supplier::findOrFail(session('procurement.supplier_id'));
+        $supplier = Supplier::findOrFail(session('procurement.supplier_id'));
         $destination = Store::find(session('procurement.store_id'));
-        $items      = session('procurement.items', []);
+        $items = session('procurement.items', []);
         $financials = session('procurement.financials');
-        $products   = Product::whereIn('id', array_column($items, 'product_id'))->get()->keyBy('id');
-        $subtotal   = collect($items)->sum(fn($i) => $i['quantity'] * $i['unit_cost']);
-        $legs       = session('procurement.logistics', []);
-        $logisticsTotal = collect($legs)->sum(fn($l) => (float) $l['amount']);
+        $products = Product::whereIn('id', array_column($items, 'product_id'))->get()->keyBy('id');
+        $subtotal = collect($items)->sum(fn ($i) => $i['quantity'] * $i['unit_cost']);
+        $legs = session('procurement.logistics', []);
+        $logisticsTotal = collect($legs)->sum(fn ($l) => (float) $l['amount']);
 
         return view('procurement.confirm', compact('vendor', 'supplier', 'destination', 'items', 'products', 'financials', 'subtotal', 'legs', 'logisticsTotal'));
     }
@@ -290,34 +297,33 @@ class ProcurementWizardController extends Controller
     {
         $vendor = $this->resolveAuthorizedVendor($request);
         $financials = session('procurement.financials');
-        $items      = session('procurement.items', []);
-        $subtotal   = collect($items)->sum(fn($i) => $i['quantity'] * $i['unit_cost']);
+        $items = session('procurement.items', []);
+        $subtotal = collect($items)->sum(fn ($i) => $i['quantity'] * $i['unit_cost']);
 
         $amountPaid = (float) str_replace(',', '', $financials['amount_paid']);
 
         $paymentStatus = match (true) {
-            $amountPaid <= 0             => 'credit',
-            $amountPaid >= $subtotal     => 'full',
-            default                      => 'part_payment',
+            $amountPaid <= 0 => 'credit',
+            $amountPaid >= $subtotal => 'full',
+            default => 'part_payment',
         };
 
         $legs = session('procurement.logistics', []);
 
         DB::transaction(function () use ($vendor, $financials, $items, $subtotal, $amountPaid, $paymentStatus, $legs) {
             $procurement = Procurement::create([
-                'vendor_id'      => $vendor->id,
-                'store_id'       => session('procurement.store_id'),
-                'supplier_id'    => session('procurement.supplier_id'),
-                'created_by'     => auth()->id(),
-                'total_cost'     => $subtotal,
-                'amount_paid'    => $amountPaid,
+                'vendor_id' => $vendor->id,
+                'store_id' => session('procurement.store_id'),
+                'supplier_id' => session('procurement.supplier_id'),
+                'created_by' => auth()->id(),
+                'total_cost' => $subtotal,
+                'amount_paid' => $amountPaid,
                 'payment_status' => $paymentStatus,
                 'payment_method' => $financials['payment_method'],
-                'notes'          => $financials['reference_number'] ?? null,
-                'status'         => 'pending',
-                'waybill_image'  => session('procurement.receipt_image'),
+                'notes' => $financials['reference_number'] ?? null,
+                'status' => 'pending',
+                'waybill_image' => session('procurement.receipt_image'),
             ]);
-
 
             foreach ($items as $item) {
                 // Bought in a bigger unit: stock and cost are recorded per base
@@ -332,34 +338,34 @@ class ProcurementWizardController extends Controller
 
                 ProcurementItem::create([
                     'procurement_id' => $procurement->id,
-                    'product_id'     => $item['product_id'],
-                    'barcode'        => $item['barcode'] ?? null,
-                    'quantity'       => Quantity::mul($item['quantity'], $factor),
-                    'unit_cost'      => $unit ? round((float) $item['unit_cost'] / $factor, 2) : $item['unit_cost'],
-                    'selling_price'  => $item['selling_price'],
+                    'product_id' => $item['product_id'],
+                    'barcode' => $item['barcode'] ?? null,
+                    'quantity' => Quantity::mul($item['quantity'], $factor),
+                    'unit_cost' => $unit ? round((float) $item['unit_cost'] / $factor, 2) : $item['unit_cost'],
+                    'selling_price' => $item['selling_price'],
                     'product_unit_id' => $unit?->id,
-                    'unit_qty'        => $unit ? Quantity::of($item['quantity']) : null,
-                    'cost_per_unit'   => $unit ? $item['unit_cost'] : null,
+                    'unit_qty' => $unit ? Quantity::of($item['quantity']) : null,
+                    'cost_per_unit' => $unit ? $item['unit_cost'] : null,
                 ]);
             }
 
             foreach ($legs as $index => $leg) {
                 ProcurementLogisticsLeg::create([
                     'procurement_id' => $procurement->id,
-                    'route_label'    => $leg['route_label'],
-                    'amount'         => $leg['amount'],
-                    'sort_order'     => $index,
+                    'route_label' => $leg['route_label'],
+                    'amount' => $leg['amount'],
+                    'sort_order' => $index,
                 ]);
             }
         });
 
         session()->forget(['procurement.supplier_id', 'procurement.store_id', 'procurement.items', 'procurement.logistics', 'procurement.financials', 'procurement.receipt_image']);
 
-        \Filament\Notifications\Notification::make()
+        Notification::make()
             ->title('Procurement submitted successfully and is pending approval.')
             ->success()
             ->send();
 
-        return redirect(\App\Filament\Vendor\Resources\Procurements\ProcurementResource::getUrl('index', ['tenant' => $vendor->slug]));
+        return redirect(ProcurementResource::getUrl('index', ['tenant' => $vendor->slug]));
     }
 }

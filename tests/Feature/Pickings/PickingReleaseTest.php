@@ -1,20 +1,12 @@
 <?php
 
-use App\Actions\Inventory\AdjustStockAction;
 use App\Actions\Pickings\ReleaseToPickerAction;
 use App\Actions\Pickings\ReturnFromPickerAction;
-use App\Models\Category;
 use App\Models\InventoryLedger;
 use App\Models\Picker;
 use App\Models\Picking;
-use App\Models\Product;
-use App\Models\ProductStoreStock;
-use App\Models\Store;
-use App\Models\User;
-use App\Models\Vendor;
 use App\Services\Pickings\PickingLedger;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Str;
 
 require_once __DIR__.'/Helpers.php';
 
@@ -40,7 +32,7 @@ test('goods handed to a picker leave the shelf and are recorded as a trip', func
         ->and($picking->items)->toHaveCount(1)
         // Still ours, still out: the ledger says the units moved, not that they sold.
         ->and(InventoryLedger::where('reference', $picking->reference)->value('transaction_type'))
-            ->toBe('picking_out');
+        ->toBe('picking_out');
 });
 
 test('what the units actually cost is captured as they leave', function () {

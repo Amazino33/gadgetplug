@@ -16,7 +16,7 @@ function wizardVendor(): Vendor
 {
     return Vendor::create([
         'user_id' => User::factory()->create()->id,
-        'name'    => 'Wizard Vendor '.uniqid(),
+        'name' => 'Wizard Vendor '.uniqid(),
     ]);
 }
 
@@ -26,14 +26,14 @@ function wizardVendor(): Vendor
 function wizardProduct(Vendor $vendor, string $name, Store $home, int $quantity = 0): Product
 {
     $product = Product::create([
-        'vendor_id'      => $vendor->id,
-        'store_id'       => $home->id,
-        'category_id'    => Category::create(['name' => 'Cat '.uniqid()])->id,
-        'name'           => $name,
-        'price'          => 1000,
-        'cost_price'     => 500,
+        'vendor_id' => $vendor->id,
+        'store_id' => $home->id,
+        'category_id' => Category::create(['name' => 'Cat '.uniqid()])->id,
+        'name' => $name,
+        'price' => 1000,
+        'cost_price' => 500,
         'stock_quantity' => 0,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
     if ($quantity > 0) {
@@ -65,7 +65,7 @@ test('a branch the user cannot reach is refused', function () {
     $this->actingAs(User::find($vendor->user_id))
         ->post(route('procurement.storeSupplier'), [
             'supplier_id' => $supplier->id,
-            'store_id'    => $foreign->id,
+            'store_id' => $foreign->id,
         ])
         ->assertSessionHasErrors('store_id');
 
@@ -81,7 +81,7 @@ test('choosing a branch carries it through to the saved order', function () {
     $this->actingAs($user)
         ->post(route('procurement.storeSupplier'), [
             'supplier_id' => $supplier->id,
-            'store_id'    => $branch->id,
+            'store_id' => $branch->id,
         ])
         ->assertRedirect(route('procurement.items'));
 
@@ -90,9 +90,9 @@ test('choosing a branch carries it through to the saved order', function () {
     $this->actingAs($user)
         ->withSession([
             'procurement.supplier_id' => $supplier->id,
-            'procurement.store_id'    => $branch->id,
-            'procurement.items'       => [],
-            'procurement.financials'  => ['payment_method' => 'cash', 'amount_paid' => '0'],
+            'procurement.store_id' => $branch->id,
+            'procurement.items' => [],
+            'procurement.financials' => ['payment_method' => 'cash', 'amount_paid' => '0'],
         ])
         ->post(route('procurement.submit'))
         ->assertRedirect(route('procurement.create'));
@@ -129,12 +129,12 @@ test('the items step renders, naming the branch and blocking what it cannot rece
 
     // Stocked at the default store, so this branch cannot receive it.
     $stocked = wizardProduct($vendor, 'JBL Speaker', $vendor->defaultStore, 6);
-    $free    = wizardProduct($vendor, 'Empty Product', $vendor->defaultStore, 0);
+    $free = wizardProduct($vendor, 'Empty Product', $vendor->defaultStore, 0);
 
     $response = $this->actingAs(User::find($vendor->user_id))
         ->withSession([
             'procurement.supplier_id' => $supplier->id,
-            'procurement.store_id'    => $branch->id,
+            'procurement.store_id' => $branch->id,
         ])
         ->get(route('procurement.items'))
         ->assertOk()
@@ -155,18 +155,18 @@ test('the confirm step names the branch before the order is placed', function ()
     $this->actingAs(User::find($vendor->user_id))
         ->withSession([
             'procurement.supplier_id' => $supplier->id,
-            'procurement.store_id'    => $branch->id,
-            'procurement.items'       => [[
-                'product_id'    => $product->id,
-                'barcode'       => null,
-                'quantity'      => 2,
-                'unit_cost'     => 500,
+            'procurement.store_id' => $branch->id,
+            'procurement.items' => [[
+                'product_id' => $product->id,
+                'barcode' => null,
+                'quantity' => 2,
+                'unit_cost' => 500,
                 'selling_price' => 1000,
             ]],
             // Same shape storeFinancials() puts there, reference_number included.
-            'procurement.financials'  => [
-                'payment_method'   => 'cash',
-                'amount_paid'      => '0',
+            'procurement.financials' => [
+                'payment_method' => 'cash',
+                'amount_paid' => '0',
                 'reference_number' => null,
             ],
         ])

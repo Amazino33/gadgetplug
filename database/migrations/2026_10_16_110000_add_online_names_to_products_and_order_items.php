@@ -61,7 +61,7 @@ return new class extends Migration
                     $shown = $product->source_product_id ? ($sources->get($product->source_product_id) ?? $product) : $product;
 
                     DB::table('order_items')->where('id', $item->id)->update([
-                        'product_name'         => $product->name,
+                        'product_name' => $product->name,
                         'product_display_name' => $shown->online_name ?: $shown->name,
                     ]);
                 }

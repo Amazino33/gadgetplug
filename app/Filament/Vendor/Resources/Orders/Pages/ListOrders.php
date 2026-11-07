@@ -90,7 +90,7 @@ class ListOrders extends ListRecords
     public function messageTemplatesFor(Order $order): array
     {
         $renderer = app(TemplateRenderer::class);
-        $context  = TemplateRenderer::contextForOrder($order, TemplateRenderer::AUDIENCE_CUSTOMER);
+        $context = TemplateRenderer::contextForOrder($order, TemplateRenderer::AUDIENCE_CUSTOMER);
 
         return MessageTemplate::query()
             ->where('vendor_id', filament()->getTenant()->id)
@@ -99,10 +99,10 @@ class ListOrders extends ListRecords
             ->orderBy('key')
             ->get()
             ->map(fn (MessageTemplate $template): array => [
-                'key'     => $template->key,
-                'label'   => Str::headline($template->key),
+                'key' => $template->key,
+                'label' => Str::headline($template->key),
                 'channel' => $template->channel,
-                'body'    => $renderer->render($template->body, $context),
+                'body' => $renderer->render($template->body, $context),
             ])
             ->values()
             ->all();
@@ -129,14 +129,14 @@ class ListOrders extends ListRecords
         }
 
         $message = DeliveryMessage::create([
-            'vendor_id'      => filament()->getTenant()->id,
-            'order_id'       => $order->id,
+            'vendor_id' => filament()->getTenant()->id,
+            'order_id' => $order->id,
             'recipient_type' => 'customer',
-            'channel'        => $channel,
-            'to_number'      => $order->customer_phone,
-            'body'           => $body,
-            'status'         => 'queued',
-            'sent_by'        => auth()->id(),
+            'channel' => $channel,
+            'to_number' => $order->customer_phone,
+            'body' => $body,
+            'status' => 'queued',
+            'sent_by' => auth()->id(),
         ]);
 
         $result = app(MessagingService::class)->send($message);
@@ -175,6 +175,7 @@ class ListOrders extends ListRecords
         if (filled($newStatus)) {
             if (! in_array($newStatus, array_column($this->statusOptionsFor($order), 'value'), true)) {
                 Notification::make()->title('That status change is not available for this order.')->danger()->send();
+
                 return;
             }
 
@@ -182,6 +183,7 @@ class ListOrders extends ListRecords
                 OrderStatusService::applyStoreStep($order, auth()->user(), $newStatus);
             } catch (InvalidOrderTransition|AuthorizationException $e) {
                 Notification::make()->title($e instanceof AuthorizationException ? 'Only staff of the store holding this order can update it.' : $e->getMessage())->danger()->send();
+
                 return;
             }
 
@@ -191,13 +193,14 @@ class ListOrders extends ListRecords
         if (filled($note)) {
             $order->notes()->create([
                 'vendor_id' => $order->items()->value('vendor_id'),
-                'user_id'   => auth()->id(),
-                'body'      => $note,
+                'user_id' => auth()->id(),
+                'body' => $note,
             ]);
         }
 
         if (! $statusChanged && blank($note)) {
             Notification::make()->title('Nothing to update — add a note or pick a new status.')->warning()->send();
+
             return;
         }
 

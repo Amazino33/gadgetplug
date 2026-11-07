@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Filament\Vendor\Resources\Suppliers;
 
 use App\Models\Supplier;
@@ -18,9 +19,12 @@ class SupplierResource extends Resource
 
     protected static ?string $tenantOwnershipRelationshipName = 'vendor';
 
-    protected static string|null|\BackedEnum $navigationIcon  = 'heroicon-o-truck';
-    protected static string|null|\UnitEnum  $navigationGroup = 'Procurement';
-    protected static ?string                $navigationLabel = 'Suppliers';
+    protected static string|null|\BackedEnum $navigationIcon = 'heroicon-o-truck';
+
+    protected static string|null|\UnitEnum $navigationGroup = 'Procurement';
+
+    protected static ?string $navigationLabel = 'Suppliers';
+
     protected static ?int $navigationSort = 1;
 
     public static function canAccess(): bool
@@ -29,8 +33,9 @@ class SupplierResource extends Resource
             return false;
         }
 
-        $user   = auth()->user();
+        $user = auth()->user();
         $vendor = filament()->getTenant();
+
         return $vendor && $user->hasVendorPermission($vendor->id, 'manage_procurement');
     }
 

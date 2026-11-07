@@ -21,10 +21,10 @@ class AffiliateApplicationInfolist
                     TextEntry::make('status')
                         ->badge()
                         ->color(fn ($state) => match ($state) {
-                            'pending'  => 'warning',
+                            'pending' => 'warning',
                             'approved' => 'success',
                             'rejected' => 'danger',
-                            default    => 'gray',
+                            default => 'gray',
                         }),
                 ]),
 

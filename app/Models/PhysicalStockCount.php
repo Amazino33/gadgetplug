@@ -8,6 +8,7 @@ use App\Support\Quantity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 use LogicException;
 
 /**
@@ -26,11 +27,11 @@ class PhysicalStockCount extends Model
 
     protected $casts = [
         'period_start' => 'datetime',
-        'period_end'   => 'datetime',
-        'counted_at'   => 'datetime',
-        'approved_at'  => 'datetime',
-        'adjusted_at'  => 'datetime',
-        'created_at'   => 'datetime',
+        'period_end' => 'datetime',
+        'counted_at' => 'datetime',
+        'approved_at' => 'datetime',
+        'adjusted_at' => 'datetime',
+        'created_at' => 'datetime',
     ];
 
     /** Counted and waiting on somebody else to sign it off. */
@@ -143,11 +144,11 @@ class PhysicalStockCount extends Model
             ->sum(fn (PhysicalStockCountLine $l) => $l->varianceAtSellingPrice());
 
         return [
-            'units'             => Quantity::of($units),
-            'value'             => round((float) $value, 2),
+            'units' => Quantity::of($units),
+            'value' => round((float) $value, 2),
             'missing_at_selling' => round((float) $atSelling, 2),
-            'lines_short'       => $lines->filter(fn ($l) => $l->variance() > 0)->count(),
-            'lines_over'        => $lines->filter(fn ($l) => $l->variance() < 0)->count(),
+            'lines_short' => $lines->filter(fn ($l) => $l->variance() > 0)->count(),
+            'lines_over' => $lines->filter(fn ($l) => $l->variance() < 0)->count(),
         ];
     }
 
@@ -157,22 +158,22 @@ class PhysicalStockCount extends Model
      * A total tells somebody there is a problem; this tells them which shelf to
      * go and look at.
      *
-     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
+     * @return Collection<int, array<string, mixed>>
      */
-    public function discrepancies(): \Illuminate\Support\Collection
+    public function discrepancies(): Collection
     {
         $lines = $this->relationLoaded('lines') ? $this->lines : $this->lines()->load('product');
 
         return $lines
             ->filter(fn (PhysicalStockCountLine $l) => $l->variance() !== 0)
             ->map(fn (PhysicalStockCountLine $l) => [
-                'product_id'   => $l->product_id,
-                'product'      => $l->product?->name ?? ('Product #' . $l->product_id),
-                'system'       => $l->system_quantity,
-                'counted'      => $l->counted_quantity,
-                'missing'      => $l->variance(),
-                'at_cost'      => $l->varianceValue(),
-                'at_selling'   => $l->varianceAtSellingPrice(),
+                'product_id' => $l->product_id,
+                'product' => $l->product?->name ?? ('Product #'.$l->product_id),
+                'system' => $l->system_quantity,
+                'counted' => $l->counted_quantity,
+                'missing' => $l->variance(),
+                'at_cost' => $l->varianceValue(),
+                'at_selling' => $l->varianceAtSellingPrice(),
             ])
             ->sortByDesc('missing')
             ->values();

@@ -17,7 +17,7 @@ class FinancialLedgerEntry extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'amount'      => 'decimal:2',
+        'amount' => 'decimal:2',
         'occurred_at' => 'date',
     ];
 

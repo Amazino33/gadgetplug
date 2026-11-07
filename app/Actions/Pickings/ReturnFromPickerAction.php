@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace App\Actions\Pickings;
 
-use App\Models\Picking;
-use App\Models\Vendor;
-use App\Support\Quantity;
 use App\Actions\Inventory\AdjustStockAction;
+use App\Models\Picking;
 use App\Models\PickingItem;
 use App\Models\PickingLedgerEntry;
+use App\Models\User;
+use App\Models\Vendor;
 use App\Services\Pickings\PickingLedger;
+use App\Support\Quantity;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -28,9 +29,7 @@ use RuntimeException;
  */
 class ReturnFromPickerAction
 {
-    public function __construct(private readonly AdjustStockAction $adjustStock)
-    {
-    }
+    public function __construct(private readonly AdjustStockAction $adjustStock) {}
 
     public function execute(
         PickingItem $item,
@@ -74,20 +73,20 @@ class ReturnFromPickerAction
 
             activity()
                 ->performedOn($product)
-                ->causedBy($userId ? \App\Models\User::find($userId) : null)
+                ->causedBy($userId ? User::find($userId) : null)
                 ->tap(fn ($activity) => $activity->store_id = $picking->store_id)
                 ->event('picking_returned')
                 ->withProperties(['picker' => $picking->picker->name, 'quantity' => $quantity])
                 ->log('Returned from picker');
 
             return PickingLedgerEntry::create([
-                'vendor_id'       => $picking->vendor_id,
+                'vendor_id' => $picking->vendor_id,
                 'picking_item_id' => $item->id,
-                'direction'       => PickingLedgerEntry::DIRECTION_RETURN,
-                'quantity'        => $quantity,
-                'amount'          => 0,
-                'user_id'         => $userId,
-                'note'            => $note,
+                'direction' => PickingLedgerEntry::DIRECTION_RETURN,
+                'quantity' => $quantity,
+                'amount' => 0,
+                'user_id' => $userId,
+                'note' => $note,
             ]);
         });
     }

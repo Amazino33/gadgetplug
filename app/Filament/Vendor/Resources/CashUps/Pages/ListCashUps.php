@@ -7,11 +7,13 @@ use App\Actions\CashUp\RecordRectificationAction;
 use App\Filament\Vendor\Resources\CashUps\CashUpResource;
 use App\Filament\Vendor\Resources\CashUps\Widgets\MissingEndOfDaysWidget;
 use App\Models\CashUpRectification;
-use App\Models\PosSession;
 use App\Models\PosSale;
+use App\Models\PosSession;
+use App\Models\Store;
 use App\Services\ActiveStore;
 use App\Support\Pos\BusinessDate;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -39,7 +41,7 @@ class ListCashUps extends ListRecords
     public function getSubheading(): ?HtmlString
     {
         $storeId = ActiveStore::currentId();
-        $store = $storeId ? \App\Models\Store::find($storeId) : null;
+        $store = $storeId ? Store::find($storeId) : null;
         $vendor = filament()->getTenant();
 
         if ($store) {
@@ -50,7 +52,7 @@ class ListCashUps extends ListRecords
             // resolves a branch, so without saying this the answer is invisible
             // and a shortage at another branch would simply never be looked at.
             $others = $vendor
-                ? \App\Models\Store::query()->forVendor($vendor->id)->where('id', '!=', $store->id)->count()
+                ? Store::query()->forVendor($vendor->id)->where('id', '!=', $store->id)->count()
                 : 0;
 
             if ($others > 0) {
@@ -98,15 +100,15 @@ class ListCashUps extends ListRecords
                         Tables\Columns\TextColumn::make('status')
                             ->badge()
                             ->formatStateUsing(fn (string $state) => match ($state) {
-                                PosSession::STATUS_OPEN            => 'Still open',
-                                PosSession::STATUS_PENDING_REVIEW  => 'Waiting for review',
-                                PosSession::STATUS_APPROVED        => 'Approved',
-                                default                               => $state,
+                                PosSession::STATUS_OPEN => 'Still open',
+                                PosSession::STATUS_PENDING_REVIEW => 'Waiting for review',
+                                PosSession::STATUS_APPROVED => 'Approved',
+                                default => $state,
                             })
                             ->color(fn (string $state) => match ($state) {
-                                PosSession::STATUS_APPROVED       => 'success',
+                                PosSession::STATUS_APPROVED => 'success',
                                 PosSession::STATUS_PENDING_REVIEW => 'warning',
-                                default                              => 'gray',
+                                default => 'gray',
                             }),
                     ]),
 
@@ -123,14 +125,14 @@ class ListCashUps extends ListRecords
                     Tables\Columns\Layout\Stack::make([
                         Tables\Columns\TextColumn::make('counted_cash')
                             ->label('Cash Drawer')
-                            ->formatStateUsing(fn ($state) => 'Counted: ₦' . number_format((float) $state, 2))
+                            ->formatStateUsing(fn ($state) => 'Counted: ₦'.number_format((float) $state, 2))
                             ->description(fn (PosSession $r) => $r->expected_cash !== null
                                 ? 'Expected ₦'.number_format((float) $r->expected_cash, 2)
                                 : null),
 
                         Tables\Columns\TextColumn::make('cash_variance')
                             ->label('Cash difference')
-                            ->formatStateUsing(fn ($state) => 'Cash diff: ₦' . number_format((float) $state, 2))
+                            ->formatStateUsing(fn ($state) => 'Cash diff: ₦'.number_format((float) $state, 2))
                             ->weight('bold')
                             ->color(fn ($state) => static::varianceColour((float) $state))
                             ->description(fn (PosSession $r) => $r->countsSubmitted()
@@ -140,7 +142,7 @@ class ListCashUps extends ListRecords
 
                         Tables\Columns\TextColumn::make('terminal_variance')
                             ->label('Terminal difference')
-                            ->formatStateUsing(fn ($state) => 'Term diff: ₦' . number_format((float) $state, 2))
+                            ->formatStateUsing(fn ($state) => 'Term diff: ₦'.number_format((float) $state, 2))
                             ->color(fn ($state) => static::varianceColour((float) $state))
                             ->description(fn (PosSession $r) => $r->countsSubmitted()
                                 && abs($r->resolvedTerminalVariance() - (float) $r->terminal_variance) > 0.009
@@ -153,8 +155,8 @@ class ListCashUps extends ListRecords
                 Tables\Filters\SelectFilter::make('status')
                     ->options([
                         PosSession::STATUS_PENDING_REVIEW => 'Waiting for review',
-                        PosSession::STATUS_APPROVED       => 'Approved',
-                        PosSession::STATUS_OPEN           => 'Still open',
+                        PosSession::STATUS_APPROVED => 'Approved',
+                        PosSession::STATUS_OPEN => 'Still open',
                     ])
                     ->default(PosSession::STATUS_PENDING_REVIEW),
 
@@ -179,16 +181,16 @@ class ListCashUps extends ListRecords
                             ->orWhere('terminal_variance', '!=', 0))),
             ])
             ->recordActions([
-                \Filament\Actions\ActionGroup::make([
+                ActionGroup::make([
                     $this->detailsAction(),
                     $this->rectifyAction(),
                 ])
-                ->label('Review')
-                ->button()
-                ->outlined()
-                ->color('gray')
-                ->icon('heroicon-m-chevron-down')
-                ->iconPosition('after'),
+                    ->label('Review')
+                    ->button()
+                    ->outlined()
+                    ->color('gray')
+                    ->icon('heroicon-m-chevron-down')
+                    ->iconPosition('after'),
 
                 $this->approveAction(),
             ])
@@ -231,10 +233,10 @@ class ListCashUps extends ListRecords
                 Select::make('kind')
                     ->label('What happened')
                     ->options([
-                        CashUpRectification::KIND_EXPENSE        => 'Money was spent out of the drawer',
-                        CashUpRectification::KIND_CASH_OUT       => 'Cash was handed to someone',
+                        CashUpRectification::KIND_EXPENSE => 'Money was spent out of the drawer',
+                        CashUpRectification::KIND_CASH_OUT => 'Cash was handed to someone',
                         CashUpRectification::KIND_TENDER_RECLASS => 'A sale was rung on the wrong tender',
-                        CashUpRectification::KIND_DEBT_PAID      => 'A credit sale was actually paid',
+                        CashUpRectification::KIND_DEBT_PAID => 'A credit sale was actually paid',
                     ])
                     ->required()
                     ->live(),

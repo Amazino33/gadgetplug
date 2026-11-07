@@ -29,8 +29,8 @@ uses(RefreshDatabase::class);
 function tbiVendor(): array
 {
     $vendor = Vendor::create([
-        'user_id'                => User::factory()->create()->id,
-        'name'                   => 'Branch Identity '.uniqid(),
+        'user_id' => User::factory()->create()->id,
+        'name' => 'Branch Identity '.uniqid(),
         'pos_min_margin_percent' => 0,
     ]);
 
@@ -55,35 +55,35 @@ function tbiMember(Vendor $vendor, array $stores = [], ?string $pin = null): Use
 function tbiProduct(Vendor $vendor, Store $home, int $qty): Product
 {
     return Product::create([
-        'vendor_id'      => $vendor->id,
-        'store_id'       => $home->id,
-        'category_id'    => Category::create(['name' => 'Cat '.uniqid()])->id,
-        'name'           => 'NOKIA 2720 FLIP '.uniqid(),
-        'sku'            => 'SKU-'.strtoupper(uniqid()),
-        'price'          => 1000,
-        'cost_price'     => 400,
+        'vendor_id' => $vendor->id,
+        'store_id' => $home->id,
+        'category_id' => Category::create(['name' => 'Cat '.uniqid()])->id,
+        'name' => 'NOKIA 2720 FLIP '.uniqid(),
+        'sku' => 'SKU-'.strtoupper(uniqid()),
+        'price' => 1000,
+        'cost_price' => 400,
         'stock_quantity' => $qty,
-        'status'         => 'published',
-        'show_in_pos'    => true,
+        'status' => 'published',
+        'show_in_pos' => true,
     ]);
 }
 
 function tbiSale(Product $product, array $extra = []): array
 {
     return array_merge([
-        'offline_id'      => 'OFF-'.uniqid(),
-        'items'           => [[
-            'product_id'   => $product->id,
+        'offline_id' => 'OFF-'.uniqid(),
+        'items' => [[
+            'product_id' => $product->id,
             'product_name' => $product->name,
-            'unit_price'   => 1000,
-            'quantity'     => 1,
-            'total'        => 1000,
+            'unit_price' => 1000,
+            'quantity' => 1,
+            'total' => 1000,
         ]],
-        'payment_method'  => 'cash',
-        'total'           => 1000,
-        'vat_amount'      => 0,
+        'payment_method' => 'cash',
+        'total' => 1000,
+        'vat_amount' => 0,
         'amount_tendered' => 1000,
-        'completed_at'    => now()->toIso8601String(),
+        'completed_at' => now()->toIso8601String(),
     ], $extra);
 }
 
@@ -183,7 +183,7 @@ describe('the branch is fixed when the till signs in', function () {
 
     test('the bound branch decides what the till sells from', function () {
         [$vendor, $default, $phones] = tbiVendor();
-        $atPhones  = tbiProduct($vendor, $phones, 5);
+        $atPhones = tbiProduct($vendor, $phones, 5);
         $atDefault = tbiProduct($vendor, $default, 5);
 
         Sanctum::actingAs(tbiMember($vendor, [$default, $phones]), ['pos', 'pos-store:'.$phones->id]);
@@ -226,8 +226,8 @@ describe('the branch is fixed when the till signs in', function () {
 
     test('a sale rung by another cashier is not synced under this login', function () {
         [$vendor, , $phones] = tbiVendor();
-        $product  = tbiProduct($vendor, $phones, 10);
-        $rungBy   = tbiMember($vendor, [$phones]);
+        $product = tbiProduct($vendor, $phones, 10);
+        $rungBy = tbiMember($vendor, [$phones]);
         $syncedBy = tbiMember($vendor, [$phones]);
         Sanctum::actingAs($syncedBy, ['pos']);
 

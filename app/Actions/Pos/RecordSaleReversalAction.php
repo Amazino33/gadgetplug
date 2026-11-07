@@ -33,9 +33,9 @@ class RecordSaleReversalAction
         }
 
         return $this->record(
-            sale:   $sale,
-            actor:  $actor,
-            type:   PosSaleReversal::TYPE_VOID,
+            sale: $sale,
+            actor: $actor,
+            type: PosSaleReversal::TYPE_VOID,
             amount: (float) $sale->total,
             reason: $reason,
             expect: ['completed'],
@@ -46,9 +46,9 @@ class RecordSaleReversalAction
     public function forReturn(PosSale $sale, User $actor, PosReturn $return, bool $fullyReturned, ?string $reason = null): PosSaleReversal
     {
         return $this->record(
-            sale:   $sale,
-            actor:  $actor,
-            type:   $fullyReturned ? PosSaleReversal::TYPE_RETURN_FULL : PosSaleReversal::TYPE_RETURN_PARTIAL,
+            sale: $sale,
+            actor: $actor,
+            type: $fullyReturned ? PosSaleReversal::TYPE_RETURN_FULL : PosSaleReversal::TYPE_RETURN_PARTIAL,
             amount: (float) $return->refund_amount,
             reason: $reason ?: "Return {$return->reference}",
             expect: ['completed', 'partial_refund'],
@@ -84,16 +84,16 @@ class RecordSaleReversalAction
             $to = PosSaleReversal::STATUS_FOR_TYPE[$type];
 
             $reversal = PosSaleReversal::create([
-                'vendor_id'    => $row->vendor_id,
-                'store_id'     => $row->store_id,
-                'pos_sale_id'  => $row->id,
-                'type'         => $type,
-                'from_status'  => $row->status,
-                'to_status'    => $to,
-                'amount'       => round($amount, 2),
-                'reason'       => $reason,
-                'source_type'  => $source ? $source->getMorphClass() : null,
-                'source_id'    => $source?->getKey(),
+                'vendor_id' => $row->vendor_id,
+                'store_id' => $row->store_id,
+                'pos_sale_id' => $row->id,
+                'type' => $type,
+                'from_status' => $row->status,
+                'to_status' => $to,
+                'amount' => round($amount, 2),
+                'reason' => $reason,
+                'source_type' => $source ? $source->getMorphClass() : null,
+                'source_id' => $source?->getKey(),
                 'performed_by' => $actor->id,
             ]);
 

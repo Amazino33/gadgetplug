@@ -12,7 +12,7 @@ class Supplier extends Model
 {
     use LogsActivity;
 
-    protected $fillable = ['vendor_id', 'name', 'phone', 'email', 'address', 'notes', 'location', 'rating', 'avg_delivery_days',];
+    protected $fillable = ['vendor_id', 'name', 'phone', 'email', 'address', 'notes', 'location', 'rating', 'avg_delivery_days'];
 
     public function vendor(): BelongsTo
     {
@@ -30,6 +30,6 @@ class Supplier extends Model
             ->logOnly(['name', 'phone', 'email', 'address', 'notes'])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
-            ->setDescriptionForEvent(fn (string $event) => 'Supplier ' . $event);
+            ->setDescriptionForEvent(fn (string $event) => 'Supplier '.$event);
     }
 }

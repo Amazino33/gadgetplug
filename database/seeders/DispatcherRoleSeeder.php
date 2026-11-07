@@ -31,9 +31,9 @@ class DispatcherRoleSeeder extends Seeder
             Permission::firstOrCreate(['name' => self::PERMISSION, 'guard_name' => 'web']);
 
             Role::firstOrCreate([
-                'name'       => self::ROLE,
+                'name' => self::ROLE,
                 'guard_name' => 'web',
-                'team_id'    => null,
+                'team_id' => null,
             ])->givePermissionTo(self::PERMISSION);
         } finally {
             setPermissionsTeamId($previousTeam);
