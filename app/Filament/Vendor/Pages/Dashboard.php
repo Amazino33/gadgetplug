@@ -18,6 +18,14 @@ class Dashboard extends \Filament\Pages\Dashboard
 
     public function content(Schema $schema): Schema
     {
+        // A free (self-signup) shop has no till, purchases or reports, so the
+        // sales widgets would be empty boxes. It gets its own simple home.
+        if (filament()->getTenant()?->isFreePlan()) {
+            return $schema->components([
+                \Filament\Schemas\Components\View::make('filament.vendor.free-shop-home'),
+            ]);
+        }
+
         return $schema
             ->components([
                 Livewire::make(HomeDashboard::class),

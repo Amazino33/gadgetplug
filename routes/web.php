@@ -100,6 +100,32 @@ Route::get('/affiliate/join', function () {
     return view('pages.affiliate-join');
 })->name('affiliate.join');
 
+
+// The free plan: a small business signs itself up, is reviewed by the
+// platform admin, and gets a shop link. Rate limits are named limiters
+// (AppServiceProvider) so the link check and the submit keep separate counts.
+Route::get('/become-a-vendor', [App\Http\Controllers\FreeShopSignupController::class, 'create'])
+    ->name('free-shop.create');
+Route::post('/become-a-vendor', [App\Http\Controllers\FreeShopSignupController::class, 'store'])
+    ->middleware('throttle:free-shop-signup')
+    ->name('free-shop.store');
+Route::get('/become-a-vendor/check-link', [App\Http\Controllers\FreeShopSignupController::class, 'checkSlug'])
+    ->middleware('throttle:free-shop-slug-check')
+    ->name('free-shop.check-slug');
+
+Route::middleware('auth')->group(function () {
+    Route::get('/my-shop/application', [App\Http\Controllers\FreeShopApplicationController::class, 'edit'])
+        ->name('free-shop.application.edit');
+    Route::put('/my-shop/application', [App\Http\Controllers\FreeShopApplicationController::class, 'update'])
+        ->middleware('throttle:free-shop-signup')
+        ->name('free-shop.application.update');
+
+    // Platform admin only (checked in the controller). Bound by id: the
+    // reviewer's link must not change if the shop's link name does.
+    Route::get('/platform/free-shops/{vendor:id}/verification-photo', App\Http\Controllers\FreeShopVerificationPhotoController::class)
+        ->name('free-shop.verification-photo');
+});
+
 Route::redirect('/dashboard', '/account')->name('dashboard');
 
 Route::middleware(['auth'])->prefix('account')->group(function () {
@@ -138,6 +164,11 @@ Route::get('/sales-point/{vendor:slug}', function (Vendor $vendor) {
     // for a PIN it is going to refuse anyway.
     if ($vendor->isDashboardBlocked() && ! auth()->user()?->isSuperAdmin()) {
         return response()->view('vendor.blocked', ['vendor' => $vendor], 403);
+    }
+
+    // A free (self-signup) shop has no till; back to its own panel.
+    if ($vendor->isFreePlan() && ! auth()->user()?->isSuperAdmin()) {
+        return redirect()->to(route('filament.vendor.pages.dashboard', ['tenant' => $vendor]));
     }
 
     return view('pos.index', [

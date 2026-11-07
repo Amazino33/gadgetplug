@@ -85,6 +85,9 @@ class VendorPanelProvider extends PanelProvider
             // a page that was already open.
             ->tenantMiddleware([
                 EnsureUserBelongsToVendor::class,
+                // After the membership/block check. A no-op for every vendor
+                // that is not on the free (self-signup) plan.
+                \App\Http\Middleware\EnforceFreePlan::class,
             ], isPersistent: true)
             ->tenant(Vendor::class, slugAttribute: 'slug', ownershipRelationship: 'vendors')
             // No ->icon() on the groups: Filament refuses to render a sidebar
@@ -150,6 +153,13 @@ class VendorPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::BODY_END,
                 fn () => Blade::render('<x-barcode-scanner />'),
+            )
+            // The review banner on every page of a free shop's panel: under
+            // review, more info asked for, or live. Renders nothing for paid
+            // vendors.
+            ->renderHook(
+                PanelsRenderHook::CONTENT_START,
+                fn() => view('filament.vendor.partials.free-shop-banner', ['vendor' => filament()->getTenant()]),
             )
             // driver.js and the tour registry, scoped to this panel. Deliberately
             // not in resources/js/app.js: that bundle is shared with the

@@ -226,7 +226,9 @@ class ListProducts extends ListRecords
                 ->label('Import')
                 ->icon('heroicon-o-arrow-up-tray')
                 ->color('gray')
-                ->visible(fn (): bool => static::canBulkMove('import_products'))
+                // Not offered on the free plan: the import page is outside it,
+                // and a spreadsheet of hundreds would only run into the cap.
+                ->visible(fn (): bool => static::canBulkMove('import_products') && ! filament()->getTenant()?->isFreePlan())
                 ->url(fn (): string => ImportProducts::getUrl()),
 
             CreateAction::make()

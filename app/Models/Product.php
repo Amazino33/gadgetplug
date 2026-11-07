@@ -180,6 +180,13 @@ class Product extends Model implements HasMedia
 
     protected static function booted(): void
     {
+        // The free plan's product cap, held here so no path that creates a
+        // product (form, import, duplicate) can step past it. Paid vendors
+        // are never limited.
+        static::creating(function (Product $product) {
+            \App\Services\FreePlan\FreePlanLimits::assertCanAddProduct($product->vendor_id);
+        });
+
         // Every product ends up with a SKU. Filled in when blank - on create,
         // and on any later save that blanked it - rather than only in the form,
         // because imports, seeders and linked listings create products too.

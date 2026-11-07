@@ -48,6 +48,11 @@ class ProcurementWizardController extends Controller
             abort(response()->view('vendor.blocked', ['vendor' => $vendor], 403));
         }
 
+        // Procurement is not part of the free (self-signup) plan.
+        if ($vendor->isFreePlan() && ! $user->isSuperAdmin()) {
+            abort(redirect()->to(route('filament.vendor.pages.dashboard', ['tenant' => $vendor])));
+        }
+
         return $vendor;
     }
 

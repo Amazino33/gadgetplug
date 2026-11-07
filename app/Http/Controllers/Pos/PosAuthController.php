@@ -47,6 +47,14 @@ class PosAuthController extends Controller
             ], 403);
         }
 
+        // A free (self-signup) shop has no till at all.
+        if ($vendor?->isFreePlan() && ! $user->isSuperAdmin()) {
+            return response()->json([
+                'message' => \App\Models\Vendor::FREE_PLAN_NO_TILL,
+                'blocked' => true,
+            ], 403);
+        }
+
         // The branch this till is standing in, settled before a token exists.
         // It is written onto the token, so every request the till makes — and
         // every sale it rings — belongs to that branch without the server

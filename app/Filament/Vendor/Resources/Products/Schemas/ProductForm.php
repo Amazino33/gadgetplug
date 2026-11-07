@@ -816,7 +816,10 @@ class ProductForm
                 ->reorderable()
                 ->image()
                 ->imageEditor()
-                ->maxFiles(8)
+                // Free shops get the plan's photo allowance; everyone else keeps 8.
+                ->maxFiles(fn (): int => filament()->getTenant()?->isFreePlan()
+                    ? \App\Models\FreePlanSetting::photosPerProduct()
+                    : 8)
                 ->panelLayout('grid')
                 ->columnSpanFull()
                 // Only the one photo targeted by "Enhance with AI" (tracked by
