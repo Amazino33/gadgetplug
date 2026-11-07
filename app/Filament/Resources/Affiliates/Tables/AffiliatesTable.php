@@ -29,14 +29,14 @@ class AffiliatesTable
 
                 TextColumn::make('pending_balance')
                     ->label('Pending')
-                    ->getStateUsing(fn (Affiliate $record) => '₦' . number_format(
+                    ->getStateUsing(fn (Affiliate $record) => '₦'.number_format(
                         app(WalletService::class)->pendingBalance($record->id), 2
                     )),
 
                 TextColumn::make('available_balance')
                     ->label('Available')
                     ->weight('bold')
-                    ->getStateUsing(fn (Affiliate $record) => '₦' . number_format(
+                    ->getStateUsing(fn (Affiliate $record) => '₦'.number_format(
                         app(WalletService::class)->availableBalance($record->id), 2
                     )),
 
@@ -53,9 +53,9 @@ class AffiliatesTable
                     ->label('Engaged Visits')
                     ->alignCenter()
                     ->getStateUsing(fn (Affiliate $record) => $record->clicks()->engaged()->count())
-                    ->description(fn (Affiliate $record) => '₦' . number_format(
+                    ->description(fn (Affiliate $record) => '₦'.number_format(
                         (float) $record->clicks()->sum('reward_amount'), 2
-                    ) . ' earned')
+                    ).' earned')
                     ->toggleable(),
 
                 IconColumn::make('is_active')->label('Active')->boolean(),

@@ -21,6 +21,7 @@ use App\Services\Delivery\DeliveryDistance;
 class OrderLocation
 {
     public const EXACT = 'exact';
+
     public const APPROXIMATE = 'approximate';
 
     /** @return array{lat: float, lng: float, name: string}|null */
@@ -30,8 +31,8 @@ class OrderLocation
             ->first(fn (Store $s) => $s->latitude !== null && $s->longitude !== null);
 
         return $store ? [
-            'lat'  => (float) $store->latitude,
-            'lng'  => (float) $store->longitude,
+            'lat' => (float) $store->latitude,
+            'lng' => (float) $store->longitude,
             'name' => trim(($store->vendor?->name ? $store->vendor->name.' — ' : '').$store->name),
         ] : null;
     }
@@ -43,10 +44,10 @@ class OrderLocation
 
         if ($checkout?->customer_latitude !== null && $checkout?->customer_longitude !== null) {
             return [
-                'lat'       => (float) $checkout->customer_latitude,
-                'lng'       => (float) $checkout->customer_longitude,
+                'lat' => (float) $checkout->customer_latitude,
+                'lng' => (float) $checkout->customer_longitude,
                 'precision' => self::EXACT,
-                'label'     => 'Customer\'s shared location',
+                'label' => 'Customer\'s shared location',
             ];
         }
 
@@ -54,10 +55,10 @@ class OrderLocation
 
         if ($lga && $lga->latitude !== null && $lga->longitude !== null) {
             return [
-                'lat'       => (float) $lga->latitude,
-                'lng'       => (float) $lga->longitude,
+                'lat' => (float) $lga->latitude,
+                'lng' => (float) $lga->longitude,
                 'precision' => self::APPROXIMATE,
-                'label'     => 'Approximate (LGA centre) — '.$lga->name,
+                'label' => 'Approximate (LGA centre) — '.$lga->name,
             ];
         }
 
@@ -122,9 +123,9 @@ class OrderLocation
     public function mapData(Order $order): array
     {
         return [
-            'store'      => $this->store($order),
-            'customer'   => $this->customer($order),
-            'km'         => $this->km($order),
+            'store' => $this->store($order),
+            'customer' => $this->customer($order),
+            'km' => $this->km($order),
             'directions' => $this->directionsUrl($order),
         ];
     }

@@ -29,9 +29,9 @@ class TaskSubmissionsRelationManager extends RelationManager
                     ->formatStateUsing(fn ($state) => ucfirst($state))
                     ->color(fn ($state) => match ($state) {
                         'submitted' => 'warning',
-                        'approved'  => 'success',
-                        'rejected'  => 'danger',
-                        default     => 'gray',
+                        'approved' => 'success',
+                        'rejected' => 'danger',
+                        default => 'gray',
                     }),
 
                 TextColumn::make('submitted_at')->label('Submitted')->dateTime('d M Y, g:ia')->sortable(),

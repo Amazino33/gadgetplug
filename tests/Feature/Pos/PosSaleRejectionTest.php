@@ -19,24 +19,24 @@ function rejectionContext(array $productAttributes = []): array
     $owner = User::factory()->create();
 
     $vendor = Vendor::create([
-        'user_id'                => $owner->id,
-        'name'                   => 'Rejection Test Store',
+        'user_id' => $owner->id,
+        'name' => 'Rejection Test Store',
         'pos_min_margin_percent' => 0,
     ]);
 
     $category = Category::create(['name' => 'Powerbanks']);
 
     $product = Product::create(array_merge([
-        'vendor_id'                => $vendor->id,
-        'category_id'              => $category->id,
-        'name'                     => 'Powerbank 20000mAh',
-        'price'                    => 8000,
-        'cost_price'               => 5000,
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'Powerbank 20000mAh',
+        'price' => 8000,
+        'cost_price' => 5000,
         'allow_pos_price_override' => false,
-        'stock_quantity'           => 1,
-        'reserved_stock'           => 0,
-        'status'                   => 'published',
-        'show_in_pos'              => true,
+        'stock_quantity' => 1,
+        'reserved_stock' => 0,
+        'status' => 'published',
+        'show_in_pos' => true,
     ], $productAttributes));
 
     return ['owner' => $owner, 'vendor' => $vendor, 'product' => $product];
@@ -48,15 +48,15 @@ it('rejects a sale for more stock than is on the shelf with a clear message, not
 
     $response = $this->postJson('/api/pos/sales', [
         'vendor_id' => $context['vendor']->id,
-        'items'     => [[
-            'product_id'   => $context['product']->id,
+        'items' => [[
+            'product_id' => $context['product']->id,
             'product_name' => 'Powerbank 20000mAh',
-            'unit_price'   => 8000,
-            'quantity'     => 5,
+            'unit_price' => 8000,
+            'quantity' => 5,
         ]],
-        'payment_method'  => 'cash',
+        'payment_method' => 'cash',
         'amount_tendered' => 40000,
-        'vat_rate'        => 0,
+        'vat_rate' => 0,
     ]);
 
     $response->assertStatus(422)
@@ -70,15 +70,15 @@ it('never persists a sale, sale item, or ledger row when the sale is rejected', 
 
     $this->postJson('/api/pos/sales', [
         'vendor_id' => $context['vendor']->id,
-        'items'     => [[
-            'product_id'   => $context['product']->id,
+        'items' => [[
+            'product_id' => $context['product']->id,
             'product_name' => 'Powerbank 20000mAh',
-            'unit_price'   => 8000,
-            'quantity'     => 5,
+            'unit_price' => 8000,
+            'quantity' => 5,
         ]],
-        'payment_method'  => 'cash',
+        'payment_method' => 'cash',
         'amount_tendered' => 40000,
-        'vat_rate'        => 0,
+        'vat_rate' => 0,
     ]);
 
     expect(PosSale::count())->toBe(0)
@@ -92,15 +92,15 @@ it('still completes a sale that stock genuinely covers', function () {
 
     $response = $this->postJson('/api/pos/sales', [
         'vendor_id' => $context['vendor']->id,
-        'items'     => [[
-            'product_id'   => $context['product']->id,
+        'items' => [[
+            'product_id' => $context['product']->id,
             'product_name' => 'Powerbank 20000mAh',
-            'unit_price'   => 8000,
-            'quantity'     => 2,
+            'unit_price' => 8000,
+            'quantity' => 2,
         ]],
-        'payment_method'  => 'cash',
+        'payment_method' => 'cash',
         'amount_tendered' => 20000,
-        'vat_rate'        => 0,
+        'vat_rate' => 0,
     ]);
 
     $response->assertSuccessful();
@@ -119,18 +119,18 @@ it('completes a plain cash sale when payments is explicitly sent as null, matchi
 
     $response = $this->postJson('/api/pos/sales', [
         'vendor_id' => $context['vendor']->id,
-        'items'     => [[
-            'product_id'   => $context['product']->id,
+        'items' => [[
+            'product_id' => $context['product']->id,
             'product_name' => 'Powerbank 20000mAh',
-            'unit_price'   => 8000,
-            'quantity'     => 1,
+            'unit_price' => 8000,
+            'quantity' => 1,
         ]],
-        'payment_method'          => 'cash',
-        'amount_tendered'         => 8000,
-        'vat_rate'                => 0,
-        'discount_approved_by'    => null,
+        'payment_method' => 'cash',
+        'amount_tendered' => 8000,
+        'vat_rate' => 0,
+        'discount_approved_by' => null,
         'bank_transfer_reference' => null,
-        'payments'                => null,
+        'payments' => null,
     ]);
 
     $response->assertSuccessful();
@@ -144,19 +144,19 @@ it('accepts a split-payment sale through the offline sync endpoint', function ()
 
     $response = $this->postJson('/api/pos/sync', [
         'vendor_id' => $context['vendor']->id,
-        'sales'     => [[
-            'offline_id'     => 'split-offline-1',
-            'items'          => [[
-                'product_id'   => $context['product']->id,
+        'sales' => [[
+            'offline_id' => 'split-offline-1',
+            'items' => [[
+                'product_id' => $context['product']->id,
                 'product_name' => 'Powerbank 20000mAh',
-                'unit_price'   => 8000,
-                'quantity'     => 1,
-                'total'        => 8000,
+                'unit_price' => 8000,
+                'quantity' => 1,
+                'total' => 8000,
             ]],
             'payment_method' => 'split',
-            'total'          => 8000,
-            'completed_at'   => now()->toDateTimeString(),
-            'payments'       => [
+            'total' => 8000,
+            'completed_at' => now()->toDateTimeString(),
+            'payments' => [
                 ['method' => 'cash', 'amount' => 3000],
                 ['method' => 'card', 'amount' => 5000],
             ],
@@ -180,19 +180,19 @@ it('syncs a queued plain cash sale when payments is explicitly null in the offli
 
     $response = $this->postJson('/api/pos/sync', [
         'vendor_id' => $context['vendor']->id,
-        'sales'     => [[
-            'offline_id'     => 'cash-offline-1',
-            'items'          => [[
-                'product_id'   => $context['product']->id,
+        'sales' => [[
+            'offline_id' => 'cash-offline-1',
+            'items' => [[
+                'product_id' => $context['product']->id,
                 'product_name' => 'Powerbank 20000mAh',
-                'unit_price'   => 8000,
-                'quantity'     => 1,
-                'total'        => 8000,
+                'unit_price' => 8000,
+                'quantity' => 1,
+                'total' => 8000,
             ]],
             'payment_method' => 'cash',
-            'total'          => 8000,
-            'completed_at'   => now()->toDateTimeString(),
-            'payments'       => null,
+            'total' => 8000,
+            'completed_at' => now()->toDateTimeString(),
+            'payments' => null,
         ]],
     ]);
 

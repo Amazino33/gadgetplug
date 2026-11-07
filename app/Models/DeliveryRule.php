@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Naira;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use InvalidArgumentException;
@@ -22,22 +23,24 @@ class DeliveryRule extends Model
 {
     use LogsActivity;
 
-    public const FREE          = 'free';
-    public const FEE           = 'fee';
+    public const FREE = 'free';
+
+    public const FEE = 'fee';
+
     public const NOT_DELIVERED = 'not_delivered';
 
     public const MODES = [self::FREE, self::FEE, self::NOT_DELIVERED];
 
     public const LABELS = [
-        self::FREE          => 'Free',
-        self::FEE           => 'Fee',
+        self::FREE => 'Free',
+        self::FEE => 'Fee',
         self::NOT_DELIVERED => 'Not delivered',
     ];
 
     /** Filament colours: the same green / amber / grey as the delivery map's dots. */
     public const COLORS = [
-        self::FREE          => 'success',
-        self::FEE           => 'warning',
+        self::FREE => 'success',
+        self::FEE => 'warning',
         self::NOT_DELIVERED => 'gray',
     ];
 
@@ -45,7 +48,7 @@ class DeliveryRule extends Model
     public static function describe(?string $mode, float|int|string|null $fee = null): string
     {
         return $mode === self::FEE
-            ? \App\Support\Naira::format($fee)
+            ? Naira::format($fee)
             : (self::LABELS[$mode] ?? self::LABELS[self::NOT_DELIVERED]);
     }
 
@@ -127,8 +130,8 @@ class DeliveryRule extends Model
     private static function clean(array $values): array
     {
         return [
-            'mode'          => $values['mode'],
-            'fee'           => filled($values['fee'] ?? null) ? round((float) $values['fee'], 2) : 0,
+            'mode' => $values['mode'],
+            'fee' => filled($values['fee'] ?? null) ? round((float) $values['fee'], 2) : 0,
             'expected_cost' => filled($values['expected_cost'] ?? null) ? round((float) $values['expected_cost'], 2) : null,
             'delivery_days' => filled($values['delivery_days'] ?? null) ? trim((string) $values['delivery_days']) : null,
         ];

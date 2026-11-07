@@ -11,15 +11,16 @@ use Filament\Schemas\Schema;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use UnitEnum;
 
 class AffiliateLevelResource extends Resource
 {
     protected static ?string $model = AffiliateLevel::class;
 
-    protected static string|null|BackedEnum $navigationIcon  = 'heroicon-o-arrow-trending-up';
-    protected static ?string                $navigationLabel = 'Levels';
-    protected static ?int                   $navigationSort  = 2;
+    protected static string|null|BackedEnum $navigationIcon = 'heroicon-o-arrow-trending-up';
+
+    protected static ?string $navigationLabel = 'Levels';
+
+    protected static ?int $navigationSort = 2;
 
     public static function getNavigationGroup(): ?string
     {
@@ -57,9 +58,9 @@ class AffiliateLevelResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index'  => Pages\ListAffiliateLevels::route('/'),
+            'index' => Pages\ListAffiliateLevels::route('/'),
             'create' => Pages\CreateAffiliateLevel::route('/create'),
-            'edit'   => Pages\EditAffiliateLevel::route('/{record}/edit'),
+            'edit' => Pages\EditAffiliateLevel::route('/{record}/edit'),
         ];
     }
 }

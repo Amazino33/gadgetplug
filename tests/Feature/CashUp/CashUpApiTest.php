@@ -1,8 +1,12 @@
 <?php
 
-use App\Models\PosSession;
+use App\Exceptions\TillBranchUnclear;
+use App\Models\CashUpRectification;
 use App\Models\PosSale;
+use App\Models\PosSession;
+use App\Models\Store;
 use App\Models\User;
+use App\Models\Vendor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
@@ -26,28 +30,28 @@ function apiSale(array $ctx, array $over = []): PosSale
     $total = $over['total'] ?? 10000;
 
     return PosSale::create(array_merge([
-        'reference'       => 'POS-'.Str::random(10),
-        'vendor_id'       => $ctx['vendor']->id,
-        'store_id'        => $ctx['store']->id,
-        'cashier_id'      => $ctx['cashier']->id,
-        'subtotal'        => $total,
+        'reference' => 'POS-'.Str::random(10),
+        'vendor_id' => $ctx['vendor']->id,
+        'store_id' => $ctx['store']->id,
+        'cashier_id' => $ctx['cashier']->id,
+        'subtotal' => $total,
         'discount_amount' => 0,
-        'vat_amount'      => 0,
-        'total'           => $total,
-        'payment_method'  => 'cash',
+        'vat_amount' => 0,
+        'total' => $total,
+        'payment_method' => 'cash',
         'amount_tendered' => $total,
-        'change_given'    => 0,
-        'status'          => 'completed',
-        'completed_at'    => now(),
+        'change_given' => 0,
+        'status' => 'completed',
+        'completed_at' => now(),
     ], $over));
 }
 
 function openViaApi(array $ctx, array $payload = [])
 {
     return test()->postJson('/api/pos/sessions/open', array_merge([
-        'vendor_id'     => $ctx['vendor']->id,
+        'vendor_id' => $ctx['vendor']->id,
         'opening_float' => 20000,
-        'terminal_id'   => 'MPT-001',
+        'terminal_id' => 'MPT-001',
     ], $payload));
 }
 
@@ -88,17 +92,17 @@ test('a till standing in no branch is told plainly', function () {
     $ctx = tillContext();
     // A business with more than one shop, and a cashier assigned to none of
     // them. There is no branch to guess — the default store is not one.
-    App\Models\Store::create(['vendor_id' => $ctx['vendor']->id, 'name' => 'Second Shop']);
+    Store::create(['vendor_id' => $ctx['vendor']->id, 'name' => 'Second Shop']);
     $ctx['cashier']->stores()->detach();
 
     openViaApi($ctx)->assertStatus(422)
-        ->assertJsonPath('code', App\Exceptions\TillBranchUnclear::CODE)
-        ->assertJsonPath('message', App\Exceptions\TillBranchUnclear::noBranch()->getMessage());
+        ->assertJsonPath('code', TillBranchUnclear::CODE)
+        ->assertJsonPath('message', TillBranchUnclear::noBranch()->getMessage());
 });
 
 test('a cashier cannot open a session in another vendor books', function () {
     $ctx = tillContext();
-    $stranger = App\Models\Vendor::create([
+    $stranger = Vendor::create([
         'user_id' => User::factory()->create()->id, 'name' => 'Someone Else',
     ]);
 
@@ -274,7 +278,7 @@ test('history shows what is still unexplained, not only what was frozen', functi
     );
 
     // The manager later accounts for 3,000 of it.
-    App\Models\CashUpRectification::create([
+    CashUpRectification::create([
         'pos_session_id' => $session->id, 'vendor_id' => $ctx['vendor']->id,
         'kind' => 'expense', 'amount' => 3000, 'created_by' => $ctx['owner']->id,
     ]);

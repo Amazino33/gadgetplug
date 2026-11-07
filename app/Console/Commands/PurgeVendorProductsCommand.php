@@ -30,10 +30,10 @@ class PurgeVendorProductsCommand extends Command
 
     /** Cascades silently when a product is deleted — the dangerous ones. */
     private const CASCADES = [
-        'order_items'                 => 'online order lines',
-        'inventory_ledgers'           => 'stock ledger entries',
-        'audit_sessions'              => 'audit sessions (count results)',
-        'stock_accountability_entries'=> 'accountability entries',
+        'order_items' => 'online order lines',
+        'inventory_ledgers' => 'stock ledger entries',
+        'audit_sessions' => 'audit sessions (count results)',
+        'stock_accountability_entries' => 'accountability entries',
     ];
 
     /**
@@ -48,8 +48,8 @@ class PurgeVendorProductsCommand extends Command
      */
     private const BLOCKERS = [
         'blind_count_entries' => 'inventory count entries',
-        'pos_sale_items'      => 'POS sale lines',
-        'procurement_items'   => 'procurement lines',
+        'pos_sale_items' => 'POS sale lines',
+        'procurement_items' => 'procurement lines',
     ];
 
     /** Safe to clear first — no history value. */
@@ -93,14 +93,16 @@ class PurgeVendorProductsCommand extends Command
 
         if ($matches->isEmpty()) {
             $this->error("No vendor matches \"{$needle}\".");
+
             return self::FAILURE;
         }
 
         if ($matches->count() > 1) {
-            $this->error("\"{$needle}\" matches " . $matches->count() . ' vendors. Re-run with the exact id or slug:');
+            $this->error("\"{$needle}\" matches ".$matches->count().' vendors. Re-run with the exact id or slug:');
             foreach ($matches as $m) {
                 $this->line("  id={$m->id}  slug={$m->slug}  {$m->name}");
             }
+
             return self::FAILURE;
         }
 
@@ -133,7 +135,7 @@ class PurgeVendorProductsCommand extends Command
         }
 
         if ($matches->count() > 1) {
-            $this->error("\"{$needle}\" matches " . $matches->count() . ' branches. Re-run with the exact id:');
+            $this->error("\"{$needle}\" matches ".$matches->count().' branches. Re-run with the exact id:');
             foreach ($matches as $m) {
                 $this->line("  id={$m->id}  vendor_id={$m->vendor_id}  {$m->name}");
             }
@@ -165,6 +167,7 @@ class PurgeVendorProductsCommand extends Command
 
         if ($ids->isEmpty()) {
             $this->info('Catalogue is already empty. Nothing to do.');
+
             return self::SUCCESS;
         }
 
@@ -187,14 +190,14 @@ class PurgeVendorProductsCommand extends Command
         } else {
             $this->warn('These products are not just catalogue rows:');
             foreach ($cascading as $table => $n) {
-                $this->line("  <fg=yellow>{$n}</> " . self::CASCADES[$table] . " ({$table}) would be DELETED with them");
+                $this->line("  <fg=yellow>{$n}</> ".self::CASCADES[$table]." ({$table}) would be DELETED with them");
             }
             foreach ($blocked as $table => $rows) {
                 $verdict = $this->option('with-history')
                     ? 'their rows will be DELETED first to clear the way'
                     : 'these BLOCK deletion';
 
-                $this->line("  <fg=red>{$rows->count()}</> products have " . self::BLOCKERS[$table] . " ({$table}) — {$verdict}");
+                $this->line("  <fg=red>{$rows->count()}</> products have ".self::BLOCKERS[$table]." ({$table}) — {$verdict}");
             }
         }
 
@@ -220,11 +223,13 @@ class PurgeVendorProductsCommand extends Command
         if (! $this->option('force')) {
             $this->newLine();
             $this->comment('DRY RUN — nothing changed. Add --force to apply.');
+
             return self::SUCCESS;
         }
 
         if ($delete->isEmpty()) {
             $this->info('Nothing to delete.');
+
             return self::SUCCESS;
         }
 
@@ -274,8 +279,8 @@ class PurgeVendorProductsCommand extends Command
 
         $this->newLine();
         $this->info("Deleted {$deleted} products for {$vendor->name}"
-            . ($store !== null ? " at {$store->name}" : '') . '.');
-        $this->line('Remaining: ' . Product::where('vendor_id', $vendor->id)
+            .($store !== null ? " at {$store->name}" : '').'.');
+        $this->line('Remaining: '.Product::where('vendor_id', $vendor->id)
             ->when($store, fn ($q) => $q->where('store_id', $store->id))
             ->count());
 

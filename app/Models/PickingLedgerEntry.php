@@ -22,8 +22,8 @@ class PickingLedgerEntry extends Model
     public const UPDATED_AT = null;
 
     protected $casts = [
-        'quantity'   => AsQuantity::class,
-        'amount'     => 'decimal:2',
+        'quantity' => AsQuantity::class,
+        'amount' => 'decimal:2',
         'unit_price' => 'decimal:2',
         'created_at' => 'datetime',
     ];

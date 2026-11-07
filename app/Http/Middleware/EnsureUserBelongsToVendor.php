@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Vendor;
 use Closure;
 use Illuminate\Http\Request;
 
@@ -9,7 +10,7 @@ class EnsureUserBelongsToVendor
 {
     public function handle(Request $request, Closure $next)
     {
-        if (!auth()->check()) {
+        if (! auth()->check()) {
             return $next($request);
         }
 
@@ -17,7 +18,7 @@ class EnsureUserBelongsToVendor
         $vendor = filament()->getTenant();
 
         // No tenant resolved yet (e.g. on the /plug root redirect) — let it through
-        if (!$vendor) {
+        if (! $vendor) {
             return $next($request);
         }
 
@@ -25,6 +26,7 @@ class EnsureUserBelongsToVendor
         // would miss the global (team_id = NULL) super_admin role here.
         if ($user->isSuperAdmin()) {
             setPermissionsTeamId(null);
+
             return $next($request);
         }
 
@@ -39,6 +41,7 @@ class EnsureUserBelongsToVendor
             }
 
             setPermissionsTeamId($vendor->id);
+
             return $next($request);
         }
 
@@ -49,7 +52,7 @@ class EnsureUserBelongsToVendor
      * Livewire can't follow a rendered page, so the panel's own background
      * requests get a plain 403 and the next full page load shows the notice.
      */
-    private function blocked(Request $request, \App\Models\Vendor $vendor)
+    private function blocked(Request $request, Vendor $vendor)
     {
         if ($request->expectsJson() || $request->hasHeader('X-Livewire')) {
             abort(403, $vendor->dashboardBlockMessage());

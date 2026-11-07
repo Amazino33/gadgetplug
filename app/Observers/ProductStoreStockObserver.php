@@ -2,9 +2,9 @@
 
 namespace App\Observers;
 
-use App\Support\Quantity;
 use App\Models\Product;
 use App\Models\ProductStoreStock;
+use App\Support\Quantity;
 use Illuminate\Support\Facades\DB;
 
 // Keeps products.stock_quantity / products.reserved_stock equal to the sum of

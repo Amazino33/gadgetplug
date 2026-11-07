@@ -15,7 +15,7 @@ class LegalPolicyController extends Controller
 
         // Self-heal: if policy not found or table is empty, seed default policies on the fly
         if (! $policy) {
-            (new LegalPolicySeeder())->run();
+            (new LegalPolicySeeder)->run();
             $policy = LegalPolicy::published()->where('slug', $slug)->first();
         }
 
@@ -24,7 +24,7 @@ class LegalPolicyController extends Controller
         $allPolicies = LegalPolicy::published()->orderBy('sort_order')->get(['id', 'title', 'slug', 'summary']);
 
         return view('pages.legal-policy', [
-            'policy'      => $policy,
+            'policy' => $policy,
             'allPolicies' => $allPolicies,
         ]);
     }

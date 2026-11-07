@@ -26,12 +26,12 @@ function actingAsAdminForVendorApps(): User
 function pendingVendorApplication(string $storeName = 'Wins Gadgets'): VendorApplication
 {
     return VendorApplication::create([
-        'user_id'       => User::factory()->create()->id,
-        'store_name'    => $storeName,
+        'user_id' => User::factory()->create()->id,
+        'store_name' => $storeName,
         'business_type' => 'Individual Reseller',
-        'description'   => 'Sells phones and accessories.',
-        'whatsapp'      => '08162386631',
-        'status'        => 'pending',
+        'description' => 'Sells phones and accessories.',
+        'whatsapp' => '08162386631',
+        'status' => 'pending',
     ]);
 }
 

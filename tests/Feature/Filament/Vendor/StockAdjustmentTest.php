@@ -19,9 +19,9 @@ uses(RefreshDatabase::class);
 
 function adjVendor(): array
 {
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
 
-    $owner  = User::factory()->create();
+    $owner = User::factory()->create();
     $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Adjust Store', 'slug' => 'adjust-store']);
 
     VendorRoles::seedFor($vendor);
@@ -37,15 +37,15 @@ function adjVendor(): array
 function adjProduct(Vendor $vendor, string $sku, int $stock = 0, ?string $barcode = null, ?Store $home = null): Product
 {
     return Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => Category::firstOrCreate(['name' => 'Adjust Cat'])->id,
-        'name'           => "Product {$sku}",
-        'sku'            => $sku,
-        'barcode'        => $barcode,
-        'price'          => 1000,
+        'vendor_id' => $vendor->id,
+        'category_id' => Category::firstOrCreate(['name' => 'Adjust Cat'])->id,
+        'name' => "Product {$sku}",
+        'sku' => $sku,
+        'barcode' => $barcode,
+        'price' => 1000,
         'stock_quantity' => $stock,
-        'status'         => 'published',
-        'store_id'       => $home?->id,
+        'status' => 'published',
+        'store_id' => $home?->id,
     ]);
 }
 
@@ -58,7 +58,7 @@ function asManager(array $data): void
 
 test('pasted rows are matched to products before anything changes', function () {
     $data = adjVendor();
-    $p    = adjProduct($data['vendor'], 'SKU-1', 0);
+    $p = adjProduct($data['vendor'], 'SKU-1', 0);
     asManager($data);
 
     $component = Livewire::test(StockAdjustment::class)
@@ -78,7 +78,7 @@ test('pasted rows are matched to products before anything changes', function () 
 
 test('applying sets stock to the sheet figure and writes a ledger entry', function () {
     $data = adjVendor();
-    $p    = adjProduct($data['vendor'], 'SKU-1', 0);
+    $p = adjProduct($data['vendor'], 'SKU-1', 0);
     asManager($data);
 
     Livewire::test(StockAdjustment::class)
@@ -101,7 +101,7 @@ test('applying sets stock to the sheet figure and writes a ledger entry', functi
 // The sheet states what is on the shelf, so 12 means "make it 12", not "add 12".
 test('quantities are absolute, not added to what is already there', function () {
     $data = adjVendor();
-    $p    = adjProduct($data['vendor'], 'SKU-1', 20);
+    $p = adjProduct($data['vendor'], 'SKU-1', 20);
     asManager($data);
 
     Livewire::test(StockAdjustment::class)
@@ -117,7 +117,7 @@ test('quantities are absolute, not added to what is already there', function () 
 
 test('a product already at the right figure is left alone', function () {
     $data = adjVendor();
-    $p    = adjProduct($data['vendor'], 'SKU-1', 12);
+    $p = adjProduct($data['vendor'], 'SKU-1', 12);
     asManager($data);
 
     Livewire::test(StockAdjustment::class)
@@ -131,7 +131,7 @@ test('a product already at the right figure is left alone', function () {
 
 test('barcodes work as well as SKUs', function () {
     $data = adjVendor();
-    $p    = adjProduct($data['vendor'], 'SKU-9', 0, '6901443000123');
+    $p = adjProduct($data['vendor'], 'SKU-9', 0, '6901443000123');
     asManager($data);
 
     Livewire::test(StockAdjustment::class)
@@ -144,8 +144,8 @@ test('barcodes work as well as SKUs', function () {
 
 test('commas and plain spaces are accepted, not just tabs', function () {
     $data = adjVendor();
-    $a    = adjProduct($data['vendor'], 'SKU-A', 0);
-    $b    = adjProduct($data['vendor'], 'SKU-B', 0);
+    $a = adjProduct($data['vendor'], 'SKU-A', 0);
+    $b = adjProduct($data['vendor'], 'SKU-B', 0);
     asManager($data);
 
     Livewire::test(StockAdjustment::class)
@@ -179,7 +179,7 @@ test('unknown and unreadable lines are reported and skipped, good lines still ap
 
 test('a negative quantity is refused', function () {
     $data = adjVendor();
-    $p    = adjProduct($data['vendor'], 'SKU-1', 5);
+    $p = adjProduct($data['vendor'], 'SKU-1', 5);
     asManager($data);
 
     Livewire::test(StockAdjustment::class)
@@ -192,7 +192,7 @@ test('a negative quantity is refused', function () {
 });
 
 test('another vendor product cannot be reached', function () {
-    $data  = adjVendor();
+    $data = adjVendor();
     $other = Vendor::create(['user_id' => User::factory()->create()->id, 'name' => 'Other', 'slug' => 'other-adj']);
     $theirs = adjProduct($other, 'SKU-X', 0);
     asManager($data);
@@ -208,7 +208,7 @@ test('another vendor product cannot be reached', function () {
 
 test('applying without previewing first does nothing', function () {
     $data = adjVendor();
-    $p    = adjProduct($data['vendor'], 'SKU-1', 0);
+    $p = adjProduct($data['vendor'], 'SKU-1', 0);
     asManager($data);
 
     Livewire::test(StockAdjustment::class)
@@ -220,7 +220,7 @@ test('applying without previewing first does nothing', function () {
 
 test('an empty reason blocks the apply', function () {
     $data = adjVendor();
-    $p    = adjProduct($data['vendor'], 'SKU-1', 0);
+    $p = adjProduct($data['vendor'], 'SKU-1', 0);
     asManager($data);
 
     Livewire::test(StockAdjustment::class)
@@ -235,7 +235,7 @@ test('an empty reason blocks the apply', function () {
 
 test('a duplicate line is applied once, not twice', function () {
     $data = adjVendor();
-    $p    = adjProduct($data['vendor'], 'SKU-1', 0);
+    $p = adjProduct($data['vendor'], 'SKU-1', 0);
     asManager($data);
 
     Livewire::test(StockAdjustment::class)
@@ -279,8 +279,8 @@ test('an inventory manager and the owner can reach the page', function () {
 // branch's own row, not every branch's stock added together. Getting this
 // wrong computes the wrong delta and silently sends it to the right store.
 test('the sheet figure is measured against the branch being worked in, not every branch combined', function () {
-    $data   = adjVendor();
-    $hq     = Store::create(['vendor_id' => $data['vendor']->id, 'name' => 'HQ', 'is_default' => true]);
+    $data = adjVendor();
+    $hq = Store::create(['vendor_id' => $data['vendor']->id, 'name' => 'HQ', 'is_default' => true]);
     $branch = Store::create(['vendor_id' => $data['vendor']->id, 'name' => 'Branch']);
 
     // Vendor-wide mirror is 12 (10 + 2), but the branch itself only holds 2.
@@ -318,7 +318,7 @@ test('the sheet figure is measured against the branch being worked in, not every
 /** A vendor with two branches, the owner working in the second. */
 function adjTwoBranches(array $data): array
 {
-    $hq     = Store::create(['vendor_id' => $data['vendor']->id, 'name' => 'HQ', 'is_default' => true]);
+    $hq = Store::create(['vendor_id' => $data['vendor']->id, 'name' => 'HQ', 'is_default' => true]);
     $branch = Store::create(['vendor_id' => $data['vendor']->id, 'name' => 'Branch']);
 
     test()->actingAs($data['owner']);
@@ -340,7 +340,7 @@ test('the list shows this branch products, zeroes included, and nothing else', f
 
     $stocked = adjProduct($data['vendor'], 'IN-1');
     $soldOut = adjProduct($data['vendor'], 'IN-0');
-    $hqOnly  = adjProduct($data['vendor'], 'HQ-1', home: $hq);
+    $hqOnly = adjProduct($data['vendor'], 'HQ-1', home: $hq);
     adjStock($stocked, $branch, 4);
     adjStock($soldOut, $branch, 0);
     adjStock($hqOnly, $hq, 9);
@@ -463,7 +463,7 @@ test('a product this branch does not stock cannot be set from the list', functio
     $hqOnly = adjProduct($data['vendor'], 'HQ-1', home: $hq);
     adjStock($hqOnly, $hq, 9);
 
-    $other  = Vendor::create(['user_id' => User::factory()->create()->id, 'name' => 'Other', 'slug' => 'other-set']);
+    $other = Vendor::create(['user_id' => User::factory()->create()->id, 'name' => 'Other', 'slug' => 'other-set']);
     $theirs = adjProduct($other, 'THEIRS');
 
     Livewire::test(StockAdjustment::class)

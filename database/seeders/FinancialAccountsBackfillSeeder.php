@@ -2,9 +2,9 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
-use App\Services\FinancialAccounts;
 use App\Models\Vendor;
+use App\Services\FinancialAccounts;
+use Illuminate\Database\Seeder;
 
 class FinancialAccountsBackfillSeeder extends Seeder
 {

@@ -7,7 +7,7 @@ use Database\Seeders\VendorPermissionsSeeder;
 
 function setUpForbiddenRedirectVendor(): array
 {
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
 
     $owner = User::factory()->create();
     $vendor = Vendor::create([

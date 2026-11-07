@@ -9,7 +9,7 @@ use App\Services\Reporting\SalesReportService;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
-require_once __DIR__ . '/Helpers.php';
+require_once __DIR__.'/Helpers.php';
 
 uses(RefreshDatabase::class);
 

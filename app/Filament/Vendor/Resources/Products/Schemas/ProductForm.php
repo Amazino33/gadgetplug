@@ -5,6 +5,7 @@ namespace App\Filament\Vendor\Resources\Products\Schemas;
 use App\Models\Product;
 use App\Models\ProductBarcode;
 use App\Models\Store;
+use App\Models\Supplier;
 use App\Models\Tag;
 use App\Services\ActiveStore;
 use App\Services\ImageProcessing\ProductImagePipeline;
@@ -188,7 +189,7 @@ class ProductForm
         $extra = collect($get('extraUnits') ?? [])->filter(fn ($u) => filled($u['name'] ?? null));
         $units = 1 + $extra->count();
 
-        $choice  = $get('default_unit_choice');
+        $choice = $get('default_unit_choice');
         $default = (is_string($choice) && str_starts_with($choice, 'unit:'))
             ? substr($choice, 5)
             : ($get('base_unit') ?: 'Piece');
@@ -223,8 +224,8 @@ class ProductForm
         }
 
         $units = [[
-            'name'   => $get('base_unit') ?: 'Piece',
-            'price'  => $price,
+            'name' => $get('base_unit') ?: 'Piece',
+            'price' => $price,
             'factor' => 1,
         ]];
 
@@ -234,8 +235,8 @@ class ProductForm
             }
 
             $units[] = [
-                'name'   => $unit['name'],
-                'price'  => (float) $unit['price'],
+                'name' => $unit['name'],
+                'price' => (float) $unit['price'],
                 'factor' => max(1, (int) ($unit['conversion_factor'] ?? 1)),
             ];
         }
@@ -403,7 +404,7 @@ class ProductForm
                             // fixes that and skips the check when cost price is
                             // legitimately left blank.
                             ->rule(
-                                fn (Get $get): string => 'gt:' . $get('cost_price'),
+                                fn (Get $get): string => 'gt:'.$get('cost_price'),
                                 fn (Get $get): bool => filled($get('cost_price')),
                             )
                             ->live()
@@ -477,10 +478,10 @@ class ProductForm
             ->required(fn () => self::skuIsManual())
             ->placeholder(fn () => self::skuIsManual() ? 'Enter a SKU' : 'Generated when you save')
             ->hint(fn () => match (app(SkuGenerator::class)->styleFor(filament()->getTenant()?->id)) {
-                SkuGenerator::STYLE_SERIAL        => 'Next number in your sequence',
+                SkuGenerator::STYLE_SERIAL => 'Next number in your sequence',
                 SkuGenerator::STYLE_PREFIX_SERIAL => 'Your prefix + next number',
-                SkuGenerator::STYLE_MANUAL        => 'You type this one',
-                default                           => 'Generated from category + name',
+                SkuGenerator::STYLE_MANUAL => 'You type this one',
+                default => 'Generated from category + name',
             })
             ->readOnly(fn (Get $get) => ! self::skuIsManual() && ! $get('sku_manual'))
             ->extraInputAttributes(['class' => 'font-mono'])
@@ -543,22 +544,22 @@ class ProductForm
                 $price = (float) $get('price');
 
                 return [
-                    'name'              => 'Crate',
+                    'name' => 'Crate',
                     'conversion_factor' => 12,
-                    'price'             => $price > 0 ? self::suggestedUnitPrice($price, 12) : null,
+                    'price' => $price > 0 ? self::suggestedUnitPrice($price, 12) : null,
                 ];
             })
             ->action(function (array $data, Get $get, Set $set) {
                 $units = $get('extraUnits') ?? [];
 
                 $units['new-'.Str::lower(Str::random(8))] = [
-                    'name'              => $data['name'],
-                    'sku'               => null,
+                    'name' => $data['name'],
+                    'sku' => null,
                     'conversion_factor' => (int) $data['conversion_factor'],
-                    'price'             => $data['price'],
-                    'wholesale_price'   => null,
-                    'is_active'         => true,
-                    'barcodes'          => [],
+                    'price' => $data['price'],
+                    'wholesale_price' => null,
+                    'is_active' => true,
+                    'barcodes' => [],
                 ];
 
                 $set('extraUnits', $units);
@@ -720,7 +721,7 @@ class ProductForm
                         ->hiddenLabel()
                         ->content(function (Get $get): HtmlString {
                             $single = (float) $get('../../price');
-                            $price  = (float) $get('price');
+                            $price = (float) $get('price');
                             $factor = (int) $get('conversion_factor');
 
                             if ($single <= 0 || $price <= 0 || $factor < 1) {
@@ -815,7 +816,10 @@ class ProductForm
                 ->reorderable()
                 ->image()
                 ->imageEditor()
-                ->maxFiles(8)
+                // Free shops get the plan's photo allowance; everyone else keeps 8.
+                ->maxFiles(fn (): int => filament()->getTenant()?->isFreePlan()
+                    ? \App\Models\FreePlanSetting::photosPerProduct()
+                    : 8)
                 ->panelLayout('grid')
                 ->columnSpanFull()
                 // Only the one photo targeted by "Enhance with AI" (tracked by
@@ -954,7 +958,7 @@ class ProductForm
                         TextInput::make('name')->required()->maxLength(255),
                         TextInput::make('phone')->tel()->maxLength(30),
                     ])
-                    ->createOptionUsing(fn (array $data) => \App\Models\Supplier::create([
+                    ->createOptionUsing(fn (array $data) => Supplier::create([
                         ...$data,
                         'vendor_id' => filament()->getTenant()->id,
                     ])->getKey()),

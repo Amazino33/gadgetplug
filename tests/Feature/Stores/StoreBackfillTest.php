@@ -20,13 +20,13 @@ function runStoreBackfill(): void
     $migration->up();
 }
 
-function makeStoreVendor(string $name = null): Vendor
+function makeStoreVendor(?string $name = null): Vendor
 {
     $owner = User::factory()->create();
 
     $vendor = Vendor::create([
         'user_id' => $owner->id,
-        'name'    => $name ?? 'Store Vendor '.uniqid(),
+        'name' => $name ?? 'Store Vendor '.uniqid(),
     ]);
 
     // Phase 2's VendorObserver now seeds a default store on creation, which is
@@ -108,11 +108,11 @@ test('the backfill leaves an existing default store and its curated members alon
     $vendor->users()->attach($member->id);
 
     $existing = Store::create([
-        'vendor_id'  => $vendor->id,
-        'name'       => 'Uyo Branch',
-        'slug'       => 'uyo-branch',
+        'vendor_id' => $vendor->id,
+        'name' => 'Uyo Branch',
+        'slug' => 'uyo-branch',
         'is_default' => true,
-        'is_active'  => true,
+        'is_active' => true,
     ]);
 
     runStoreBackfill();

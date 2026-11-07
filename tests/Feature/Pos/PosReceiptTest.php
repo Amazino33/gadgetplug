@@ -13,13 +13,13 @@ uses(RefreshDatabase::class);
 
 function receiptVendor(): array
 {
-    $owner  = User::factory()->create(['name' => 'Owner Person']);
+    $owner = User::factory()->create(['name' => 'Owner Person']);
     $vendor = Vendor::create([
-        'user_id'         => $owner->id,
-        'name'            => 'Zelink Tech',
-        'slug'            => 'zelink-tech',
+        'user_id' => $owner->id,
+        'name' => 'Zelink Tech',
+        'slug' => 'zelink-tech',
         'pos_vat_enabled' => true,
-        'pos_vat_rate'    => 7.5,
+        'pos_vat_rate' => 7.5,
     ]);
 
     $cashier = User::factory()->create(['name' => 'Grace Cashier']);
@@ -31,38 +31,38 @@ function receiptVendor(): array
 function receiptSale(array $data, array $overrides = []): PosSale
 {
     $sale = PosSale::create(array_merge([
-        'reference'       => 'POS-TESTREF1',
-        'vendor_id'       => $data['vendor']->id,
-        'cashier_id'      => $data['cashier']->id,
-        'subtotal'        => 10000,
+        'reference' => 'POS-TESTREF1',
+        'vendor_id' => $data['vendor']->id,
+        'cashier_id' => $data['cashier']->id,
+        'subtotal' => 10000,
         'discount_amount' => 0,
-        'vat_amount'      => 750,
-        'total'           => 10750,
-        'payment_method'  => 'cash',
+        'vat_amount' => 750,
+        'total' => 10750,
+        'payment_method' => 'cash',
         'amount_tendered' => 11000,
-        'change_given'    => 250,
-        'status'          => 'completed',
-        'completed_at'    => now(),
+        'change_given' => 250,
+        'status' => 'completed',
+        'completed_at' => now(),
     ], $overrides));
 
     $product = Product::create([
-        'vendor_id'      => $data['vendor']->id,
-        'category_id'    => Category::firstOrCreate(['name' => 'Receipt Cat'])->id,
-        'name'           => 'Itel Power Go Pro',
-        'sku'            => 'ITL-PGP',
-        'price'          => 5000,
+        'vendor_id' => $data['vendor']->id,
+        'category_id' => Category::firstOrCreate(['name' => 'Receipt Cat'])->id,
+        'name' => 'Itel Power Go Pro',
+        'sku' => 'ITL-PGP',
+        'price' => 5000,
         'stock_quantity' => 10,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
     PosSaleItem::create([
-        'pos_sale_id'  => $sale->id,
-        'product_id'   => $product->id,
+        'pos_sale_id' => $sale->id,
+        'product_id' => $product->id,
         'product_name' => 'Itel Power Go Pro',
-        'product_sku'  => 'ITL-PGP',
-        'unit_price'   => 5000,
-        'quantity'     => 2,
-        'total'        => 10000,
+        'product_sku' => 'ITL-PGP',
+        'unit_price' => 5000,
+        'quantity' => 2,
+        'total' => 10000,
     ]);
 
     return $sale;
@@ -89,11 +89,11 @@ test('header and footer settings appear on the paper', function () {
     $sale = receiptSale($data);
 
     VendorReceiptSetting::create([
-        'vendor_id'        => $data['vendor']->id,
-        'header_name'      => 'ZELINK SUPERSTORE',
-        'header_address'   => '14 Aka Road, Uyo',
-        'header_phone'     => '0801 234 5678',
-        'footer_text'      => "Thank you for shopping\nNo refund after 7 days",
+        'vendor_id' => $data['vendor']->id,
+        'header_name' => 'ZELINK SUPERSTORE',
+        'header_address' => '14 Aka Road, Uyo',
+        'header_phone' => '0801 234 5678',
+        'footer_text' => "Thank you for shopping\nNo refund after 7 days",
         'footer_alignment' => 'center',
     ]);
 
@@ -111,7 +111,7 @@ test('the header name overrides the store name when set', function () {
     $sale = receiptSale($data);
 
     VendorReceiptSetting::create([
-        'vendor_id'   => $data['vendor']->id,
+        'vendor_id' => $data['vendor']->id,
         'header_name' => 'ZELINK SUPERSTORE',
     ]);
 
@@ -126,8 +126,8 @@ test('switched-off lines are left off the paper', function () {
     $sale = receiptSale($data);
 
     VendorReceiptSetting::create([
-        'vendor_id'           => $data['vendor']->id,
-        'show_cashier'        => false,
+        'vendor_id' => $data['vendor']->id,
+        'show_cashier' => false,
         'show_receipt_number' => false,
     ]);
 
@@ -180,10 +180,10 @@ test('cash sales show tendered and change', function () {
 test('a bank transfer shows its reference', function () {
     $data = receiptVendor();
     $sale = receiptSale($data, [
-        'payment_method'          => 'bank_transfer',
+        'payment_method' => 'bank_transfer',
         'bank_transfer_reference' => 'TRF-99881',
-        'amount_tendered'         => 0,
-        'change_given'            => 0,
+        'amount_tendered' => 0,
+        'change_given' => 0,
     ]);
 
     $this->actingAs($data['owner'])
@@ -225,7 +225,7 @@ test('the print flag adds the self-printing script, and is off by default', func
         ->assertDontSee('window.print()', false);
 
     $this->actingAs($data['owner'])
-        ->get(route('pos.receipt', $sale) . '?print=1')
+        ->get(route('pos.receipt', $sale).'?print=1')
         ->assertSee('window.print()', false);
 });
 
@@ -236,7 +236,7 @@ test('a store with no saved settings still gets a complete receipt', function ()
     $data = receiptVendor();
     $sale = receiptSale($data);
 
-    expect(App\Models\VendorReceiptSetting::where('vendor_id', $data['vendor']->id)->exists())->toBeFalse();
+    expect(VendorReceiptSetting::where('vendor_id', $data['vendor']->id)->exists())->toBeFalse();
 
     $this->actingAs($data['owner'])
         ->get(route('pos.receipt', $sale))

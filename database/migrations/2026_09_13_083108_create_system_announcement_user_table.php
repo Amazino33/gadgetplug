@@ -19,7 +19,7 @@ return new class extends Migration
             $table->timestamp('dismissed_at')->nullable();
             $table->timestamp('action_taken_at')->nullable();
             $table->timestamps();
-            
+
             $table->unique(['system_announcement_id', 'user_id'], 'sys_ann_user_unique');
         });
     }

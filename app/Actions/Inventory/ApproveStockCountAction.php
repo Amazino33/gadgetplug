@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Actions\Inventory;
 
-use App\Support\Quantity;
 use App\Models\PhysicalStockCount;
 use App\Models\User;
 use App\Services\AccountabilityLedger;
 use App\Services\Auth\StorePermission;
 use App\Support\Accountability\FrozenLossSnapshot;
+use App\Support\Quantity;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -78,7 +78,7 @@ class ApproveStockCountAction
                     quantityChanged: $delta,
                     transactionType: 'count_adjustment',
                     userId: $approver->id,
-                    reference: 'COUNT-' . $row->id,
+                    reference: 'COUNT-'.$row->id,
                     description: sprintf(
                         'Stock count %s — books %s, counted %s',
                         $delta < 0 ? 'shortfall' : 'overage',
@@ -133,13 +133,13 @@ class ApproveStockCountAction
             }
 
             $row->update([
-                'status'        => PhysicalStockCount::STATUS_APPROVED,
-                'approved_by'   => $approver->id,
-                'approved_at'   => now(),
-                'outcome'       => $variance['units'] === 0 ? PhysicalStockCount::OUTCOME_NONE : $outcome,
-                'charged_to'    => $outcome === PhysicalStockCount::OUTCOME_CHARGED ? $chargeTo?->id : null,
+                'status' => PhysicalStockCount::STATUS_APPROVED,
+                'approved_by' => $approver->id,
+                'approved_at' => now(),
+                'outcome' => $variance['units'] === 0 ? PhysicalStockCount::OUTCOME_NONE : $outcome,
+                'charged_to' => $outcome === PhysicalStockCount::OUTCOME_CHARGED ? $chargeTo?->id : null,
                 'decision_note' => $note,
-                'adjusted_at'   => now(),
+                'adjusted_at' => now(),
             ]);
 
             return $row->fresh(['lines', 'approvedBy', 'chargedTo']);
@@ -169,9 +169,9 @@ class ApproveStockCountAction
             }
 
             $row->update([
-                'status'        => PhysicalStockCount::STATUS_REJECTED,
-                'approved_by'   => $approver->id,
-                'approved_at'   => now(),
+                'status' => PhysicalStockCount::STATUS_REJECTED,
+                'approved_by' => $approver->id,
+                'approved_at' => now(),
                 'decision_note' => $note,
             ]);
 

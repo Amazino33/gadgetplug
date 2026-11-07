@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Affiliates\RelationManagers;
 
+use App\Filament\Resources\Orders\OrderResource;
 use Filament\Actions\Action;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Columns\TextColumn;
@@ -22,18 +23,18 @@ class CommissionsRelationManager extends RelationManager
                 TextColumn::make('status')
                     ->badge()
                     ->formatStateUsing(fn ($state) => match ($state) {
-                        'pending'        => 'Pending',
-                        'return_window'  => 'In Return Window',
-                        'available'      => 'Available',
-                        'rejected'       => 'Rejected',
-                        default          => ucfirst($state),
+                        'pending' => 'Pending',
+                        'return_window' => 'In Return Window',
+                        'available' => 'Available',
+                        'rejected' => 'Rejected',
+                        default => ucfirst($state),
                     })
                     ->color(fn ($state) => match ($state) {
-                        'pending'        => 'gray',
-                        'return_window'  => 'warning',
-                        'available'      => 'success',
-                        'rejected'       => 'danger',
-                        default          => 'gray',
+                        'pending' => 'gray',
+                        'return_window' => 'warning',
+                        'available' => 'success',
+                        'rejected' => 'danger',
+                        default => 'gray',
                     }),
 
                 TextColumn::make('rejected_reason')->label('Rejected Reason')->placeholder('—')->toggleable(),
@@ -43,17 +44,17 @@ class CommissionsRelationManager extends RelationManager
             ->filters([
                 SelectFilter::make('status')
                     ->options([
-                        'pending'       => 'Pending',
+                        'pending' => 'Pending',
                         'return_window' => 'In Return Window',
-                        'available'     => 'Available',
-                        'rejected'      => 'Rejected',
+                        'available' => 'Available',
+                        'rejected' => 'Rejected',
                     ]),
             ])
             ->recordActions([
                 Action::make('viewOrder')
                     ->label('View Order')
                     ->icon('heroicon-o-shopping-bag')
-                    ->url(fn ($record) => \App\Filament\Resources\Orders\OrderResource::getUrl('view', ['record' => $record->order_id]))
+                    ->url(fn ($record) => OrderResource::getUrl('view', ['record' => $record->order_id]))
                     ->visible(fn ($record) => $record->order_id !== null),
             ]);
     }

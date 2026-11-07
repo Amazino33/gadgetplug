@@ -2,9 +2,11 @@
 
 namespace App\Filament\Resources\Orders\Schemas;
 
+use App\Models\Affiliate;
 use App\Models\DeliveryMessage;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Services\Orders\DispatchMessages;
 use App\Services\Orders\OrderLocation;
 use App\Services\Orders\OrderMessages;
 use App\Services\Orders\OrderProgress;
@@ -111,14 +113,14 @@ class OrderPage
             ->state(fn (Order $record): string => self::stepWhen(self::step($record, $index)))
             ->helperText(fn (Order $record): ?string => self::step($record, $index)['by'])
             ->icon(fn (Order $record): string => match (self::step($record, $index)['state']) {
-                OrderProgress::DONE    => 'heroicon-m-check-circle',
+                OrderProgress::DONE => 'heroicon-m-check-circle',
                 OrderProgress::CURRENT => 'heroicon-m-arrow-right-circle',
-                default                => 'heroicon-o-clock',
+                default => 'heroicon-o-clock',
             })
             ->iconColor(fn (Order $record): string => match (self::step($record, $index)['state']) {
-                OrderProgress::DONE    => 'success',
+                OrderProgress::DONE => 'success',
                 OrderProgress::CURRENT => 'primary',
-                default                => 'gray',
+                default => 'gray',
             })
             ->weight(fn (Order $record): ?FontWeight => self::step($record, $index)['state'] === OrderProgress::CURRENT ? FontWeight::Bold : null)
             ->color(fn (Order $record): ?string => self::step($record, $index)['state'] === OrderProgress::UPCOMING ? 'gray' : null);
@@ -188,7 +190,7 @@ class OrderPage
             ->schema([
                 TextEntry::make('reseller_affiliate_code')
                     ->label('Affiliate')
-                    ->state(fn (Order $record): string => \App\Models\Affiliate::where('user_id', $record->user_id)->value('code') ?? '—'),
+                    ->state(fn (Order $record): string => Affiliate::where('user_id', $record->user_id)->value('code') ?? '—'),
 
                 TextEntry::make('reseller_affiliate_name')
                     ->label('Name')
@@ -314,14 +316,14 @@ class OrderPage
                     ->label('Rider link')
                     ->badge()
                     ->state(fn (Order $record): string => match (true) {
-                        ! $record->logistics_company_id                                      => 'Not sent',
-                        $record->dispatch_assigned_at?->lt(now()->subHours(48)) ?? false     => 'Expired — resend if needed',
-                        default                                                              => 'Sent',
+                        ! $record->logistics_company_id => 'Not sent',
+                        $record->dispatch_assigned_at?->lt(now()->subHours(48)) ?? false => 'Expired — resend if needed',
+                        default => 'Sent',
                     })
                     ->color(fn (string $state): string => match ($state) {
-                        'Sent'     => 'success',
+                        'Sent' => 'success',
                         'Not sent' => 'gray',
-                        default    => 'warning',
+                        default => 'warning',
                     })
                     ->helperText(fn (Order $record): ?string => $record->dispatch_assigned_at
                         ? 'Assigned '.$record->dispatch_assigned_at->format('d M, g:ia').($record->dispatchAssignedBy ? ' by '.$record->dispatchAssignedBy->name : '')
@@ -332,16 +334,16 @@ class OrderPage
                     ->label('Delivery code')
                     ->badge()
                     ->state(fn (Order $record): string => match (true) {
-                        $record->delivered_via === 'code'    => 'Used',
-                        $record->isDeliveryCodeLocked()      => 'Locked',
+                        $record->delivered_via === 'code' => 'Used',
+                        $record->isDeliveryCodeLocked() => 'Locked',
                         $record->delivery_code_hash !== null => 'Sent to customer',
-                        default                              => 'Not sent yet',
+                        default => 'Not sent yet',
                     })
                     ->color(fn (string $state): string => match ($state) {
-                        'Locked'           => 'danger',
-                        'Used'             => 'success',
+                        'Locked' => 'danger',
+                        'Used' => 'success',
                         'Sent to customer' => 'info',
-                        default            => 'gray',
+                        default => 'gray',
                     })
                     ->helperText(fn (Order $record): ?string => $record->isDeliveryCodeLocked()
                         ? 'Locked after '.$record->delivery_code_attempts.' wrong tries — send a new code.'
@@ -383,7 +385,7 @@ class OrderPage
 
                 TextEntry::make('stock_from')
                     ->label('Stock held at')
-                    ->state(fn (Order $record): string => \App\Services\Orders\DispatchMessages::pickupStores($record)
+                    ->state(fn (Order $record): string => DispatchMessages::pickupStores($record)
                         ->map(fn ($store) => trim(($store->vendor?->name ? $store->vendor->name.' — ' : '').$store->name))
                         ->implode(', ') ?: '—'),
             ]);
@@ -415,13 +417,13 @@ class OrderPage
                             ->badge()
                             ->formatStateUsing(fn (?string $state): string => match ($state) {
                                 'link_generated' => 'Link made',
-                                default          => ucfirst((string) $state),
+                                default => ucfirst((string) $state),
                             })
                             ->color(fn (?string $state): string => match ($state) {
-                                'sent'           => 'success',
-                                'failed'         => 'danger',
+                                'sent' => 'success',
+                                'failed' => 'danger',
                                 'queued', 'held' => 'warning',
-                                default          => 'gray',
+                                default => 'gray',
                             })
                             ->helperText(fn (DeliveryMessage $record): string => $record->created_at?->format('d M, g:ia') ?? ''),
                     ])

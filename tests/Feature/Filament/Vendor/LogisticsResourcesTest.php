@@ -22,9 +22,9 @@ uses(RefreshDatabase::class);
 
 function setUpLogisticsResourceVendor(): array
 {
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
 
-    $owner  = User::factory()->create();
+    $owner = User::factory()->create();
     $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Logistics Resource Store']);
 
     return compact('owner', 'vendor');
@@ -44,7 +44,7 @@ test('vendor owner can access all three logistics resources', function () {
 });
 
 test('a team member without manage_logistics permission cannot access the logistics resources', function () {
-    $data   = setUpLogisticsResourceVendor();
+    $data = setUpLogisticsResourceVendor();
     $member = User::factory()->create();
     $data['vendor']->users()->attach($member->id);
 
@@ -57,7 +57,7 @@ test('a team member without manage_logistics permission cannot access the logist
 });
 
 test('a team member with the manage_logistics permission can access the logistics resources', function () {
-    $data   = setUpLogisticsResourceVendor();
+    $data = setUpLogisticsResourceVendor();
     $member = User::factory()->create();
     $data['vendor']->users()->attach($member->id);
 
@@ -85,7 +85,7 @@ test('vendor owner can create a logistics company through the resource form', fu
     Livewire::test(ManageLogisticsCompanies::class)
         ->mountAction('create')
         ->setActionData([
-            'name'  => 'Speedy Dispatch',
+            'name' => 'Speedy Dispatch',
             'phone' => '08010000000',
         ])
         ->callMountedAction()
@@ -127,9 +127,9 @@ test('the rider form rejects a logistics company belonging to a different vendor
     Livewire::test(ManageDeliveryPersons::class)
         ->mountAction('create')
         ->setActionData([
-            'name'                  => 'Cross Tenant Rider',
-            'phone'                 => '08030000000',
-            'logistics_company_id'  => $companyB->id,
+            'name' => 'Cross Tenant Rider',
+            'phone' => '08030000000',
+            'logistics_company_id' => $companyB->id,
         ])
         ->callMountedAction()
         ->assertHasActionErrors(['logistics_company_id']);
@@ -142,8 +142,8 @@ test('the rider form rejects an inactive logistics company for the same vendor',
 
     $inactiveCompany = LogisticsCompany::create([
         'vendor_id' => $data['vendor']->id,
-        'name'      => 'Retired Dispatch',
-        'phone'     => '08040000000',
+        'name' => 'Retired Dispatch',
+        'phone' => '08040000000',
         'is_active' => false,
     ]);
 
@@ -155,8 +155,8 @@ test('the rider form rejects an inactive logistics company for the same vendor',
     Livewire::test(ManageDeliveryPersons::class)
         ->mountAction('create')
         ->setActionData([
-            'name'                 => 'Rider For Retired Co',
-            'phone'                => '08050000000',
+            'name' => 'Rider For Retired Co',
+            'phone' => '08050000000',
             'logistics_company_id' => $inactiveCompany->id,
         ])
         ->callMountedAction()
@@ -168,8 +168,8 @@ test('the rider form accepts an active logistics company belonging to the same v
 
     $company = LogisticsCompany::create([
         'vendor_id' => $data['vendor']->id,
-        'name'      => 'Home Team Dispatch',
-        'phone'     => '08060000000',
+        'name' => 'Home Team Dispatch',
+        'phone' => '08060000000',
     ]);
 
     $this->actingAs($data['owner']);
@@ -180,8 +180,8 @@ test('the rider form accepts an active logistics company belonging to the same v
     Livewire::test(ManageDeliveryPersons::class)
         ->mountAction('create')
         ->setActionData([
-            'name'                 => 'Rider For Home Team',
-            'phone'                => '08070000000',
+            'name' => 'Rider For Home Team',
+            'phone' => '08070000000',
             'logistics_company_id' => $company->id,
         ])
         ->callMountedAction()

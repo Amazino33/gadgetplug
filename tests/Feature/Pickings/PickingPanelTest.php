@@ -2,12 +2,14 @@
 
 use App\Actions\Pickings\ReleaseToPickerAction;
 use App\Actions\Pickings\WriteOffPickingAction;
-use App\Filament\Vendor\Resources\Pickers\PickerResource;
 use App\Filament\Vendor\Resources\Pickers\Pages\ListPickers;
+use App\Filament\Vendor\Resources\Pickers\PickerResource;
 use App\Models\PickingLedgerEntry;
 use App\Models\Store;
 use App\Models\User;
+use App\Models\Vendor;
 use App\Policies\PickingWriteOffPolicy;
+use App\Services\ActiveStore;
 use App\Services\Pickings\PickingLedger;
 use App\Services\VendorRoles;
 use Database\Seeders\VendorPermissionsSeeder;
@@ -15,15 +17,15 @@ use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
-require_once __DIR__ . '/Helpers.php';
+require_once __DIR__.'/Helpers.php';
 
 uses(RefreshDatabase::class);
 
 // Roles only receive permissions that already exist, so the permission list has
 // to be seeded before any role is cut from it.
-beforeEach(fn () => (new VendorPermissionsSeeder())->run());
+beforeEach(fn () => (new VendorPermissionsSeeder)->run());
 
-function pickerPanel(\App\Models\Vendor $vendor, ?User $as = null): void
+function pickerPanel(Vendor $vendor, ?User $as = null): void
 {
     test()->actingAs($as ?? User::find($vendor->user_id));
     Filament::setCurrentPanel(Filament::getPanel('vendor'));
@@ -99,7 +101,7 @@ test('a storekeeper sees only the branch they are standing in', function () {
     $keeper->assignRole('storekeeper');
 
     pickerPanel($vendor, $keeper);
-    \App\Services\ActiveStore::set($vendor, $keeper, $branch);
+    ActiveStore::set($vendor, $keeper, $branch);
 
     // Both pickers are listed — they belong to the vendor — but the units and
     // value shown are only what went out from this branch.
@@ -185,5 +187,5 @@ test('nothing can be written off once the line is settled', function () {
 
     expect(app(PickingWriteOffPolicy::class)->writeOff(User::find($vendor->user_id), $item->fresh()))->toBeFalse()
         ->and(fn () => app(WriteOffPickingAction::class)->execute($item->fresh(), 1))
-            ->toThrow(RuntimeException::class, 'Nothing is still out');
+        ->toThrow(RuntimeException::class, 'Nothing is still out');
 });

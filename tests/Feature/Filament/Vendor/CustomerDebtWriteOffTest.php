@@ -8,6 +8,7 @@ use App\Models\FinancialLedgerEntry;
 use App\Models\PosCustomerLedgerEntry;
 use App\Models\User;
 use App\Policies\PosCustomerDebtPolicy;
+use App\Services\ActiveStore;
 use App\Services\Pos\CustomerDebtService;
 use App\Services\VendorRoles;
 use Database\Seeders\VendorPermissionsSeeder;
@@ -29,13 +30,13 @@ function writeOffContext(float $owed = 10000.0): array
 
     PosCustomerLedgerEntry::create([
         'pos_customer_id' => $ctx['customer']->id,
-        'vendor_id'       => $ctx['vendor']->id,
-        'direction'       => 'charge',
-        'amount'          => $owed,
-        'store_id'        => $ctx['store']->id,
-        'created_by'      => $cashier->id,
-        'occurred_at'     => '2026-08-01',
-        'description'     => 'Credit sale — seed',
+        'vendor_id' => $ctx['vendor']->id,
+        'direction' => 'charge',
+        'amount' => $owed,
+        'store_id' => $ctx['store']->id,
+        'created_by' => $cashier->id,
+        'occurred_at' => '2026-08-01',
+        'description' => 'Credit sale — seed',
     ]);
 
     return $ctx + ['cashier' => $cashier];
@@ -133,7 +134,7 @@ it('is append-only like every other row', function () {
 
 it('refuses a non-owner at the policy, not merely in the UI', function () {
     $ctx = writeOffContext();
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
     VendorRoles::seedFor($ctx['vendor']);
 
     $admin = User::factory()->create();
@@ -153,7 +154,7 @@ it('refuses a non-owner at the policy, not merely in the UI', function () {
 });
 
 it('refuses a member of another vendor entirely', function () {
-    $mine   = writeOffContext();
+    $mine = writeOffContext();
     $theirs = writeOffContext();
 
     expect(app(PosCustomerDebtPolicy::class)->writeOff($theirs['owner'], $mine['customer']))->toBeFalse();
@@ -180,11 +181,11 @@ it('blocks it even when only one of several charges was theirs', function () {
     // A second charge from someone else does not launder the first.
     PosCustomerLedgerEntry::create([
         'pos_customer_id' => $ctx['customer']->id,
-        'vendor_id'       => $ctx['vendor']->id,
-        'direction'       => 'charge',
-        'amount'          => 5000,
-        'created_by'      => $ctx['owner']->id,
-        'occurred_at'     => '2026-08-05',
+        'vendor_id' => $ctx['vendor']->id,
+        'direction' => 'charge',
+        'amount' => 5000,
+        'created_by' => $ctx['owner']->id,
+        'occurred_at' => '2026-08-05',
     ]);
 
     $ctx['vendor']->update(['user_id' => $ctx['cashier']->id]);
@@ -245,7 +246,7 @@ it('writes off through the panel action', function () {
 
 it('hides the write-off button from someone who may not use it', function () {
     $ctx = writeOffContext();
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
     VendorRoles::seedFor($ctx['vendor']);
 
     $admin = User::factory()->create();
@@ -261,7 +262,7 @@ it('hides the write-off button from someone who may not use it', function () {
     $this->actingAs($admin);
     Filament\Facades\Filament::setCurrentPanel(Filament\Facades\Filament::getPanel('vendor'));
     Filament\Facades\Filament::setTenant($ctx['vendor']);
-    App\Services\ActiveStore::set($ctx['vendor'], $admin, $ctx['store']);
+    ActiveStore::set($ctx['vendor'], $admin, $ctx['store']);
 
     Livewire::test(ListCustomerDebts::class)
         ->assertTableActionHidden('writeOff', $ctx['customer']);

@@ -4,17 +4,17 @@ namespace App\Filament\Vendor\Resources\CustomerDebts\Pages;
 
 use App\Actions\Pos\RecordCustomerPaymentAction;
 use App\Actions\Pos\WriteOffCustomerDebtAction;
-use App\Policies\PosCustomerDebtPolicy;
 use App\Filament\Vendor\Resources\CustomerDebts\CustomerDebtResource;
+use App\Models\FinancialAccount;
 use App\Models\PosCustomer;
+use App\Policies\PosCustomerDebtPolicy;
 use App\Services\ActiveStore;
 use App\Services\Pos\CustomerDebtService;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
-use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
-use App\Models\FinancialAccount;
+use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Tables\Columns\TextColumn;
@@ -56,7 +56,7 @@ class ListCustomerDebts extends ListRecords
                     ->label('Paid')
                     // Stored negative so outstanding stays a plain SUM; shown
                     // positive, because "paid ₦5,000" is what a person means.
-                    ->formatStateUsing(fn ($state) => '₦' . number_format(abs((float) $state), 2))
+                    ->formatStateUsing(fn ($state) => '₦'.number_format(abs((float) $state), 2))
                     ->alignEnd()
                     ->sortable(),
 
@@ -79,7 +79,7 @@ class ListCustomerDebts extends ListRecords
                     ->color('success')
                     ->modalHeading(fn (PosCustomer $record) => "Record payment from {$record->name}")
                     ->modalDescription(fn (PosCustomer $record) => 'Currently owing ₦'
-                        . number_format(app(CustomerDebtService::class)->outstanding($record->id), 2) . '.')
+                        .number_format(app(CustomerDebtService::class)->outstanding($record->id), 2).'.')
                     ->schema([
                         TextInput::make('amount')
                             ->label('Amount received now (₦)')
@@ -126,9 +126,9 @@ class ListCustomerDebts extends ListRecords
 
                         Notification::make()
                             ->title('Payment recorded')
-                            ->body('Now owing ₦' . number_format(
+                            ->body('Now owing ₦'.number_format(
                                 app(CustomerDebtService::class)->outstanding($record->id), 2
-                            ) . '.')
+                            ).'.')
                             ->success()
                             ->send();
                     }),
@@ -140,8 +140,8 @@ class ListCustomerDebts extends ListRecords
                     ->requiresConfirmation()
                     ->modalHeading(fn (PosCustomer $record) => "Write off {$record->name}'s balance")
                     ->modalDescription(fn (PosCustomer $record) => 'This forgives ₦'
-                        . number_format(app(CustomerDebtService::class)->outstanding($record->id), 2)
-                        . ' and cannot be undone. The record stays; the money does not.')
+                        .number_format(app(CustomerDebtService::class)->outstanding($record->id), 2)
+                        .' and cannot be undone. The record stays; the money does not.')
                     // Hidden when not permitted, but the action re-checks the
                     // policy itself — hiding a button is a courtesy, not a rule.
                     ->visible(fn (PosCustomer $record) => app(PosCustomerDebtPolicy::class)

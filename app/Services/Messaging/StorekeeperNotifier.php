@@ -2,17 +2,17 @@
 
 namespace App\Services\Messaging;
 
-use App\Support\Quantity;
 use App\Models\DeliveryMessage;
 use App\Models\MessageTemplate;
 use App\Models\Order;
 use App\Models\OrderItemStoreAllocation;
-use App\Models\User;
 use App\Models\PlatformMessagingSetting;
 use App\Models\Product;
 use App\Models\Store;
+use App\Models\User;
 use App\Models\Vendor;
 use App\Models\VendorNotificationSetting;
+use App\Support\Quantity;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -184,7 +184,7 @@ class StorekeeperNotifier
     // not nine, or the storekeeper starts ignoring them.
     public function undispatchedReminder(Vendor $vendor, ?CarbonInterface $now = null): ?DeliveryMessage
     {
-        $now      = $now ? Carbon::instance($now->toDateTime()) : Carbon::now();
+        $now = $now ? Carbon::instance($now->toDateTime()) : Carbon::now();
         $settings = VendorNotificationSetting::forVendor($vendor);
 
         $cutoff = $now->copy()->subHours($settings->undispatched_after_hours);
@@ -222,9 +222,9 @@ class StorekeeperNotifier
             templateKey: 'storekeeper_undispatched',
             toggle: 'notify_undispatched',
             context: [
-                'store_name'  => $vendor->name,
+                'store_name' => $vendor->name,
                 'order_count' => (string) $orders->count(),
-                'order_list'  => $lines,
+                'order_list' => $lines,
                 'oldest_wait' => $oldestWait,
             ],
             // Digests cover several orders, so the log row is deliberately not
@@ -255,9 +255,9 @@ class StorekeeperNotifier
             templateKey: 'storekeeper_low_stock',
             toggle: 'notify_low_stock',
             context: [
-                'store_name'    => $vendor->name,
+                'store_name' => $vendor->name,
                 'product_count' => (string) $products->count(),
-                'product_list'  => $lines,
+                'product_list' => $lines,
             ],
             order: null,
         );
@@ -283,8 +283,8 @@ class StorekeeperNotifier
             toggle: 'notify_unremitted_cash',
             context: [
                 'store_name' => $store->name,
-                'amount'     => number_format($amount, 2),
-                'days'       => (string) $days,
+                'amount' => number_format($amount, 2),
+                'days' => (string) $days,
             ],
             order: null,
         );
@@ -302,7 +302,7 @@ class StorekeeperNotifier
         ?string $to = null,
     ): ?DeliveryMessage {
         $settings = VendorNotificationSetting::forVendor($vendor);
-        $locked   = MessageTemplate::isPlatformLocked($templateKey);
+        $locked = MessageTemplate::isPlatformLocked($templateKey);
 
         // A locked alert ignores the vendor's toggle. While GadgetPlug is
         // handling online orders, "was this order announced to the store?" must
@@ -320,8 +320,8 @@ class StorekeeperNotifier
             if ($locked) {
                 Log::warning('Storekeeper alert had nowhere to go — no vendor number and no platform fallback.', [
                     'vendor_id' => $vendor->id,
-                    'template'  => $templateKey,
-                    'order_id'  => $order?->id,
+                    'template' => $templateKey,
+                    'order_id' => $order?->id,
                 ]);
             }
 
@@ -335,14 +335,14 @@ class StorekeeperNotifier
         }
 
         $message = DeliveryMessage::create([
-            'vendor_id'      => $vendor->id,
-            'order_id'       => $order?->id,
+            'vendor_id' => $vendor->id,
+            'order_id' => $order?->id,
             'recipient_type' => 'storekeeper',
-            'channel'        => $template->channel,
-            'to_number'      => $to,
-            'body'           => app(TemplateRenderer::class)->render($template->body, $context),
-            'status'         => 'queued',
-            'template_key'   => $templateKey,
+            'channel' => $template->channel,
+            'to_number' => $to,
+            'body' => app(TemplateRenderer::class)->render($template->body, $context),
+            'status' => 'queued',
+            'template_key' => $templateKey,
         ]);
 
         return $this->messaging->dispatch($message);

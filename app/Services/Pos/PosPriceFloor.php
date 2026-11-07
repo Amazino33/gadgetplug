@@ -104,15 +104,15 @@ class PosPriceFloor
                 : null;
 
             if ($unit) {
-                $floor    = $this->floorForUnit($product, $unit, $item['price_type'] ?? 'retail', $margin);
+                $floor = $this->floorForUnit($product, $unit, $item['price_type'] ?? 'retail', $margin);
                 $quantity = Quantity::of($item['unit_qty']);
-                $lineNet  = (float) $item['line_gross'] - (float) ($item['discount_amount'] ?? 0);
+                $lineNet = (float) $item['line_gross'] - (float) ($item['discount_amount'] ?? 0);
             } else {
-                $floor    = $this->floorFor($product, $margin);
+                $floor = $this->floorFor($product, $margin);
                 $quantity = Quantity::of($item['quantity']);
                 // line_gross when the resolver supplied it: with a half in the
                 // line, unit price × quantity is not what the customer pays.
-                $lineNet  = (float) ($item['line_gross'] ?? (float) $item['unit_price'] * $quantity)
+                $lineNet = (float) ($item['line_gross'] ?? (float) $item['unit_price'] * $quantity)
                     - (float) ($item['discount_amount'] ?? 0);
             }
 

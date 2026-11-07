@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace App\Actions\Pickings;
 
-use App\Support\Quantity;
 use App\Actions\Inventory\AdjustStockAction;
 use App\Models\Picker;
 use App\Models\Picking;
 use App\Models\Product;
 use App\Models\Store;
+use App\Models\User;
+use App\Support\Quantity;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -25,9 +26,7 @@ use RuntimeException;
  */
 class ReleaseToPickerAction
 {
-    public function __construct(private readonly AdjustStockAction $adjustStock)
-    {
-    }
+    public function __construct(private readonly AdjustStockAction $adjustStock) {}
 
     /**
      * @param  array<int, array{product_id: int, quantity: int}>  $lines
@@ -54,12 +53,12 @@ class ReleaseToPickerAction
             }
 
             $picking = Picking::create([
-                'vendor_id'   => $picker->vendor_id,
-                'store_id'    => $store->id,
-                'picker_id'   => $picker->id,
+                'vendor_id' => $picker->vendor_id,
+                'store_id' => $store->id,
+                'picker_id' => $picker->id,
                 'released_by' => $userId,
-                'taken_at'    => $takenAt ?? now(),
-                'notes'       => $notes,
+                'taken_at' => $takenAt ?? now(),
+                'notes' => $notes,
             ]);
 
             foreach ($lines as $line) {
@@ -91,7 +90,7 @@ class ReleaseToPickerAction
 
                 activity()
                     ->performedOn($product)
-                    ->causedBy($userId ? \App\Models\User::find($userId) : null)
+                    ->causedBy($userId ? User::find($userId) : null)
                     ->tap(fn ($activity) => $activity->store_id = $store->id)
                     ->event('picking_released')
                     ->withProperties(['picker' => $picker->name, 'quantity' => $quantity])
@@ -105,8 +104,8 @@ class ReleaseToPickerAction
 
                 $picking->items()->create([
                     'product_id' => $product->id,
-                    'quantity'   => $quantity,
-                    'unit_cost'  => $costTotal !== null ? round((float) $costTotal / $quantity, 2) : null,
+                    'quantity' => $quantity,
+                    'unit_cost' => $costTotal !== null ? round((float) $costTotal / $quantity, 2) : null,
                 ]);
             }
 

@@ -42,7 +42,7 @@ class ViewAffiliateApplication extends ViewRecord
                         $affiliate = Affiliate::findOrCreateForUser($locked->user);
 
                         $locked->update([
-                            'status'      => 'approved',
+                            'status' => 'approved',
                             'admin_notes' => $data['admin_notes'] ?? null,
                         ]);
 
@@ -60,7 +60,7 @@ class ViewAffiliateApplication extends ViewRecord
                     }
 
                     Notification::make()
-                        ->title('Approved — referral code ' . $affiliate->code)
+                        ->title('Approved — referral code '.$affiliate->code)
                         ->success()
                         ->send();
 
@@ -80,7 +80,7 @@ class ViewAffiliateApplication extends ViewRecord
                 ])
                 ->action(function (array $data): void {
                     $this->record->update([
-                        'status'      => 'rejected',
+                        'status' => 'rejected',
                         'admin_notes' => $data['admin_notes'],
                     ]);
 

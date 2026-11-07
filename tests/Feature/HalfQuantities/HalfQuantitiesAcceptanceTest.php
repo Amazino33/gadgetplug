@@ -23,30 +23,30 @@ use Livewire\Livewire;
 
 function acceptShop(bool $halves = true, array $product = [], array $vendor = []): array
 {
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
 
-    $owner  = User::factory()->create();
+    $owner = User::factory()->create();
     $vendor = Vendor::create(array_merge([
-        'user_id'                => $owner->id,
-        'name'                   => ($halves ? 'Veruzo Wholesale ' : 'Corner Mart ').uniqid(),
+        'user_id' => $owner->id,
+        'name' => ($halves ? 'Veruzo Wholesale ' : 'Corner Mart ').uniqid(),
         'pos_min_margin_percent' => 0,
-        'allow_half_quantities'  => $halves,
+        'allow_half_quantities' => $halves,
     ], $vendor));
     VendorRoles::seedFor($vendor);
 
     $product = Product::create(array_merge([
-        'vendor_id'                => $vendor->id,
-        'store_id'                 => $vendor->defaultStore?->id,
-        'category_id'              => Category::create(['name' => 'Drinks '.uniqid()])->id,
-        'name'                     => 'Hero Lager',
-        'base_unit'                => 'Crate',
-        'price'                    => 10100,
-        'wholesale_price'          => 9600,
-        'cost_price'               => 8000,
+        'vendor_id' => $vendor->id,
+        'store_id' => $vendor->defaultStore?->id,
+        'category_id' => Category::create(['name' => 'Drinks '.uniqid()])->id,
+        'name' => 'Hero Lager',
+        'base_unit' => 'Crate',
+        'price' => 10100,
+        'wholesale_price' => 9600,
+        'cost_price' => 8000,
         'allow_pos_price_override' => false,
-        'stock_quantity'           => 20,
-        'status'                   => 'published',
-        'show_in_pos'              => true,
+        'stock_quantity' => 20,
+        'status' => 'published',
+        'show_in_pos' => true,
     ], $product));
 
     // One batch at the crate cost, so cost of goods sold is real, not estimated.
@@ -65,23 +65,23 @@ function acceptSale(array $ctx, int|float $qty, array $line = [])
 {
     Sanctum::actingAs($ctx['owner']);
 
-    $type  = $line['price_type'] ?? 'retail';
+    $type = $line['price_type'] ?? 'retail';
     $price = $line['unit_price'] ?? ($type === 'wholesale' ? 9600 : 10100);
 
     return test()->postJson('/api/pos/sales', [
-        'vendor_id'       => $ctx['vendor']->id,
-        'items'           => [array_merge([
-            'product_id'      => $ctx['product']->id,
-            'product_name'    => 'Hero Lager',
-            'unit_price'      => $price,
-            'quantity'        => $qty,
+        'vendor_id' => $ctx['vendor']->id,
+        'items' => [array_merge([
+            'product_id' => $ctx['product']->id,
+            'product_name' => 'Hero Lager',
+            'unit_price' => $price,
+            'quantity' => $qty,
             'product_unit_id' => $ctx['base']->id,
-            'unit_qty'        => $qty,
-            'price_type'      => $type,
+            'unit_qty' => $qty,
+            'price_type' => $type,
         ], $line)],
-        'payment_method'  => 'cash',
+        'payment_method' => 'cash',
         'amount_tendered' => 100000,
-        'vat_rate'        => 0,
+        'vat_rate' => 0,
     ]);
 }
 
@@ -91,20 +91,20 @@ function acceptSync(array $ctx, string $offlineId, int|float $qty)
 
     return test()->postJson('/api/pos/sync', [
         'vendor_id' => $ctx['vendor']->id,
-        'sales'     => [[
-            'offline_id'      => $offlineId,
-            'items'           => [[
+        'sales' => [[
+            'offline_id' => $offlineId,
+            'items' => [[
                 'product_id' => $ctx['product']->id, 'product_name' => 'Hero Lager',
                 'unit_price' => 10100, 'quantity' => $qty, 'total' => 10100 * $qty,
                 'product_unit_id' => $ctx['base']->id, 'unit_qty' => $qty,
             ]],
-            'total'           => 10100 * $qty,
-            'vat_amount'      => 0,
-            'payment_method'  => 'cash',
+            'total' => 10100 * $qty,
+            'vat_amount' => 0,
+            'payment_method' => 'cash',
             'amount_tendered' => 100000,
-            'completed_at'    => now()->subMinutes(10)->toDateTimeString(),
-            'store_id'        => $ctx['vendor']->defaultStore?->id,
-            'payments'        => null,
+            'completed_at' => now()->subMinutes(10)->toDateTimeString(),
+            'store_id' => $ctx['vendor']->defaultStore?->id,
+            'payments' => null,
         ]],
     ]);
 }
@@ -152,7 +152,7 @@ describe('a supermarket, with half quantities off', function () {
         acceptSale($ctx, 2)->assertSuccessful();
 
         expect(PosSaleItem::sole()->receiptLine())->toBe([
-            'quantity'   => 2,
+            'quantity' => 2,
             'unit_price' => PosSaleItem::sole()->unit_price,
             'half_price' => null,
         ]);
@@ -163,7 +163,7 @@ describe('a supermarket, with half quantities off', function () {
         acceptSale($ctx, 2)->assertSuccessful();
 
         $summary = app(SalesReportService::class)->summary($ctx['vendor']->id, now()->subDay(), now()->addDay());
-        $top     = app(SalesReportService::class)->topProducts($ctx['vendor']->id, now()->subDay(), now()->addDay());
+        $top = app(SalesReportService::class)->topProducts($ctx['vendor']->id, now()->subDay(), now()->addDay());
 
         expect((float) $summary['revenue'])->toBe(20200.0)
             ->and((float) $summary['cost'])->toBe(16000.0)
@@ -241,7 +241,7 @@ describe('a halves shop', function () {
 
         acceptSale($ctx, 0.5)->assertSuccessful();
 
-        $line    = PosSaleItem::sole();
+        $line = PosSaleItem::sole();
         $summary = app(SalesReportService::class)->summary($ctx['vendor']->id, now()->subDay(), now()->addDay());
 
         expect((float) $line->cost_total)->toBe(4000.0)
@@ -277,7 +277,7 @@ describe('a halves shop', function () {
         acceptSale($ctx, 1.5)->assertSuccessful();
 
         expect(PosSaleItem::sole()->receiptLine())->toBe([
-            'quantity'   => '1½ Crate',
+            'quantity' => '1½ Crate',
             'unit_price' => 10100.0,
             'half_price' => 5200.0,
         ]);

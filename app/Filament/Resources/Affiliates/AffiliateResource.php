@@ -10,15 +10,16 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use UnitEnum;
 
 class AffiliateResource extends Resource
 {
     protected static ?string $model = Affiliate::class;
 
-    protected static string|null|BackedEnum $navigationIcon  = 'heroicon-o-user-group';
-    protected static ?string                $navigationLabel = 'Affiliates';
-    protected static ?int                   $navigationSort  = 2;
+    protected static string|null|BackedEnum $navigationIcon = 'heroicon-o-user-group';
+
+    protected static ?string $navigationLabel = 'Affiliates';
+
+    protected static ?int $navigationSort = 2;
 
     public static function getNavigationGroup(): ?string
     {
@@ -30,7 +31,10 @@ class AffiliateResource extends Resource
         return auth()->user()?->hasRole('super_admin') ?? false;
     }
 
-    public static function canDelete($record): bool { return false; }
+    public static function canDelete($record): bool
+    {
+        return false;
+    }
 
     public static function getEloquentQuery(): Builder
     {
@@ -58,10 +62,10 @@ class AffiliateResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index'  => Pages\ListAffiliates::route('/'),
+            'index' => Pages\ListAffiliates::route('/'),
             'create' => Pages\CreateAffiliate::route('/create'),
-            'view'   => Pages\ViewAffiliate::route('/{record}'),
-            'edit'   => Pages\EditAffiliate::route('/{record}/edit'),
+            'view' => Pages\ViewAffiliate::route('/{record}'),
+            'edit' => Pages\EditAffiliate::route('/{record}/edit'),
         ];
     }
 }

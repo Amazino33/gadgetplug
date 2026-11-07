@@ -61,13 +61,13 @@ class ProductInteractions
 
             try {
                 ProductInteraction::create([
-                    'product_id'   => $product->id,
-                    'user_id'      => $userId,
+                    'product_id' => $product->id,
+                    'user_id' => $userId,
                     'device_token' => $userId ? null : $token,
-                    'type'         => ProductInteraction::TYPE_LIKE,
+                    'type' => ProductInteraction::TYPE_LIKE,
                     // What the unique index bites on. Shares leave it null so
                     // the same product can be shared more than once.
-                    'unique_key'   => ProductInteraction::TYPE_LIKE,
+                    'unique_key' => ProductInteraction::TYPE_LIKE,
                 ]);
             } catch (UniqueConstraintViolationException) {
                 // Two taps raced. The other one won and the like is on, which
@@ -126,11 +126,11 @@ class ProductInteractions
         [$userId, $token] = $this->identify($user, $deviceToken);
 
         ProductInteraction::create([
-            'product_id'   => $product->id,
-            'user_id'      => $userId,
+            'product_id' => $product->id,
+            'user_id' => $userId,
             'device_token' => $userId ? null : $token,
-            'type'         => ProductInteraction::TYPE_SHARE,
-            'unique_key'   => null,
+            'type' => ProductInteraction::TYPE_SHARE,
+            'unique_key' => null,
         ]);
 
         $this->adjustCount($product, 'share_count', 1);
@@ -196,9 +196,9 @@ class ProductInteractions
                 }
 
                 $row->update([
-                    'user_id'      => $user->id,
+                    'user_id' => $user->id,
                     'device_token' => null,
-                    'unique_key'   => ProductInteraction::TYPE_LIKE,
+                    'unique_key' => ProductInteraction::TYPE_LIKE,
                 ]);
                 $merged++;
             }

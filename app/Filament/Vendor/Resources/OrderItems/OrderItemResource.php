@@ -2,7 +2,6 @@
 
 namespace App\Filament\Vendor\Resources\OrderItems;
 
-use App\Filament\Vendor\Resources\OrderItems\Pages\CreateOrderItem;
 use App\Filament\Vendor\Resources\OrderItems\Pages\EditOrderItem;
 use App\Filament\Vendor\Resources\OrderItems\Pages\ListOrderItems;
 use App\Filament\Vendor\Resources\OrderItems\Pages\ViewOrderItem;
@@ -21,7 +20,9 @@ use Illuminate\Database\Eloquent\Model;
 class OrderItemResource extends Resource
 {
     protected static ?int $navigationSort = 2;
+
     protected static string|null|\UnitEnum $navigationGroup = 'Orders';
+
     protected static ?string $model = OrderItem::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
@@ -67,7 +68,7 @@ class OrderItemResource extends Resource
     private static function isAuthorized(): bool
     {
         $vendor = filament()->getTenant();
-        $user   = auth()->user();
+        $user = auth()->user();
 
         // Same online-sales gate as OrderResource — super admin bypasses it,
         // everyone else on a disabled vendor loses this resource entirely.
@@ -104,16 +105,18 @@ class OrderItemResource extends Resource
     public static function getDeleteAuthorizationResponse(Model $record): Response
     {
         $vendor = filament()->getTenant();
-        $user   = auth()->user();
+        $user = auth()->user();
         $allowed = $vendor && ($user->isSuperAdmin() || ($vendor->canSellOnline() && $vendor->isOwner($user)));
+
         return $allowed ? Response::allow() : Response::deny();
     }
 
     public static function getDeleteAnyAuthorizationResponse(): Response
     {
-        $vendor  = filament()->getTenant();
-        $user    = auth()->user();
+        $vendor = filament()->getTenant();
+        $user = auth()->user();
         $allowed = $vendor && ($user->isSuperAdmin() || ($vendor->canSellOnline() && $vendor->isOwner($user)));
+
         return $allowed ? Response::allow() : Response::deny();
     }
 }

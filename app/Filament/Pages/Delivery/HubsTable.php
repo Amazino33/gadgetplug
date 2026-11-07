@@ -10,6 +10,7 @@ use Filament\Actions\ActionGroup;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\ViewField;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Grid;
 use Filament\Support\Enums\FontWeight;
 use Filament\Tables\Columns\TextColumn;
@@ -154,7 +155,7 @@ class HubsTable extends TableWidget
             });
     }
 
-    /** @return array<int, \Filament\Schemas\Components\Component> */
+    /** @return array<int, Component> */
     private static function coordinateFields(): array
     {
         return [
@@ -190,7 +191,7 @@ class HubsTable extends TableWidget
         DeliveryRuleForm::authorize();
 
         $store->update([
-            'latitude'  => round((float) $data['latitude'], 6),
+            'latitude' => round((float) $data['latitude'], 6),
             'longitude' => round((float) $data['longitude'], 6),
         ]);
 
@@ -214,7 +215,7 @@ class HubsTable extends TableWidget
     private static function coordinates(Store $store): array
     {
         return [
-            'latitude'  => $store->latitude !== null ? (float) $store->latitude : null,
+            'latitude' => $store->latitude !== null ? (float) $store->latitude : null,
             'longitude' => $store->longitude !== null ? (float) $store->longitude : null,
         ];
     }

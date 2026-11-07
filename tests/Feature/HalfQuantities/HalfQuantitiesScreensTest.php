@@ -3,12 +3,12 @@
 use App\Filament\Vendor\Pages\StockAdjustment;
 use App\Filament\Vendor\Pages\StoreProfile;
 use App\Models\Category;
+use App\Models\PosReturn;
 use App\Models\PosSale;
 use App\Models\PosSaleItem;
 use App\Models\Product;
 use App\Models\ProductStoreStock;
 use App\Models\ProductUnit;
-use App\Models\Supplier;
 use App\Models\User;
 use App\Models\Vendor;
 use App\Services\VendorRoles;
@@ -25,30 +25,30 @@ use Livewire\Livewire;
 
 function halvesScreensShop(bool $halves = true, array $product = []): array
 {
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
 
-    $owner  = User::factory()->create();
+    $owner = User::factory()->create();
     $vendor = Vendor::create([
-        'user_id'                => $owner->id,
-        'name'                   => ($halves ? 'Veruzo Wholesale ' : 'Corner Mart ').uniqid(),
+        'user_id' => $owner->id,
+        'name' => ($halves ? 'Veruzo Wholesale ' : 'Corner Mart ').uniqid(),
         'pos_min_margin_percent' => 0,
-        'allow_half_quantities'  => $halves,
+        'allow_half_quantities' => $halves,
     ]);
     VendorRoles::seedFor($vendor);
 
     $product = Product::create(array_merge([
-        'vendor_id'                => $vendor->id,
-        'store_id'                 => $vendor->defaultStore?->id,
-        'category_id'              => Category::create(['name' => 'Drinks '.uniqid()])->id,
-        'name'                     => 'Hero Lager',
-        'base_unit'                => 'Crate',
-        'price'                    => 10100,
-        'wholesale_price'          => 9600,
-        'cost_price'               => 8000,
+        'vendor_id' => $vendor->id,
+        'store_id' => $vendor->defaultStore?->id,
+        'category_id' => Category::create(['name' => 'Drinks '.uniqid()])->id,
+        'name' => 'Hero Lager',
+        'base_unit' => 'Crate',
+        'price' => 10100,
+        'wholesale_price' => 9600,
+        'cost_price' => 8000,
         'allow_pos_price_override' => false,
-        'stock_quantity'           => 20,
-        'status'                   => 'published',
-        'show_in_pos'              => true,
+        'stock_quantity' => 20,
+        'status' => 'published',
+        'show_in_pos' => true,
     ], $product));
 
     $base = ProductUnit::where('product_id', $product->id)->where('is_base', true)->first();
@@ -61,19 +61,19 @@ function halvesSale(array $ctx, int|float $qty, array $over = [])
     Sanctum::actingAs($ctx['owner']);
 
     return test()->postJson('/api/pos/sales', [
-        'vendor_id'       => $ctx['vendor']->id,
-        'items'           => [array_merge([
-            'product_id'      => $ctx['product']->id,
-            'product_name'    => 'Hero Lager',
-            'unit_price'      => 10100,
-            'quantity'        => $qty,
+        'vendor_id' => $ctx['vendor']->id,
+        'items' => [array_merge([
+            'product_id' => $ctx['product']->id,
+            'product_name' => 'Hero Lager',
+            'unit_price' => 10100,
+            'quantity' => $qty,
             'product_unit_id' => $ctx['base']->id,
-            'unit_qty'        => $qty,
-            'price_type'      => 'retail',
+            'unit_qty' => $qty,
+            'price_type' => 'retail',
         ], $over)],
-        'payment_method'  => 'cash',
+        'payment_method' => 'cash',
         'amount_tendered' => 100000,
-        'vat_rate'        => 0,
+        'vat_rate' => 0,
     ]);
 }
 
@@ -112,7 +112,7 @@ it('says which products are in the way when halves cannot be turned off', functi
 
 it('tells the till about halves, and sends half prices only to a halves shop', function () {
     $halves = halvesScreensShop(true, ['half_price' => 5200]);
-    $plain  = halvesScreensShop(false);
+    $plain = halvesScreensShop(false);
 
     expect(TillProfile::for($halves['owner'], $halves['vendor'])['allow_half_quantities'])->toBeTrue()
         ->and(TillProfile::for($plain['owner'], $plain['vendor'])['allow_half_quantities'])->toBeFalse();
@@ -126,7 +126,7 @@ it('tells the till about halves, and sends half prices only to a halves shop', f
         return $product['units'][0] ?? null;
     };
 
-    $unit      = $baseUnitOf($halves);
+    $unit = $baseUnitOf($halves);
     $plainUnit = $baseUnitOf($plain);
 
     expect($unit['half_price'] ?? null)->toEqual(5200.0)
@@ -192,20 +192,20 @@ function halvesSync(array $ctx, string $offlineId, int|float $qty)
 
     return test()->postJson('/api/pos/sync', [
         'vendor_id' => $ctx['vendor']->id,
-        'sales'     => [[
-            'offline_id'      => $offlineId,
-            'items'           => [[
+        'sales' => [[
+            'offline_id' => $offlineId,
+            'items' => [[
                 'product_id' => $ctx['product']->id, 'product_name' => 'Hero Lager',
                 'unit_price' => 10100, 'quantity' => $qty, 'total' => 5050,
                 'product_unit_id' => $ctx['base']->id, 'unit_qty' => $qty,
             ]],
-            'total'           => 5050,
-            'vat_amount'      => 0,
-            'payment_method'  => 'cash',
+            'total' => 5050,
+            'vat_amount' => 0,
+            'payment_method' => 'cash',
             'amount_tendered' => 5050,
-            'completed_at'    => now()->subHour()->toDateTimeString(),
-            'store_id'        => $ctx['vendor']->defaultStore?->id,
-            'payments'        => null,
+            'completed_at' => now()->subHour()->toDateTimeString(),
+            'store_id' => $ctx['vendor']->defaultStore?->id,
+            'payments' => null,
         ]],
     ]);
 }
@@ -254,7 +254,7 @@ it('refunds the half at what it cost, and the rest so it all adds up', function 
         'items' => [['product_id' => $ctx['product']->id, 'quantity' => 1]], 'refund_method' => 'cash',
     ])->assertSuccessful();
 
-    $refunds = App\Models\PosReturn::where('original_sale_id', $sale->id)->orderBy('id')->pluck('refund_amount')->map(fn ($a) => (float) $a);
+    $refunds = PosReturn::where('original_sale_id', $sale->id)->orderBy('id')->pluck('refund_amount')->map(fn ($a) => (float) $a);
 
     expect($refunds->all())->toBe([5200.0, 10100.0])
         ->and($ctx['product']->fresh()->stock_quantity)->toBe(20);

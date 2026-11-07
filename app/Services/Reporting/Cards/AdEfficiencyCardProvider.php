@@ -15,6 +15,7 @@ use Carbon\CarbonImmutable;
 class AdEfficiencyCardProvider implements ReportCardProvider
 {
     private const RATIO_URGENT = 25.0;
+
     private const RATIO_ATTENTION = 15.0;
 
     public function summarize(int $vendorId, ?int $storeId = null): CardSummary
@@ -28,10 +29,10 @@ class AdEfficiencyCardProvider implements ReportCardProvider
         $revenue = $report['revenue'];
         $ratio = $revenue > 0 ? ($adSpend / $revenue) * 100 : null;
 
-        $headline = '₦' . number_format($adSpend, 2) . ' ad spend this month';
+        $headline = '₦'.number_format($adSpend, 2).' ad spend this month';
 
         $comparison = match (true) {
-            $ratio !== null => number_format($ratio, 1) . '% of delivered revenue',
+            $ratio !== null => number_format($ratio, 1).'% of delivered revenue',
             $adSpend > 0 => 'No delivered revenue yet to compare against',
             default => 'No ad spend recorded this month',
         };

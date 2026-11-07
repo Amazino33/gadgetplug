@@ -22,13 +22,13 @@ uses(RefreshDatabase::class);
 
 function setUpLegsVendor(): array
 {
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
 
     $owner = User::factory()->create();
-    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Logistics Legs Store ' . uniqid()]);
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Logistics Legs Store '.uniqid()]);
     VendorRoles::seedFor($vendor);
     $supplier = Supplier::create(['vendor_id' => $vendor->id, 'name' => 'Test Supplier']);
-    $category = Category::create(['name' => 'Legs Category ' . uniqid()]);
+    $category = Category::create(['name' => 'Legs Category '.uniqid()]);
     $product = Product::create([
         'vendor_id' => $vendor->id, 'category_id' => $category->id,
         'name' => 'Legs Product', 'price' => 5000, 'stock_quantity' => 0, 'status' => 'published',
@@ -115,7 +115,7 @@ test('recording a logistics payment posts one ledger entry per unpaid leg from t
 
     expect($procurement->legs()->whereNotNull('posted_at')->count())->toBe(2)
         ->and($account->fresh()->balance())->toBe(-3000.0)
-        ->and(FinancialLedgerEntry::where('source_type', (new ProcurementLogisticsLeg())->getMorphClass())->count())->toBe(2);
+        ->and(FinancialLedgerEntry::where('source_type', (new ProcurementLogisticsLeg)->getMorphClass())->count())->toBe(2);
 });
 
 test('recording a logistics payment twice does not double-post already-paid legs', function () {
@@ -145,8 +145,8 @@ test('a posted leg\'s amount and route cannot be changed', function () {
     $leg = $procurement->legs()->first();
     $leg->update(['financial_account_id' => $account->id, 'posted_at' => now()]);
 
-    expect(fn () => $leg->update(['amount' => 9999]))->toThrow(\LogicException::class);
-    expect(fn () => $leg->update(['route_label' => 'Changed']))->toThrow(\LogicException::class);
+    expect(fn () => $leg->update(['amount' => 9999]))->toThrow(LogicException::class);
+    expect(fn () => $leg->update(['route_label' => 'Changed']))->toThrow(LogicException::class);
 });
 
 test('an unposted leg can still be freely updated', function () {

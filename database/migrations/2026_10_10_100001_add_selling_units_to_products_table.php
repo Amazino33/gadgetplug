@@ -39,17 +39,17 @@ return new class extends Migration
                 $now = now();
 
                 DB::table('product_units')->insert($products->map(fn ($p) => [
-                    'product_id'        => $p->id,
-                    'vendor_id'         => $p->vendor_id,
-                    'name'              => mb_substr($p->base_unit ?: 'Piece', 0, 64),
+                    'product_id' => $p->id,
+                    'vendor_id' => $p->vendor_id,
+                    'name' => mb_substr($p->base_unit ?: 'Piece', 0, 64),
                     'conversion_factor' => 1,
-                    'price'             => $p->price ?? 0,
-                    'wholesale_price'   => null,
-                    'is_base'           => true,
-                    'sort_order'        => 0,
-                    'is_active'         => true,
-                    'created_at'        => $now,
-                    'updated_at'        => $now,
+                    'price' => $p->price ?? 0,
+                    'wholesale_price' => null,
+                    'is_base' => true,
+                    'sort_order' => 0,
+                    'is_active' => true,
+                    'created_at' => $now,
+                    'updated_at' => $now,
                 ])->all());
 
                 $unitIds = DB::table('product_units')

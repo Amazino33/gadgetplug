@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Vendor\Pages;
 
-use App\Support\Quantity;
 use App\Models\Product;
-use Barryvdh\DomPDF\Facade\Pdf;
+use App\Support\Quantity;
 use BackedEnum;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Filament\Pages\Page;
 use Illuminate\Support\Collection;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -15,18 +15,23 @@ use UnitEnum;
 
 class PriceList extends Page
 {
-    protected static null|string|BackedEnum $navigationIcon  = 'heroicon-o-tag';
-    protected static string|null|UnitEnum   $navigationGroup = 'Products';
+    protected static null|string|BackedEnum $navigationIcon = 'heroicon-o-tag';
+
+    protected static string|null|UnitEnum $navigationGroup = 'Products';
+
     protected static ?string $navigationLabel = 'Price List';
-    protected static ?string $title           = 'Price List';
+
+    protected static ?string $title = 'Price List';
+
     protected static ?int $navigationSort = 2;
+
     protected string $view = 'filament.vendor.pages.price-list';
 
     // Deliberately the broadest product permission: this is a reference sheet
     // every staff member needs, and it carries selling prices only.
     public static function canAccess(): bool
     {
-        $user   = auth()->user();
+        $user = auth()->user();
         $vendor = filament()->getTenant();
 
         return $vendor && $user->hasVendorPermission($vendor->id, 'view_products');
@@ -110,9 +115,9 @@ class PriceList extends Page
      */
     private function packColumns(array $rows, float $capacity): array
     {
-        $columns         = [];
-        $current         = [];
-        $used            = 0.0;
+        $columns = [];
+        $current = [];
+        $used = 0.0;
         $currentCategory = null;
 
         foreach ($rows as $row) {
@@ -121,13 +126,13 @@ class PriceList extends Page
 
             if ($current !== [] && $used + $needed > $capacity) {
                 $columns[] = $current;
-                $current   = [];
-                $used      = 0.0;
+                $current = [];
+                $used = 0.0;
 
                 if ($row['type'] === 'item' && $currentCategory !== null) {
-                    $carried   = ['type' => 'header', 'text' => $currentCategory . ' (cont.)', 'units' => 1.6];
+                    $carried = ['type' => 'header', 'text' => $currentCategory.' (cont.)', 'units' => 1.6];
                     $current[] = $carried;
-                    $used     += $carried['units'];
+                    $used += $carried['units'];
                 }
             }
 
@@ -136,7 +141,7 @@ class PriceList extends Page
             }
 
             $current[] = $row;
-            $used     += $row['units'];
+            $used += $row['units'];
         }
 
         if ($current !== []) {
@@ -170,10 +175,10 @@ class PriceList extends Page
 
             foreach ($products as $product) {
                 $rows[] = [
-                    'type'  => 'item',
-                    'name'  => $product->name,
+                    'type' => 'item',
+                    'name' => $product->name,
                     'price' => number_format((float) $product->price, 2),
-                    'out'   => Quantity::of($product->stock_quantity) <= 0,
+                    'out' => Quantity::of($product->stock_quantity) <= 0,
                     'units' => (float) $this->estimateLines((string) $product->name),
                 ];
             }
@@ -192,7 +197,7 @@ class PriceList extends Page
         // cannot predict, so grow the target until it really does fit one page.
         if (count($columns) <= $columnsPerPage) {
             $totalUnits = array_sum(array_column($rows, 'units'));
-            $balanced   = max(1.0, ceil($totalUnits / $columnsPerPage));
+            $balanced = max(1.0, ceil($totalUnits / $columnsPerPage));
 
             for ($try = $balanced; $try <= $capacity; $try++) {
                 $candidate = $this->packColumns($rows, (float) $try);
@@ -215,18 +220,18 @@ class PriceList extends Page
 
     public function downloadPdf(): StreamedResponse
     {
-        $vendor  = filament()->getTenant();
+        $vendor = filament()->getTenant();
         $grouped = $this->getGroupedProducts();
 
         $pdf = Pdf::loadView('filament.vendor.pages.price-list-pdf', [
-            'vendor'      => $vendor,
-            'pages'       => $this->buildPages($grouped),
-            'total'       => $grouped->flatten()->count(),
+            'vendor' => $vendor,
+            'pages' => $this->buildPages($grouped),
+            'total' => $grouped->flatten()->count(),
             'generatedAt' => now(),
         ])->setPaper('a4', 'portrait');
 
-        $filename = str($vendor->name)->slug() . '-pricelist-' . now()->format('Y-m-d') . '.pdf';
+        $filename = str($vendor->name)->slug().'-pricelist-'.now()->format('Y-m-d').'.pdf';
 
-        return response()->streamDownload(fn () => print($pdf->output()), $filename);
+        return response()->streamDownload(fn () => print ($pdf->output()), $filename);
     }
 }

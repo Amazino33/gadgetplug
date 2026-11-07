@@ -6,8 +6,8 @@ namespace App\Actions\CashUp;
 
 use App\Actions\Pos\RecordCustomerPaymentAction;
 use App\Models\CashUpRectification;
-use App\Models\PosSession;
 use App\Models\PosSale;
+use App\Models\PosSession;
 use App\Models\User;
 use App\Services\Pos\CustomerDebtService;
 use Illuminate\Support\Facades\DB;
@@ -80,16 +80,16 @@ class RecordRectificationAction
 
             $entry = CashUpRectification::create([
                 'pos_session_id' => $session->id,
-                'vendor_id'          => $session->vendor_id,
-                'kind'               => $kind,
-                'amount'             => round($amount, 2),
-                'from_tender'        => $fromTender,
-                'to_tender'          => $toTender,
-                'related_sale_id'    => $sale?->id,
-                'note'               => $note,
-                'created_by'         => $manager->id,
-                'idempotency_key'    => $idempotencyKey,
-                'created_at'         => now(),
+                'vendor_id' => $session->vendor_id,
+                'kind' => $kind,
+                'amount' => round($amount, 2),
+                'from_tender' => $fromTender,
+                'to_tender' => $toTender,
+                'related_sale_id' => $sale?->id,
+                'note' => $note,
+                'created_by' => $manager->id,
+                'idempotency_key' => $idempotencyKey,
+                'created_at' => now(),
             ]);
 
             if ($entry->kind === CashUpRectification::KIND_DEBT_PAID) {
@@ -99,9 +99,9 @@ class RecordRectificationAction
             activity()->causedBy($manager)
                 ->performedOn($session)
                 ->withProperties([
-                    'kind'   => $entry->kind,
+                    'kind' => $entry->kind,
                     'amount' => (float) $entry->amount,
-                    'sale'   => $sale?->reference,
+                    'sale' => $sale?->reference,
                 ])
                 ->tap(fn ($a) => $a->vendor_id = $session->vendor_id)
                 ->log('Rectified cash-up');

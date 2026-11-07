@@ -8,6 +8,8 @@ use App\Events\Accountability\ShortageWrittenOff;
 use App\Models\AccountabilityLedgerEntry;
 use App\Models\AuditSession;
 use App\Models\InventoryShortageCase;
+use App\Models\User;
+use App\Support\Accountability\FrozenLossSnapshot;
 use App\Support\Pos\BusinessDate;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -53,17 +55,17 @@ class ShortageCaseService
             return null;
         }
 
-        $snapshot = \App\Support\Accountability\FrozenLossSnapshot::forProduct($product, $variance);
+        $snapshot = FrozenLossSnapshot::forProduct($product, $variance);
 
         try {
             return InventoryShortageCase::create(array_merge($snapshot->toLedgerColumns(), [
-                'vendor_id'     => $line->vendor_id,
+                'vendor_id' => $line->vendor_id,
                 'count_line_id' => $line->id,
-                'product_id'    => $line->product_id,
+                'product_id' => $line->product_id,
                 // No assigned-storekeeper concept exists in this data model, so
                 // the case opens unattributed and the owner names someone.
                 'charged_storekeeper_id' => null,
-                'status'                 => 'pending_disposition',
+                'status' => 'pending_disposition',
             ]));
         } catch (QueryException $e) {
             // Lost a race on the unique index — return what the winner created.
@@ -106,9 +108,9 @@ class ShortageCaseService
         $this->guardDisposable($case, $reason);
 
         $case->update([
-            'status'             => 'written_off',
-            'disposed_by'        => $disposedBy,
-            'disposed_at'        => now(),
+            'status' => 'written_off',
+            'disposed_by' => $disposedBy,
+            'disposed_at' => now(),
             'disposition_reason' => $reason,
         ]);
 
@@ -156,9 +158,9 @@ class ShortageCaseService
             );
 
             $case->update([
-                'status'             => 'charged',
-                'disposed_by'        => $disposedBy,
-                'disposed_at'        => now(),
+                'status' => 'charged',
+                'disposed_by' => $disposedBy,
+                'disposed_at' => now(),
                 'disposition_reason' => $reason,
             ]);
 
@@ -186,9 +188,9 @@ class ShortageCaseService
         }
 
         $case->update([
-            'status'             => 'investigating',
-            'disposed_by'        => $disposedBy,
-            'disposed_at'        => now(),
+            'status' => 'investigating',
+            'disposed_by' => $disposedBy,
+            'disposed_at' => now(),
             'disposition_reason' => $reason,
         ]);
 
@@ -311,9 +313,9 @@ class ShortageCaseService
             $split = $this->allocation($case);
 
             $case->update([
-                'status'             => 'written_off',
-                'disposed_by'        => $recordedBy,
-                'disposed_at'        => now(),
+                'status' => 'written_off',
+                'disposed_by' => $recordedBy,
+                'disposed_at' => now(),
                 'disposition_reason' => $reason,
             ]);
 
@@ -343,7 +345,7 @@ class ShortageCaseService
      */
     public function allocation(InventoryShortageCase $case): array
     {
-        $chargedCost   = (float) $case->cost_component;
+        $chargedCost = (float) $case->cost_component;
         $chargedMargin = (float) $case->margin_component;
 
         // Sum of recovery rows only. writeoff_conversion also reduces the
@@ -353,13 +355,13 @@ class ShortageCaseService
             ->whereIn('entry_type', AccountabilityLedgerEntry::RECOVERY_TYPES)
             ->sum('amount'));
 
-        $recoveredCost   = min($recovered, $chargedCost);
+        $recoveredCost = min($recovered, $chargedCost);
         $recoveredMargin = max(0.0, $recovered - $chargedCost);
 
         return [
-            'recovered_cost'     => round($recoveredCost, 2),
-            'recovered_margin'   => round($recoveredMargin, 2),
-            'unrecovered_cost'   => round(max(0.0, $chargedCost - $recoveredCost), 2),
+            'recovered_cost' => round($recoveredCost, 2),
+            'recovered_margin' => round($recoveredMargin, 2),
+            'unrecovered_cost' => round(max(0.0, $chargedCost - $recoveredCost), 2),
             'unrecovered_margin' => round(max(0.0, $chargedMargin - $recoveredMargin), 2),
         ];
     }
@@ -377,7 +379,7 @@ class ShortageCaseService
 
     private function belongsToStore(int $userId, int $vendorId): bool
     {
-        $user = \App\Models\User::find($userId);
+        $user = User::find($userId);
 
         if (! $user) {
             return false;

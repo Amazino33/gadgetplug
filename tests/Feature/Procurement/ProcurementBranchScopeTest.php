@@ -24,9 +24,9 @@ function branchVendor(): array
     $oraimo = Store::create(['vendor_id' => $vendor->id, 'name' => 'Oraimo Store']);
 
     return [
-        'vendor'      => $vendor,
-        'oga'         => $oga,
-        'oraimo'      => $oraimo,
+        'vendor' => $vendor,
+        'oga' => $oga,
+        'oraimo' => $oraimo,
         'accessories' => $vendor->defaultStore,
     ];
 }
@@ -48,14 +48,14 @@ function branchOrder(Vendor $vendor, ?Store $store, ?User $creator = null): Proc
     $supplier = Supplier::create(['vendor_id' => $vendor->id, 'name' => 'Branch Supplier '.uniqid()]);
 
     return Procurement::create([
-        'vendor_id'      => $vendor->id,
-        'supplier_id'    => $supplier->id,
-        'store_id'       => $store?->id,
-        'reference'      => 'PO-'.strtoupper(Str::random(8)),
-        'status'         => 'pending',
-        'created_by'     => ($creator ?? User::find($vendor->user_id))->id,
-        'total_cost'     => 0,
-        'amount_paid'    => 0,
+        'vendor_id' => $vendor->id,
+        'supplier_id' => $supplier->id,
+        'store_id' => $store?->id,
+        'reference' => 'PO-'.strtoupper(Str::random(8)),
+        'status' => 'pending',
+        'created_by' => ($creator ?? User::find($vendor->user_id))->id,
+        'total_cost' => 0,
+        'amount_paid' => 0,
         'payment_status' => 'credit',
         'payment_method' => 'cash',
     ]);

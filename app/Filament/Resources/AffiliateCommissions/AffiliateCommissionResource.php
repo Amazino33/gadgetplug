@@ -9,7 +9,6 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use UnitEnum;
 
 // Read-only, cross-affiliate oversight — mirrors the admin Orders/PosSales
 // pattern. The per-affiliate commission list already exists as a relation
@@ -19,9 +18,11 @@ class AffiliateCommissionResource extends Resource
 {
     protected static ?string $model = AffiliateCommission::class;
 
-    protected static string|null|BackedEnum $navigationIcon  = 'heroicon-o-banknotes';
-    protected static ?string                $navigationLabel = 'Commissions';
-    protected static ?int                   $navigationSort  = 3;
+    protected static string|null|BackedEnum $navigationIcon = 'heroicon-o-banknotes';
+
+    protected static ?string $navigationLabel = 'Commissions';
+
+    protected static ?int $navigationSort = 3;
 
     public static function getNavigationGroup(): ?string
     {
@@ -33,9 +34,20 @@ class AffiliateCommissionResource extends Resource
         return auth()->user()?->hasRole('super_admin') ?? false;
     }
 
-    public static function canCreate(): bool   { return false; }
-    public static function canEdit($record): bool   { return false; }
-    public static function canDelete($record): bool { return false; }
+    public static function canCreate(): bool
+    {
+        return false;
+    }
+
+    public static function canEdit($record): bool
+    {
+        return false;
+    }
+
+    public static function canDelete($record): bool
+    {
+        return false;
+    }
 
     public static function getEloquentQuery(): Builder
     {

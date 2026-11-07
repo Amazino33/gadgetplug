@@ -33,9 +33,9 @@ class CloseStoreAccountAction
 {
     /**
      * @param  array<string, mixed>  $figures  The assembled balance, as
-     *   StoreAccountCloseBalance produces it. Copied in whole and never
-     *   recomputed; the paths lifted into columns below are the contract
-     *   between that service and this row.
+     *                                         StoreAccountCloseBalance produces it. Copied in whole and never
+     *                                         recomputed; the paths lifted into columns below are the contract
+     *                                         between that service and this row.
      */
     public function execute(
         User $closedBy,
@@ -90,23 +90,23 @@ class CloseStoreAccountAction
             }
 
             $close = StoreAccountClose::create([
-                'vendor_id'         => $store->vendor_id,
-                'store_id'          => $store->id,
-                'period_from'       => $from,
-                'period_to'         => $to,
+                'vendor_id' => $store->vendor_id,
+                'store_id' => $store->id,
+                'period_from' => $from,
+                'period_to' => $to,
                 'previous_close_id' => $previous?->id,
-                'opening_source'    => $baseline->source,
-                'opening_count_id'  => $baseline->count?->id,
-                'closing_count_id'  => $closingCount->id,
-                'payload'           => $figures,
+                'opening_source' => $baseline->source,
+                'opening_count_id' => $baseline->count?->id,
+                'closing_count_id' => $closingCount->id,
+                'payload' => $figures,
 
                 // Copies for the list screen, never a second calculation. Every
                 // one of these is also in the payload, which stays definitive.
-                'value_sold'          => (float) data_get($figures, 'balance.value_sold', 0),
-                'submitted_total'     => (float) data_get($figures, 'balance.submitted_total', 0),
-                'till_expenses'       => (float) data_get($figures, 'balance.till_expenses', 0),
-                'period_debt'         => (float) data_get($figures, 'balance.period_debt', 0),
-                'shortage'            => (float) data_get($figures, 'balance.shortage', 0),
+                'value_sold' => (float) data_get($figures, 'balance.value_sold', 0),
+                'submitted_total' => (float) data_get($figures, 'balance.submitted_total', 0),
+                'till_expenses' => (float) data_get($figures, 'balance.till_expenses', 0),
+                'period_debt' => (float) data_get($figures, 'balance.period_debt', 0),
+                'shortage' => (float) data_get($figures, 'balance.shortage', 0),
                 'variance_at_selling' => (float) data_get($figures, 'count_variance.at_selling', 0),
 
                 'closed_by' => $closedBy->id,

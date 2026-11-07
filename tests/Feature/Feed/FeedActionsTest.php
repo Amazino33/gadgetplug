@@ -4,11 +4,12 @@ use App\Http\Middleware\EnsureDeviceToken;
 use App\Listeners\ClaimGuestFeedActivity;
 use App\Models\Category;
 use App\Models\Product;
-use Database\Factories\ProductFactory;
 use App\Models\ProductInteraction;
 use App\Models\User;
 use App\Models\Vendor;
 use App\Models\Wishlist;
+use Database\Factories\ProductFactory;
+use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
@@ -18,8 +19,8 @@ uses(RefreshDatabase::class);
 function actionVendor(bool $online = true): Vendor
 {
     return Vendor::create([
-        'user_id'              => User::factory()->create()->id,
-        'name'                 => 'Action Shop '.uniqid(),
+        'user_id' => User::factory()->create()->id,
+        'name' => 'Action Shop '.uniqid(),
         'online_sales_enabled' => $online,
     ]);
 }
@@ -29,14 +30,14 @@ function actionProduct(?Vendor $vendor = null, array $over = []): Product
     $vendor ??= actionVendor();
 
     return ProductFactory::new()->withPhoto()->create(array_merge([
-        'vendor_id'      => $vendor->id,
-        'store_id'       => $vendor->defaultStore->id,
-        'category_id'    => Category::firstOrCreate(['name' => 'Action Cat'])->id,
-        'name'           => 'Action Thing '.Str::random(5),
-        'price'          => 9500,
+        'vendor_id' => $vendor->id,
+        'store_id' => $vendor->defaultStore->id,
+        'category_id' => Category::firstOrCreate(['name' => 'Action Cat'])->id,
+        'name' => 'Action Thing '.Str::random(5),
+        'price' => 9500,
         'stock_quantity' => 6,
-        'status'         => 'published',
-        'published_at'   => now(),
+        'status' => 'published',
+        'published_at' => now(),
     ], $over));
 }
 
@@ -57,7 +58,7 @@ function asDevice(string $token, string $method, string $url, array $data = [])
         // it — after which the middleware mints a fresh token and nothing
         // toggles. Production is unaffected: there the framework encrypts on
         // the way out and decrypts on the way in.
-        ->withoutMiddleware(\Illuminate\Cookie\Middleware\EncryptCookies::class)
+        ->withoutMiddleware(EncryptCookies::class)
         ->call($method, $url, $data, [EnsureDeviceToken::COOKIE => $token], [], [
             'HTTP_ACCEPT' => 'application/json',
         ]);

@@ -2,8 +2,7 @@
 
 use App\Models\PosSale;
 use App\Models\PosSaleItem;
-use App\Models\ProductStoreStock;
-use App\Models\StockCostLayer;
+use App\Services\Inventory\StockValuation;
 use App\Services\Reporting\FinancialReportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -33,17 +32,17 @@ function sellAtTill(array $ctx, int $quantity): array
     Sanctum::actingAs($ctx['owner']);
 
     return test()->postJson('/api/pos/sales', [
-        'vendor_id'       => $ctx['vendor']->id,
-        'items'           => [[
-            'product_id'   => $ctx['product']->id,
+        'vendor_id' => $ctx['vendor']->id,
+        'items' => [[
+            'product_id' => $ctx['product']->id,
             'product_name' => 'Credit Widget',
-            'unit_price'   => 5000.0,
-            'quantity'     => $quantity,
+            'unit_price' => 5000.0,
+            'quantity' => $quantity,
         ]],
-        'payment_method'  => 'cash',
+        'payment_method' => 'cash',
         'amount_tendered' => 5000.0 * $quantity,
-        'vat_rate'        => 0,
-        'payments'        => null,
+        'vat_rate' => 0,
+        'payments' => null,
     ])->json();
 }
 
@@ -100,7 +99,7 @@ test('what was sold and what is left add up to what was bought', function () {
     sellAtTill($ctx, 12);
 
     $sold = cogsFor($ctx);
-    $left = App\Services\Inventory\StockValuation::forVendor($ctx['vendor']->id)['value'];
+    $left = StockValuation::forVendor($ctx['vendor']->id)['value'];
 
     // (10 x 1,000) + (10 x 1,500) = 25,000 came in and none of it evaporated.
     expect($sold + $left)->toBe(25000.0);
@@ -113,14 +112,14 @@ test('two lines of the same product on one cart are each costed on their own', f
     // The same product twice, which the line-keyed write-back has to keep apart.
     $sale = test()->postJson('/api/pos/sales', [
         'vendor_id' => $ctx['vendor']->id,
-        'items'     => [
+        'items' => [
             ['product_id' => $ctx['product']->id, 'product_name' => 'Credit Widget', 'unit_price' => 5000.0, 'quantity' => 6],
             ['product_id' => $ctx['product']->id, 'product_name' => 'Credit Widget', 'unit_price' => 5000.0, 'quantity' => 6],
         ],
-        'payment_method'  => 'cash',
+        'payment_method' => 'cash',
         'amount_tendered' => 60000.0,
-        'vat_rate'        => 0,
-        'payments'        => null,
+        'vat_rate' => 0,
+        'payments' => null,
     ])->json();
 
     $lines = PosSaleItem::where('pos_sale_id', $sale['id'])->orderBy('id')->get();
@@ -138,7 +137,7 @@ test('a sale made before batches existed still reports its old cost', function (
 
     // A line with no cost_total, exactly as every historic row will look.
     $sale = PosSale::create([
-        'reference' => 'POS-OLD-' . uniqid(),
+        'reference' => 'POS-OLD-'.uniqid(),
         'vendor_id' => $ctx['vendor']->id, 'store_id' => $ctx['store']->id,
         'cashier_id' => $ctx['owner']->id,
         'subtotal' => 5000, 'discount_amount' => 0, 'vat_amount' => 0, 'total' => 5000,
@@ -162,7 +161,7 @@ test('returning part of a sale reverses that share of what it really cost', func
 
     // Hand back 6 of the 12. The line cost 13,000, so 6/12 of it comes back.
     test()->postJson("/api/pos/sales/{$sale['id']}/return", [
-        'items'         => [['product_id' => $ctx['product']->id, 'quantity' => 6]],
+        'items' => [['product_id' => $ctx['product']->id, 'quantity' => 6]],
         'refund_method' => 'cash',
     ])->assertSuccessful();
 

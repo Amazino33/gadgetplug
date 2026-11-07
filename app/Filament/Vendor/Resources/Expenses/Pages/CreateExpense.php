@@ -13,7 +13,7 @@ class CreateExpense extends CreateRecord
 
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        $data['vendor_id']  = filament()->getTenant()->id;
+        $data['vendor_id'] = filament()->getTenant()->id;
         $data['created_by'] = auth()->id();
 
         return $data;

@@ -2,13 +2,13 @@
 
 namespace App\Observers;
 
-use App\Support\Quantity;
 use App\Models\InventoryLedger;
 use App\Models\Product;
 use App\Models\ProductStoreStock;
 use App\Models\Store;
 use App\Services\ActiveStore;
 use App\Services\DefaultStore;
+use App\Support\Quantity;
 use Illuminate\Support\Facades\DB;
 use LogicException;
 
@@ -179,7 +179,7 @@ class ProductObserver
 
             $destination = ProductStoreStock::firstOrNew([
                 'product_id' => $product->id,
-                'store_id'   => $to,
+                'store_id' => $to,
             ]);
 
             $destination->quantity = Quantity::add($destination->quantity ?? 0, $quantity);
@@ -202,14 +202,14 @@ class ProductObserver
             // the truth on its own: units left here, units arrived there.
             foreach ([[$from, -$quantity], [$to, $quantity]] as [$storeId, $change]) {
                 InventoryLedger::create([
-                    'vendor_id'        => $product->vendor_id,
-                    'store_id'         => $storeId,
-                    'product_id'       => $product->id,
-                    'user_id'          => auth()->id(),
+                    'vendor_id' => $product->vendor_id,
+                    'store_id' => $storeId,
+                    'product_id' => $product->id,
+                    'user_id' => auth()->id(),
                     'transaction_type' => 'store_transfer',
-                    'quantity_change'  => $change,
-                    'reference'        => "product-{$product->id}-home-store",
-                    'description'      => $description,
+                    'quantity_change' => $change,
+                    'reference' => "product-{$product->id}-home-store",
+                    'description' => $description,
                 ]);
             }
         });
@@ -243,9 +243,9 @@ class ProductObserver
 
         ProductStoreStock::create([
             'product_id' => $product->id,
-            'store_id'   => $storeId,
-            'quantity'   => $quantity,
-            'reserved'   => $reserved,
+            'store_id' => $storeId,
+            'quantity' => $quantity,
+            'reserved' => $reserved,
         ]);
     }
 }

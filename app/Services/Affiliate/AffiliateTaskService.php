@@ -41,10 +41,10 @@ class AffiliateTaskService
 
         return AffiliateTaskSubmission::create([
             'affiliate_task_id' => $task->id,
-            'affiliate_id'      => $affiliate->id,
-            'status'            => 'submitted',
-            'notes'             => $notes,
-            'submitted_at'      => now(),
+            'affiliate_id' => $affiliate->id,
+            'status' => 'submitted',
+            'notes' => $notes,
+            'submitted_at' => now(),
         ]);
     }
 
@@ -63,10 +63,10 @@ class AffiliateTaskService
             $task = $locked->task;
 
             $locked->update([
-                'status'                => 'approved',
-                'reviewed_at'           => now(),
-                'reviewed_by'           => $reviewer->id,
-                'level_progress_value'  => $task->counts_toward_level ? $task->level_progress_value : null,
+                'status' => 'approved',
+                'reviewed_at' => now(),
+                'reviewed_by' => $reviewer->id,
+                'level_progress_value' => $task->counts_toward_level ? $task->level_progress_value : null,
             ]);
 
             app(PlugPointService::class)->creditForSubmission(
@@ -101,10 +101,10 @@ class AffiliateTaskService
             }
 
             $locked->update([
-                'status'           => 'rejected',
-                'reviewed_at'      => now(),
-                'reviewed_by'      => $reviewer->id,
-                'rejected_reason'  => $reason,
+                'status' => 'rejected',
+                'reviewed_at' => now(),
+                'reviewed_by' => $reviewer->id,
+                'rejected_reason' => $reason,
             ]);
 
             activity()
@@ -142,12 +142,12 @@ class AffiliateTaskService
                 }
 
                 $submission = AffiliateTaskSubmission::create([
-                    'affiliate_task_id'     => $task->id,
-                    'affiliate_id'          => $lockedAffiliate->id,
-                    'status'                => 'approved',
-                    'submitted_at'          => now(),
-                    'reviewed_at'           => now(),
-                    'level_progress_value'  => $task->counts_toward_level ? $task->level_progress_value : null,
+                    'affiliate_task_id' => $task->id,
+                    'affiliate_id' => $lockedAffiliate->id,
+                    'status' => 'approved',
+                    'submitted_at' => now(),
+                    'reviewed_at' => now(),
+                    'level_progress_value' => $task->counts_toward_level ? $task->level_progress_value : null,
                 ]);
 
                 app(PlugPointService::class)->creditForSubmission(
@@ -166,9 +166,9 @@ class AffiliateTaskService
     private function metricMeetsTarget(AffiliateTask $task, Affiliate $affiliate): bool
     {
         $value = match ($task->auto_metric) {
-            'cleared_sales_value'   => app(AffiliateLevelProgressionService::class)->lifetimeSalesValue($affiliate->id),
+            'cleared_sales_value' => app(AffiliateLevelProgressionService::class)->lifetimeSalesValue($affiliate->id),
             'completed_sales_count' => AffiliateCommission::where('affiliate_id', $affiliate->id)->where('status', 'available')->count(),
-            default                 => 0,
+            default => 0,
         };
 
         return $value >= (float) $task->auto_target;

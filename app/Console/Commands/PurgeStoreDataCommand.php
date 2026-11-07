@@ -54,7 +54,7 @@ class PurgeStoreDataCommand extends Command
         }
 
         $vendor = $this->resolveVendor();
-        $store  = $vendor ? $this->resolveStore($vendor) : null;
+        $store = $vendor ? $this->resolveStore($vendor) : null;
 
         if (! $vendor || ! $store) {
             return self::FAILURE;
@@ -68,7 +68,7 @@ class PurgeStoreDataCommand extends Command
         $this->info("Vendor: {$vendor->name} (#{$vendor->id})");
         $this->info("Store:  {$store->name} (#{$store->id})");
         $this->line($posBefore
-            ? 'POS sales: completed on or before ' . $posBefore->toDateString()
+            ? 'POS sales: completed on or before '.$posBefore->toDateString()
             : 'POS sales: ALL dates');
         $this->line($this->option('keep-products') ? 'Products: kept' : 'Products: deleted');
         $this->newLine();
@@ -149,7 +149,7 @@ class PurgeStoreDataCommand extends Command
         // nothing and reported zero ledger entries for sales that had them —
         // which would have deleted the sales and left their revenue on the books.
         $ledgerIds = $posSaleIds === [] ? [] : DB::table('financial_ledger_entries')
-            ->where('source_type', (new PosSale())->getMorphClass())
+            ->where('source_type', (new PosSale)->getMorphClass())
             ->whereIn('source_id', $posSaleIds)
             ->pluck('id')->all();
 
@@ -173,12 +173,12 @@ class PurgeStoreDataCommand extends Command
         )));
 
         return [
-            'products'         => array_values(array_diff($productIds, $blocked)),
+            'products' => array_values(array_diff($productIds, $blocked)),
             'products_blocked' => $blocked,
-            'pos_sales'        => $posSaleIds,
-            'order_items'      => $orderItemIds,
-            'orders_touched'   => $orderIds,
-            'ledger_entries'   => $ledgerIds,
+            'pos_sales' => $posSaleIds,
+            'order_items' => $orderItemIds,
+            'orders_touched' => $orderIds,
+            'ledger_entries' => $ledgerIds,
         ];
     }
 
@@ -194,17 +194,17 @@ class PurgeStoreDataCommand extends Command
         $this->table(['What', 'Rows', 'Value'], [
             ['Products',                 count($scope['products']),       '-'],
             ['Products kept (in use)',   count($scope['products_blocked']), 'referenced by history being kept'],
-            ['POS sales',                count($scope['pos_sales']),      'NGN ' . number_format($posValue, 2)],
+            ['POS sales',                count($scope['pos_sales']),      'NGN '.number_format($posValue, 2)],
             ['Online order lines',       count($scope['order_items']),    '-'],
             ['Orders touched',           count($scope['orders_touched']), 'emptied ones are removed'],
-            ['Financial ledger entries', count($scope['ledger_entries']), 'NGN ' . number_format($ledgerValue, 2)],
+            ['Financial ledger entries', count($scope['ledger_entries']), 'NGN '.number_format($ledgerValue, 2)],
         ]);
 
         $this->line('Also cleared for this store: stock ledger entries, per-store stock rows and reservations held against them.');
 
         if ($scope['products_blocked'] !== []) {
             $this->newLine();
-            $this->warn(count($scope['products_blocked']) . ' product(s) are still referenced by sales or procurement being kept, so they stay.');
+            $this->warn(count($scope['products_blocked']).' product(s) are still referenced by sales or procurement being kept, so they stay.');
             $this->line('Deleting them would break that retained history. Remove the referencing records first if they really must go.');
         }
     }
@@ -260,7 +260,7 @@ class PurgeStoreDataCommand extends Command
 
     private function resolveVendor(): ?Vendor
     {
-        $needle  = trim((string) $this->argument('vendor'));
+        $needle = trim((string) $this->argument('vendor'));
 
         $matches = Vendor::query()
             ->when(ctype_digit($needle), fn ($q) => $q->orWhere('id', (int) $needle))
@@ -293,7 +293,7 @@ class PurgeStoreDataCommand extends Command
                 ? "No store matches \"{$needle}\" under {$vendor->name}."
                 : "\"{$needle}\" matches several stores - use the id.");
 
-            $this->line('Stores: ' . Store::where('vendor_id', $vendor->id)->get()
+            $this->line('Stores: '.Store::where('vendor_id', $vendor->id)->get()
                 ->map(fn ($s) => "#{$s->id} {$s->slug}")->implode(', '));
 
             return null;

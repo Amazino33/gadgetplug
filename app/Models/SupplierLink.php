@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Permission for one vendor to sell from another vendor's catalogue.
@@ -25,13 +26,13 @@ class SupplierLink extends Model
     // in the database, which is a trap for every caller.
     protected $attributes = [
         'markup_percent' => 0,
-        'rounding_rule'  => RoundingRules::DEFAULT,
-        'is_active'      => true,
+        'rounding_rule' => RoundingRules::DEFAULT,
+        'is_active' => true,
     ];
 
     protected $casts = [
         'markup_percent' => 'decimal:2',
-        'is_active'      => 'boolean',
+        'is_active' => 'boolean',
     ];
 
     /** The vendor doing the selling — owns the listings and the payable. */
@@ -48,7 +49,7 @@ class SupplierLink extends Model
 
     /**
      * Safely resolve the supplier's name.
-     * 
+     *
      * Eager loading the supplier relation occasionally drops the vendor model due
      * to Filament's global tenant scoping bleeding across contexts, leaving the
      * name blank in the UI. This falls back to a raw database query to guarantee
@@ -60,7 +61,7 @@ class SupplierLink extends Model
             return $this->supplier->name;
         }
 
-        return \Illuminate\Support\Facades\DB::table('vendors')
+        return DB::table('vendors')
             ->where('id', $this->supplier_vendor_id)
             ->value('name') ?? 'Unknown supplier';
     }

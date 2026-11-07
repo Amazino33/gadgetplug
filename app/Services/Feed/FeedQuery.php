@@ -39,9 +39,7 @@ class FeedQuery
     /** How many posts from one store may sit next to each other. */
     private const MAX_CONSECUTIVE_PER_VENDOR = 2;
 
-    public function __construct(private readonly ProductInteractions $interactions)
-    {
-    }
+    public function __construct(private readonly ProductInteractions $interactions) {}
 
     /**
      * @return array{posts: Collection, next_cursor: ?string, has_more: bool}
@@ -85,9 +83,9 @@ class FeedQuery
         $hasMore = $rows->count() > $slice->count();
 
         return [
-            'posts'       => $this->present($posts),
+            'posts' => $this->present($posts),
             'next_cursor' => $last && $hasMore ? FeedCursor::encode($last, $seedBucket) : null,
-            'has_more'    => (bool) ($last && $hasMore),
+            'has_more' => (bool) ($last && $hasMore),
         ];
     }
 
@@ -235,17 +233,17 @@ class FeedQuery
         );
 
         return $posts->map(fn (Product $p) => [
-            'id'          => $p->id,
-            'name'        => $p->displayName(),
-            'slug'        => $p->slug,
-            'caption'     => $p->catalogueDescription(),
-            'price'       => (float) $p->price,
-            'url'         => route('product.show', $p->slug),
+            'id' => $p->id,
+            'name' => $p->displayName(),
+            'slug' => $p->slug,
+            'caption' => $p->catalogueDescription(),
+            'price' => (float) $p->price,
+            'url' => route('product.show', $p->slug),
             // Falls back through feed -> preview -> placeholder, so a queue
             // that has not caught up serves a heavier image rather than a
             // broken one.
-            'image'       => $p->feedImage(),
-            'store'       => [
+            'image' => $p->feedImage(),
+            'store' => [
                 'name' => $p->vendor?->name,
                 'slug' => $p->vendor?->slug,
                 // Null for every store until a logo can be uploaded; the card
@@ -258,9 +256,9 @@ class FeedQuery
                 // a route to nowhere, and the card renders plain text then.
                 'url' => $p->vendor?->slug ? route('store.show', $p->vendor->slug) : null,
             ],
-            'like_count'  => (int) $p->like_count,
+            'like_count' => (int) $p->like_count,
             'share_count' => (int) $p->share_count,
-            'liked'       => in_array($p->id, $liked, true),
+            'liked' => in_array($p->id, $liked, true),
         ])->values();
     }
 }

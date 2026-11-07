@@ -43,9 +43,9 @@ test('public legal routes return 200 and display policy content', function () {
 
 test('an unpublished policy returns 404', function () {
     LegalPolicy::create([
-        'title'        => 'Draft Policy',
-        'slug'         => 'draft-policy',
-        'content'      => '<p>Draft</p>',
+        'title' => 'Draft Policy',
+        'slug' => 'draft-policy',
+        'content' => '<p>Draft</p>',
         'is_published' => false,
     ]);
 

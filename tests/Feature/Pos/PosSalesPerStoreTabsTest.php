@@ -16,7 +16,7 @@ function storeTabsVendor(): Vendor
 {
     return Vendor::create([
         'user_id' => User::factory()->create()->id,
-        'name'    => 'Tabs Vendor '.uniqid(),
+        'name' => 'Tabs Vendor '.uniqid(),
     ]);
 }
 
@@ -25,19 +25,19 @@ function storeTabsSale(Vendor $vendor, ?Store $store, array $over = []): PosSale
     $total = $over['total'] ?? 10000;
 
     return PosSale::create(array_merge([
-        'reference'       => 'POS-'.Str::random(10),
-        'vendor_id'       => $vendor->id,
-        'store_id'        => $store?->id,
-        'cashier_id'      => $vendor->user_id,
-        'subtotal'        => $total,
+        'reference' => 'POS-'.Str::random(10),
+        'vendor_id' => $vendor->id,
+        'store_id' => $store?->id,
+        'cashier_id' => $vendor->user_id,
+        'subtotal' => $total,
         'discount_amount' => 0,
-        'vat_amount'      => 0,
-        'total'           => $total,
-        'payment_method'  => 'cash',
+        'vat_amount' => 0,
+        'total' => $total,
+        'payment_method' => 'cash',
         'amount_tendered' => $total,
-        'change_given'    => 0,
-        'status'          => 'completed',
-        'completed_at'    => now(),
+        'change_given' => 0,
+        'status' => 'completed',
+        'completed_at' => now(),
     ], $over));
 }
 
@@ -121,7 +121,7 @@ describe('the day', function () {
 
         $today = storeTabsSale($vendor, $vendor->defaultStore, ['reference' => 'POS-TODAY']);
         $yesterday = storeTabsSale($vendor, $vendor->defaultStore, [
-            'reference'    => 'POS-YESTERDAY',
+            'reference' => 'POS-YESTERDAY',
             'completed_at' => now()->subDay(),
         ]);
 

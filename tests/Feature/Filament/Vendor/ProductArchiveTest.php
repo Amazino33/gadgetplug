@@ -21,7 +21,7 @@ uses(RefreshDatabase::class);
 
 function setUpArchiveVendor(string $status = 'published'): array
 {
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
 
     $owner = User::factory()->create();
     $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Archive Test Store']);
@@ -29,13 +29,13 @@ function setUpArchiveVendor(string $status = 'published'): array
     $category = Category::create(['name' => 'Archive Category']);
 
     $product = Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'name'           => 'Archivable Widget',
-        'price'          => 5000,
-        'cost_price'     => 3000,
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'Archivable Widget',
+        'price' => 5000,
+        'cost_price' => 3000,
         'stock_quantity' => 10,
-        'status'         => $status,
+        'status' => $status,
     ]);
 
     return compact('owner', 'vendor', 'category', 'product');

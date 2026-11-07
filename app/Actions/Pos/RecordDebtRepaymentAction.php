@@ -89,15 +89,15 @@ class RecordDebtRepaymentAction
             );
 
             return PosDebtPayment::create([
-                'pos_customer_id'              => $customer->id,
-                'vendor_id'                    => $customer->vendor_id,
-                'store_id'                     => $storeId,
-                'collected_by'                 => $collectedBy->id,
+                'pos_customer_id' => $customer->id,
+                'vendor_id' => $customer->vendor_id,
+                'store_id' => $storeId,
+                'collected_by' => $collectedBy->id,
                 'pos_customer_ledger_entry_id' => $ledgerEntry->id,
-                'method'                       => $method,
-                'amount'                       => round($amount, 2),
-                'note'                         => $note,
-                'collected_at'                 => BusinessDate::today(),
+                'method' => $method,
+                'amount' => round($amount, 2),
+                'note' => $note,
+                'collected_at' => BusinessDate::today(),
             ]);
         });
     }

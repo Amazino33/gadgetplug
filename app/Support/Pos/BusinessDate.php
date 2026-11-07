@@ -105,7 +105,7 @@ final class BusinessDate
      */
     public static function sqlDate(string $column): string
     {
-        $now     = CarbonImmutable::now();
+        $now = CarbonImmutable::now();
         $seconds = $now->setTimezone(self::timezone())->getOffset()
             - $now->setTimezone(config('app.timezone', 'UTC'))->getOffset();
 

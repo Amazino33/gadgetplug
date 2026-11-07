@@ -5,6 +5,7 @@ use App\Models\Cutover;
 use App\Models\FinancialAccount;
 use App\Models\FinancialLedgerEntry;
 use App\Services\Orders\InvalidOrderTransition;
+use Carbon\CarbonInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
@@ -17,7 +18,7 @@ require_once __DIR__.'/Helpers.php';
 // the admin can record the payment as "collected by vendor (legacy)", which
 // books it the old way: to the vendor's own cash account.
 
-function setCutover(Carbon\CarbonInterface $at): void
+function setCutover(CarbonInterface $at): void
 {
     Cutover::updateOrCreate(['key' => Cutover::ORDER_STATUS_SERVICE], ['happened_at' => $at]);
 }

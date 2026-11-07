@@ -4,19 +4,17 @@ declare(strict_types=1);
 
 namespace App\Filament\Vendor\Widgets;
 
-use App\Support\Quantity;
 use App\Models\InventoryLedger;
-use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Services\Pickings\PickingLedger;
-use Filament\Facades\Filament;
-use Filament\Infolists\Components\TextEntry;
-use Filament\Infolists\Infolist;
-use Filament\Tables;
+use App\Support\Quantity;
 use Filament\Actions\Action;
+use Filament\Facades\Filament;
+use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseWidget;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\HtmlString;
 use Livewire\Attributes\Reactive;
@@ -28,6 +26,7 @@ class InventoryTableWidget extends BaseWidget
     public ?int $storeFilter = null;
 
     protected static ?string $heading = 'Inventory Analysis — All Products';
+
     protected int|string|array $columnSpan = 'full';
 
     public function table(Table $table): Table
@@ -75,8 +74,8 @@ class InventoryTableWidget extends BaseWidget
                     ->badge()
                     ->color(fn (int $state): string => match (true) {
                         $state === 0 => 'danger',
-                        $state < 5   => 'warning',
-                        default      => 'success',
+                        $state < 5 => 'warning',
+                        default => 'success',
                     })
                     ->tooltip('Physical units sitting in your shop'),
 
@@ -93,14 +92,13 @@ class InventoryTableWidget extends BaseWidget
                     ->label('Available to Sell')
                     ->getStateUsing(fn (Product $r): int|float => max(0, Quantity::sub($r->stock_quantity, $r->reserved_stock)))
                     ->formatStateUsing(fn ($state): string => Quantity::format($state, filament()->getTenant()))
-                    ->sortable(query: fn ($query, $direction) =>
-                        $query->orderByRaw(Quantity::availableSql()." {$direction}")
+                    ->sortable(query: fn ($query, $direction) => $query->orderByRaw(Quantity::availableSql()." {$direction}")
                     )
                     ->badge()
                     ->color(fn (int|float $state): string => match (true) {
-                        $state <= 0  => 'danger',
-                        $state < 5   => 'warning',
-                        default      => 'success',
+                        $state <= 0 => 'danger',
+                        $state < 5 => 'warning',
+                        default => 'success',
                     })
                     ->tooltip('What the storefront shows buyers = On Shelf − Reserved'),
 
@@ -122,17 +120,17 @@ class InventoryTableWidget extends BaseWidget
                 Tables\Columns\TextColumn::make('cost_price')
                     ->label('Cost')
                     ->sortable()
-                    ->formatStateUsing(fn ($state): string => '₦' . number_format((float) $state)),
+                    ->formatStateUsing(fn ($state): string => '₦'.number_format((float) $state)),
 
                 Tables\Columns\TextColumn::make('price')
                     ->label('Price')
                     ->sortable()
-                    ->formatStateUsing(fn ($state): string => '₦' . number_format((float) $state)),
+                    ->formatStateUsing(fn ($state): string => '₦'.number_format((float) $state)),
 
                 Tables\Columns\TextColumn::make('margin_pct')
                     ->label('Margin')
                     ->getStateUsing(fn (Product $r): string => $r->price > 0
-                        ? number_format((((float) $r->price - (float) $r->cost_price) / (float) $r->price) * 100, 1) . '%'
+                        ? number_format((((float) $r->price - (float) $r->cost_price) / (float) $r->price) * 100, 1).'%'
                         : '0.0%'
                     ),
 
@@ -151,14 +149,14 @@ class InventoryTableWidget extends BaseWidget
                         return match (true) {
                             $available === 0 && $r->stock_quantity > 0 => 'All Reserved',
                             $available === 0 => 'Out of Stock',
-                            $available < 5   => 'Low Stock',
-                            default          => 'Healthy',
+                            $available < 5 => 'Low Stock',
+                            default => 'Healthy',
                         };
                     })
                     ->color(fn (string $state): string => match ($state) {
                         'Out of Stock', 'All Reserved' => 'danger',
-                        'Low Stock'                    => 'warning',
-                        default                        => 'success',
+                        'Low Stock' => 'warning',
+                        default => 'success',
                     }),
             ])
             // Clicking a row opens its movement history. It used to open the
@@ -191,16 +189,16 @@ class InventoryTableWidget extends BaseWidget
                 Tables\Filters\SelectFilter::make('stock_status')
                     ->label('Stock Status')
                     ->options([
-                        'out'     => 'Out of Stock',
-                        'low'     => 'Low Stock',
+                        'out' => 'Out of Stock',
+                        'low' => 'Low Stock',
                         'healthy' => 'Healthy',
                     ])
-                    ->query(fn (\Illuminate\Database\Eloquent\Builder $q, array $data) => match ($data['value'] ?? null) {
-                        'out'     => $q->whereRaw(Quantity::availableSql().' <= 0'),
-                        'low'     => $q->whereRaw(Quantity::availableSql().' > 0')
-                                       ->whereRaw(Quantity::availableSql().' < 5'),
+                    ->query(fn (Builder $q, array $data) => match ($data['value'] ?? null) {
+                        'out' => $q->whereRaw(Quantity::availableSql().' <= 0'),
+                        'low' => $q->whereRaw(Quantity::availableSql().' > 0')
+                            ->whereRaw(Quantity::availableSql().' < 5'),
                         'healthy' => $q->whereRaw(Quantity::availableSql().' >= 5'),
-                        default   => $q,
+                        default => $q,
                     }),
             ])
             ->paginated([15, 25, 50]);
@@ -208,17 +206,17 @@ class InventoryTableWidget extends BaseWidget
 
     /** Human wording for a movement type — the "how" of each row. */
     private const MOVEMENT_LABELS = [
-        'online_sale'          => 'Online Sale',
-        'pos_sale'             => 'Shop Sale',
-        'pos_void'             => 'Shop Sale Voided',
-        'pos_return'           => 'Shop Return',
-        'restock'              => 'Restock',
-        'audit_correction'     => 'Audit Correction',
-        'refund'               => 'Refund',
-        'reserved'             => 'Reserved',
-        'dispatched'           => 'Dispatched',
+        'online_sale' => 'Online Sale',
+        'pos_sale' => 'Shop Sale',
+        'pos_void' => 'Shop Sale Voided',
+        'pos_return' => 'Shop Return',
+        'restock' => 'Restock',
+        'audit_correction' => 'Audit Correction',
+        'refund' => 'Refund',
+        'reserved' => 'Reserved',
+        'dispatched' => 'Dispatched',
         'reservation_released' => 'Reservation Released',
-        'online_return'        => 'Returned (failed delivery)',
+        'online_return' => 'Returned (failed delivery)',
     ];
 
     /**
@@ -249,8 +247,8 @@ class InventoryTableWidget extends BaseWidget
         if ($movements->isEmpty()) {
             return new HtmlString(
                 '<p style="font-size:13px;color:#6b7280;padding:16px 0;text-align:center">'
-                . 'No stock movement has been recorded for this product yet.'
-                . '</p>'
+                .'No stock movement has been recorded for this product yet.'
+                .'</p>'
             );
         }
 
@@ -259,22 +257,22 @@ class InventoryTableWidget extends BaseWidget
                 ?? ucfirst(str_replace('_', ' ', (string) $entry->transaction_type));
 
             $typeColor = match ($entry->transaction_type) {
-                'restock', 'reservation_released'       => '#068B03',
+                'restock', 'reservation_released' => '#068B03',
                 'pos_sale', 'online_sale', 'dispatched' => '#F97316',
                 'pos_void', 'pos_return', 'refund', 'online_return' => '#0284C7',
-                default                                 => '#6b7280',
+                default => '#6b7280',
             };
 
-            $change      = (int) $entry->quantity_change;
-            $changeText  = $change > 0 ? "+{$change}" : (string) $change;
+            $change = (int) $entry->quantity_change;
+            $changeText = $change > 0 ? "+{$change}" : (string) $change;
             $changeColor = $change > 0 ? '#068B03' : ($change < 0 ? '#DC2626' : '#6b7280');
 
             // "System" rather than blank: an online sale deducts stock with no
             // staff member behind it, and an empty cell reads as missing data.
-            $who    = e($entry->user?->name ?? 'System');
+            $who = e($entry->user?->name ?? 'System');
             $branch = $entry->store?->name ? e($entry->store->name) : '—';
-            $note   = e($entry->description ?: ($entry->reference ?: '—'));
-            $when   = $entry->created_at?->format('d M Y, g:ia') ?? '—';
+            $note = e($entry->description ?: ($entry->reference ?: '—'));
+            $when = $entry->created_at?->format('d M Y, g:ia') ?? '—';
 
             return "<tr style='border-bottom:1px solid #f3f4f6'>
                 <td style='padding:10px 12px;font-size:12px;color:#6b7280;white-space:nowrap'>{$when}</td>
@@ -292,7 +290,7 @@ class InventoryTableWidget extends BaseWidget
 
         $footer = $total > $limit
             ? "<p style='font-size:12px;color:#6b7280;padding:10px 2px 0'>Showing the most recent {$limit} of {$total} movements. The Stock Movement page under Inventory holds the full history.</p>"
-            : "<p style='font-size:12px;color:#6b7280;padding:10px 2px 0'>{$total} " . ($total === 1 ? 'movement' : 'movements') . " recorded.</p>";
+            : "<p style='font-size:12px;color:#6b7280;padding:10px 2px 0'>{$total} ".($total === 1 ? 'movement' : 'movements').' recorded.</p>';
 
         return new HtmlString("
             <div style='overflow-x:auto'>
@@ -330,9 +328,9 @@ class InventoryTableWidget extends BaseWidget
 
         $rows = $items->map(function ($item) {
             $statusColor = match ($item->order->status) {
-                'paid'      => '#068B03',
+                'paid' => '#068B03',
                 'confirmed' => '#F97316',
-                default     => '#6b7280',
+                default => '#6b7280',
             };
             $date = $item->order->created_at->format('d M Y, g:ia');
 
@@ -383,38 +381,38 @@ class InventoryTableWidget extends BaseWidget
      * rest of their history is in front of you. This answers the one question
      * the inventory page raises — where did the missing units go.
      */
-    private function holdersAction(): \Filament\Actions\Action
+    private function holdersAction(): Action
     {
-        return \Filament\Actions\Action::make('holders')
+        return Action::make('holders')
             ->label('Who is holding it')
-            ->modalHeading(fn (Product $record) => 'Out on picking — ' . $record->name)
+            ->modalHeading(fn (Product $record) => 'Out on picking — '.$record->name)
             ->modalSubmitAction(false)
             ->modalCancelActionLabel('Close')
             ->modalContent(function (Product $record) {
                 $holders = PickingLedger::holdersOfProduct($record->id, $this->storeFilter);
 
                 if ($holders->isEmpty()) {
-                    return new \Illuminate\Support\HtmlString(
+                    return new HtmlString(
                         '<p class="text-sm text-gray-500 dark:text-gray-400">Nobody is holding this product.</p>'
                     );
                 }
 
                 $rows = $holders->map(fn (array $row) => '<tr class="border-b border-gray-100 dark:border-white/10">'
-                    . '<td class="py-2 pr-4 text-gray-950 dark:text-white">' . e($row['picker_name']) . '</td>'
-                    . '<td class="py-2 pr-4 text-right font-semibold">' . (int) $row['units'] . '</td>'
-                    . '<td class="py-2 pr-4 text-gray-500 dark:text-gray-400">'
-                    . e(\Illuminate\Support\Carbon::parse($row['taken_at'])->format('d M Y')) . '</td>'
-                    . '<td class="py-2 text-gray-500 dark:text-gray-400 font-mono text-xs">'
-                    . e($row['reference'] ?? '—') . '</td></tr>')->implode('');
+                    .'<td class="py-2 pr-4 text-gray-950 dark:text-white">'.e($row['picker_name']).'</td>'
+                    .'<td class="py-2 pr-4 text-right font-semibold">'.(int) $row['units'].'</td>'
+                    .'<td class="py-2 pr-4 text-gray-500 dark:text-gray-400">'
+                    .e(Carbon::parse($row['taken_at'])->format('d M Y')).'</td>'
+                    .'<td class="py-2 text-gray-500 dark:text-gray-400 font-mono text-xs">'
+                    .e($row['reference'] ?? '—').'</td></tr>')->implode('');
 
-                return new \Illuminate\Support\HtmlString(
+                return new HtmlString(
                     '<div class="overflow-x-auto"><table class="w-full text-sm">'
-                    . '<thead><tr class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">'
-                    . '<th class="pb-2 pr-4 text-left font-medium">Picker</th>'
-                    . '<th class="pb-2 pr-4 text-right font-medium">Units</th>'
-                    . '<th class="pb-2 pr-4 text-left font-medium">Taken</th>'
-                    . '<th class="pb-2 text-left font-medium">Trip</th>'
-                    . '</tr></thead><tbody>' . $rows . '</tbody></table></div>'
+                    .'<thead><tr class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">'
+                    .'<th class="pb-2 pr-4 text-left font-medium">Picker</th>'
+                    .'<th class="pb-2 pr-4 text-right font-medium">Units</th>'
+                    .'<th class="pb-2 pr-4 text-left font-medium">Taken</th>'
+                    .'<th class="pb-2 text-left font-medium">Trip</th>'
+                    .'</tr></thead><tbody>'.$rows.'</tbody></table></div>'
                 );
             });
     }

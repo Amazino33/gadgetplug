@@ -2,6 +2,7 @@
 
 use App\Models\Affiliate;
 use App\Models\AffiliateCommission;
+use App\Models\AffiliateSetting;
 use App\Models\Category;
 use App\Models\Order;
 use App\Models\OrderItem;
@@ -22,15 +23,15 @@ function makeCommissionAffiliate(): Affiliate
 function makeCommissionOrder(array $lines, ?int $orderUserId = null, ?string $customerEmail = null): Order
 {
     $order = Order::create([
-        'reference'        => 'GP-' . uniqid(),
-        'user_id'          => $orderUserId,
-        'customer_name'    => 'Test Buyer',
-        'customer_email'   => $customerEmail ?? 'buyer@example.com',
-        'customer_phone'   => '08040000000',
+        'reference' => 'GP-'.uniqid(),
+        'user_id' => $orderUserId,
+        'customer_name' => 'Test Buyer',
+        'customer_email' => $customerEmail ?? 'buyer@example.com',
+        'customer_phone' => '08040000000',
         'shipping_address' => 'Uyo',
-        'total_amount'     => collect($lines)->sum(fn ($l) => $l['unit_price'] * $l['quantity']),
-        'status'           => 'pending',
-        'payment_method'   => 'paystack',
+        'total_amount' => collect($lines)->sum(fn ($l) => $l['unit_price'] * $l['quantity']),
+        'status' => 'pending',
+        'payment_method' => 'paystack',
     ]);
 
     foreach ($lines as $line) {
@@ -44,28 +45,28 @@ function makeCommissionOrder(array $lines, ?int $orderUserId = null, ?string $cu
 
 function makeCommissionProduct(?float $rate = null): Product
 {
-    $owner    = User::factory()->create();
-    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Commission Store ' . uniqid()]);
-    $category = Category::create(['name' => 'Commission Category ' . uniqid()]);
+    $owner = User::factory()->create();
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Commission Store '.uniqid()]);
+    $category = Category::create(['name' => 'Commission Category '.uniqid()]);
 
     return Product::create([
-        'vendor_id'        => $vendor->id,
-        'category_id'      => $category->id,
-        'name'             => 'Commission Product',
-        'price'            => 1000,
-        'stock_quantity'   => 50,
-        'status'           => 'published',
-        'commission_rate'  => $rate,
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'Commission Product',
+        'price' => 1000,
+        'stock_quantity' => 50,
+        'status' => 'published',
+        'commission_rate' => $rate,
     ]);
 }
 
 test('commission base is the sum of order item quantity times unit price', function () {
     $affiliate = makeCommissionAffiliate();
-    $product   = makeCommissionProduct(rate: 10.0);
-    $order     = makeCommissionOrder([[
+    $product = makeCommissionProduct(rate: 10.0);
+    $order = makeCommissionOrder([[
         'product_id' => $product->id,
-        'vendor_id'  => $product->vendor_id,
-        'quantity'   => 3,
+        'vendor_id' => $product->vendor_id,
+        'quantity' => 3,
         'unit_price' => 1000,
     ]]);
 
@@ -78,8 +79,8 @@ test('commission base is the sum of order item quantity times unit price', funct
 
 test('a multi-product order resolves and freezes a different rate per line', function () {
     $affiliate = makeCommissionAffiliate();
-    $productA  = makeCommissionProduct(rate: 10.0);
-    $productB  = makeCommissionProduct(rate: 20.0);
+    $productA = makeCommissionProduct(rate: 10.0);
+    $productB = makeCommissionProduct(rate: 20.0);
 
     $order = makeCommissionOrder([
         ['product_id' => $productA->id, 'vendor_id' => $productA->vendor_id, 'quantity' => 1, 'unit_price' => 1000],
@@ -98,16 +99,16 @@ test('a multi-product order resolves and freezes a different rate per line', fun
 
 test('re-creating a commission for the same order is idempotent', function () {
     $affiliate = makeCommissionAffiliate();
-    $product   = makeCommissionProduct(rate: 10.0);
-    $order     = makeCommissionOrder([[
+    $product = makeCommissionProduct(rate: 10.0);
+    $order = makeCommissionOrder([[
         'product_id' => $product->id,
-        'vendor_id'  => $product->vendor_id,
-        'quantity'   => 1,
+        'vendor_id' => $product->vendor_id,
+        'quantity' => 1,
         'unit_price' => 1000,
     ]]);
 
     $service = app(CommissionService::class);
-    $first  = $service->createForOrder($order, $affiliate);
+    $first = $service->createForOrder($order, $affiliate);
     $second = $service->createForOrder($order, $affiliate);
 
     expect($first->id)->toBe($second->id)
@@ -115,32 +116,32 @@ test('re-creating a commission for the same order is idempotent', function () {
 });
 
 test('a settings rate change never rewrites an already-frozen commission', function () {
-    \App\Models\AffiliateSetting::current()->update(['platform_default_rate' => 5.0]);
+    AffiliateSetting::current()->update(['platform_default_rate' => 5.0]);
 
     $affiliate = makeCommissionAffiliate();
-    $product   = makeCommissionProduct(); // no override -> uses platform default (5%)
-    $order     = makeCommissionOrder([[
+    $product = makeCommissionProduct(); // no override -> uses platform default (5%)
+    $order = makeCommissionOrder([[
         'product_id' => $product->id,
-        'vendor_id'  => $product->vendor_id,
-        'quantity'   => 1,
+        'vendor_id' => $product->vendor_id,
+        'quantity' => 1,
         'unit_price' => 1000,
     ]]);
 
     $commission = app(CommissionService::class)->createForOrder($order, $affiliate);
     expect($commission->amount)->toEqual('50.00'); // 5% of 1000
 
-    \App\Models\AffiliateSetting::current()->update(['platform_default_rate' => 50.0]);
+    AffiliateSetting::current()->update(['platform_default_rate' => 50.0]);
 
     expect($commission->fresh()->amount)->toEqual('50.00');
 });
 
 test('the full lifecycle credits the ledger exactly once', function () {
     $affiliate = makeCommissionAffiliate();
-    $product   = makeCommissionProduct(rate: 10.0);
-    $order     = makeCommissionOrder([[
+    $product = makeCommissionProduct(rate: 10.0);
+    $order = makeCommissionOrder([[
         'product_id' => $product->id,
-        'vendor_id'  => $product->vendor_id,
-        'quantity'   => 1,
+        'vendor_id' => $product->vendor_id,
+        'quantity' => 1,
         'unit_price' => 1000,
     ]]);
 
@@ -156,8 +157,8 @@ test('the full lifecycle credits the ledger exactly once', function () {
     $commission->fresh()->update(['status' => 'available', 'available_at' => now()]);
     $commission->walletTransactions()->create([
         'affiliate_id' => $affiliate->id,
-        'type'         => 'credit',
-        'amount'       => $commission->amount,
+        'type' => 'credit',
+        'amount' => $commission->amount,
     ]);
 
     expect(WalletTransaction::where('affiliate_commission_id', $commission->id)->where('type', 'credit')->count())->toBe(1)
@@ -166,11 +167,11 @@ test('the full lifecycle credits the ledger exactly once', function () {
 
 test('rejecting an already-credited commission writes a compensating reversal, never mutates the credit', function () {
     $affiliate = makeCommissionAffiliate();
-    $product   = makeCommissionProduct(rate: 10.0);
-    $order     = makeCommissionOrder([[
+    $product = makeCommissionProduct(rate: 10.0);
+    $order = makeCommissionOrder([[
         'product_id' => $product->id,
-        'vendor_id'  => $product->vendor_id,
-        'quantity'   => 1,
+        'vendor_id' => $product->vendor_id,
+        'quantity' => 1,
         'unit_price' => 1000,
     ]]);
 
@@ -179,8 +180,8 @@ test('rejecting an already-credited commission writes a compensating reversal, n
     $commission->update(['status' => 'available', 'available_at' => now()]);
     $credit = $commission->walletTransactions()->create([
         'affiliate_id' => $affiliate->id,
-        'type'         => 'credit',
-        'amount'       => $commission->amount,
+        'type' => 'credit',
+        'amount' => $commission->amount,
     ]);
 
     $service->reject($order, 'order_cancelled');
@@ -193,11 +194,11 @@ test('rejecting an already-credited commission writes a compensating reversal, n
 
 test('rejecting a pending commission writes no reversal, since nothing was ever credited', function () {
     $affiliate = makeCommissionAffiliate();
-    $product   = makeCommissionProduct(rate: 10.0);
-    $order     = makeCommissionOrder([[
+    $product = makeCommissionProduct(rate: 10.0);
+    $order = makeCommissionOrder([[
         'product_id' => $product->id,
-        'vendor_id'  => $product->vendor_id,
-        'quantity'   => 1,
+        'vendor_id' => $product->vendor_id,
+        'quantity' => 1,
         'unit_price' => 1000,
     ]]);
 
@@ -212,7 +213,7 @@ test('rejecting a pending commission writes no reversal, since nothing was ever 
 
 test('pending and available balances derive correctly across mixed commission states', function () {
     $affiliate = makeCommissionAffiliate();
-    $service   = app(CommissionService::class);
+    $service = app(CommissionService::class);
 
     foreach ([
         ['status' => 'pending', 'amount' => 100],
@@ -221,10 +222,10 @@ test('pending and available balances derive correctly across mixed commission st
         ['status' => 'rejected', 'amount' => 400],
     ] as $state) {
         $product = makeCommissionProduct(rate: 10.0);
-        $order   = makeCommissionOrder([[
+        $order = makeCommissionOrder([[
             'product_id' => $product->id,
-            'vendor_id'  => $product->vendor_id,
-            'quantity'   => 1,
+            'vendor_id' => $product->vendor_id,
+            'quantity' => 1,
             'unit_price' => $state['amount'] * 10, // so 10% commission = $state['amount']
         ]]);
 
@@ -234,8 +235,8 @@ test('pending and available balances derive correctly across mixed commission st
         if ($state['status'] === 'available') {
             $commission->walletTransactions()->create([
                 'affiliate_id' => $affiliate->id,
-                'type'         => 'credit',
-                'amount'       => $commission->amount,
+                'type' => 'credit',
+                'amount' => $commission->amount,
             ]);
         }
     }

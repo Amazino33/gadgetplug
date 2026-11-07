@@ -31,27 +31,27 @@ return new class extends Migration
             ->chunkById(500, function ($orders) use (&$created) {
                 foreach ($orders as $order) {
                     $checkoutId = DB::table('checkouts')->insertGetId([
-                        'reference'           => $order->reference,
-                        'idempotency_key'     => $order->idempotency_key,
-                        'user_id'             => $order->user_id,
-                        'customer_name'       => $order->customer_name,
-                        'customer_email'      => $order->customer_email,
-                        'customer_phone'      => $order->customer_phone,
-                        'shipping_address'    => $order->shipping_address,
-                        'local_government'    => $order->local_government,
-                        'payment_method'      => $order->payment_method,
-                        'items_total'         => $order->total_amount,
-                        'delivery_fee'        => 0,
-                        'grand_total'         => $order->total_amount,
-                        'fbp'                 => $order->fbp,
-                        'fbc'                 => $order->fbc,
+                        'reference' => $order->reference,
+                        'idempotency_key' => $order->idempotency_key,
+                        'user_id' => $order->user_id,
+                        'customer_name' => $order->customer_name,
+                        'customer_email' => $order->customer_email,
+                        'customer_phone' => $order->customer_phone,
+                        'shipping_address' => $order->shipping_address,
+                        'local_government' => $order->local_government,
+                        'payment_method' => $order->payment_method,
+                        'items_total' => $order->total_amount,
+                        'delivery_fee' => 0,
+                        'grand_total' => $order->total_amount,
+                        'fbp' => $order->fbp,
+                        'fbc' => $order->fbc,
                         // Orders already past the "money is settled" point have
                         // had their Purchase sent; mark it so nothing re-sends.
                         'purchase_tracked_at' => in_array($order->status, ['confirmed', 'paid', 'shipped', 'delivered'], true)
                             ? $order->updated_at
                             : null,
-                        'created_at'          => $order->created_at,
-                        'updated_at'          => $order->updated_at,
+                        'created_at' => $order->created_at,
+                        'updated_at' => $order->updated_at,
                     ]);
 
                     DB::table('orders')->where('id', $order->id)->update(['checkout_id' => $checkoutId]);

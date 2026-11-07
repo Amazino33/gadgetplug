@@ -52,8 +52,8 @@ return new class extends Migration
                     DB::table('product_store_stock')->updateOrInsert(
                         ['product_id' => $product->id, 'store_id' => $storeId],
                         [
-                            'quantity'   => (int) $product->stock_quantity,
-                            'reserved'   => (int) $product->reserved_stock,
+                            'quantity' => (int) $product->stock_quantity,
+                            'reserved' => (int) $product->reserved_stock,
                             'updated_at' => $now,
                             'created_at' => $now,
                         ],
@@ -78,11 +78,11 @@ return new class extends Migration
 
         foreach (DB::table('vendors')->whereNotIn('id', $withDefault ?: [0])->pluck('id') as $vendorId) {
             DB::table('stores')->insert([
-                'vendor_id'  => $vendorId,
-                'name'       => 'Main Store',
-                'slug'       => $this->uniqueSlug($vendorId, 'Main Store'),
+                'vendor_id' => $vendorId,
+                'name' => 'Main Store',
+                'slug' => $this->uniqueSlug($vendorId, 'Main Store'),
                 'is_default' => true,
-                'is_active'  => true,
+                'is_active' => true,
                 'created_at' => $now,
                 'updated_at' => $now,
             ]);

@@ -25,9 +25,13 @@ class ReceiptSettings extends Page
     protected string $view = 'filament.vendor.pages.receipt-settings';
 
     protected static ?string $navigationLabel = 'Receipt Settings';
-    protected static ?string $title           = 'Receipt Settings';
+
+    protected static ?string $title = 'Receipt Settings';
+
     protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedPrinter;
-    protected static string|null|\UnitEnum   $navigationGroup = 'Settings';
+
+    protected static string|null|\UnitEnum $navigationGroup = 'Settings';
+
     protected static ?int $navigationSort = 2;
 
     public ?array $data = [];
@@ -35,7 +39,7 @@ class ReceiptSettings extends Page
     // Whoever configures the store's paperwork, not whoever stands at the till.
     public static function canAccess(): bool
     {
-        $user   = auth()->user();
+        $user = auth()->user();
         $vendor = filament()->getTenant();
 
         if (! $vendor) {
@@ -63,18 +67,18 @@ class ReceiptSettings extends Page
         ]) + [
             // firstOrNew gives an unsaved model, so column defaults are not
             // applied yet — spell them out so the form never opens blank.
-            'header_alignment'     => $settings->header_alignment ?? 'center',
-            'footer_alignment'     => $settings->footer_alignment ?? 'center',
-            'show_receipt_number'  => $settings->show_receipt_number ?? true,
-            'show_cashier'         => $settings->show_cashier ?? true,
-            'show_customer'        => $settings->show_customer ?? true,
-            'show_datetime'        => $settings->show_datetime ?? true,
+            'header_alignment' => $settings->header_alignment ?? 'center',
+            'footer_alignment' => $settings->footer_alignment ?? 'center',
+            'show_receipt_number' => $settings->show_receipt_number ?? true,
+            'show_cashier' => $settings->show_cashier ?? true,
+            'show_customer' => $settings->show_customer ?? true,
+            'show_datetime' => $settings->show_datetime ?? true,
             'show_item_unit_price' => $settings->show_item_unit_price ?? true,
-            'show_logo'            => $settings->show_logo ?? false,
-            'feed_lines'           => $settings->feed_lines ?? 2,
-            'show_qr'              => $settings->show_qr ?? true,
-            'loyalty_enabled'      => $settings->loyalty_enabled ?? false,
-            'loyalty_goal'         => $settings->loyalty_goal ?? 10,
+            'show_logo' => $settings->show_logo ?? false,
+            'feed_lines' => $settings->feed_lines ?? 2,
+            'show_qr' => $settings->show_qr ?? true,
+            'loyalty_enabled' => $settings->loyalty_enabled ?? false,
+            'loyalty_goal' => $settings->loyalty_goal ?? 10,
         ]);
     }
 
@@ -211,7 +215,7 @@ class ReceiptSettings extends Page
     {
         abort_unless(static::canAccess(), 403);
 
-        $data   = $this->form->getState();
+        $data = $this->form->getState();
         $vendor = filament()->getTenant();
 
         // The goal and reward are hidden while the loyalty card is off, so the
@@ -231,30 +235,30 @@ class ReceiptSettings extends Page
         VendorReceiptSetting::updateOrCreate(
             ['vendor_id' => $vendor->id],
             [
-                'header_name'          => ($data['header_name'] ?? null) ?: null,
-                'header_tagline'       => ($data['header_tagline'] ?? null) ?: null,
-                'header_address'       => ($data['header_address'] ?? null) ?: null,
-                'header_phone'         => ($data['header_phone'] ?? null) ?: null,
-                'header_extra'         => ($data['header_extra'] ?? null) ?: null,
-                'show_logo'            => (bool) ($data['show_logo'] ?? false),
-                'header_alignment'     => $data['header_alignment'] ?? 'center',
-                'show_receipt_number'  => (bool) ($data['show_receipt_number'] ?? true),
-                'show_cashier'         => (bool) ($data['show_cashier'] ?? true),
-                'show_customer'        => (bool) ($data['show_customer'] ?? true),
-                'show_datetime'        => (bool) ($data['show_datetime'] ?? true),
+                'header_name' => ($data['header_name'] ?? null) ?: null,
+                'header_tagline' => ($data['header_tagline'] ?? null) ?: null,
+                'header_address' => ($data['header_address'] ?? null) ?: null,
+                'header_phone' => ($data['header_phone'] ?? null) ?: null,
+                'header_extra' => ($data['header_extra'] ?? null) ?: null,
+                'show_logo' => (bool) ($data['show_logo'] ?? false),
+                'header_alignment' => $data['header_alignment'] ?? 'center',
+                'show_receipt_number' => (bool) ($data['show_receipt_number'] ?? true),
+                'show_cashier' => (bool) ($data['show_cashier'] ?? true),
+                'show_customer' => (bool) ($data['show_customer'] ?? true),
+                'show_datetime' => (bool) ($data['show_datetime'] ?? true),
                 'show_item_unit_price' => (bool) ($data['show_item_unit_price'] ?? true),
-                'footer_text'          => ($data['footer_text'] ?? null) ?: null,
-                'footer_alignment'     => $data['footer_alignment'] ?? 'center',
-                'feed_lines'           => (int) ($data['feed_lines'] ?? 2),
+                'footer_text' => ($data['footer_text'] ?? null) ?: null,
+                'footer_alignment' => $data['footer_alignment'] ?? 'center',
+                'feed_lines' => (int) ($data['feed_lines'] ?? 2),
 
-                'show_qr'              => (bool) ($data['show_qr'] ?? true),
-                'qr_caption'           => ($data['qr_caption'] ?? null) ?: null,
-                'banner_image'         => ($data['banner_image'] ?? null) ?: null,
-                'banner_link'          => ($data['banner_link'] ?? null) ?: null,
-                'cta_label'            => ($data['cta_label'] ?? null) ?: null,
-                'cta_link'             => ($data['cta_link'] ?? null) ?: null,
+                'show_qr' => (bool) ($data['show_qr'] ?? true),
+                'qr_caption' => ($data['qr_caption'] ?? null) ?: null,
+                'banner_image' => ($data['banner_image'] ?? null) ?: null,
+                'banner_link' => ($data['banner_link'] ?? null) ?: null,
+                'cta_label' => ($data['cta_label'] ?? null) ?: null,
+                'cta_link' => ($data['cta_link'] ?? null) ?: null,
 
-                'loyalty_enabled'      => (bool) ($data['loyalty_enabled'] ?? false),
+                'loyalty_enabled' => (bool) ($data['loyalty_enabled'] ?? false),
             ] + $loyaltyDetails
         );
 

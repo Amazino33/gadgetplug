@@ -72,7 +72,7 @@ function inlineAlpineAttributes(): array
         $offset = 0;
 
         while (($at = strpos($source, 'x-data="', $offset)) !== false) {
-            $start  = $at + strlen('x-data="');
+            $start = $at + strlen('x-data="');
             $offset = $start;
 
             // Only object-literal components can be truncated mid-expression;
@@ -84,7 +84,7 @@ function inlineAlpineAttributes(): array
                 continue;
             }
 
-            $depth     = 0;
+            $depth = 0;
             $truncated = true;
 
             for ($i = $brace; $i < strlen($source); $i++) {
@@ -110,8 +110,8 @@ function inlineAlpineAttributes(): array
             }
 
             $found[] = [
-                'file'      => str_replace(base_path() . DIRECTORY_SEPARATOR, '', $file->getPathname()),
-                'line'      => substr_count(substr($source, 0, $at), "\n") + 1,
+                'file' => str_replace(base_path().DIRECTORY_SEPARATOR, '', $file->getPathname()),
+                'line' => substr_count(substr($source, 0, $at), "\n") + 1,
                 'truncated' => $truncated,
             ];
         }
@@ -133,9 +133,9 @@ test('no inline Alpine component is cut short by a stray double quote', function
 
     expect($broken)->toBe([], $detail === ''
         ? ''
-        : "A double quote inside x-data=\"…\" ends the attribute early, and the browser "
-          . "renders the rest of the component as text on the page. Use single quotes "
-          . "instead — in comments too:\n{$detail}");
+        : 'A double quote inside x-data="…" ends the attribute early, and the browser '
+          .'renders the rest of the component as text on the page. Use single quotes '
+          ."instead — in comments too:\n{$detail}");
 });
 
 test('the repo is actually being scanned, so a passing result means something', function () {

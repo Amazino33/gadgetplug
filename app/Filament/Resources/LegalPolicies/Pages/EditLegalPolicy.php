@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\LegalPolicies\Pages;
 
 use App\Filament\Resources\LegalPolicies\LegalPolicyResource;
-use App\Models\LegalPolicy;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Resources\Pages\EditRecord;

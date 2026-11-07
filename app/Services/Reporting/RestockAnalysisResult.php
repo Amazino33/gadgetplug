@@ -11,21 +11,27 @@ namespace App\Services\Reporting;
 readonly class RestockAnalysisResult
 {
     public const TIER_WATCH = 'watch';
+
     public const TIER_URGENT = 'urgent';
+
     public const TIER_REORDER_NOW = 'reorder_now';
+
     public const TIER_HEALTHY = 'healthy';
+
     public const TIER_DEAD_STOCK_CANDIDATE = 'dead_stock_candidate';
+
     public const TIER_REVIEW = 'review';
+
     public const TIER_STARVED_REVIEW = 'starved_review';
 
     public const LABELS = [
-        self::TIER_WATCH               => 'Watch',
-        self::TIER_URGENT              => 'Urgent',
-        self::TIER_REORDER_NOW         => 'Reorder now',
-        self::TIER_HEALTHY             => 'Healthy',
+        self::TIER_WATCH => 'Watch',
+        self::TIER_URGENT => 'Urgent',
+        self::TIER_REORDER_NOW => 'Reorder now',
+        self::TIER_HEALTHY => 'Healthy',
         self::TIER_DEAD_STOCK_CANDIDATE => 'Dead stock candidate',
-        self::TIER_REVIEW              => 'Review',
-        self::TIER_STARVED_REVIEW      => 'Starved — review',
+        self::TIER_REVIEW => 'Review',
+        self::TIER_STARVED_REVIEW => 'Starved — review',
     ];
 
     public function __construct(
@@ -52,13 +58,13 @@ readonly class RestockAnalysisResult
     }
 
     public const COLORS = [
-        self::TIER_WATCH               => 'info',
-        self::TIER_URGENT              => 'danger',
-        self::TIER_REORDER_NOW         => 'warning',
-        self::TIER_HEALTHY             => 'success',
+        self::TIER_WATCH => 'info',
+        self::TIER_URGENT => 'danger',
+        self::TIER_REORDER_NOW => 'warning',
+        self::TIER_HEALTHY => 'success',
         self::TIER_DEAD_STOCK_CANDIDATE => 'gray',
-        self::TIER_REVIEW              => 'gray',
-        self::TIER_STARVED_REVIEW      => 'warning',
+        self::TIER_REVIEW => 'gray',
+        self::TIER_STARVED_REVIEW => 'warning',
     ];
 
     public function label(): string

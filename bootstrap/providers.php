@@ -1,9 +1,15 @@
 <?php
 
+use App\Providers\AppServiceProvider;
+use App\Providers\Filament\AdminPanelProvider;
+use App\Providers\Filament\VendorPanelProvider;
+use App\Providers\FortifyServiceProvider;
+use App\Providers\VoltServiceProvider;
+
 return [
-    App\Providers\AppServiceProvider::class,
-    App\Providers\Filament\AdminPanelProvider::class,
-    App\Providers\Filament\VendorPanelProvider::class,
-    App\Providers\FortifyServiceProvider::class,
-    App\Providers\VoltServiceProvider::class,
+    AppServiceProvider::class,
+    AdminPanelProvider::class,
+    VendorPanelProvider::class,
+    FortifyServiceProvider::class,
+    VoltServiceProvider::class,
 ];

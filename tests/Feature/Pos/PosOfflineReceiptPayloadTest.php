@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Store;
+use App\Models\User;
 use App\Models\VendorReceiptSetting;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -18,14 +19,14 @@ uses(RefreshDatabase::class);
  * and the customer got a visibly worse receipt purely because the connection
  * was down.
  */
-function loginAsTill(array $ctx, string $pin = '1234', ?int $storeId = null, ?App\Models\User $as = null)
+function loginAsTill(array $ctx, string $pin = '1234', ?int $storeId = null, ?User $as = null)
 {
     ($as ?? $ctx['owner'])->forceFill(['pos_pin' => Hash::make($pin)])->save();
 
     return test()->postJson('/api/pos/auth/login', array_filter([
         'vendor_id' => $ctx['vendor']->id,
-        'pin'       => $pin,
-        'store_id'  => $storeId,
+        'pin' => $pin,
+        'store_id' => $storeId,
     ]));
 }
 
@@ -33,14 +34,14 @@ it('sends the receipt layout the till needs to print without the server', functi
     $ctx = debtTenderContext();
 
     VendorReceiptSetting::create([
-        'vendor_id'        => $ctx['vendor']->id,
-        'header_name'      => 'CREDIT STORE LTD',
-        'header_tagline'   => 'Your gadget people',
-        'header_address'   => '3 Head Office Way, Lagos',
-        'header_phone'     => '08030000000',
+        'vendor_id' => $ctx['vendor']->id,
+        'header_name' => 'CREDIT STORE LTD',
+        'header_tagline' => 'Your gadget people',
+        'header_address' => '3 Head Office Way, Lagos',
+        'header_phone' => '08030000000',
         'header_alignment' => 'center',
-        'footer_text'      => 'No refunds after 7 days.',
-        'feed_lines'       => 3,
+        'footer_text' => 'No refunds after 7 days.',
+        'feed_lines' => 3,
     ]);
 
     $receipt = loginAsTill($ctx)->assertOk()->json('vendor.receipt');
@@ -86,9 +87,9 @@ it('names the branch only when the vendor has more than one store', function () 
 
     $second = Store::create([
         'vendor_id' => $ctx['vendor']->id,
-        'name'      => 'Ikeja Branch',
-        'address'   => '12 Allen Avenue',
-        'phone'     => '08031234567',
+        'name' => 'Ikeja Branch',
+        'address' => '12 Allen Avenue',
+        'phone' => '08031234567',
     ]);
     // The owner works in both, so the till is signed in to the one they are in.
     $store = loginAsTill($ctx, storeId: $second->id)->json('vendor.store');
@@ -108,7 +109,7 @@ it('resolves the branch the same way a sale does — from the cashier assignment
     Store::create(['vendor_id' => $ctx['vendor']->id, 'name' => 'Yaba Branch']);
 
     // A cashier who works in one branch is signed in to it without being asked.
-    $cashier = App\Models\User::factory()->create();
+    $cashier = User::factory()->create();
     $ctx['vendor']->users()->attach($cashier->id);
     $cashier->stores()->sync([$assigned->id]);
 
@@ -144,13 +145,13 @@ it('sends the layout again when a session is opened, so a change need not wait f
     Sanctum::actingAs($ctx['owner']);
 
     VendorReceiptSetting::create([
-        'vendor_id'   => $ctx['vendor']->id,
+        'vendor_id' => $ctx['vendor']->id,
         'header_name' => 'MID-SHIFT REBRAND',
         'footer_text' => 'Now open Sundays.',
     ]);
 
     $opened = test()->postJson('/api/pos/sessions/open', [
-        'vendor_id'     => $ctx['vendor']->id,
+        'vendor_id' => $ctx['vendor']->id,
         'opening_float' => 0,
     ])->assertCreated();
 
@@ -163,7 +164,7 @@ it('still returns the session itself, which the till reads for the shift', funct
     Sanctum::actingAs($ctx['owner']);
 
     $opened = test()->postJson('/api/pos/sessions/open', [
-        'vendor_id'     => $ctx['vendor']->id,
+        'vendor_id' => $ctx['vendor']->id,
         'opening_float' => 5000,
     ])->assertCreated();
 

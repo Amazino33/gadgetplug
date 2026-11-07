@@ -2,6 +2,7 @@
 
 use App\Filament\Vendor\Resources\Procurements\Pages\ListProcurements;
 use App\Filament\Vendor\Resources\Procurements\Pages\ViewProcurement;
+use App\Services\Procurement\ProcurementReview;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 require_once __DIR__.'/ReviewHelpers.php';
@@ -20,7 +21,7 @@ test('the record screen shows who approved it once agreed', function () {
     $delivery = reviewDelivery($ctx, [[$product, 12, 5000]]);
 
     $this->actingAs($ctx['checker']);
-    app(App\Services\Procurement\ProcurementReview::class)
+    app(ProcurementReview::class)
         ->approve($delivery, $ctx['checker'], $ctx['store']->id);
 
     Filament\Facades\Filament::setCurrentPanel(Filament\Facades\Filament::getPanel('vendor'));
@@ -52,7 +53,7 @@ test('the approver name also shows on the list, next to the items', function () 
     $delivery = reviewDelivery($ctx, [[$product, 12, 5000]]);
 
     $this->actingAs($ctx['checker']);
-    app(App\Services\Procurement\ProcurementReview::class)
+    app(ProcurementReview::class)
         ->approve($delivery, $ctx['checker'], $ctx['store']->id);
 
     Filament\Facades\Filament::setCurrentPanel(Filament\Facades\Filament::getPanel('vendor'));

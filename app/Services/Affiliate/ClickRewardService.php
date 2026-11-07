@@ -46,13 +46,13 @@ class ClickRewardService
     public function recordLanding(Affiliate $affiliate, Request $request): AffiliateClick
     {
         $click = $affiliate->clicks()->create([
-            'ip_address'  => $request->ip(),
-            'user_agent'  => $request->userAgent(),
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
             'landing_url' => $request->query('to'),
-            'session_id'  => $request->hasSession() ? $request->session()->getId() : null,
+            'session_id' => $request->hasSession() ? $request->session()->getId() : null,
             // Zero, not one: the redirect target this click is about to send
             // them to is itself counted by the middleware, as pageview 1.
-            'page_views'  => 0,
+            'page_views' => 0,
         ]);
 
         if ($request->hasSession()) {
@@ -124,7 +124,7 @@ class ClickRewardService
             $amount = $this->payableAmount($locked, $request);
 
             $locked->update([
-                'qualified_at'  => now(),
+                'qualified_at' => now(),
                 'reward_amount' => $amount,
             ]);
 
@@ -134,9 +134,9 @@ class ClickRewardService
 
             $locked->walletTransactions()->create([
                 'affiliate_id' => $locked->affiliate_id,
-                'type'         => 'credit',
-                'amount'       => $amount,
-                'description'  => "Engaged visit reward — referral click #{$locked->id}.",
+                'type' => 'credit',
+                'amount' => $amount,
+                'description' => "Engaged visit reward — referral click #{$locked->id}.",
             ]);
         });
     }

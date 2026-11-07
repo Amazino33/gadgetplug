@@ -3,24 +3,22 @@
 namespace App\Filament\Vendor\Pages;
 
 use App\Models\VendorPayout;
-use Filament\Schemas\Components\Placeholder;
-use Filament\Schemas\Components\Section;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Concerns\InteractsWithForms;
-use Filament\Schemas\Schema;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
-use Filament\Tables\Columns\BadgeColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
 
 class PayoutsPage extends Page implements HasTable
 {
     protected static string|null|\UnitEnum $navigationGroup = 'Money';
+
     use InteractsWithForms;
     use InteractsWithTable;
 
@@ -35,9 +33,12 @@ class PayoutsPage extends Page implements HasTable
     public ?array $data = [];
 
     public float $availableBalance = 0.0;
-    public float $totalEarned      = 0.0;
-    public float $totalPaid        = 0.0;
-    public float $totalPending     = 0.0;
+
+    public float $totalEarned = 0.0;
+
+    public float $totalPaid = 0.0;
+
+    public float $totalPending = 0.0;
 
     public function mount(): void
     {
@@ -57,15 +58,15 @@ class PayoutsPage extends Page implements HasTable
             ->whereIn('status', ['pending', 'approved'])
             ->sum('amount');
 
-        $this->totalEarned      = $balance['collected'];
-        $this->totalPaid        = (float) $paid;
-        $this->totalPending     = (float) $pending;
+        $this->totalEarned = $balance['collected'];
+        $this->totalPaid = (float) $paid;
+        $this->totalPending = (float) $pending;
         $this->availableBalance = $balance['available'];
 
         $this->form->fill([
-            'bank_name'      => $vendor->bank_name ?? '',
+            'bank_name' => $vendor->bank_name ?? '',
             'account_number' => $vendor->account_number ?? '',
-            'account_name'   => $vendor->account_name ?? '',
+            'account_name' => $vendor->account_name ?? '',
         ]);
     }
 
@@ -81,8 +82,8 @@ class PayoutsPage extends Page implements HasTable
                             ->numeric()
                             ->required()
                             ->minValue(VendorPayout::MINIMUM)
-                            ->maxValue(fn() => $this->availableBalance)
-                            ->helperText(fn() => 'Available: ₦' . number_format($this->availableBalance, 2)),
+                            ->maxValue(fn () => $this->availableBalance)
+                            ->helperText(fn () => 'Available: ₦'.number_format($this->availableBalance, 2)),
 
                         TextInput::make('bank_name')
                             ->label('Bank Name')
@@ -115,7 +116,7 @@ class PayoutsPage extends Page implements HasTable
 
                 TextColumn::make('amount')
                     ->label('Amount')
-                    ->formatStateUsing(fn($state) => '₦' . number_format($state, 2))
+                    ->formatStateUsing(fn ($state) => '₦'.number_format($state, 2))
                     ->sortable(),
 
                 TextColumn::make('bank_name')->label('Bank'),
@@ -124,12 +125,12 @@ class PayoutsPage extends Page implements HasTable
 
                 TextColumn::make('status')
                     ->badge()
-                    ->color(fn(string $state) => match ($state) {
-                        'pending'  => 'warning',
+                    ->color(fn (string $state) => match ($state) {
+                        'pending' => 'warning',
                         'approved' => 'info',
-                        'paid'     => 'success',
+                        'paid' => 'success',
                         'rejected' => 'danger',
-                        default    => 'gray',
+                        default => 'gray',
                     }),
 
                 TextColumn::make('settled_at')
@@ -150,7 +151,7 @@ class PayoutsPage extends Page implements HasTable
 
     public function requestPayout(): void
     {
-        $data   = $this->form->getState();
+        $data = $this->form->getState();
         $vendor = filament()->getTenant();
 
         // Recomputed now, not trusted from when the page loaded.
@@ -162,6 +163,7 @@ class PayoutsPage extends Page implements HasTable
                 ->body('Your available balance is below the minimum withdrawal of ₦500.')
                 ->danger()
                 ->send();
+
             return;
         }
 
@@ -170,6 +172,7 @@ class PayoutsPage extends Page implements HasTable
                 ->title('Amount exceeds available balance')
                 ->danger()
                 ->send();
+
             return;
         }
 
@@ -179,17 +182,18 @@ class PayoutsPage extends Page implements HasTable
                 ->body('Please add your bank details in Store Profile before requesting a payout.')
                 ->warning()
                 ->send();
+
             return;
         }
 
         VendorPayout::create([
-            'vendor_id'      => $vendor->id,
-            'amount'         => $data['amount'],
-            'bank_name'      => $vendor->bank_name,
+            'vendor_id' => $vendor->id,
+            'amount' => $data['amount'],
+            'bank_name' => $vendor->bank_name,
             'account_number' => $vendor->account_number,
-            'account_name'   => $vendor->account_name,
-            'status'         => 'pending',
-            'funded_from'    => VendorPayout::FUNDED_GADGETPLUG_DUE,
+            'account_name' => $vendor->account_name,
+            'status' => 'pending',
+            'funded_from' => VendorPayout::FUNDED_GADGETPLUG_DUE,
         ]);
 
         // Refresh balance stats
@@ -202,7 +206,7 @@ class PayoutsPage extends Page implements HasTable
             ->send();
     }
 
-    public static function canAccess(): bool 
+    public static function canAccess(): bool
     {
         $user = auth()->user();
         $vendor = filament()->getTenant();

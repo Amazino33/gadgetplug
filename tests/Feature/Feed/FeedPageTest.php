@@ -2,9 +2,9 @@
 
 use App\Models\Category;
 use App\Models\Product;
-use Database\Factories\ProductFactory;
 use App\Models\User;
 use App\Models\Vendor;
+use Database\Factories\ProductFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 
@@ -13,8 +13,8 @@ uses(RefreshDatabase::class);
 function pageVendor(bool $online = true): Vendor
 {
     return Vendor::create([
-        'user_id'              => User::factory()->create()->id,
-        'name'                 => 'Feed Shop '.uniqid(),
+        'user_id' => User::factory()->create()->id,
+        'name' => 'Feed Shop '.uniqid(),
         'online_sales_enabled' => $online,
     ]);
 }
@@ -22,14 +22,14 @@ function pageVendor(bool $online = true): Vendor
 function pageProduct(Vendor $vendor, array $over = []): Product
 {
     return ProductFactory::new()->withPhoto()->create(array_merge([
-        'vendor_id'      => $vendor->id,
-        'store_id'       => $vendor->defaultStore->id,
-        'category_id'    => Category::firstOrCreate(['name' => 'Feed Page Cat'])->id,
-        'name'           => 'Feed Thing '.Str::random(5),
-        'price'          => 12500,
+        'vendor_id' => $vendor->id,
+        'store_id' => $vendor->defaultStore->id,
+        'category_id' => Category::firstOrCreate(['name' => 'Feed Page Cat'])->id,
+        'name' => 'Feed Thing '.Str::random(5),
+        'price' => 12500,
         'stock_quantity' => 4,
-        'status'         => 'published',
-        'published_at'   => now()->subMinutes(random_int(1, 500)),
+        'status' => 'published',
+        'published_at' => now()->subMinutes(random_int(1, 500)),
     ], $over));
 }
 

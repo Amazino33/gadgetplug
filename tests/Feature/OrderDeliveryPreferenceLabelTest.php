@@ -12,19 +12,19 @@ uses(RefreshDatabase::class);
 // so the label stays covered even though nothing writes it any more.
 test('the label reads back the recorded urgency, not just the date', function () {
     $make = fn (array $attributes = []) => Order::create(array_merge([
-        'reference'        => 'GP-' . fake()->unique()->numerify('######'),
-        'customer_name'    => 'Ada Customer',
-        'customer_email'   => 'ada@example.com',
-        'customer_phone'   => '08012345678',
+        'reference' => 'GP-'.fake()->unique()->numerify('######'),
+        'customer_name' => 'Ada Customer',
+        'customer_email' => 'ada@example.com',
+        'customer_phone' => '08012345678',
         'shipping_address' => '12 Test Street',
-        'total_amount'     => 50000,
-        'status'           => 'paid',
-        'payment_method'   => 'paystack',
+        'total_amount' => 50000,
+        'status' => 'paid',
+        'payment_method' => 'paystack',
     ], $attributes));
 
     $today = $make(['delivery_urgency' => 'today',     'preferred_delivery_date' => now()->toDateString()]);
     $sched = $make(['delivery_urgency' => 'scheduled', 'preferred_delivery_date' => now()->addDays(4)->toDateString()]);
-    $none  = $make();
+    $none = $make();
 
     expect($today->deliveryPreferenceLabel())->toBe('Today')
         ->and($sched->deliveryPreferenceLabel())->toBe(now()->addDays(4)->format('D, j M Y'))

@@ -29,7 +29,7 @@ function setUpTopSellersStore(): array
     ]);
 
     $order = Order::create([
-        'reference' => 'ORD-TSP-' . uniqid(), 'customer_name' => 'Buyer', 'customer_email' => 'b@example.com',
+        'reference' => 'ORD-TSP-'.uniqid(), 'customer_name' => 'Buyer', 'customer_email' => 'b@example.com',
         'customer_phone' => '0804', 'shipping_address' => 'Uyo', 'total_amount' => $product->price * 12,
         // Default period is "Today" — must land inside it or every rendering
         // assertion below sees "Nothing sold in this period yet" instead.

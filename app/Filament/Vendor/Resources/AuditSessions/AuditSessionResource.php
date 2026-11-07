@@ -4,32 +4,31 @@ declare(strict_types=1);
 
 namespace App\Filament\Vendor\Resources\AuditSessions;
 
+use App\Actions\Inventory\AdjustStockAction;
+use App\Actions\Inventory\ProcessAuditCountAction;
 use App\Filament\Support\QuantityInput;
-use App\Support\Quantity;
-use App\Filament\Vendor\Resources\AuditSessions\Pages;
+use App\Filament\Vendor\Resources\InventoryLedgers\InventoryLedgerResource;
 use App\Filament\Vendor\Resources\Products\Schemas\ProductForm;
 use App\Models\AuditSession;
-use App\Models\User;
-use App\Actions\Inventory\ProcessAuditCountAction;
-use App\Actions\Inventory\AdjustStockAction;
+use App\Models\InventoryLedger;
 use App\Models\InventoryShortageCase;
+use App\Models\User;
 use App\Services\ShortageCaseService;
-use Filament\Forms\Components\Textarea;
-use Filament\Resources\Resource;
-use Filament\Tables\Table;
-use Filament\Tables\Columns\ImageColumn;
-use Filament\Tables\Columns\TextColumn;
+use App\Support\Quantity;
+use BackedEnum;
+use Exception;
 use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
-use Filament\Actions\BulkActionGroup;
-use Illuminate\Support\Collection;
-use Filament\Actions\DeleteBulkAction;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
+use Filament\Resources\Resource;
+use Filament\Tables\Columns\ImageColumn;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Table;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
-use Exception;
-use BackedEnum;
 use UnitEnum;
 
 class AuditSessionResource extends Resource
@@ -38,9 +37,12 @@ class AuditSessionResource extends Resource
 
     protected static ?string $tenantOwnershipRelationshipName = 'vendor';
 
-    protected static string|null|BackedEnum $navigationIcon  = 'heroicon-o-clipboard-document-list';
-    protected static string|null|UnitEnum   $navigationGroup = 'Inventory';
-    protected static ?string                $navigationLabel = 'All Counted Lines';
+    protected static string|null|BackedEnum $navigationIcon = 'heroicon-o-clipboard-document-list';
+
+    protected static string|null|UnitEnum $navigationGroup = 'Inventory';
+
+    protected static ?string $navigationLabel = 'All Counted Lines';
+
     protected static ?int $navigationSort = 7;
 
     // Off the menu. Auditing now starts from a count and drills into its lines,
@@ -54,8 +56,9 @@ class AuditSessionResource extends Resource
 
     public static function canAccess(): bool
     {
-        $user   = auth()->user();
+        $user = auth()->user();
         $vendor = filament()->getTenant();
+
         return $vendor && $user->hasVendorPermission($vendor->id, 'view_audit_sessions');
     }
 
@@ -68,8 +71,7 @@ class AuditSessionResource extends Resource
                 ImageColumn::make('product_thumbnail')
                     ->label('')
                     ->getStateUsing(
-                        fn (AuditSession $r): ?string =>
-                            $r->product?->getFirstMediaUrl('product-images', 'thumb') ?: null
+                        fn (AuditSession $r): ?string => $r->product?->getFirstMediaUrl('product-images', 'thumb') ?: null
                     )
                     ->defaultImageUrl(fn () => asset('images/logo.svg'))
                     ->size(44)
@@ -83,7 +85,7 @@ class AuditSessionResource extends Resource
                     ->sortable()
                     ->wrap()
                     ->description(
-                        fn (AuditSession $r): string => 'SKU: ' . ($r->product?->sku ?? '—')
+                        fn (AuditSession $r): string => 'SKU: '.($r->product?->sku ?? '—')
                     )
                     ->extraAttributes(['style' => 'min-width: 180px']),
 
@@ -116,8 +118,7 @@ class AuditSessionResource extends Resource
                     ->formatStateUsing(fn ($state): string => Quantity::display($state, filament()->getTenant()))
                     ->placeholder('—')
                     ->description(
-                        fn (AuditSession $r): string =>
-                            $r->storekeeperB?->name ?? ($r->status === 'pending' ? 'Awaiting...' : '—')
+                        fn (AuditSession $r): string => $r->storekeeperB?->name ?? ($r->status === 'pending' ? 'Awaiting...' : '—')
                     ),
 
                 // ── Sold ─────────────────────────────────────────────────────────
@@ -125,16 +126,16 @@ class AuditSessionResource extends Resource
                     ->label('Sold')
                     ->alignCenter()
                     ->getStateUsing(function (AuditSession $r): int|float {
-                        return Quantity::of(\App\Models\InventoryLedger::where('product_id', $r->product_id)
+                        return Quantity::of(InventoryLedger::where('product_id', $r->product_id)
                             ->whereIn('transaction_type', ['pos_sale', 'online_sale'])
                             ->sum('quantity_change') * -1);
                     })
                     ->formatStateUsing(fn ($state): string => Quantity::display($state, filament()->getTenant()))
-                    ->url(fn (AuditSession $r): string => \App\Filament\Vendor\Resources\InventoryLedgers\InventoryLedgerResource::getUrl('index', [
+                    ->url(fn (AuditSession $r): string => InventoryLedgerResource::getUrl('index', [
                         'tableFilters' => [
                             'product_id' => ['value' => $r->product_id],
                             'transaction_type' => ['value' => 'pos_sale'],
-                        ]
+                        ],
                     ])),
 
                 // ── Total Stock In ───────────────────────────────────────────────
@@ -142,16 +143,16 @@ class AuditSessionResource extends Resource
                     ->label('Total Stock In')
                     ->alignCenter()
                     ->getStateUsing(function (AuditSession $r): int|float {
-                        return Quantity::of(\App\Models\InventoryLedger::where('product_id', $r->product_id)
+                        return Quantity::of(InventoryLedger::where('product_id', $r->product_id)
                             ->where('transaction_type', 'restock')
                             ->sum('quantity_change'));
                     })
                     ->formatStateUsing(fn ($state): string => Quantity::display($state, filament()->getTenant()))
-                    ->url(fn (AuditSession $r): string => \App\Filament\Vendor\Resources\InventoryLedgers\InventoryLedgerResource::getUrl('index', [
+                    ->url(fn (AuditSession $r): string => InventoryLedgerResource::getUrl('index', [
                         'tableFilters' => [
                             'product_id' => ['value' => $r->product_id],
                             'transaction_type' => ['value' => 'restock'],
-                        ]
+                        ],
                     ])),
 
                 // ── 6. Unit Variance (physical count − system qty) ───────────────
@@ -171,9 +172,9 @@ class AuditSessionResource extends Resource
 
                         return match (true) {
                             $diff === null => 'gray',
-                            $diff < 0      => 'danger',
-                            $diff > 0      => 'warning',
-                            default        => 'success',
+                            $diff < 0 => 'danger',
+                            $diff > 0 => 'warning',
+                            default => 'success',
                         };
                     })
                     ->tooltip(fn (AuditSession $r): ?string => $r->system_quantity === null
@@ -198,7 +199,7 @@ class AuditSessionResource extends Resource
                             return '—';
                         }
 
-                        $value  = $diff * (float) $r->product->cost_price;
+                        $value = $diff * (float) $r->product->cost_price;
                         $prefix = $value < 0 ? '−' : ($value > 0 ? '+' : '');
 
                         return $prefix.'₦'.number_format(abs($value), 2);
@@ -208,9 +209,9 @@ class AuditSessionResource extends Resource
 
                         return match (true) {
                             $diff === null => 'gray',
-                            $diff < 0      => 'danger',
-                            $diff > 0      => 'warning',
-                            default        => 'success',
+                            $diff < 0 => 'danger',
+                            $diff > 0 => 'warning',
+                            default => 'success',
                         };
                     }),
 
@@ -218,18 +219,18 @@ class AuditSessionResource extends Resource
                 TextColumn::make('status')
                     ->badge()
                     ->formatStateUsing(fn (string $state): string => match ($state) {
-                        'pending'             => 'Pending',
-                        'verified'            => 'Verified',
-                        'discrepancy'         => 'Review Needed',
-                        'resolved_by_override'=> 'Resolved (Override)',
-                        default               => ucfirst($state),
+                        'pending' => 'Pending',
+                        'verified' => 'Verified',
+                        'discrepancy' => 'Review Needed',
+                        'resolved_by_override' => 'Resolved (Override)',
+                        default => ucfirst($state),
                     })
                     ->color(fn (string $state): string => match ($state) {
-                        'pending'             => 'warning',
-                        'verified'            => 'success',
-                        'discrepancy'         => 'warning',
-                        'resolved_by_override'=> 'info',
-                        default               => 'gray',
+                        'pending' => 'warning',
+                        'verified' => 'success',
+                        'discrepancy' => 'warning',
+                        'resolved_by_override' => 'info',
+                        default => 'gray',
                     }),
 
                 // ── 9. Reason code ───────────────────────────────────────────────
@@ -245,19 +246,19 @@ class AuditSessionResource extends Resource
                     ->badge()
                     ->getStateUsing(fn (AuditSession $r): string => match (static::caseFor($r)?->status) {
                         'pending_disposition' => 'Awaiting decision',
-                        'investigating'       => 'Investigating',
-                        'charged'             => 'Charged',
-                        'written_off'         => 'Written off',
+                        'investigating' => 'Investigating',
+                        'charged' => 'Charged',
+                        'written_off' => 'Written off',
                         // A balanced line never opens a case, and that is the
                         // normal outcome rather than something missing.
-                        default               => 'Balanced',
+                        default => 'Balanced',
                     })
                     ->color(fn (AuditSession $r): string => match (static::caseFor($r)?->status) {
                         'pending_disposition' => 'warning',
-                        'investigating'       => 'info',
-                        'charged'             => 'danger',
-                        'written_off'         => 'gray',
-                        default               => 'success',
+                        'investigating' => 'info',
+                        'charged' => 'danger',
+                        'written_off' => 'gray',
+                        default => 'success',
                     }),
 
                 TextColumn::make('charged_to')
@@ -309,13 +310,11 @@ class AuditSessionResource extends Resource
                 TextColumn::make('loss_value')
                     ->label('Write-Off (₦)')
                     ->alignRight()
-                    ->getStateUsing(fn (AuditSession $r): string =>
-                        $r->loss_value > 0
-                            ? '−₦' . number_format((float) $r->loss_value, 2)
+                    ->getStateUsing(fn (AuditSession $r): string => $r->loss_value > 0
+                            ? '−₦'.number_format((float) $r->loss_value, 2)
                             : '—'
                     )
-                    ->color(fn (AuditSession $r): string =>
-                        $r->loss_value > 0 ? 'danger' : 'gray'
+                    ->color(fn (AuditSession $r): string => $r->loss_value > 0 ? 'danger' : 'gray'
                     ),
 
             ])
@@ -376,13 +375,13 @@ class AuditSessionResource extends Resource
                     Select::make('reason_code')
                         ->label('Reason for these corrections')
                         ->options([
-                            'Opening Stock Count'     => 'Opening Stock Count - first count of this branch',
-                            'Data Entry Error'        => 'Data Entry Error',
-                            'Damaged in Store'        => 'Damaged in Store',
-                            'Suspected Theft'         => 'Suspected Theft',
-                            'Waybill Shortage'        => 'Waybill Shortage',
+                            'Opening Stock Count' => 'Opening Stock Count - first count of this branch',
+                            'Data Entry Error' => 'Data Entry Error',
+                            'Damaged in Store' => 'Damaged in Store',
+                            'Suspected Theft' => 'Suspected Theft',
+                            'Waybill Shortage' => 'Waybill Shortage',
                             'Supplier Short Delivery' => 'Supplier Short Delivery',
-                            'Other'                   => 'Other',
+                            'Other' => 'Other',
                         ])
                         ->default('Opening Stock Count')
                         ->required()
@@ -432,16 +431,16 @@ class AuditSessionResource extends Resource
                         ->label('Decision')
                         ->options([
                             'investigate' => 'Investigate - park them, decide later',
-                            'write_off'   => 'Write off - the company absorbs it',
-                            'charge'      => 'Charge the assigned staff member',
+                            'write_off' => 'Write off - the company absorbs it',
+                            'charge' => 'Charge the assigned staff member',
                         ])
                         ->default('investigate')
                         ->required()
                         ->live()
                         ->helperText(fn ($state): string => match ($state) {
-                            'charge'      => 'Posts a charge per case at its frozen retail figure. Only cases already assigned to someone can be charged.',
-                            'write_off'   => 'No staff debt. Only the cost is a real loss - the margin was never earned.',
-                            default       => 'No money moves. They can be charged or written off later.',
+                            'charge' => 'Posts a charge per case at its frozen retail figure. Only cases already assigned to someone can be charged.',
+                            'write_off' => 'No staff debt. Only the cost is a real loss - the margin was never earned.',
+                            default => 'No money moves. They can be charged or written off later.',
                         }),
 
                     Textarea::make('reason')
@@ -464,13 +463,14 @@ class AuditSessionResource extends Resource
                         // read as success; counted and reported instead.
                         if (! $case || ! $case->awaitsDisposition() || auth()->user()->cannot('dispose', $case)) {
                             $skipped++;
+
                             continue;
                         }
 
                         try {
                             match ($data['disposition']) {
-                                'write_off'   => $cases->writeOff($case, (int) auth()->id(), $data['reason']),
-                                'charge'      => $cases->charge($case, (int) auth()->id(), $data['reason']),
+                                'write_off' => $cases->writeOff($case, (int) auth()->id(), $data['reason']),
+                                'charge' => $cases->charge($case, (int) auth()->id(), $data['reason']),
                                 'investigate' => $cases->investigate($case, (int) auth()->id(), $data['reason'] ?? null),
                             };
 
@@ -506,342 +506,340 @@ class AuditSessionResource extends Resource
     {
         return [
 
-                // ── Storekeeper B submits their count ────────────────────────────
-                Action::make('verify_count')
-                    ->label('Submit My Count')
-                    ->icon('heroicon-o-check-circle')
-                    ->color('success')
-                    ->requiresConfirmation()
-                    ->modalHeading('Verify Physical Stock')
-                    ->slideOver()
-                    ->form([
-                        QuantityInput::apply(TextInput::make('count_b'), allowZero: true)
-                            ->label('My Physical Count')
-                            ->required(),
-                    ])
-                    ->visible(fn (AuditSession $record): bool =>
-                        $record->status === 'pending' &&
-                        $record->storekeeper_a_id !== auth()->id()
-                    )
-                    ->action(function (AuditSession $record, array $data, ProcessAuditCountAction $processAudit): void {
-                        try {
-                            $audit = $processAudit->execute($record, auth()->id(), Quantity::of($data['count_b']));
+            // ── Storekeeper B submits their count ────────────────────────────
+            Action::make('verify_count')
+                ->label('Submit My Count')
+                ->icon('heroicon-o-check-circle')
+                ->color('success')
+                ->requiresConfirmation()
+                ->modalHeading('Verify Physical Stock')
+                ->slideOver()
+                ->form([
+                    QuantityInput::apply(TextInput::make('count_b'), allowZero: true)
+                        ->label('My Physical Count')
+                        ->required(),
+                ])
+                ->visible(fn (AuditSession $record): bool => $record->status === 'pending' &&
+                    $record->storekeeper_a_id !== auth()->id()
+                )
+                ->action(function (AuditSession $record, array $data, ProcessAuditCountAction $processAudit): void {
+                    try {
+                        $audit = $processAudit->execute($record, auth()->id(), Quantity::of($data['count_b']));
 
-                            if ($audit->status === 'verified') {
-                                Notification::make()->title('Match! Stock Updated.')->success()->send();
-                            } else {
-                                Notification::make()
-                                    ->title('Discrepancy Logged')
-                                    ->body('Count did not match. A manager must resolve it.')
-                                    ->danger()
-                                    ->send();
-
-                                $managers = User::where(fn ($q) => $q
-                                        ->whereHas('ownedVendors', fn ($q) => $q->where('id', $record->vendor_id))
-                                        ->orWhereHas('roles', fn ($q) => $q
-                                            ->where('name', 'inventory_manager')
-                                            ->where('team_id', $record->vendor_id)
-                                        )
-                                    )
-                                    ->where('id', '!=', auth()->id())
-                                    ->get();
-
-                                Notification::make()
-                                    ->title('Audit Discrepancy — Action Required')
-                                    ->body("Counts for \"{$record->product->name}\" don't match (A: {$record->count_a}, B: {$audit->count_b}). Please resolve.")
-                                    ->danger()
-                                    ->sendToDatabase($managers);
-                            }
-                        } catch (Exception $e) {
-                            Notification::make()->title('Error')->body($e->getMessage())->danger()->send();
-                        }
-                    }),
-
-                // ── Manager resolves discrepancy ─────────────────────────────────
-                Action::make('manager_override')
-                    ->label('Resolve Discrepancy')
-                    ->icon('heroicon-o-exclamation-triangle')
-                    ->color('danger')
-                    ->requiresConfirmation()
-                    ->modalHeading('Manager Override')
-                    ->modalDescription(fn (AuditSession $record): string => $record->storekeeper_b_id
-                        ? "A counted {$record->count_a}. B counted {$record->count_b}. Enter the correct stock figure."
-                        : "Solo count found {$record->count_a}. System expected {$record->branchSystemStock()}. Enter the correct stock figure."
-                    )
-                    ->slideOver()
-                    ->form([
-                        QuantityInput::apply(TextInput::make('manager_override_count'), allowZero: true)
-                            ->label('Final Correct Stock')
-                            ->required(),
-                        Select::make('reason_code')
-                            ->label('Reason for Discrepancy')
-                            ->options([
-                                'Damaged in Store'        => 'Damaged in Store',
-                                'Suspected Theft'         => 'Suspected Theft',
-                                'Waybill Shortage'        => 'Waybill Shortage',
-                                'Data Entry Error'        => 'Data Entry Error',
-                                'Supplier Short Delivery' => 'Supplier Short Delivery',
-                                'Other'                   => 'Other',
-                            ])
-                            ->required()
-                            ->searchable(),
-                    ])
-                    ->visible(fn (AuditSession $record): bool =>
-                        $record->status === 'discrepancy' &&
-                        auth()->user()->hasVendorPermission($record->vendor_id, 'edit_order_items')
-                    )
-                    ->action(function (AuditSession $record, array $data, AdjustStockAction $adjustStock): void {
-                        self::applyOverride(
-                            $record,
-                            Quantity::of($data['manager_override_count']),
-                            $data['reason_code'],
-                            $adjustStock,
-                        );
-                    })
-                    ->successNotificationTitle('Discrepancy resolved.'),
-
-                // ── Owner names who carries the loss ─────────────────────────────
-                //
-                // Separate from disposing because a case opens unattributed: this
-                // store has no assigned-storekeeper concept to default to, so
-                // somebody must be named before a charge is possible.
-                Action::make('assign_accountable')
-                    ->label('Assign')
-                    ->icon('heroicon-o-user-plus')
-                    ->color('gray')
-                    ->modalHeading('Who is accountable for this shortage?')
-                    ->form([
-                        Select::make('storekeeper_id')
-                            ->label('Accountable staff member')
-                            ->helperText('Leave blank to leave the loss unattributed.')
-                            ->options(fn (AuditSession $record): array => User::query()
-                                ->whereHas('memberVendors', fn ($q) => $q->where('vendors.id', $record->vendor_id))
-                                ->orderBy('name')
-                                ->pluck('name', 'id')
-                                ->toArray())
-                            ->searchable()
-                            ->placeholder('Nobody'),
-                    ])
-                    ->visible(fn (AuditSession $record): bool => static::caseFor($record)?->awaitsDisposition() === true)
-                    ->action(function (AuditSession $record, array $data, ShortageCaseService $cases): void {
-                        $case = static::caseFor($record);
-
-                        // The real gate. Hiding the button is presentation; this
-                        // is what denies a storekeeper who calls the action
-                        // directly, and what blocks reassigning a case onto
-                        // yourself to route around self-disposition.
-                        if (! $case || auth()->user()->cannot('reassign', $case)) {
-                            Notification::make()->title('Only the store owner can assign accountability.')->danger()->send();
-
-                            return;
-                        }
-
-                        try {
-                            $cases->reassign($case, $data['storekeeper_id'] ? (int) $data['storekeeper_id'] : null);
-                            Notification::make()->title('Accountability updated.')->success()->send();
-                        } catch (\Throwable $e) {
-                            Notification::make()->title($e->getMessage())->danger()->send();
-                        }
-                    }),
-
-                // ── Owner disposes the case ──────────────────────────────────────
-                Action::make('dispose_case')
-                    ->label('Dispose')
-                    ->icon('heroicon-o-scale')
-                    ->color('danger')
-                    ->requiresConfirmation()
-                    ->modalHeading('Decide what happens to this shortage')
-                    ->modalDescription(function (AuditSession $record): string {
-                        $case = static::caseFor($record);
-
-                        if (! $case) {
-                            return '';
-                        }
-
-                        $who = $case->chargedStorekeeper?->name ?? 'nobody yet';
-
-                        return sprintf(
-                            '%d unit(s) short, %s at retail. Currently assigned to: %s.',
-                            $case->shortage_qty,
-                            '₦'.number_format((float) $case->charge_amount, 2),
-                            $who,
-                        );
-                    })
-                    ->slideOver()
-                    ->form([
-                        Select::make('disposition')
-                            ->label('Decision')
-                            ->options([
-                                'write_off'   => 'Write off — the company absorbs it',
-                                'charge'      => 'Charge the assigned staff member',
-                                'investigate' => 'Investigate — park it, decide later',
-                            ])
-                            ->required()
-                            ->live()
-                            ->helperText(fn ($state): string => match ($state) {
-                                'charge'      => 'Posts one charge to the accountability ledger at the frozen retail figure.',
-                                'investigate' => 'No money moves. Can be charged or written off later.',
-                                default       => 'No staff debt. Only the cost is a real loss — the margin was never earned.',
-                            }),
-
-                        Textarea::make('reason')
-                            ->label('Reason')
-                            ->rows(2)
-                            // Investigating is a holding position, so it does not
-                            // demand a justification the owner may not have yet.
-                            ->required(fn ($get): bool => in_array($get('disposition'), ['write_off', 'charge'], true)),
-                    ])
-                    ->visible(fn (AuditSession $record): bool => static::caseFor($record)?->awaitsDisposition() === true)
-                    ->action(function (AuditSession $record, array $data, ShortageCaseService $cases): void {
-                        $case = static::caseFor($record);
-
-                        if (! $case || auth()->user()->cannot('dispose', $case)) {
+                        if ($audit->status === 'verified') {
+                            Notification::make()->title('Match! Stock Updated.')->success()->send();
+                        } else {
                             Notification::make()
-                                ->title('You cannot dispose this case.')
-                                ->body('Disposition is the store owner\'s decision, and nobody may dispose a shortage charged to themselves.')
+                                ->title('Discrepancy Logged')
+                                ->body('Count did not match. A manager must resolve it.')
                                 ->danger()
                                 ->send();
 
-                            return;
+                            $managers = User::where(fn ($q) => $q
+                                ->whereHas('ownedVendors', fn ($q) => $q->where('id', $record->vendor_id))
+                                ->orWhereHas('roles', fn ($q) => $q
+                                    ->where('name', 'inventory_manager')
+                                    ->where('team_id', $record->vendor_id)
+                                )
+                            )
+                                ->where('id', '!=', auth()->id())
+                                ->get();
+
+                            Notification::make()
+                                ->title('Audit Discrepancy — Action Required')
+                                ->body("Counts for \"{$record->product->name}\" don't match (A: {$record->count_a}, B: {$audit->count_b}). Please resolve.")
+                                ->danger()
+                                ->sendToDatabase($managers);
                         }
+                    } catch (Exception $e) {
+                        Notification::make()->title('Error')->body($e->getMessage())->danger()->send();
+                    }
+                }),
 
-                        try {
-                            match ($data['disposition']) {
-                                'write_off'   => $cases->writeOff($case, (int) auth()->id(), $data['reason']),
-                                'charge'      => $cases->charge($case, (int) auth()->id(), $data['reason']),
-                                'investigate' => $cases->investigate($case, (int) auth()->id(), $data['reason'] ?? null),
-                            };
+            // ── Manager resolves discrepancy ─────────────────────────────────
+            Action::make('manager_override')
+                ->label('Resolve Discrepancy')
+                ->icon('heroicon-o-exclamation-triangle')
+                ->color('danger')
+                ->requiresConfirmation()
+                ->modalHeading('Manager Override')
+                ->modalDescription(fn (AuditSession $record): string => $record->storekeeper_b_id
+                    ? "A counted {$record->count_a}. B counted {$record->count_b}. Enter the correct stock figure."
+                    : "Solo count found {$record->count_a}. System expected {$record->branchSystemStock()}. Enter the correct stock figure."
+                )
+                ->slideOver()
+                ->form([
+                    QuantityInput::apply(TextInput::make('manager_override_count'), allowZero: true)
+                        ->label('Final Correct Stock')
+                        ->required(),
+                    Select::make('reason_code')
+                        ->label('Reason for Discrepancy')
+                        ->options([
+                            'Damaged in Store' => 'Damaged in Store',
+                            'Suspected Theft' => 'Suspected Theft',
+                            'Waybill Shortage' => 'Waybill Shortage',
+                            'Data Entry Error' => 'Data Entry Error',
+                            'Supplier Short Delivery' => 'Supplier Short Delivery',
+                            'Other' => 'Other',
+                        ])
+                        ->required()
+                        ->searchable(),
+                ])
+                ->visible(fn (AuditSession $record): bool => $record->status === 'discrepancy' &&
+                    auth()->user()->hasVendorPermission($record->vendor_id, 'edit_order_items')
+                )
+                ->action(function (AuditSession $record, array $data, AdjustStockAction $adjustStock): void {
+                    self::applyOverride(
+                        $record,
+                        Quantity::of($data['manager_override_count']),
+                        $data['reason_code'],
+                        $adjustStock,
+                    );
+                })
+                ->successNotificationTitle('Discrepancy resolved.'),
 
-                            Notification::make()->title('Case disposed.')->success()->send();
-                        } catch (\Throwable $e) {
-                            Notification::make()->title($e->getMessage())->danger()->send();
-                        }
-                    }),
+            // ── Owner names who carries the loss ─────────────────────────────
+            //
+            // Separate from disposing because a case opens unattributed: this
+            // store has no assigned-storekeeper concept to default to, so
+            // somebody must be named before a charge is possible.
+            Action::make('assign_accountable')
+                ->label('Assign')
+                ->icon('heroicon-o-user-plus')
+                ->color('gray')
+                ->modalHeading('Who is accountable for this shortage?')
+                ->form([
+                    Select::make('storekeeper_id')
+                        ->label('Accountable staff member')
+                        ->helperText('Leave blank to leave the loss unattributed.')
+                        ->options(fn (AuditSession $record): array => User::query()
+                            ->whereHas('memberVendors', fn ($q) => $q->where('vendors.id', $record->vendor_id))
+                            ->orderBy('name')
+                            ->pluck('name', 'id')
+                            ->toArray())
+                        ->searchable()
+                        ->placeholder('Nobody'),
+                ])
+                ->visible(fn (AuditSession $record): bool => static::caseFor($record)?->awaitsDisposition() === true)
+                ->action(function (AuditSession $record, array $data, ShortageCaseService $cases): void {
+                    $case = static::caseFor($record);
 
-                // ── Owner records money coming back ──────────────────────────────
-                //
-                // v1 is manual entry throughout. The ordering of the options is
-                // the recommended precedence — net against cash the storekeeper
-                // already holds before reaching for salary — but nothing here
-                // cascades automatically; the owner chooses.
-                Action::make('record_recovery')
-                    ->label('Record recovery')
-                    ->icon('heroicon-o-banknotes')
-                    ->color('success')
-                    ->modalHeading('Record money recovered')
-                    ->modalDescription(function (AuditSession $record): string {
-                        $case = static::caseFor($record);
+                    // The real gate. Hiding the button is presentation; this
+                    // is what denies a storekeeper who calls the action
+                    // directly, and what blocks reassigning a case onto
+                    // yourself to route around self-disposition.
+                    if (! $case || auth()->user()->cannot('reassign', $case)) {
+                        Notification::make()->title('Only the store owner can assign accountability.')->danger()->send();
 
-                        return $case
-                            ? 'Outstanding on this case: ₦'.number_format(app(ShortageCaseService::class)->outstandingFor($case), 2)
-                            : '';
-                    })
-                    ->slideOver()
-                    ->form([
-                        Select::make('type')
-                            ->label('How was it recovered?')
-                            ->options([
-                                'recovery_cash'   => 'Cash the storekeeper holds or owes',
-                                'recovery_salary' => 'Salary deduction',
-                                'recovery_manual' => 'Paid back directly',
-                            ])
-                            ->default('recovery_cash')
-                            ->required()
-                            ->helperText('Net against cash held first where possible, then salary for any remainder.'),
+                        return;
+                    }
 
-                        TextInput::make('amount')
-                            ->label('Amount (₦)')
-                            ->numeric()
-                            ->required()
-                            ->minValue(0.01)
-                            // Advisory only. The service re-checks inside its
-                            // transaction, which is what actually prevents two
-                            // concurrent part-payments both slipping through.
-                            ->maxValue(fn (AuditSession $record): float => static::caseFor($record)
-                                ? app(ShortageCaseService::class)->outstandingFor(static::caseFor($record))
-                                : 0)
-                            ->helperText('Part payments are fine — the case closes itself once nothing is left.'),
+                    try {
+                        $cases->reassign($case, $data['storekeeper_id'] ? (int) $data['storekeeper_id'] : null);
+                        Notification::make()->title('Accountability updated.')->success()->send();
+                    } catch (\Throwable $e) {
+                        Notification::make()->title($e->getMessage())->danger()->send();
+                    }
+                }),
 
-                        Textarea::make('note')->label('Note (optional)')->rows(2),
-                    ])
-                    ->visible(fn (AuditSession $record): bool => static::caseFor($record)?->status === 'charged')
-                    ->action(function (AuditSession $record, array $data, ShortageCaseService $cases): void {
-                        $case = static::caseFor($record);
+            // ── Owner disposes the case ──────────────────────────────────────
+            Action::make('dispose_case')
+                ->label('Dispose')
+                ->icon('heroicon-o-scale')
+                ->color('danger')
+                ->requiresConfirmation()
+                ->modalHeading('Decide what happens to this shortage')
+                ->modalDescription(function (AuditSession $record): string {
+                    $case = static::caseFor($record);
 
-                        if (! $case || auth()->user()->cannot('recordRecovery', $case)) {
-                            Notification::make()->title('Only the store owner can record a recovery.')->danger()->send();
+                    if (! $case) {
+                        return '';
+                    }
 
-                            return;
-                        }
+                    $who = $case->chargedStorekeeper?->name ?? 'nobody yet';
 
-                        try {
-                            $cases->recover(
-                                case: $case,
-                                type: $data['type'],
-                                amount: (float) $data['amount'],
-                                // Keyed on the case and a fresh id, so a
-                                // double-submitted form posts once.
-                                eventKey: 'case:'.$case->id.':recovery:'.Str::ulid(),
-                                recordedBy: (int) auth()->id(),
-                                note: $data['note'] ?? null,
-                            );
+                    return sprintf(
+                        '%d unit(s) short, %s at retail. Currently assigned to: %s.',
+                        $case->shortage_qty,
+                        '₦'.number_format((float) $case->charge_amount, 2),
+                        $who,
+                    );
+                })
+                ->slideOver()
+                ->form([
+                    Select::make('disposition')
+                        ->label('Decision')
+                        ->options([
+                            'write_off' => 'Write off — the company absorbs it',
+                            'charge' => 'Charge the assigned staff member',
+                            'investigate' => 'Investigate — park it, decide later',
+                        ])
+                        ->required()
+                        ->live()
+                        ->helperText(fn ($state): string => match ($state) {
+                            'charge' => 'Posts one charge to the accountability ledger at the frozen retail figure.',
+                            'investigate' => 'No money moves. Can be charged or written off later.',
+                            default => 'No staff debt. Only the cost is a real loss — the margin was never earned.',
+                        }),
 
-                            Notification::make()->title('Recovery recorded.')->success()->send();
-                        } catch (\Throwable $e) {
-                            Notification::make()->title($e->getMessage())->danger()->send();
-                        }
-                    }),
+                    Textarea::make('reason')
+                        ->label('Reason')
+                        ->rows(2)
+                        // Investigating is a holding position, so it does not
+                        // demand a justification the owner may not have yet.
+                        ->required(fn ($get): bool => in_array($get('disposition'), ['write_off', 'charge'], true)),
+                ])
+                ->visible(fn (AuditSession $record): bool => static::caseFor($record)?->awaitsDisposition() === true)
+                ->action(function (AuditSession $record, array $data, ShortageCaseService $cases): void {
+                    $case = static::caseFor($record);
 
-                // ── Owner gives up on the remainder ──────────────────────────────
-                Action::make('convert_to_writeoff')
-                    ->label('Write off remainder')
-                    ->icon('heroicon-o-scissors')
-                    ->color('warning')
-                    ->requiresConfirmation()
-                    ->modalHeading('Write off what is left')
-                    ->modalDescription(function (AuditSession $record): string {
-                        $case = static::caseFor($record);
+                    if (! $case || auth()->user()->cannot('dispose', $case)) {
+                        Notification::make()
+                            ->title('You cannot dispose this case.')
+                            ->body('Disposition is the store owner\'s decision, and nobody may dispose a shortage charged to themselves.')
+                            ->danger()
+                            ->send();
 
-                        if (! $case) {
-                            return '';
-                        }
+                        return;
+                    }
 
-                        $outstanding = app(ShortageCaseService::class)->outstandingFor($case);
+                    try {
+                        match ($data['disposition']) {
+                            'write_off' => $cases->writeOff($case, (int) auth()->id(), $data['reason']),
+                            'charge' => $cases->charge($case, (int) auth()->id(), $data['reason']),
+                            'investigate' => $cases->investigate($case, (int) auth()->id(), $data['reason'] ?? null),
+                        };
 
-                        return sprintf(
-                            'Stops pursuing ₦%s. The company absorbs the unrecovered cost; margin that was never earned is simply not recognised.',
-                            number_format($outstanding, 2),
+                        Notification::make()->title('Case disposed.')->success()->send();
+                    } catch (\Throwable $e) {
+                        Notification::make()->title($e->getMessage())->danger()->send();
+                    }
+                }),
+
+            // ── Owner records money coming back ──────────────────────────────
+            //
+            // v1 is manual entry throughout. The ordering of the options is
+            // the recommended precedence — net against cash the storekeeper
+            // already holds before reaching for salary — but nothing here
+            // cascades automatically; the owner chooses.
+            Action::make('record_recovery')
+                ->label('Record recovery')
+                ->icon('heroicon-o-banknotes')
+                ->color('success')
+                ->modalHeading('Record money recovered')
+                ->modalDescription(function (AuditSession $record): string {
+                    $case = static::caseFor($record);
+
+                    return $case
+                        ? 'Outstanding on this case: ₦'.number_format(app(ShortageCaseService::class)->outstandingFor($case), 2)
+                        : '';
+                })
+                ->slideOver()
+                ->form([
+                    Select::make('type')
+                        ->label('How was it recovered?')
+                        ->options([
+                            'recovery_cash' => 'Cash the storekeeper holds or owes',
+                            'recovery_salary' => 'Salary deduction',
+                            'recovery_manual' => 'Paid back directly',
+                        ])
+                        ->default('recovery_cash')
+                        ->required()
+                        ->helperText('Net against cash held first where possible, then salary for any remainder.'),
+
+                    TextInput::make('amount')
+                        ->label('Amount (₦)')
+                        ->numeric()
+                        ->required()
+                        ->minValue(0.01)
+                        // Advisory only. The service re-checks inside its
+                        // transaction, which is what actually prevents two
+                        // concurrent part-payments both slipping through.
+                        ->maxValue(fn (AuditSession $record): float => static::caseFor($record)
+                            ? app(ShortageCaseService::class)->outstandingFor(static::caseFor($record))
+                            : 0)
+                        ->helperText('Part payments are fine — the case closes itself once nothing is left.'),
+
+                    Textarea::make('note')->label('Note (optional)')->rows(2),
+                ])
+                ->visible(fn (AuditSession $record): bool => static::caseFor($record)?->status === 'charged')
+                ->action(function (AuditSession $record, array $data, ShortageCaseService $cases): void {
+                    $case = static::caseFor($record);
+
+                    if (! $case || auth()->user()->cannot('recordRecovery', $case)) {
+                        Notification::make()->title('Only the store owner can record a recovery.')->danger()->send();
+
+                        return;
+                    }
+
+                    try {
+                        $cases->recover(
+                            case: $case,
+                            type: $data['type'],
+                            amount: (float) $data['amount'],
+                            // Keyed on the case and a fresh id, so a
+                            // double-submitted form posts once.
+                            eventKey: 'case:'.$case->id.':recovery:'.Str::ulid(),
+                            recordedBy: (int) auth()->id(),
+                            note: $data['note'] ?? null,
                         );
-                    })
-                    ->form([
-                        Textarea::make('reason')
-                            ->label('Why is the remainder unrecoverable?')
-                            ->rows(2)
-                            ->required(),
-                    ])
-                    ->visible(fn (AuditSession $record): bool => static::caseFor($record)?->status === 'charged')
-                    ->action(function (AuditSession $record, array $data, ShortageCaseService $cases): void {
-                        $case = static::caseFor($record);
 
-                        if (! $case || auth()->user()->cannot('recordRecovery', $case)) {
-                            Notification::make()->title('Only the store owner can write off a remainder.')->danger()->send();
+                        Notification::make()->title('Recovery recorded.')->success()->send();
+                    } catch (\Throwable $e) {
+                        Notification::make()->title($e->getMessage())->danger()->send();
+                    }
+                }),
 
-                            return;
-                        }
+            // ── Owner gives up on the remainder ──────────────────────────────
+            Action::make('convert_to_writeoff')
+                ->label('Write off remainder')
+                ->icon('heroicon-o-scissors')
+                ->color('warning')
+                ->requiresConfirmation()
+                ->modalHeading('Write off what is left')
+                ->modalDescription(function (AuditSession $record): string {
+                    $case = static::caseFor($record);
 
-                        try {
-                            $cases->convertToWriteOff(
-                                case: $case,
-                                eventKey: "case:{$case->id}:writeoff_conversion",
-                                recordedBy: (int) auth()->id(),
-                                reason: $data['reason'],
-                            );
+                    if (! $case) {
+                        return '';
+                    }
 
-                            Notification::make()->title('Remainder written off.')->success()->send();
-                        } catch (\Throwable $e) {
-                            Notification::make()->title($e->getMessage())->danger()->send();
-                        }
-                    }),
+                    $outstanding = app(ShortageCaseService::class)->outstandingFor($case);
+
+                    return sprintf(
+                        'Stops pursuing ₦%s. The company absorbs the unrecovered cost; margin that was never earned is simply not recognised.',
+                        number_format($outstanding, 2),
+                    );
+                })
+                ->form([
+                    Textarea::make('reason')
+                        ->label('Why is the remainder unrecoverable?')
+                        ->rows(2)
+                        ->required(),
+                ])
+                ->visible(fn (AuditSession $record): bool => static::caseFor($record)?->status === 'charged')
+                ->action(function (AuditSession $record, array $data, ShortageCaseService $cases): void {
+                    $case = static::caseFor($record);
+
+                    if (! $case || auth()->user()->cannot('recordRecovery', $case)) {
+                        Notification::make()->title('Only the store owner can write off a remainder.')->danger()->send();
+
+                        return;
+                    }
+
+                    try {
+                        $cases->convertToWriteOff(
+                            case: $case,
+                            eventKey: "case:{$case->id}:writeoff_conversion",
+                            recordedBy: (int) auth()->id(),
+                            reason: $data['reason'],
+                        );
+
+                        Notification::make()->title('Remainder written off.')->success()->send();
+                    } catch (\Throwable $e) {
+                        Notification::make()->title($e->getMessage())->danger()->send();
+                    }
+                }),
 
         ];
     }
@@ -874,9 +872,9 @@ class AuditSessionResource extends Resource
         string $reasonCode,
         AdjustStockAction $adjustStock,
     ): void {
-        $storeId            = $record->resolvedStoreId();
+        $storeId = $record->resolvedStoreId();
         $currentSystemStock = $record->branchSystemStock();
-        $difference         = Quantity::sub($finalCount, $currentSystemStock);
+        $difference = Quantity::sub($finalCount, $currentSystemStock);
 
         // Only a shortfall is a loss. Finding more than expected is not a gain
         // to be booked here.
@@ -886,25 +884,24 @@ class AuditSessionResource extends Resource
 
         if ($difference !== 0) {
             $adjustStock->execute(
-                productId:       $record->product_id,
+                productId: $record->product_id,
                 quantityChanged: $difference,
                 transactionType: 'audit_correction',
-                userId:          auth()->id(),
-                reference:       "Audit Override #{$record->id}",
-                description:     "Stock set to {$finalCount} from a counted {$record->countedQuantity()}. Reason: {$reasonCode}.",
-                auditSessionId:  $record->id,
-                reasonCode:      $reasonCode,
-                store:           $storeId,
+                userId: auth()->id(),
+                reference: "Audit Override #{$record->id}",
+                description: "Stock set to {$finalCount} from a counted {$record->countedQuantity()}. Reason: {$reasonCode}.",
+                auditSessionId: $record->id,
+                reasonCode: $reasonCode,
+                store: $storeId,
             );
         }
 
         $record->update([
-            'manager_id'             => auth()->id(),
+            'manager_id' => auth()->id(),
             'manager_override_count' => $finalCount,
-            'status'                 => 'resolved_by_override',
-            'reason_code'            => $reasonCode,
-            'loss_value'             => $lossValue,
+            'status' => 'resolved_by_override',
+            'reason_code' => $reasonCode,
+            'loss_value' => $lossValue,
         ]);
     }
-
 }

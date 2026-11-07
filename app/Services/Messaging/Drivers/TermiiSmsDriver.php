@@ -13,7 +13,7 @@ class TermiiSmsDriver implements MessagingDriver
 {
     public function send(DeliveryMessage $message): DriverSendResult
     {
-        $apiKey   = config('services.termii.api_key');
+        $apiKey = config('services.termii.api_key');
         $senderId = config('services.termii.sender_id');
 
         if (! $apiKey || ! $senderId) {
@@ -23,10 +23,10 @@ class TermiiSmsDriver implements MessagingDriver
         $response = Http::timeout(15)
             ->post('https://api.ng.termii.com/api/sms/send', [
                 'api_key' => $apiKey,
-                'to'      => preg_replace('/\D/', '', $message->to_number),
-                'from'    => $senderId,
-                'sms'     => $message->body,
-                'type'    => 'plain',
+                'to' => preg_replace('/\D/', '', $message->to_number),
+                'from' => $senderId,
+                'sms' => $message->body,
+                'type' => 'plain',
                 'channel' => 'generic',
             ])
             ->throw()

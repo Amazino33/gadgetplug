@@ -24,7 +24,7 @@ class TrackStorePresence
 
         if ($vendor && $user) {
             $storeId = ActiveStore::currentId();
-            
+
             if ($storeId) {
                 DB::table('store_user')
                     ->where('store_id', $storeId)

@@ -2,8 +2,8 @@
 
 namespace App\Filament\Resources\VendorApplications\Schemas;
 
-use Filament\Schemas\Components\Section;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 
 class VendorApplicationInfolist
@@ -20,11 +20,11 @@ class VendorApplicationInfolist
                         TextEntry::make('created_at')->label('Applied')->dateTime('d M Y, g:ia'),
                         TextEntry::make('status')
                             ->badge()
-                            ->color(fn($state) => match($state) {
-                                'pending'  => 'warning',
+                            ->color(fn ($state) => match ($state) {
+                                'pending' => 'warning',
                                 'approved' => 'success',
                                 'rejected' => 'danger',
-                                default    => 'gray',
+                                default => 'gray',
                             }),
                     ]),
 

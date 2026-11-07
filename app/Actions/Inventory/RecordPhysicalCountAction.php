@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Actions\Inventory;
 
-use App\Support\Quantity;
 use App\Models\PhysicalStockCount;
 use App\Models\PhysicalStockCountLine;
 use App\Models\Product;
 use App\Models\ProductStoreStock;
 use App\Models\Store;
 use App\Models\User;
+use App\Support\Quantity;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -47,16 +47,16 @@ class RecordPhysicalCountAction
 
         return DB::transaction(function () use ($countedBy, $store, $periodStart, $periodEnd, $counts, $note) {
             $count = PhysicalStockCount::create([
-                'vendor_id'    => $store->vendor_id,
-                'store_id'     => $store->id,
-                'counted_by'   => $countedBy->id,
+                'vendor_id' => $store->vendor_id,
+                'store_id' => $store->id,
+                'counted_by' => $countedBy->id,
                 'period_start' => $periodStart,
-                'period_end'   => $periodEnd,
-                'counted_at'   => now(),
-                'note'         => $note,
+                'period_end' => $periodEnd,
+                'counted_at' => now(),
+                'note' => $note,
                 // Set here rather than left to the column default, so the model
                 // handed back to the caller says what it is without a refresh.
-                'status'       => PhysicalStockCount::STATUS_SUBMITTED,
+                'status' => PhysicalStockCount::STATUS_SUBMITTED,
             ]);
 
             $systemQuantities = ProductStoreStock::query()
@@ -76,18 +76,18 @@ class RecordPhysicalCountAction
 
                 PhysicalStockCountLine::create([
                     'physical_stock_count_id' => $count->id,
-                    'product_id'              => $productId,
-                    'counted_quantity'        => Quantity::of($found),
+                    'product_id' => $productId,
+                    'counted_quantity' => Quantity::of($found),
                     // Absent means the branch holds no row for it, which is a
                     // system figure of zero — and counting something the system
                     // does not think is there is exactly the kind of gap worth
                     // seeing.
-                    'system_quantity'         => Quantity::of($systemQuantities[$productId] ?? 0),
+                    'system_quantity' => Quantity::of($systemQuantities[$productId] ?? 0),
                     // Both snapshotted now, for the same reason the system
                     // quantity is: a price that moved next week would silently
                     // restate what this gap was worth.
-                    'unit_cost'               => $products[$productId]?->cost_price,
-                    'unit_price'              => $products[$productId]?->price,
+                    'unit_cost' => $products[$productId]?->cost_price,
+                    'unit_price' => $products[$productId]?->price,
                 ]);
             }
 

@@ -6,6 +6,7 @@ use App\Filament\Pages\DeliverySettings;
 use App\Models\DeliveryRule;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Utilities\Get;
 use Illuminate\Support\Facades\Validator;
 
@@ -16,7 +17,7 @@ use Illuminate\Support\Facades\Validator;
  */
 final class DeliveryRuleForm
 {
-    /** @return array<int, \Filament\Schemas\Components\Component> */
+    /** @return array<int, Component> */
     public static function fields(): array
     {
         return [
@@ -60,9 +61,9 @@ final class DeliveryRuleForm
     public static function validate(array $values): array
     {
         return Validator::make($values, [
-            'mode'          => ['required', 'in:'.implode(',', DeliveryRule::MODES)],
+            'mode' => ['required', 'in:'.implode(',', DeliveryRule::MODES)],
             // A fee on a free / not-delivered rule is ignored (DeliveryRule zeroes it).
-            'fee'           => ['nullable', 'numeric', 'min:0', 'required_if:mode,fee'],
+            'fee' => ['nullable', 'numeric', 'min:0', 'required_if:mode,fee'],
             'expected_cost' => ['nullable', 'numeric', 'min:0'],
             'delivery_days' => ['nullable', 'string', 'max:60'],
         ], [
@@ -78,8 +79,8 @@ final class DeliveryRuleForm
     public static function fill(array $rule): array
     {
         return [
-            'mode'          => $rule['mode'],
-            'fee'           => $rule['mode'] === DeliveryRule::FEE ? $rule['fee'] : null,
+            'mode' => $rule['mode'],
+            'fee' => $rule['mode'] === DeliveryRule::FEE ? $rule['fee'] : null,
             'expected_cost' => $rule['expected_cost'],
             'delivery_days' => $rule['delivery_days'] ?? $rule['days'] ?? null,
         ];

@@ -27,10 +27,13 @@ class ProductResource extends Resource
 {
     protected static ?string $model = Product::class;
 
-    protected static string|null|BackedEnum $navigationIcon  = 'heroicon-o-cube';
-    protected static ?string                $navigationLabel = 'All Products';
-    protected static ?string                $modelLabel      = 'product';
-    protected static ?int                   $navigationSort  = 5;
+    protected static string|null|BackedEnum $navigationIcon = 'heroicon-o-cube';
+
+    protected static ?string $navigationLabel = 'All Products';
+
+    protected static ?string $modelLabel = 'product';
+
+    protected static ?int $navigationSort = 5;
 
     /**
      * What a user without cost visibility may load. Deliberately a whitelist:
@@ -65,9 +68,15 @@ class ProductResource extends Resource
         return auth()->user()?->isSuperAdmin() ?? false;
     }
 
-    public static function canCreate(): bool { return false; }
+    public static function canCreate(): bool
+    {
+        return false;
+    }
 
-    public static function canDelete($record): bool { return false; }
+    public static function canDelete($record): bool
+    {
+        return false;
+    }
 
     // The Edit page is the commission/discount form — super-admin only.
     public static function canEdit($record): bool
@@ -105,7 +114,7 @@ class ProductResource extends Resource
     {
         return [
             'index' => Pages\ListProducts::route('/'),
-            'edit'  => Pages\EditProduct::route('/{record}/edit'),
+            'edit' => Pages\EditProduct::route('/{record}/edit'),
         ];
     }
 }

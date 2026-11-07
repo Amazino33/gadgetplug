@@ -7,6 +7,7 @@ use App\Models\Store;
 use App\Models\User;
 use App\Models\Vendor;
 use App\Services\ActiveStore;
+use App\Services\Inventory\StoreStockMetrics;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -15,7 +16,7 @@ function activeStoreVendor(): Vendor
 {
     return Vendor::create([
         'user_id' => User::factory()->create()->id,
-        'name'    => 'Active Store Vendor '.uniqid(),
+        'name' => 'Active Store Vendor '.uniqid(),
     ]);
 }
 
@@ -36,7 +37,7 @@ function memberOf(Vendor $vendor, array $storeIds = []): User
 test('the owner sees every store the vendor has, without any store_user row', function () {
     $vendor = activeStoreVendor();
     $second = Store::create(['vendor_id' => $vendor->id, 'name' => 'Second Branch']);
-    $third  = Store::create(['vendor_id' => $vendor->id, 'name' => 'Third Branch']);
+    $third = Store::create(['vendor_id' => $vendor->id, 'name' => 'Third Branch']);
 
     $accessible = ActiveStore::accessibleFor($vendor, $vendor->user);
 
@@ -208,7 +209,7 @@ test('store metrics count only that store rows', function () {
     ProductStoreStock::where('product_id', $product->id)->first()->update(['quantity' => 10]);
     ProductStoreStock::create(['product_id' => $product->id, 'store_id' => $branch->id, 'quantity' => 2]);
 
-    $metrics = App\Services\Inventory\StoreStockMetrics::forStores([$vendor->defaultStore->id, $branch->id]);
+    $metrics = StoreStockMetrics::forStores([$vendor->defaultStore->id, $branch->id]);
 
     expect($metrics[$vendor->defaultStore->id]->retail_value)->toBe(10000.0)
         ->and($metrics[$vendor->defaultStore->id]->cost_value)->toBe(4000.0)

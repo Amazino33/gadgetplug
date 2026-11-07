@@ -52,7 +52,7 @@ function platformAdmin(): User
 
 function onboardingVendor(string $name = 'Chip Gadget'): Vendor
 {
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
 
     $vendor = Vendor::create(['user_id' => User::factory()->create()->id, 'name' => $name]);
 
@@ -152,7 +152,7 @@ it('records an import run by platform staff as done by support', function () {
     Storage::fake('local');
 
     $vendor = onboardingVendor();
-    $admin  = platformAdmin();
+    $admin = platformAdmin();
 
     enterPanelForOnboarding($admin, $vendor);
 
@@ -200,7 +200,7 @@ it('does not label the vendor doing their own import as support', function () {
     Storage::fake('local');
 
     $vendor = onboardingVendor();
-    $owner  = User::find($vendor->user_id);
+    $owner = User::find($vendor->user_id);
 
     enterPanelForOnboarding($owner, $vendor);
 
@@ -218,7 +218,7 @@ it('does not label a platform admin importing into their own shop as support', f
     // wrong party as accountable for their own catalogue.
     $admin = platformAdmin();
 
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
     $vendor = Vendor::create(['user_id' => $admin->id, 'name' => 'Tolu Gadgets']);
     VendorRoles::seedFor($vendor);
 
@@ -234,7 +234,7 @@ it('marks a command-line import as run from our end', function () {
     Storage::fake('local');
 
     $vendor = onboardingVendor();
-    $path   = Storage::disk('local')->path('cli-import.csv');
+    $path = Storage::disk('local')->path('cli-import.csv');
 
     Storage::disk('local')->put('cli-import.csv', ADMIN_IMPORT_CSV);
 
@@ -267,9 +267,9 @@ it('shows the vendor every import of their catalogue, and who ran it', function 
 it('never shows one vendor another vendor imports', function () {
     Storage::fake('local');
 
-    $mine     = onboardingVendor('Chip Gadget');
-    $theirs   = onboardingVendor('Rival Gadget');
-    $admin    = platformAdmin();
+    $mine = onboardingVendor('Chip Gadget');
+    $theirs = onboardingVendor('Rival Gadget');
+    $admin = platformAdmin();
 
     enterPanelForOnboarding($admin, $theirs);
     $theirLog = runAdminImport();

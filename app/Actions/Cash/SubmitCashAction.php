@@ -74,14 +74,14 @@ class SubmitCashAction
             }
 
             return CashSubmission::create([
-                'vendor_id'       => $store->vendor_id,
-                'store_id'        => $store->id,
-                'submitted_by'    => $submitter->id,
-                'received_by'     => $receiver?->id,
-                'amount'          => round($amount, 2),
+                'vendor_id' => $store->vendor_id,
+                'store_id' => $store->id,
+                'submitted_by' => $submitter->id,
+                'received_by' => $receiver?->id,
+                'amount' => round($amount, 2),
                 'expected_amount' => $expected,
-                'reason'          => $reason,
-                'status'          => CashSubmission::STATUS_PENDING,
+                'reason' => $reason,
+                'status' => CashSubmission::STATUS_PENDING,
             ]);
         });
     }

@@ -80,12 +80,12 @@ class PublishLinkedListingAction
     {
         return DB::transaction(function () use ($source, $link) {
             $listing = Product::create([
-                'vendor_id'         => $link->reseller_vendor_id,
+                'vendor_id' => $link->reseller_vendor_id,
                 'source_product_id' => $source->id,
-                'supplier_link_id'  => $link->id,
-                'category_id'       => $source->category_id,
-                'name'              => $source->name,
-                'brand'             => $source->brand,
+                'supplier_link_id' => $link->id,
+                'category_id' => $source->category_id,
+                'name' => $source->name,
+                'brand' => $source->brand,
                 // No description and no photos: both resolve live from the
                 // source. See the class docblock.
 
@@ -93,13 +93,13 @@ class PublishLinkedListingAction
                 // sort and filter on it in SQL. Price has no invariant behind
                 // it — nothing recomputes it — so unlike stock it is safe to
                 // hold here. The accessor stays authoritative for money.
-                'price'      => $this->retailPrice($source, $link),
+                'price' => $this->retailPrice($source, $link),
                 'cost_price' => $source->price,
 
                 // Holds nothing. See the class docblock.
                 'stock_quantity' => 0,
 
-                'status'      => 'published',
+                'status' => 'published',
                 'show_online' => true,
                 // Never on a till: there is no stock behind it to hand over,
                 // and the counter sells what is physically present.
@@ -122,7 +122,7 @@ class PublishLinkedListingAction
     {
         $data = [
             'supplier_link_id' => $link->id,
-            'cost_price'       => $source->price,
+            'cost_price' => $source->price,
         ];
 
         if (! $listing->has_custom_price) {

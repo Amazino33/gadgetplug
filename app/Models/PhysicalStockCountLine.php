@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models;
 
-use App\Support\Quantity;
 use App\Casts\AsQuantity;
+use App\Support\Quantity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use LogicException;
@@ -25,9 +25,9 @@ class PhysicalStockCountLine extends Model
 
     protected $casts = [
         'counted_quantity' => AsQuantity::class,
-        'system_quantity'  => AsQuantity::class,
-        'unit_cost'        => 'decimal:2',
-        'unit_price'       => 'decimal:2',
+        'system_quantity' => AsQuantity::class,
+        'unit_cost' => 'decimal:2',
+        'unit_price' => 'decimal:2',
     ];
 
     protected static function booted(): void

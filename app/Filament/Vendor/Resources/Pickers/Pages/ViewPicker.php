@@ -2,17 +2,16 @@
 
 namespace App\Filament\Vendor\Resources\Pickers\Pages;
 
-use App\Support\Quantity;
 use App\Filament\Vendor\Resources\Pickers\PickerResource;
 use App\Filament\Vendor\Resources\Pickers\RelationManagers\HoldingsRelationManager;
 use App\Models\Picker;
 use App\Models\PickingLedgerEntry;
 use App\Services\Pickings\PickingLedger;
+use App\Support\Quantity;
 use Filament\Actions\EditAction;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Components\Section;
-use Filament\Schemas\Components\Utilities\Get;
-use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Schema;
 use Illuminate\Support\HtmlString;
 
@@ -48,13 +47,13 @@ class ViewPicker extends ViewRecord
 
                     TextEntry::make('units_held')
                         ->label('Units held')
-                        ->state(fn () => \App\Support\Quantity::display($this->heldUnits($picker))),
+                        ->state(fn () => Quantity::display($this->heldUnits($picker))),
 
                     TextEntry::make('value_out')
                         ->label('Worth today')
                         // Valued at the price they will actually be asked to
                         // pay, so this figure moves when prices move.
-                        ->state(fn () => '₦' . number_format($this->valueOut($picker), 2))
+                        ->state(fn () => '₦'.number_format($this->valueOut($picker), 2))
                         ->weight('bold'),
                 ]),
 
@@ -123,34 +122,34 @@ class ViewPicker extends ViewRecord
 
         $rows = $entries->map(function ($entry) {
             $label = match ($entry->direction) {
-                PickingLedgerEntry::DIRECTION_PAYMENT  => '<span class="text-green-600 dark:text-green-400">Paid</span>',
-                PickingLedgerEntry::DIRECTION_RETURN   => '<span class="text-gray-600 dark:text-gray-300">Returned</span>',
+                PickingLedgerEntry::DIRECTION_PAYMENT => '<span class="text-green-600 dark:text-green-400">Paid</span>',
+                PickingLedgerEntry::DIRECTION_RETURN => '<span class="text-gray-600 dark:text-gray-300">Returned</span>',
                 PickingLedgerEntry::DIRECTION_WRITEOFF => '<span class="text-red-600 dark:text-red-400">Written off</span>',
-                default                                => e($entry->direction),
+                default => e($entry->direction),
             };
 
             $amount = (float) $entry->amount > 0
-                ? '₦' . number_format((float) $entry->amount, 2)
+                ? '₦'.number_format((float) $entry->amount, 2)
                 : '—';
 
             return '<tr class="border-b border-gray-100 dark:border-white/10">'
-                . '<td class="py-2 pr-4 text-gray-500 dark:text-gray-400">' . e($entry->created_at?->format('d M Y')) . '</td>'
-                . '<td class="py-2 pr-4">' . $label . '</td>'
-                . '<td class="py-2 pr-4 text-gray-950 dark:text-white">' . e($entry->product_name) . '</td>'
-                . '<td class="py-2 pr-4 text-right">' . e(Quantity::format($entry->quantity, filament()->getTenant())) . '</td>'
-                . '<td class="py-2 pr-4 text-right">' . $amount . '</td>'
-                . '<td class="py-2 text-gray-500 dark:text-gray-400">' . e($entry->staff_name ?? '—') . '</td>'
-                . '</tr>';
+                .'<td class="py-2 pr-4 text-gray-500 dark:text-gray-400">'.e($entry->created_at?->format('d M Y')).'</td>'
+                .'<td class="py-2 pr-4">'.$label.'</td>'
+                .'<td class="py-2 pr-4 text-gray-950 dark:text-white">'.e($entry->product_name).'</td>'
+                .'<td class="py-2 pr-4 text-right">'.e(Quantity::format($entry->quantity, filament()->getTenant())).'</td>'
+                .'<td class="py-2 pr-4 text-right">'.$amount.'</td>'
+                .'<td class="py-2 text-gray-500 dark:text-gray-400">'.e($entry->staff_name ?? '—').'</td>'
+                .'</tr>';
         })->implode('');
 
         return '<div class="overflow-x-auto"><table class="w-full text-sm">'
-            . '<thead><tr class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">'
-            . '<th class="pb-2 pr-4 text-left font-medium">When</th>'
-            . '<th class="pb-2 pr-4 text-left font-medium">What</th>'
-            . '<th class="pb-2 pr-4 text-left font-medium">Product</th>'
-            . '<th class="pb-2 pr-4 text-right font-medium">Units</th>'
-            . '<th class="pb-2 pr-4 text-right font-medium">Amount</th>'
-            . '<th class="pb-2 text-left font-medium">By</th>'
-            . '</tr></thead><tbody>' . $rows . '</tbody></table></div>';
+            .'<thead><tr class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">'
+            .'<th class="pb-2 pr-4 text-left font-medium">When</th>'
+            .'<th class="pb-2 pr-4 text-left font-medium">What</th>'
+            .'<th class="pb-2 pr-4 text-left font-medium">Product</th>'
+            .'<th class="pb-2 pr-4 text-right font-medium">Units</th>'
+            .'<th class="pb-2 pr-4 text-right font-medium">Amount</th>'
+            .'<th class="pb-2 text-left font-medium">By</th>'
+            .'</tr></thead><tbody>'.$rows.'</tbody></table></div>';
     }
 }

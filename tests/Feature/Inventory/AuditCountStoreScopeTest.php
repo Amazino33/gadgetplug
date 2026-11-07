@@ -29,7 +29,7 @@ function auditStoreScopeContext(): array
     $owner = User::factory()->create();
     $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Zeelink Tech']);
 
-    $hq     = Store::create(['vendor_id' => $vendor->id, 'name' => 'HQ', 'is_default' => true]);
+    $hq = Store::create(['vendor_id' => $vendor->id, 'name' => 'HQ', 'is_default' => true]);
     $branch = Store::create(['vendor_id' => $vendor->id, 'name' => 'Zeelink Branch']);
 
     $category = Category::create(['name' => 'Chargers '.uniqid()]);
@@ -44,14 +44,14 @@ function auditStoreScopeContext(): array
     // here would collide with the explicit row set below (same reason
     // StockAdjustmentTest's fixture creates at zero and uses updateOrCreate).
     $product = Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'store_id'       => $branch->id,
-        'name'           => 'SHPLUS 60W Charger',
-        'price'          => 5300,
-        'cost_price'     => 2570,
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'store_id' => $branch->id,
+        'name' => 'SHPLUS 60W Charger',
+        'price' => 5300,
+        'cost_price' => 2570,
         'stock_quantity' => 0, // vendor-wide mirror ends up hq(10) + branch(2)
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
     ProductStoreStock::updateOrCreate(['product_id' => $product->id, 'store_id' => $hq->id], ['quantity' => 10, 'reserved' => 0]);
@@ -67,11 +67,11 @@ it('corrects the branch actually counted, not the vendor default store', functio
     // system shows there) — the branch's shelf really does hold more than
     // its own row says.
     $audit = AuditSession::create([
-        'vendor_id'        => $c['vendor']->id,
-        'product_id'       => $c['product']->id,
+        'vendor_id' => $c['vendor']->id,
+        'product_id' => $c['product']->id,
         'storekeeper_a_id' => $c['owner']->id,
-        'count_a'          => 5,
-        'status'           => 'pending',
+        'count_a' => 5,
+        'status' => 'pending',
     ]);
 
     // Storekeeper B verifies from that same branch's context in the panel —
@@ -105,11 +105,11 @@ it('corrects the branch the product is homed at, even when the verifier is stand
     $c['product']->update(['store_id' => $c['branch']->id]);
 
     $audit = AuditSession::create([
-        'vendor_id'        => $c['vendor']->id,
-        'product_id'       => $c['product']->id,
+        'vendor_id' => $c['vendor']->id,
+        'product_id' => $c['product']->id,
         'storekeeper_a_id' => $c['owner']->id,
-        'count_a'          => 5,
-        'status'           => 'pending',
+        'count_a' => 5,
+        'status' => 'pending',
     ]);
 
     // Storekeeper B verifies from HQ — a different branch than the one this
@@ -137,11 +137,11 @@ it('leaves the branch row untouched when the count matches what it already shows
     $c = auditStoreScopeContext();
 
     $audit = AuditSession::create([
-        'vendor_id'        => $c['vendor']->id,
-        'product_id'       => $c['product']->id,
+        'vendor_id' => $c['vendor']->id,
+        'product_id' => $c['product']->id,
         'storekeeper_a_id' => $c['owner']->id,
-        'count_a'          => 2,
-        'status'           => 'pending',
+        'count_a' => 2,
+        'status' => 'pending',
     ]);
 
     $this->actingAs($c['owner']);

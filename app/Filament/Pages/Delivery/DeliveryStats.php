@@ -52,11 +52,11 @@ class DeliveryStats extends StatsOverviewWidget
 
         return [
             'delivered' => ($modes[DeliveryRule::FREE] ?? 0) + ($modes[DeliveryRule::FEE] ?? 0),
-            'free'      => $modes[DeliveryRule::FREE] ?? 0,
-            'paid'      => $modes[DeliveryRule::FEE] ?? 0,
-            'total'     => $modes->sum(),
-            'pinned'    => (clone $stores)->whereNotNull('latitude')->whereNotNull('longitude')->count(),
-            'stores'    => $stores->count(),
+            'free' => $modes[DeliveryRule::FREE] ?? 0,
+            'paid' => $modes[DeliveryRule::FEE] ?? 0,
+            'total' => $modes->sum(),
+            'pinned' => (clone $stores)->whereNotNull('latitude')->whereNotNull('longitude')->count(),
+            'stores' => $stores->count(),
         ];
     }
 
@@ -82,5 +82,4 @@ class DeliveryStats extends StatsOverviewWidget
                 ->color($s['pinned'] === 0 ? 'danger' : ($s['pinned'] < $s['stores'] ? 'warning' : 'success')),
         ];
     }
-
 }

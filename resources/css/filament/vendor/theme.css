@@ -2,6 +2,7 @@
 
 @source '../../../../app/Filament/Vendor/**/*';
 @source '../../../../resources/views/filament/vendor/**/*';
+@source '../../../../resources/views/livewire/assistant/**/*';
 
 /* Sidebar menu filter (resources/views/filament/vendor/partials/nav-search.blade.php).
    Plain CSS rather than utility classes: this markup is injected through a render

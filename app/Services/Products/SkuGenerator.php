@@ -24,9 +24,12 @@ use Illuminate\Support\Str;
 class SkuGenerator
 {
     public const STYLE_CATEGORY_NAME = 'category_name';
-    public const STYLE_SERIAL        = 'serial';
+
+    public const STYLE_SERIAL = 'serial';
+
     public const STYLE_PREFIX_SERIAL = 'prefix_serial';
-    public const STYLE_MANUAL        = 'manual';
+
+    public const STYLE_MANUAL = 'manual';
 
     public const STYLES = [
         self::STYLE_CATEGORY_NAME,
@@ -90,7 +93,7 @@ class SkuGenerator
 
         if ($style === self::STYLE_SERIAL || $style === self::STYLE_PREFIX_SERIAL) {
             $lead = $style === self::STYLE_PREFIX_SERIAL ? $this->cleanPrefix($prefix).'-' : '';
-            $n    = $this->highestSerial($vendorId, $lead) + 1 + $skip;
+            $n = $this->highestSerial($vendorId, $lead) + 1 + $skip;
 
             do {
                 $sku = $lead.$n;
@@ -101,7 +104,7 @@ class SkuGenerator
         }
 
         $head = $this->categoryCode($categoryId).'-'.$this->nameCode($name).'-';
-        $seq  = Product::where('vendor_id', $vendorId)->count() + 1 + $skip;
+        $seq = Product::where('vendor_id', $vendorId)->count() + 1 + $skip;
 
         do {
             $sku = $head.str_pad((string) $seq, 4, '0', STR_PAD_LEFT);
@@ -144,10 +147,10 @@ class SkuGenerator
     public function forUnit(ProductUnit $unit, string $productSku): string
     {
         $letters = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', (string) $unit->name), 0, 2)) ?: 'UN';
-        $base    = $productSku.'-'.$letters.max(1, (int) $unit->conversion_factor);
+        $base = $productSku.'-'.$letters.max(1, (int) $unit->conversion_factor);
 
         $sku = $base;
-        $n   = 2;
+        $n = 2;
 
         while (ProductUnit::where('vendor_id', $unit->vendor_id)->where('sku', $sku)
             ->when($unit->exists, fn ($q) => $q->whereKeyNot($unit->getKey()))->exists()) {

@@ -2,9 +2,10 @@
 
 use App\Actions\Inventory\AdoptAuditCountAction;
 use App\Models\PhysicalStockCount;
+use App\Models\Product;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
-require_once __DIR__ . '/CloseHelpers.php';
+require_once __DIR__.'/CloseHelpers.php';
 
 uses(RefreshDatabase::class);
 
@@ -14,7 +15,6 @@ uses(RefreshDatabase::class);
  * agreed figure per product, so a finished count is copied into a settlement
  * count rather than read through in two shapes.
  */
-
 function adopt(array $ctx, $session)
 {
     return app(AdoptAuditCountAction::class)->execute($session, $ctx['owner']);
@@ -53,7 +53,7 @@ test('adopting the same count twice gives back the same one', function () {
         $ctx['product']->id => ['counted' => 7, 'system' => 10],
     ]);
 
-    $first  = adopt($ctx, $session);
+    $first = adopt($ctx, $session);
     $second = adopt($ctx, $session);
 
     // A second copy would compete with the first for the same period, and the
@@ -67,9 +67,9 @@ test("a manager's override outranks what either counter wrote down", function ()
 
     $session = closeAuditSession($ctx, [
         $ctx['product']->id => [
-            'counted'  => 7,
-            'system'   => 10,
-            'status'   => 'resolved_by_override',
+            'counted' => 7,
+            'system' => 10,
+            'status' => 'resolved_by_override',
             'override' => 5,
         ],
     ]);
@@ -82,9 +82,9 @@ test("a manager's override outranks what either counter wrote down", function ()
 test('a line the two counters never agreed on is left out', function () {
     $ctx = closeContext(onShelf: 10);
 
-    $other = App\Models\Product::create([
+    $other = Product::create([
         'vendor_id' => $ctx['vendor']->id,
-        'store_id'  => $ctx['store']->id,
+        'store_id' => $ctx['store']->id,
         'category_id' => $ctx['product']->category_id,
         'name' => 'Disputed Phone', 'price' => 50000, 'cost_price' => 30000,
         'stock_quantity' => 4, 'reserved_stock' => 0, 'status' => 'published',
@@ -92,7 +92,7 @@ test('a line the two counters never agreed on is left out', function () {
 
     $session = closeAuditSession($ctx, [
         $ctx['product']->id => ['counted' => 7, 'system' => 10],
-        $other->id          => ['counted' => 3, 'system' => 4, 'status' => 'discrepancy'],
+        $other->id => ['counted' => 3, 'system' => 4, 'status' => 'discrepancy'],
     ]);
 
     $count = adopt($ctx, $session);

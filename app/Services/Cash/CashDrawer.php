@@ -178,9 +178,9 @@ class CashDrawer
                     ->value('handed'), 2);
 
                 return [
-                    'user_id'     => $userId,
-                    'name'        => $names[$userId] ?? 'Unknown',
-                    'collected'   => $collected,
+                    'user_id' => $userId,
+                    'name' => $names[$userId] ?? 'Unknown',
+                    'collected' => $collected,
                     'handed_over' => $handedOver,
                     'outstanding' => round($collected - $handedOver, 2),
                 ];
@@ -212,8 +212,8 @@ class CashDrawer
 
         return $cashiers
             ->map(fn ($userId) => [
-                'user_id'  => (int) $userId,
-                'name'     => DB::table('users')->where('id', $userId)->value('name') ?? 'Unknown',
+                'user_id' => (int) $userId,
+                'name' => DB::table('users')->where('id', $userId)->value('name') ?? 'Unknown',
                 'expected' => self::expectedFrom($vendorId, $storeId, (int) $userId),
             ])
             ->filter(fn (array $row) => $row['expected'] > 0.009)

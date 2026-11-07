@@ -23,18 +23,18 @@ class AffiliateCommissionsTable
                 TextColumn::make('status')
                     ->badge()
                     ->formatStateUsing(fn ($state) => match ($state) {
-                        'pending'        => 'Pending',
-                        'return_window'  => 'In Return Window',
-                        'available'      => 'Available',
-                        'rejected'       => 'Rejected',
-                        default          => ucfirst($state),
+                        'pending' => 'Pending',
+                        'return_window' => 'In Return Window',
+                        'available' => 'Available',
+                        'rejected' => 'Rejected',
+                        default => ucfirst($state),
                     })
                     ->color(fn ($state) => match ($state) {
-                        'pending'        => 'gray',
-                        'return_window'  => 'warning',
-                        'available'      => 'success',
-                        'rejected'       => 'danger',
-                        default          => 'gray',
+                        'pending' => 'gray',
+                        'return_window' => 'warning',
+                        'available' => 'success',
+                        'rejected' => 'danger',
+                        default => 'gray',
                     }),
 
                 TextColumn::make('created_at')->label('Created')->dateTime('d M Y, g:ia')->sortable(),
@@ -43,10 +43,10 @@ class AffiliateCommissionsTable
             ->filters([
                 SelectFilter::make('status')
                     ->options([
-                        'pending'       => 'Pending',
+                        'pending' => 'Pending',
                         'return_window' => 'In Return Window',
-                        'available'     => 'Available',
-                        'rejected'      => 'Rejected',
+                        'available' => 'Available',
+                        'rejected' => 'Rejected',
                     ]),
                 SelectFilter::make('affiliate_id')
                     ->label('Affiliate')
@@ -57,7 +57,7 @@ class AffiliateCommissionsTable
                 Action::make('breakdown')
                     ->label('Breakdown')
                     ->icon('heroicon-o-calculator')
-                    ->modalHeading(fn (AffiliateCommission $record) => 'Commission Breakdown — ' . ($record->order?->reference ?? 'Order #' . $record->order_id))
+                    ->modalHeading(fn (AffiliateCommission $record) => 'Commission Breakdown — '.($record->order?->reference ?? 'Order #'.$record->order_id))
                     ->modalSubmitAction(false)
                     ->modalCancelActionLabel('Close')
                     ->modalContent(fn (AffiliateCommission $record) => view('filament.pages.affiliate-commission-breakdown-modal', [

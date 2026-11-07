@@ -1,14 +1,8 @@
 <?php
 
-use App\Models\Category;
-use App\Models\PosCustomer;
 use App\Models\PosCustomerLedgerEntry;
 use App\Models\PosSale;
 use App\Models\PosSalePayment;
-use App\Models\Product;
-use App\Models\Store;
-use App\Models\User;
-use App\Models\Vendor;
 use App\Services\Pos\CustomerDebtService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -68,9 +62,9 @@ it('charges only the debt slice of a part-paid sale', function () {
     Sanctum::actingAs($ctx['owner']);
 
     $this->postJson('/api/pos/sales', debtSalePayload($ctx, [
-        'payment_method'  => 'split',
+        'payment_method' => 'split',
         'amount_tendered' => 10000.0,
-        'payments'        => [
+        'payments' => [
             ['method' => 'cash', 'amount' => 4000.0],
             ['method' => 'debt', 'amount' => 6000.0],
         ],
@@ -87,7 +81,7 @@ it('creates no charge at all for a fully paid sale', function () {
     Sanctum::actingAs($ctx['owner']);
 
     $this->postJson('/api/pos/sales', debtSalePayload($ctx, [
-        'payment_method'  => 'cash',
+        'payment_method' => 'cash',
         'amount_tendered' => 10000.0,
     ]))->assertSuccessful();
 
@@ -113,10 +107,10 @@ it('refuses a split containing a debt leg with no customer attached', function (
     Sanctum::actingAs($ctx['owner']);
 
     $this->postJson('/api/pos/sales', debtSalePayload($ctx, [
-        'customer_id'     => null,
-        'payment_method'  => 'split',
+        'customer_id' => null,
+        'payment_method' => 'split',
         'amount_tendered' => 10000.0,
-        'payments'        => [
+        'payments' => [
             ['method' => 'cash', 'amount' => 4000.0],
             ['method' => 'debt', 'amount' => 6000.0],
         ],
@@ -130,8 +124,8 @@ it('still allows an anonymous sale when nothing is owed', function () {
     Sanctum::actingAs($ctx['owner']);
 
     $this->postJson('/api/pos/sales', debtSalePayload($ctx, [
-        'customer_id'     => null,
-        'payment_method'  => 'cash',
+        'customer_id' => null,
+        'payment_method' => 'cash',
         'amount_tendered' => 10000.0,
     ]))->assertSuccessful();
 });
@@ -144,19 +138,19 @@ it('creates the charge when an offline credit sale syncs', function () {
 
     $this->postJson('/api/pos/sync', [
         'vendor_id' => $ctx['vendor']->id,
-        'sales'     => [[
-            'offline_id'     => 'till-1-0001',
-            'reference'      => 'POS-OFFLINE1',
-            'customer_id'    => $ctx['customer']->id,
-            'items'          => [[
+        'sales' => [[
+            'offline_id' => 'till-1-0001',
+            'reference' => 'POS-OFFLINE1',
+            'customer_id' => $ctx['customer']->id,
+            'items' => [[
                 'product_id' => $ctx['product']->id, 'product_name' => 'Credit Widget',
                 'unit_price' => 10000.0, 'quantity' => 1, 'total' => 10000.0,
             ]],
-            'total'          => 10000.0,
-            'vat_amount'     => 0,
+            'total' => 10000.0,
+            'vat_amount' => 0,
             'payment_method' => 'debt',
-            'completed_at'   => '2026-08-20 14:00:00',
-            'payments'       => null,
+            'completed_at' => '2026-08-20 14:00:00',
+            'payments' => null,
         ]],
     ])->assertSuccessful();
 
@@ -177,19 +171,19 @@ it('does not double the debt when the same offline sale syncs twice', function (
 
     $payload = [
         'vendor_id' => $ctx['vendor']->id,
-        'sales'     => [[
-            'offline_id'     => 'till-1-0002',
-            'reference'      => 'POS-OFFLINE2',
-            'customer_id'    => $ctx['customer']->id,
-            'items'          => [[
+        'sales' => [[
+            'offline_id' => 'till-1-0002',
+            'reference' => 'POS-OFFLINE2',
+            'customer_id' => $ctx['customer']->id,
+            'items' => [[
                 'product_id' => $ctx['product']->id, 'product_name' => 'Credit Widget',
                 'unit_price' => 10000.0, 'quantity' => 1, 'total' => 10000.0,
             ]],
-            'total'          => 10000.0,
-            'vat_amount'     => 0,
+            'total' => 10000.0,
+            'vat_amount' => 0,
             'payment_method' => 'debt',
-            'completed_at'   => '2026-08-20 14:00:00',
-            'payments'       => null,
+            'completed_at' => '2026-08-20 14:00:00',
+            'payments' => null,
         ]],
     ];
 
@@ -214,7 +208,7 @@ it('reports what a customer owes to the till', function () {
 });
 
 it('does not leak another vendor customer balance', function () {
-    $mine   = debtTenderContext();
+    $mine = debtTenderContext();
     $theirs = debtTenderContext();
 
     Sanctum::actingAs($mine['owner']);

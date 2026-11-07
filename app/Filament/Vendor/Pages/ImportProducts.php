@@ -21,6 +21,7 @@ use BackedEnum;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -52,11 +53,15 @@ class ImportProducts extends Page
 
     protected string $view = 'filament.vendor.pages.import-products';
 
-    public const STEP_UPLOAD    = 'upload';
-    public const STEP_MAP       = 'map';
-    public const STEP_PREVIEW   = 'preview';
+    public const STEP_UPLOAD = 'upload';
+
+    public const STEP_MAP = 'map';
+
+    public const STEP_PREVIEW = 'preview';
+
     public const STEP_IMPORTING = 'importing';
-    public const STEP_DONE      = 'done';
+
+    public const STEP_DONE = 'done';
 
     /**
      * Rows written per request.
@@ -82,7 +87,7 @@ class ImportProducts extends Page
     /** @var array<int, string> */
     public array $headers = [];
 
-    /** @var array<int, string|null>  positional, aligned with $headers */
+    /** @var array<int, string|null>  positional, aligned with */
     public array $columnMap = [];
 
     public ?int $templateId = null;
@@ -135,7 +140,7 @@ class ImportProducts extends Page
     public static function canAccess(): bool
     {
         $vendor = filament()->getTenant();
-        $user   = auth()->user();
+        $user = auth()->user();
 
         if ($vendor === null || $user === null) {
             return false;
@@ -167,7 +172,7 @@ class ImportProducts extends Page
     public function actingAsAdmin(): bool
     {
         $vendor = filament()->getTenant();
-        $user   = auth()->user();
+        $user = auth()->user();
 
         if ($vendor === null || $user === null || ! $user->isSuperAdmin()) {
             return false;
@@ -190,7 +195,7 @@ class ImportProducts extends Page
     public function activeStore(): ?Store
     {
         $vendor = filament()->getTenant();
-        $user   = auth()->user();
+        $user = auth()->user();
 
         if ($vendor === null || $user === null) {
             return null;
@@ -207,7 +212,7 @@ class ImportProducts extends Page
             'upload' => ['required', 'file', 'mimes:csv,txt,xlsx', 'max:20480'],
         ], [
             'upload.mimes' => 'Only CSV and Excel (.xlsx) files can be imported. An older .xls file must be saved as .xlsx first.',
-            'upload.max'   => 'That file is larger than 20MB. Split it into smaller files and import them one at a time.',
+            'upload.max' => 'That file is larger than 20MB. Split it into smaller files and import them one at a time.',
         ]);
 
         /** @var TemporaryUploadedFile $upload */
@@ -352,7 +357,7 @@ class ImportProducts extends Page
         // Every row, not just the first few: the vendor needs to find the ones
         // that matter (a unit or a price moved) among hundreds that did not.
         $shown = $rows->take(self::PREVIEW_ROW_LIMIT);
-        $ids   = $shown->pluck('matchedProductId')->filter()->all();
+        $ids = $shown->pluck('matchedProductId')->filter()->all();
 
         // What the matched products hold today, so an update row can show the
         // old figure under the new one.
@@ -400,33 +405,33 @@ class ImportProducts extends Page
 
                 foreach ($fileUnits as $u) {
                     $unit = $existing->first(fn ($e) => mb_strtolower($e->name) === mb_strtolower($u['name']));
-                    $was  = [];
+                    $was = [];
 
                     if (! $unit) {
                         $state = $isUpdate ? 'new' : 'same';
                     } else {
                         if ((int) $unit->conversion_factor !== $u['contains']) {
-                            $was[] = 'contains ' . (int) $unit->conversion_factor;
+                            $was[] = 'contains '.(int) $unit->conversion_factor;
                         }
 
                         if ($u['price'] !== null && round((float) $unit->price, 2) !== round($u['price'], 2)) {
-                            $was[] = 'price ' . number_format((float) $unit->price, 2);
+                            $was[] = 'price '.number_format((float) $unit->price, 2);
                         }
 
                         if ($u['wholesale'] !== null && round((float) $unit->wholesale_price, 2) !== round($u['wholesale'], 2)) {
-                            $was[] = 'wholesale ' . number_format((float) $unit->wholesale_price, 2);
+                            $was[] = 'wholesale '.number_format((float) $unit->wholesale_price, 2);
                         }
 
                         $state = $was === [] ? 'same' : 'changed';
                     }
 
                     $units[] = [
-                        'name'      => $u['name'],
-                        'contains'  => $u['contains'],
-                        'price'     => $u['price'],
+                        'name' => $u['name'],
+                        'contains' => $u['contains'],
+                        'price' => $u['price'],
                         'wholesale' => $u['wholesale'],
-                        'state'     => $state,
-                        'was'       => implode(', ', $was),
+                        'state' => $state,
+                        'was' => implode(', ', $was),
                     ];
                 }
             }
@@ -435,21 +440,21 @@ class ImportProducts extends Page
             $priceChanged = isset($changes['price']) || isset($changes['cost_price']);
 
             return [
-                'line'          => $row->line,
-                'name'          => $row->name(),
-                'sku'           => (string) ($row->value('sku') ?? ''),
-                'price'         => $row->value('price'),
-                'cost'          => $row->value('cost_price'),
-                'category'      => (string) ($row->value('category') ?? ''),
-                'unit'          => (string) ($row->value('measurement_unit') ?? ''),
-                'action'        => $row->action(),
-                'changes'       => $changes,
-                'units'         => $units,
+                'line' => $row->line,
+                'name' => $row->name(),
+                'sku' => (string) ($row->value('sku') ?? ''),
+                'price' => $row->value('price'),
+                'cost' => $row->value('cost_price'),
+                'category' => (string) ($row->value('category') ?? ''),
+                'unit' => (string) ($row->value('measurement_unit') ?? ''),
+                'action' => $row->action(),
+                'changes' => $changes,
+                'units' => $units,
                 'price_changed' => $priceChanged,
                 'units_changed' => $unitsChanged,
-                'changed'       => $changes !== [] || $unitsChanged,
-                'errors'        => $row->errors,
-                'warnings'      => $row->warnings,
+                'changed' => $changes !== [] || $unitsChanged,
+                'errors' => $row->errors,
+                'warnings' => $row->warnings,
             ];
         })->values()->all();
 
@@ -462,8 +467,8 @@ class ImportProducts extends Page
             ->filter(fn (ParsedRow $row) => $row->errors !== [])
             ->take(200)
             ->map(fn (ParsedRow $row) => [
-                'line'   => $row->line,
-                'name'   => $row->name(),
+                'line' => $row->line,
+                'name' => $row->name(),
                 'errors' => $row->errors,
             ])->values()->all();
 
@@ -484,7 +489,7 @@ class ImportProducts extends Page
     public function runImport(): void
     {
         $this->fatalError = null;
-        $this->trace      = 'runImport entered '.now()->format('H:i:s');
+        $this->trace = 'runImport entered '.now()->format('H:i:s');
 
         // Everything is inside the try, not just the parse. An exception from
         // the log insert or the snapshot would otherwise escape as a bare 500
@@ -514,25 +519,25 @@ class ImportProducts extends Page
 
             $log = ImportLog::create([
                 'vendor_id' => filament()->getTenant()->id,
-                'user_id'   => auth()->id(),
+                'user_id' => auth()->id(),
                 // Stamped at the moment of the run, not worked out later from
                 // whoever user_id turns out to be. Roles and memberships both
                 // change; what this run was does not.
                 'performed_by_admin' => $this->actingAsAdmin(),
-                'store_id'           => $this->activeStore()?->id,
-                'file_name'          => $this->originalName ?? 'import.csv',
-                'total_rows'    => $rows->count(),
+                'store_id' => $this->activeStore()?->id,
+                'file_name' => $this->originalName ?? 'import.csv',
+                'total_rows' => $rows->count(),
                 'skipped_count' => $skipped->count(),
-                'status'        => 'running',
+                'status' => 'running',
                 // Every one, not a sample: this list is downloaded and worked
                 // through line by line to fix the file.
-                'errors'        => $skipped->map(fn (ParsedRow $row) => [
-                    'line'   => $row->line,
-                    'name'   => $row->name(),
+                'errors' => $skipped->map(fn (ParsedRow $row) => [
+                    'line' => $row->line,
+                    'name' => $row->name(),
                     'errors' => $row->errors,
                 ])->values()->all(),
                 // What the preview already knew about the rows that will go in.
-                'warnings'      => app(ProductImporter::class)->warningPayload(
+                'warnings' => app(ProductImporter::class)->warningPayload(
                     $rows->filter(fn (ParsedRow $row) => $row->isImportable()),
                 ),
             ]);
@@ -547,8 +552,8 @@ class ImportProducts extends Page
 
             $this->processed = 0;
             $this->toProcess = $rows->count() - $skipped->count();
-            $this->step      = self::STEP_IMPORTING;
-            $this->trace     = "runImport ok: log #{$log->id}, {$this->toProcess} row(s) to write";
+            $this->step = self::STEP_IMPORTING;
+            $this->trace = "runImport ok: log #{$log->id}, {$this->toProcess} row(s) to write";
         } catch (Throwable $e) {
             $this->failed($e);
         }
@@ -600,11 +605,11 @@ class ImportProducts extends Page
             'created_count' => $log->created_count + $counts['created'],
             'updated_count' => $log->updated_count + $counts['updated'],
             'skipped_count' => $log->skipped_count + count($counts['failures']),
-            'units_created_count'  => $log->units_created_count + $counts['units_created'],
-            'units_updated_count'  => $log->units_updated_count + $counts['units_updated'],
+            'units_created_count' => $log->units_created_count + $counts['units_created'],
+            'units_updated_count' => $log->units_updated_count + $counts['units_updated'],
             'barcodes_added_count' => $log->barcodes_added_count + $counts['barcodes_added'],
-            'opening_stock_count'  => $log->opening_stock_count + $counts['opening_stock'],
-            'errors'   => [...($log->errors ?? []), ...$counts['failures']],
+            'opening_stock_count' => $log->opening_stock_count + $counts['opening_stock'],
+            'errors' => [...($log->errors ?? []), ...$counts['failures']],
             'warnings' => ProductImporter::mergeWarnings($log->warnings ?? [], $counts['warnings']),
         ]);
 
@@ -657,7 +662,7 @@ class ImportProducts extends Page
             ->send();
     }
 
-    /** @return \Illuminate\Support\Collection<int, ParsedRow> */
+    /** @return Collection<int, ParsedRow> */
     private function preparedRows(): Collection
     {
         return app(ImportPreparer::class)->prepare(
@@ -771,6 +776,6 @@ class ImportProducts extends Page
 
     private function absolutePath(): string
     {
-        return \Illuminate\Support\Facades\Storage::disk('local')->path((string) $this->storedPath);
+        return Storage::disk('local')->path((string) $this->storedPath);
     }
 }

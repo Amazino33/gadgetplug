@@ -60,13 +60,13 @@ class ReverseCustomerDebtAction
         // is debt to cancel. The rest was real money and belongs in the refund
         // the return itself is already handling.
         $unpaidShare = min(1.0, $charged / max((float) $sale->total, 0.01));
-        $amount      = round((float) $posReturn->refund_amount * $unpaidShare, 2);
+        $amount = round((float) $posReturn->refund_amount * $unpaidShare, 2);
 
         return $this->reverse(
             $sale,
             $amount,
             "Goods returned — {$posReturn->reference} against {$sale->reference}",
-            'return:' . $posReturn->id,
+            'return:'.$posReturn->id,
         );
     }
 
@@ -109,18 +109,18 @@ class ReverseCustomerDebtAction
 
         return PosCustomerLedgerEntry::create([
             'pos_customer_id' => $sale->customer_id,
-            'vendor_id'       => $sale->vendor_id,
+            'vendor_id' => $sale->vendor_id,
             // Recorded as a write-off, which is what it is in ledger terms: the
             // customer will not be paying it. It reads differently from a
             // forgiven debt only in its description, and deliberately does not
             // go through the owner-only write-off action — nobody is choosing
             // to forgive anything here, the goods simply came back.
-            'direction'       => PosCustomerLedgerEntry::DIRECTION_WRITEOFF,
-            'amount'          => -1 * $amount,
-            'store_id'        => $sale->store_id,
-            'created_by'      => auth()->id(),
-            'occurred_at'     => BusinessDate::today(),
-            'description'     => "{$description} [{$key}]",
+            'direction' => PosCustomerLedgerEntry::DIRECTION_WRITEOFF,
+            'amount' => -1 * $amount,
+            'store_id' => $sale->store_id,
+            'created_by' => auth()->id(),
+            'occurred_at' => BusinessDate::today(),
+            'description' => "{$description} [{$key}]",
         ]);
     }
 }

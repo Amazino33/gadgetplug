@@ -86,7 +86,7 @@ final class ReportPeriod
 
     /**
      * @param  array<string, mixed>|null  $filters
-     * @return array{0: CarbonImmutable, 1: CarbonImmutable}  business-local dates
+     * @return array{0: CarbonImmutable, 1: CarbonImmutable} business-local dates
      */
     private static function customRange(?array $filters, CarbonImmutable $now): array
     {

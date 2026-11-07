@@ -11,6 +11,7 @@ use App\Models\Vendor;
 use App\Models\VendorNotificationSetting;
 use App\Services\Messaging\StorekeeperNotifier;
 use Database\Seeders\MessageTemplateSeeder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 
@@ -59,7 +60,7 @@ function makeStorekeeperOrder(array $data, string $status = 'pending', int $qty 
     return $order;
 }
 
-function storekeeperMessages(): \Illuminate\Database\Eloquent\Collection
+function storekeeperMessages(): Collection
 {
     return DeliveryMessage::where('recipient_type', 'storekeeper')->get();
 }
@@ -178,7 +179,7 @@ test('the reminder digests every stalled order into one message', function () {
 
     $stale1 = makeStorekeeperOrder($data, 'paid');
     $stale2 = makeStorekeeperOrder($data, 'confirmed');
-    $fresh  = makeStorekeeperOrder($data, 'paid');
+    $fresh = makeStorekeeperOrder($data, 'paid');
 
     // updated_at is what the cutoff compares, so age the two stale rows directly.
     Order::whereIn('id', [$stale1->id, $stale2->id])->update(['updated_at' => now()->subHours(30)]);

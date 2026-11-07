@@ -9,12 +9,14 @@ use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\User;
 use App\Models\Vendor;
+use App\Services\Messaging\MessagingService;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Livewire\Livewire;
+use Spatie\Permission\Models\Role;
 
 uses(RefreshDatabase::class);
 
@@ -24,10 +26,10 @@ uses(RefreshDatabase::class);
 
 function queuedMessagingOrder(string $status = 'pending'): array
 {
-    $owner    = User::factory()->create();
-    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Queued Messaging Store', 'online_sales_enabled' => true]);
+    $owner = User::factory()->create();
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Queued Messaging Store', 'online_sales_enabled' => true]);
     $category = Category::create(['name' => 'Queued Messaging Category '.uniqid()]);
-    $product  = Product::create([
+    $product = Product::create([
         'vendor_id' => $vendor->id, 'category_id' => $category->id,
         'name' => 'Queued Widget', 'price' => 5000, 'stock_quantity' => 10, 'status' => 'published',
     ]);
@@ -72,7 +74,7 @@ test('the job sends the queued message and marks it sent', function () {
     $c['order']->update(['status' => 'confirmed']);
     $message = DeliveryMessage::where('order_id', $c['order']->id)->where('recipient_type', 'customer')->sole();
 
-    (new SendDeliveryMessageJob($message->id))->withFakeQueueInteractions()->handle(app(\App\Services\Messaging\MessagingService::class));
+    (new SendDeliveryMessageJob($message->id))->withFakeQueueInteractions()->handle(app(MessagingService::class));
 
     expect($message->fresh()->status)->toBe('sent')
         ->and($message->fresh()->sent_at)->not->toBeNull();
@@ -86,7 +88,7 @@ test('a failing send stays queued between retries and is marked failed once retr
     $c = queuedMessagingOrder();
     $c['order']->update(['status' => 'confirmed']);
     $message = DeliveryMessage::where('order_id', $c['order']->id)->where('recipient_type', 'customer')->sole();
-    $service = app(\App\Services\Messaging\MessagingService::class);
+    $service = app(MessagingService::class);
 
     // First attempt fails: thrown so the queue retries, row left 'queued'.
     $first = (new SendDeliveryMessageJob($message->id))->withFakeQueueInteractions();
@@ -156,7 +158,7 @@ test('the admin panel shows a banner while every message is being redirected', f
     config(['services.messaging.redirect_all_to' => '08099998888']);
 
     $admin = User::factory()->create();
-    \Spatie\Permission\Models\Role::firstOrCreate(['name' => 'super_admin', 'guard_name' => 'web', 'team_id' => null]);
+    Role::firstOrCreate(['name' => 'super_admin', 'guard_name' => 'web', 'team_id' => null]);
     setPermissionsTeamId(null);
     $admin->assignRole('super_admin');
 
@@ -173,7 +175,7 @@ test('no banner when redirect is off', function () {
     config(['services.messaging.redirect_all_to' => null]);
 
     $admin = User::factory()->create();
-    \Spatie\Permission\Models\Role::firstOrCreate(['name' => 'super_admin', 'guard_name' => 'web', 'team_id' => null]);
+    Role::firstOrCreate(['name' => 'super_admin', 'guard_name' => 'web', 'team_id' => null]);
     setPermissionsTeamId(null);
     $admin->assignRole('super_admin');
 

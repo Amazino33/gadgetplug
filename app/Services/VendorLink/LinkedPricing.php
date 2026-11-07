@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services\VendorLink;
 
-use App\Support\Quantity;
 use App\Models\Product;
 use App\Models\SupplierLink;
 use App\Services\VendorLink\Rounding\RoundingRules;
+use App\Support\Quantity;
 
 /**
  * What a linked listing costs and whether it can be sold, answered from the

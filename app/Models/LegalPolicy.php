@@ -14,7 +14,7 @@ class LegalPolicy extends Model
         return [
             'is_published' => 'boolean',
             'published_at' => 'datetime',
-            'sort_order'   => 'integer',
+            'sort_order' => 'integer',
         ];
     }
 

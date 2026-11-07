@@ -27,13 +27,13 @@ class ProductLinkCatalogue
             ->withCatalogue()
             ->get()
             ->map(fn (Product $product) => [
-                'id'          => $product->id,
-                'name'        => (string) $product->name,
+                'id' => $product->id,
+                'name' => (string) $product->name,
                 'displayName' => $product->displayName(),
-                'sku'         => (string) $product->sku,
-                'slug'        => (string) $product->slug,
-                'price'       => $this->price($product),
-                'thumb'       => $product->catalogueImageUrl('thumb'),
+                'sku' => (string) $product->sku,
+                'slug' => (string) $product->slug,
+                'price' => $this->price($product),
+                'thumb' => $product->catalogueImageUrl('thumb'),
             ])
             ->filter(fn (array $row) => $row['slug'] !== '')
             ->sortBy('displayName', SORT_NATURAL | SORT_FLAG_CASE)

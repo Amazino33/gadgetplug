@@ -3,13 +3,10 @@
 use App\Models\Expense;
 use App\Models\FinancialAccount;
 use App\Models\FinancialLedgerEntry;
-use App\Models\PosSale;
-use App\Models\PosSession;
 use App\Models\User;
 use App\Services\Cash\CashUpExpectation;
 use App\Support\Pos\BusinessDate;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Str;
 use Laravel\Sanctum\Sanctum;
 
 require_once __DIR__.'/Helpers.php';
@@ -37,13 +34,12 @@ function expenseContext(): array
 function payOut(array $ctx, array $over = [])
 {
     return test()->postJson('/api/pos/expenses', array_merge([
-        'vendor_id'   => $ctx['vendor']->id,
-        'amount'      => 3000,
-        'category'    => 'logistics_other',
+        'vendor_id' => $ctx['vendor']->id,
+        'amount' => 3000,
+        'category' => 'logistics_other',
         'description' => 'Transport for the driver',
     ], $over));
 }
-
 
 // ── Recording it at the counter ──────────────────────────────────────────────
 

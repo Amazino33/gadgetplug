@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Filament\Vendor\Resources\ImportLogs;
 
-use App\Filament\Vendor\Resources\ImportLogs\Pages;
 use App\Models\ImportLog;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
@@ -36,12 +35,17 @@ class ImportLogResource extends Resource
 
     protected static ?string $tenantOwnershipRelationshipName = 'vendor';
 
-    protected static string|null|\BackedEnum $navigationIcon   = 'heroicon-o-clock';
-    protected static string|null|UnitEnum    $navigationGroup  = 'Products';
-    protected static ?string                 $navigationLabel  = 'Import History';
-    protected static ?string                 $modelLabel       = 'import';
-    protected static ?string                 $pluralModelLabel = 'imports';
-    protected static ?int                    $navigationSort   = 4;
+    protected static string|null|\BackedEnum $navigationIcon = 'heroicon-o-clock';
+
+    protected static string|null|UnitEnum $navigationGroup = 'Products';
+
+    protected static ?string $navigationLabel = 'Import History';
+
+    protected static ?string $modelLabel = 'import';
+
+    protected static ?string $pluralModelLabel = 'imports';
+
+    protected static ?int $navigationSort = 4;
 
     /**
      * The same gate as importing itself.
@@ -53,7 +57,7 @@ class ImportLogResource extends Resource
     public static function canAccess(): bool
     {
         $vendor = filament()->getTenant();
-        $user   = auth()->user();
+        $user = auth()->user();
 
         if ($vendor === null || $user === null) {
             return false;
@@ -80,9 +84,9 @@ class ImportLogResource extends Resource
 
     private const STATUS_COLOURS = [
         'completed' => 'success',
-        'running'   => 'warning',
-        'pending'   => 'gray',
-        'failed'    => 'danger',
+        'running' => 'warning',
+        'pending' => 'gray',
+        'failed' => 'danger',
     ];
 
     public static function table(Table $table): Table

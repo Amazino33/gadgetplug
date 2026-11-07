@@ -29,8 +29,8 @@ class OrderSeeder extends Seeder
             ['id' => null, 'name' => 'Ify Chukwu',      'email' => 'ify@example.com',        'phone' => '09011223344'],
         ];
 
-        $statuses  = ['pending', 'paid', 'paid', 'shipped', 'delivered', 'delivered', 'delivered', 'cancelled'];
-        $methods   = ['paystack', 'paystack', 'paystack', 'pod'];
+        $statuses = ['pending', 'paid', 'paid', 'shipped', 'delivered', 'delivered', 'delivered', 'cancelled'];
+        $methods = ['paystack', 'paystack', 'paystack', 'pod'];
         $addresses = [
             '12 Adeola Odeku Street, Victoria Island, Lagos',
             '45 Wuse Zone 3, Abuja',
@@ -56,13 +56,13 @@ class OrderSeeder extends Seeder
         ];
 
         foreach ($orderData as $index => $def) {
-            $customer  = $customers[$def['customer']];
-            $status    = $statuses[$index % count($statuses)];
-            $method    = $methods[$index % count($methods)];
-            $address   = $addresses[$index % count($addresses)];
+            $customer = $customers[$def['customer']];
+            $status = $statuses[$index % count($statuses)];
+            $method = $methods[$index % count($methods)];
+            $address = $addresses[$index % count($addresses)];
 
             $lineItems = [];
-            $total     = 0;
+            $total = 0;
 
             foreach ($def['items'] as $line) {
                 $product = $products->firstWhere('sku', $line['sku']);
@@ -78,24 +78,24 @@ class OrderSeeder extends Seeder
             }
 
             $order = Order::create([
-                'user_id'          => $customer['id'],
-                'reference'        => 'ORD-' . strtoupper(Str::random(8)),
-                'customer_name'    => $customer['name'],
-                'customer_email'   => $customer['email'],
-                'customer_phone'   => $customer['phone'],
+                'user_id' => $customer['id'],
+                'reference' => 'ORD-'.strtoupper(Str::random(8)),
+                'customer_name' => $customer['name'],
+                'customer_email' => $customer['email'],
+                'customer_phone' => $customer['phone'],
                 'shipping_address' => $address,
-                'total_amount'     => $total,
-                'status'           => $status,
-                'payment_method'   => $method,
-                'created_at'       => now()->subDays(rand(1, 60)),
+                'total_amount' => $total,
+                'status' => $status,
+                'payment_method' => $method,
+                'created_at' => now()->subDays(rand(1, 60)),
             ]);
 
             foreach ($lineItems as $line) {
                 OrderItem::create([
-                    'order_id'   => $order->id,
+                    'order_id' => $order->id,
                     'product_id' => $line['product']->id,
-                    'vendor_id'  => $vendor->id,
-                    'quantity'   => $line['qty'],
+                    'vendor_id' => $vendor->id,
+                    'quantity' => $line['qty'],
                     'unit_price' => $line['product']->price,
                 ]);
             }

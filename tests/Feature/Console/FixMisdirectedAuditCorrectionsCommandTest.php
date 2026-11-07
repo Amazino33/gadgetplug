@@ -19,21 +19,21 @@ uses(RefreshDatabase::class);
 
 function misdirectedAuditContext(): array
 {
-    $owner  = User::factory()->create();
+    $owner = User::factory()->create();
     $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Zeelink Tech']);
-    $hq     = Store::create(['vendor_id' => $vendor->id, 'name' => 'HQ', 'is_default' => true]);
+    $hq = Store::create(['vendor_id' => $vendor->id, 'name' => 'HQ', 'is_default' => true]);
     $phones = Store::create(['vendor_id' => $vendor->id, 'name' => 'Zeelink Phones']);
 
     $category = Category::create(['name' => 'Phones '.uniqid()]);
 
     $product = Product::create([
-        'vendor_id'   => $vendor->id,
+        'vendor_id' => $vendor->id,
         'category_id' => $category->id,
-        'name'        => 'Tecno Spark 528',
-        'sku'         => 'TS-528',
-        'price'       => 65000,
-        'store_id'    => $phones->id, // homed at the branch that was counted
-        'status'      => 'published',
+        'name' => 'Tecno Spark 528',
+        'sku' => 'TS-528',
+        'price' => 65000,
+        'store_id' => $phones->id, // homed at the branch that was counted
+        'status' => 'published',
     ]);
 
     // Before the bug ran: HQ 12, Zeelink Phones 2 (aggregate 14).
@@ -43,24 +43,24 @@ function misdirectedAuditContext(): array
     // A solo count found 5 on the shelf at Zeelink Phones. The old bug
     // measured that against the aggregate (14) and wrote -9 to HQ instead.
     $audit = AuditSession::create([
-        'vendor_id'        => $vendor->id,
-        'product_id'       => $product->id,
-        'system_quantity'  => 14,
+        'vendor_id' => $vendor->id,
+        'product_id' => $product->id,
+        'system_quantity' => 14,
         'storekeeper_a_id' => $owner->id,
         'storekeeper_b_id' => $owner->id,
-        'count_a'          => 5,
-        'count_b'          => 5,
-        'status'           => 'verified',
+        'count_a' => 5,
+        'count_b' => 5,
+        'status' => 'verified',
     ]);
 
     InventoryLedger::create([
-        'vendor_id'        => $vendor->id,
-        'store_id'         => $hq->id,
-        'product_id'       => $product->id,
+        'vendor_id' => $vendor->id,
+        'store_id' => $hq->id,
+        'product_id' => $product->id,
         'transaction_type' => 'audit_correction',
-        'quantity_change'  => -9,
-        'reference'        => "Audit #{$audit->id}",
-        'description'      => 'Inventory count verified. System expected 14, actually found 5.',
+        'quantity_change' => -9,
+        'reference' => "Audit #{$audit->id}",
+        'description' => 'Inventory count verified. System expected 14, actually found 5.',
     ]);
     ProductStoreStock::where('product_id', $product->id)->where('store_id', $hq->id)->update(['quantity' => 3]);
 
@@ -83,8 +83,8 @@ it('reverses the wrong store and applies the count where it was actually taken',
     $c = misdirectedAuditContext();
 
     $this->artisan('inventory:fix-misdirected-audit', [
-        'vendor'  => $c['vendor']->id,
-        'branch'  => $c['phones']->id,
+        'vendor' => $c['vendor']->id,
+        'branch' => $c['phones']->id,
         '--force' => true,
     ])->assertSuccessful();
 
@@ -101,8 +101,8 @@ it('resolves vendor and branch by name as well as id', function () {
     $c = misdirectedAuditContext();
 
     $this->artisan('inventory:fix-misdirected-audit', [
-        'vendor'  => 'zeelink',
-        'branch'  => 'zeelink phones',
+        'vendor' => 'zeelink',
+        'branch' => 'zeelink phones',
         '--force' => true,
     ])->assertSuccessful();
 
@@ -115,8 +115,8 @@ it('leaves a product homed at another branch alone', function () {
     $elsewhere = Store::create(['vendor_id' => $c['vendor']->id, 'name' => 'Elsewhere']);
 
     $this->artisan('inventory:fix-misdirected-audit', [
-        'vendor'  => $c['vendor']->id,
-        'branch'  => $elsewhere->id,
+        'vendor' => $c['vendor']->id,
+        'branch' => $elsewhere->id,
         '--force' => true,
     ])->assertSuccessful();
 

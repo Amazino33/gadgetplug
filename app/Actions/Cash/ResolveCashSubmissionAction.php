@@ -24,7 +24,7 @@ class ResolveCashSubmissionAction
     {
         return $this->resolve($submission, $receiver, function (CashSubmission $row) {
             $row->update([
-                'status'       => CashSubmission::STATUS_CONFIRMED,
+                'status' => CashSubmission::STATUS_CONFIRMED,
                 'confirmed_at' => now(),
             ]);
         });
@@ -49,9 +49,9 @@ class ResolveCashSubmissionAction
 
         return $this->resolve($submission, $receiver, function (CashSubmission $row) use ($note, $actualAmount) {
             $row->update([
-                'status'          => CashSubmission::STATUS_DISPUTED,
-                'disputed_at'     => now(),
-                'dispute_note'    => $note,
+                'status' => CashSubmission::STATUS_DISPUTED,
+                'disputed_at' => now(),
+                'dispute_note' => $note,
                 'disputed_amount' => $actualAmount !== null ? round($actualAmount, 2) : null,
             ]);
         });
@@ -110,11 +110,11 @@ class ResolveCashSubmissionAction
             }
 
             $row->update([
-                'status'             => CashSubmission::STATUS_RESOLVED,
+                'status' => CashSubmission::STATUS_RESOLVED,
                 'resolution_outcome' => $outcome,
-                'resolved_by'        => $settler->id,
-                'resolved_at'        => now(),
-                'resolution_note'    => $note,
+                'resolved_by' => $settler->id,
+                'resolved_at' => now(),
+                'resolution_note' => $note,
             ]);
 
             return $row->fresh();

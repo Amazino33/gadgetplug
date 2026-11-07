@@ -22,15 +22,15 @@ class AccountabilityLedgerEntry extends Model
     public const UPDATED_AT = null;
 
     protected $casts = [
-        'shortage_qty'        => AsQuantity::class,
-        'unit_cost_snapshot'  => 'decimal:2',
+        'shortage_qty' => AsQuantity::class,
+        'unit_cost_snapshot' => 'decimal:2',
         'unit_price_snapshot' => 'decimal:2',
-        'charge_amount'       => 'decimal:2',
-        'cost_component'      => 'decimal:2',
-        'margin_component'    => 'decimal:2',
-        'amount'              => 'decimal:2',
-        'price_fallback'      => 'boolean',
-        'created_at'          => 'datetime',
+        'charge_amount' => 'decimal:2',
+        'cost_component' => 'decimal:2',
+        'margin_component' => 'decimal:2',
+        'amount' => 'decimal:2',
+        'price_fallback' => 'boolean',
+        'created_at' => 'datetime',
     ];
 
     public const ENTRY_TYPES = [

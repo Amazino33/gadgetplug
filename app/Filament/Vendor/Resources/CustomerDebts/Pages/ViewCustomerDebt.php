@@ -62,8 +62,8 @@ class ViewCustomerDebt extends Page
 
         return [
             'customer' => $this->customer(),
-            'summary'  => $debt->summary($this->customerId),
-            'history'  => $debt->history($this->customerId),
+            'summary' => $debt->summary($this->customerId),
+            'history' => $debt->history($this->customerId),
         ];
     }
 }

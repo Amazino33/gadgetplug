@@ -3,10 +3,13 @@
 namespace App\Filament\Resources\SystemAnnouncements\Schemas;
 
 use Filament\Forms\Components\DateTimePicker;
+use Filament\Forms\Components\RichEditor;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\Toggle;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Spatie\Permission\Models\Role;
 
 class SystemAnnouncementForm
 {
@@ -14,15 +17,15 @@ class SystemAnnouncementForm
     {
         return $schema
             ->components([
-                \Filament\Schemas\Components\Section::make('Announcement Details')->schema([
+                Section::make('Announcement Details')->schema([
                     TextInput::make('title')
                         ->required()
                         ->columnSpanFull(),
-                    \Filament\Forms\Components\RichEditor::make('message')
+                    RichEditor::make('message')
                         ->required()
                         ->columnSpanFull(),
-                    
-                    \Filament\Forms\Components\Select::make('target_group')
+
+                    Select::make('target_group')
                         ->options([
                             'all' => 'All Users (Including Guests)',
                             'users' => 'Logged-in Users Only',
@@ -33,11 +36,11 @@ class SystemAnnouncementForm
                         ->default('all')
                         ->live(),
 
-                    \Filament\Forms\Components\Select::make('target_roles')
+                    Select::make('target_roles')
                         ->multiple()
                         ->options(function () {
                             // Fetch all Spatie roles
-                            return \Spatie\Permission\Models\Role::pluck('name', 'name')->toArray();
+                            return Role::pluck('name', 'name')->toArray();
                         })
                         ->visible(fn ($get) => $get('target_group') === 'specific_roles')
                         ->required(fn ($get) => $get('target_group') === 'specific_roles'),
@@ -48,13 +51,13 @@ class SystemAnnouncementForm
                         ->columnSpanFull(),
                 ])->columns(2),
 
-                \Filament\Schemas\Components\Section::make('Action & Settings')->schema([
+                Section::make('Action & Settings')->schema([
                     TextInput::make('action_text')
                         ->label('Button Text (Optional)'),
                     TextInput::make('action_url')
                         ->label('Button URL (Optional)')
                         ->url(),
-                    
+
                     Toggle::make('is_dismissible')
                         ->label('Is Dismissible (Show X button)')
                         ->default(true)

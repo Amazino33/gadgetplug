@@ -72,10 +72,10 @@ class ApproveCashUpAction
             );
 
             $session->update([
-                'status'      => PosSession::STATUS_APPROVED,
+                'status' => PosSession::STATUS_APPROVED,
                 'reviewed_by' => $reviewer->id,
                 'reviewed_at' => now(),
-                'notes'       => $notes ?? $session->notes,
+                'notes' => $notes ?? $session->notes,
             ]);
 
             activity()->causedBy($reviewer)

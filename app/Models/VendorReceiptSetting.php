@@ -27,33 +27,33 @@ class VendorReceiptSetting extends Model
      * most common path of all, so it must be the well-arranged one.
      */
     protected $attributes = [
-        'show_logo'            => false,
-        'header_alignment'     => 'center',
-        'show_receipt_number'  => true,
-        'show_cashier'         => true,
-        'show_customer'        => true,
-        'show_datetime'        => true,
+        'show_logo' => false,
+        'header_alignment' => 'center',
+        'show_receipt_number' => true,
+        'show_cashier' => true,
+        'show_customer' => true,
+        'show_datetime' => true,
         'show_item_unit_price' => true,
-        'footer_alignment'     => 'center',
-        'feed_lines'           => 2,
-        'show_qr'              => true,
-        'loyalty_enabled'      => false,
-        'loyalty_goal'         => 10,
+        'footer_alignment' => 'center',
+        'feed_lines' => 2,
+        'show_qr' => true,
+        'loyalty_enabled' => false,
+        'loyalty_goal' => 10,
     ];
 
     protected function casts(): array
     {
         return [
-            'show_logo'            => 'boolean',
-            'show_receipt_number'  => 'boolean',
-            'show_cashier'         => 'boolean',
-            'show_customer'        => 'boolean',
-            'show_datetime'        => 'boolean',
+            'show_logo' => 'boolean',
+            'show_receipt_number' => 'boolean',
+            'show_cashier' => 'boolean',
+            'show_customer' => 'boolean',
+            'show_datetime' => 'boolean',
             'show_item_unit_price' => 'boolean',
-            'feed_lines'           => 'integer',
-            'show_qr'              => 'boolean',
-            'loyalty_enabled'      => 'boolean',
-            'loyalty_goal'         => 'integer',
+            'feed_lines' => 'integer',
+            'show_qr' => 'boolean',
+            'loyalty_enabled' => 'boolean',
+            'loyalty_goal' => 'integer',
         ];
     }
 

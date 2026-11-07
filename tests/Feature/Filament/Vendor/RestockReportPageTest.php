@@ -31,7 +31,7 @@ function setUpRestockStore(): array
     // Urgent: velocity = 1/day (30 units over 30 days), stock = 3 → days_of_cover = 3 ≤ lead time (5).
     $urgentProduct = Product::create([
         'vendor_id' => $vendor->id, 'category_id' => $category->id,
-        'name' => 'Urgent Widget', 'sku' => 'URG-' . Str::random(6),
+        'name' => 'Urgent Widget', 'sku' => 'URG-'.Str::random(6),
         'price' => 1000, 'cost_price' => 400, 'stock_quantity' => 3, 'status' => 'published',
         'created_at' => $establishedAt,
     ]);
@@ -40,7 +40,7 @@ function setUpRestockStore(): array
     // Healthy: same velocity, plenty of stock → hidden by default.
     $healthyProduct = Product::create([
         'vendor_id' => $vendor->id, 'category_id' => $category->id,
-        'name' => 'Healthy Widget', 'sku' => 'HLT-' . Str::random(6),
+        'name' => 'Healthy Widget', 'sku' => 'HLT-'.Str::random(6),
         'price' => 1000, 'cost_price' => 400, 'stock_quantity' => 100, 'status' => 'published',
         'created_at' => $establishedAt,
     ]);
@@ -52,7 +52,7 @@ function setUpRestockStore(): array
 function deliverRestockOrder(Vendor $vendor, Product $product, int $quantity): void
 {
     $order = Order::create([
-        'reference' => 'ORD-RR-' . Str::random(8),
+        'reference' => 'ORD-RR-'.Str::random(8),
         'customer_name' => 'Buyer', 'customer_email' => 'buyer@example.com',
         'customer_phone' => '08040000000', 'shipping_address' => 'Uyo',
         'total_amount' => $product->price * $quantity,

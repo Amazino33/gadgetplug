@@ -11,6 +11,7 @@ use App\Models\Store;
 use App\Models\User;
 use App\Models\Vendor;
 use App\Services\VendorRoles;
+use Database\Seeders\VendorPermissionsSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -32,7 +33,7 @@ function reconcileVendor(): Vendor
 {
     $vendor = Vendor::create([
         'user_id' => User::factory()->create()->id,
-        'name'    => 'Reconcile Vendor '.uniqid(),
+        'name' => 'Reconcile Vendor '.uniqid(),
     ]);
 
     // Solo counting, which is the path that failed in production.
@@ -55,14 +56,14 @@ function reconcileCounter(Vendor $vendor, Store $store): User
 function reconcileProduct(Vendor $vendor, Store $home, int $onShelf): Product
 {
     $product = Product::create([
-        'vendor_id'      => $vendor->id,
-        'store_id'       => $home->id,
-        'category_id'    => Category::create(['name' => 'Cat '.uniqid()])->id,
-        'name'           => 'Counted '.uniqid(),
-        'price'          => 1000,
-        'cost_price'     => 400,
+        'vendor_id' => $vendor->id,
+        'store_id' => $home->id,
+        'category_id' => Category::create(['name' => 'Cat '.uniqid()])->id,
+        'name' => 'Counted '.uniqid(),
+        'price' => 1000,
+        'cost_price' => 400,
         'stock_quantity' => $onShelf,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
     return $product->fresh();
@@ -72,13 +73,13 @@ function reconcileProduct(Vendor $vendor, Store $home, int $onShelf): Product
 function reconcileSession(Vendor $vendor, Store $store, User $counter, array $counts): BlindCountSession
 {
     $session = BlindCountSession::create([
-        'vendor_id'        => $vendor->id,
-        'store_id'         => $store->id,
+        'vendor_id' => $vendor->id,
+        'store_id' => $store->id,
         'storekeeper_a_id' => $counter->id,
-        'status'           => 'a_counting',
-        'frequency'        => 'daily',
-        'by_category'      => false,
-        'product_order'    => array_keys($counts),
+        'status' => 'a_counting',
+        'frequency' => 'daily',
+        'by_category' => false,
+        'product_order' => array_keys($counts),
     ]);
 
     $position = 1;
@@ -86,10 +87,10 @@ function reconcileSession(Vendor $vendor, Store $store, User $counter, array $co
     foreach ($counts as $productId => $count) {
         BlindCountEntry::create([
             'blind_count_session_id' => $session->id,
-            'user_id'                => $counter->id,
-            'product_id'             => $productId,
-            'position'               => $position++,
-            'count'                  => $count,
+            'user_id' => $counter->id,
+            'product_id' => $productId,
+            'position' => $position++,
+            'count' => $count,
         ]);
     }
 
@@ -105,7 +106,7 @@ function actAsCounter(Vendor $vendor, User $counter): void
 }
 
 test('submitting a solo count writes an audit line for every product counted', function () {
-    (new Database\Seeders\VendorPermissionsSeeder)->run();
+    (new VendorPermissionsSeeder)->run();
 
     $vendor = reconcileVendor();
     VendorRoles::seedFor($vendor);
@@ -113,11 +114,11 @@ test('submitting a solo count writes an audit line for every product counted', f
     $counter = reconcileCounter($vendor, $branch);
 
     $matching = reconcileProduct($vendor, $branch, onShelf: 5);
-    $short    = reconcileProduct($vendor, $branch, onShelf: 9);
+    $short = reconcileProduct($vendor, $branch, onShelf: 9);
 
     $session = reconcileSession($vendor, $branch, $counter, [
         $matching->id => 5,   // agrees with the shelf
-        $short->id    => 6,   // three missing
+        $short->id => 6,   // three missing
     ]);
 
     actAsCounter($vendor, $counter);
@@ -141,7 +142,7 @@ test('submitting a solo count writes an audit line for every product counted', f
 });
 
 test('the baseline each line is measured against is the counted branch shelf', function () {
-    (new Database\Seeders\VendorPermissionsSeeder)->run();
+    (new VendorPermissionsSeeder)->run();
 
     $vendor = reconcileVendor();
     VendorRoles::seedFor($vendor);
@@ -168,7 +169,7 @@ test('the baseline each line is measured against is the counted branch shelf', f
 });
 
 test('a product with no stock row at the branch counts as an empty shelf, not an error', function () {
-    (new Database\Seeders\VendorPermissionsSeeder)->run();
+    (new VendorPermissionsSeeder)->run();
 
     $vendor = reconcileVendor();
     VendorRoles::seedFor($vendor);

@@ -13,7 +13,6 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
-use UnitEnum;
 
 class AffiliateSettings extends Page
 {
@@ -196,10 +195,10 @@ class AffiliateSettings extends Page
                         Select::make('share_timezone')
                             ->label('Share Timezone')
                             ->options([
-                                'Africa/Lagos'   => 'Africa/Lagos (WAT)',
-                                'Africa/Accra'   => 'Africa/Accra (GMT)',
+                                'Africa/Lagos' => 'Africa/Lagos (WAT)',
+                                'Africa/Accra' => 'Africa/Accra (GMT)',
                                 'Africa/Nairobi' => 'Africa/Nairobi (EAT)',
-                                'UTC'            => 'UTC',
+                                'UTC' => 'UTC',
                             ])
                             ->required()
                             ->helperText('The app runs on UTC, so the submission window and the streak\'s idea of "a day" are both resolved against this zone.'),

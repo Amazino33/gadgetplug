@@ -46,7 +46,7 @@ class LinkCountLinesCommand extends Command
         $this->newLine();
 
         /** @var array<int, array<int, int>> $claims  line id => session ids that could own it */
-        $claims   = [];
+        $claims = [];
         $proposed = [];
 
         foreach ($sessions as $session) {

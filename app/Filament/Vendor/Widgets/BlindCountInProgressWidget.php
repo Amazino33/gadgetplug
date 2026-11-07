@@ -18,7 +18,9 @@ class BlindCountInProgressWidget extends Widget
     public function getSessions(): Collection
     {
         $vendor = filament()->getTenant();
-        if (! $vendor) return collect();
+        if (! $vendor) {
+            return collect();
+        }
 
         // Every branch's open count, not just the one the viewer is standing
         // in: on a count day the owner wants to see all the shops at once, and
@@ -32,6 +34,7 @@ class BlindCountInProgressWidget extends Widget
                 $session->counted_so_far = BlindCountEntry::where('blind_count_session_id', $session->id)
                     ->whereNotNull('count')
                     ->count();
+
                 return $session;
             });
     }

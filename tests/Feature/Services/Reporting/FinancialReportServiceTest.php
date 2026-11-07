@@ -5,13 +5,17 @@ use App\Models\Expense;
 use App\Models\FinancialAccount;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\PosCustomer;
+use App\Models\PosCustomerLedgerEntry;
 use App\Models\PosSale;
 use App\Models\PosSaleItem;
 use App\Models\Procurement;
 use App\Models\Product;
+use App\Models\ProductStoreStock;
 use App\Models\Supplier;
 use App\Models\User;
 use App\Models\Vendor;
+use App\Services\FinancialLedger;
 use App\Services\Reporting\FinancialReportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -20,8 +24,8 @@ uses(RefreshDatabase::class);
 function reportVendor(): array
 {
     $owner = User::factory()->create();
-    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Report Store ' . uniqid()]);
-    $category = Category::create(['name' => 'Report Category ' . uniqid()]);
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Report Store '.uniqid()]);
+    $category = Category::create(['name' => 'Report Category '.uniqid()]);
     $product = Product::create([
         'vendor_id' => $vendor->id, 'category_id' => $category->id,
         'name' => 'Report Product', 'price' => 5000, 'cost_price' => 3000,
@@ -34,7 +38,7 @@ function reportVendor(): array
 function reportOrder(array $data, array $overrides = []): Order
 {
     $order = Order::create(array_merge([
-        'reference' => 'ORD-RPT-' . uniqid(),
+        'reference' => 'ORD-RPT-'.uniqid(),
         'customer_name' => 'Buyer', 'customer_email' => 'buyer@example.com',
         'customer_phone' => '08040000000', 'shipping_address' => 'Uyo',
         'total_amount' => 5000, 'status' => 'delivered', 'payment_method' => 'pay_on_delivery',
@@ -52,7 +56,7 @@ function reportOrder(array $data, array $overrides = []): Order
 function reportPosSale(array $data, array $overrides = []): PosSale
 {
     $sale = PosSale::create(array_merge([
-        'reference' => 'POS-RPT-' . uniqid(),
+        'reference' => 'POS-RPT-'.uniqid(),
         'vendor_id' => $data['vendor']->id,
         'cashier_id' => $data['owner']->id,
         'subtotal' => 5000, 'discount_amount' => 0, 'vat_amount' => 0, 'total' => 5000,
@@ -180,8 +184,8 @@ test('bank and cash balances match the ledger\'s own derived math', function () 
     $data = reportVendor();
     $bank = FinancialAccount::where('vendor_id', $data['vendor']->id)->where('type', 'bank')->first();
     $bank->update(['opening_balance' => 10000]);
-    \App\Services\FinancialLedger::postEntry($bank, 'in', 3000, description: 'Manual credit');
-    \App\Services\FinancialLedger::postEntry($bank, 'out', 500, description: 'Manual debit');
+    FinancialLedger::postEntry($bank, 'in', 3000, description: 'Manual credit');
+    FinancialLedger::postEntry($bank, 'out', 500, description: 'Manual debit');
 
     $report = app(FinancialReportService::class)->report($data['vendor']->id, now()->subDay(), now()->addDay());
 
@@ -372,7 +376,7 @@ test('a product with no cost but no stock either is not flagged', function () {
     // directly empties nothing. Clearing the row is what actually empties the
     // shelf, and only then is there nothing left to flag as uncosted.
     $data['product']->update(['cost_price' => null]);
-    App\Models\ProductStoreStock::where('product_id', $data['product']->id)
+    ProductStoreStock::where('product_id', $data['product']->id)
         ->update(['quantity' => 0]);
 
     $balances = app(FinancialReportService::class)
@@ -387,13 +391,13 @@ test('a product with no cost but no stock either is not flagged', function () {
 
 test('what customers owe on credit shows as its own balance', function () {
     $data = reportVendor();
-    $customer = App\Models\PosCustomer::create([
-        'vendor_id' => $data['vendor']->id, 'name' => 'Ada', 'phone' => '0803' . random_int(1000000, 9999999),
+    $customer = PosCustomer::create([
+        'vendor_id' => $data['vendor']->id, 'name' => 'Ada', 'phone' => '0803'.random_int(1000000, 9999999),
     ]);
 
-    App\Models\PosCustomerLedgerEntry::create([
+    PosCustomerLedgerEntry::create([
         'pos_customer_id' => $customer->id, 'vendor_id' => $data['vendor']->id,
-        'direction' => App\Models\PosCustomerLedgerEntry::DIRECTION_CHARGE,
+        'direction' => PosCustomerLedgerEntry::DIRECTION_CHARGE,
         'amount' => 50000, 'occurred_at' => now()->toDateString(), 'description' => 'Credit sale',
     ]);
 
@@ -405,18 +409,18 @@ test('what customers owe on credit shows as its own balance', function () {
 
 test('a repayment reduces what customers owe', function () {
     $data = reportVendor();
-    $customer = App\Models\PosCustomer::create([
-        'vendor_id' => $data['vendor']->id, 'name' => 'Ada', 'phone' => '0803' . random_int(1000000, 9999999),
+    $customer = PosCustomer::create([
+        'vendor_id' => $data['vendor']->id, 'name' => 'Ada', 'phone' => '0803'.random_int(1000000, 9999999),
     ]);
 
-    App\Models\PosCustomerLedgerEntry::create([
+    PosCustomerLedgerEntry::create([
         'pos_customer_id' => $customer->id, 'vendor_id' => $data['vendor']->id,
-        'direction' => App\Models\PosCustomerLedgerEntry::DIRECTION_CHARGE,
+        'direction' => PosCustomerLedgerEntry::DIRECTION_CHARGE,
         'amount' => 50000, 'occurred_at' => now()->toDateString(),
     ]);
-    App\Models\PosCustomerLedgerEntry::create([
+    PosCustomerLedgerEntry::create([
         'pos_customer_id' => $customer->id, 'vendor_id' => $data['vendor']->id,
-        'direction' => App\Models\PosCustomerLedgerEntry::DIRECTION_PAYMENT,
+        'direction' => PosCustomerLedgerEntry::DIRECTION_PAYMENT,
         'amount' => -20000, 'occurred_at' => now()->toDateString(),
     ]);
 
@@ -428,19 +432,19 @@ test('a repayment reduces what customers owe', function () {
 
 test('debt owed is reported as of the end of the period, not as of today', function () {
     $data = reportVendor();
-    $customer = App\Models\PosCustomer::create([
-        'vendor_id' => $data['vendor']->id, 'name' => 'Ada', 'phone' => '0803' . random_int(1000000, 9999999),
+    $customer = PosCustomer::create([
+        'vendor_id' => $data['vendor']->id, 'name' => 'Ada', 'phone' => '0803'.random_int(1000000, 9999999),
     ]);
 
     // Charged today, repaid a week from now.
-    App\Models\PosCustomerLedgerEntry::create([
+    PosCustomerLedgerEntry::create([
         'pos_customer_id' => $customer->id, 'vendor_id' => $data['vendor']->id,
-        'direction' => App\Models\PosCustomerLedgerEntry::DIRECTION_CHARGE,
+        'direction' => PosCustomerLedgerEntry::DIRECTION_CHARGE,
         'amount' => 50000, 'occurred_at' => now()->toDateString(),
     ]);
-    App\Models\PosCustomerLedgerEntry::create([
+    PosCustomerLedgerEntry::create([
         'pos_customer_id' => $customer->id, 'vendor_id' => $data['vendor']->id,
-        'direction' => App\Models\PosCustomerLedgerEntry::DIRECTION_PAYMENT,
+        'direction' => PosCustomerLedgerEntry::DIRECTION_PAYMENT,
         'amount' => -50000, 'occurred_at' => now()->addWeek()->toDateString(),
     ]);
 
@@ -459,12 +463,12 @@ test('one vendor never sees another vendor\'s customer debt', function () {
     $data = reportVendor();
     $other = reportVendor();
 
-    $customer = App\Models\PosCustomer::create([
-        'vendor_id' => $other['vendor']->id, 'name' => 'Ada', 'phone' => '0803' . random_int(1000000, 9999999),
+    $customer = PosCustomer::create([
+        'vendor_id' => $other['vendor']->id, 'name' => 'Ada', 'phone' => '0803'.random_int(1000000, 9999999),
     ]);
-    App\Models\PosCustomerLedgerEntry::create([
+    PosCustomerLedgerEntry::create([
         'pos_customer_id' => $customer->id, 'vendor_id' => $other['vendor']->id,
-        'direction' => App\Models\PosCustomerLedgerEntry::DIRECTION_CHARGE,
+        'direction' => PosCustomerLedgerEntry::DIRECTION_CHARGE,
         'amount' => 50000, 'occurred_at' => now()->toDateString(),
     ]);
 

@@ -33,9 +33,9 @@ class AffiliateTaskForm
                     Select::make('task_type')
                         ->label('Task Type')
                         ->options([
-                            'auto'                => 'Auto (system-verified)',
-                            'manual'              => 'Manual (affiliate submits proof)',
-                            'daily_social_share'  => 'Daily social share (proof + reach)',
+                            'auto' => 'Auto (system-verified)',
+                            'manual' => 'Manual (affiliate submits proof)',
+                            'daily_social_share' => 'Daily social share (proof + reach)',
                         ])
                         ->required()
                         ->live()
@@ -62,7 +62,7 @@ class AffiliateTaskForm
                 ->schema([
                     Select::make('auto_metric')
                         ->options([
-                            'cleared_sales_value'   => 'Lifetime cleared sales value (₦)',
+                            'cleared_sales_value' => 'Lifetime cleared sales value (₦)',
                             'completed_sales_count' => 'Completed sales count',
                         ])
                         ->required(),

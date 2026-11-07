@@ -38,9 +38,9 @@ class CommissionService
         return DB::transaction(function () use ($order, $affiliate) {
             $commission = AffiliateCommission::create([
                 'affiliate_id' => $affiliate->id,
-                'order_id'     => $order->id,
-                'amount'       => 0,
-                'status'       => 'pending',
+                'order_id' => $order->id,
+                'amount' => 0,
+                'status' => 'pending',
             ]);
 
             $total = 0.0;
@@ -69,9 +69,9 @@ class CommissionService
 
                 $commission->items()->create([
                     'order_item_id' => $item->id,
-                    'rate'          => $rate,
-                    'base_amount'   => round($base, 2),
-                    'amount'        => $amount,
+                    'rate' => $rate,
+                    'base_amount' => round($base, 2),
+                    'amount' => $amount,
                 ]);
 
                 $total += $amount;
@@ -98,7 +98,7 @@ class CommissionService
         }
 
         $commission->update([
-            'status'                    => 'return_window',
+            'status' => 'return_window',
             'return_window_started_at' => now(),
         ]);
     }
@@ -123,8 +123,8 @@ class CommissionService
             $wasAvailable = $commission->status === 'available';
 
             $commission->update([
-                'status'          => 'rejected',
-                'rejected_at'     => now(),
+                'status' => 'rejected',
+                'rejected_at' => now(),
                 'rejected_reason' => $reason,
             ]);
 
@@ -136,9 +136,9 @@ class CommissionService
                 if ((float) $creditedAmount > 0) {
                     $commission->walletTransactions()->create([
                         'affiliate_id' => $commission->affiliate_id,
-                        'type'         => 'reversal',
-                        'amount'       => -$creditedAmount,
-                        'description'  => "Reversal — order rejected ({$reason}) after commission #{$commission->id} was already credited.",
+                        'type' => 'reversal',
+                        'amount' => -$creditedAmount,
+                        'description' => "Reversal — order rejected ({$reason}) after commission #{$commission->id} was already credited.",
                     ]);
                 }
             }

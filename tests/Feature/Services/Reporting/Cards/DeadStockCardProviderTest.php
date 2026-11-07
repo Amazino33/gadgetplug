@@ -10,8 +10,8 @@ use App\Services\Reporting\Cards\DeadStockCardProvider;
 function deadStockCardVendor(): array
 {
     $owner = User::factory()->create();
-    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Dead Stock Card Store ' . uniqid()]);
-    $category = Category::create(['name' => 'Dead Stock Card Category ' . uniqid()]);
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Dead Stock Card Store '.uniqid()]);
+    $category = Category::create(['name' => 'Dead Stock Card Category '.uniqid()]);
 
     return compact('owner', 'vendor', 'category');
 }
@@ -19,7 +19,7 @@ function deadStockCardVendor(): array
 test('calm with no tied-up value when there are no dead-stock candidates', function () {
     $data = deadStockCardVendor();
 
-    $summary = (new DeadStockCardProvider())->summarize($data['vendor']->id);
+    $summary = (new DeadStockCardProvider)->summarize($data['vendor']->id);
 
     expect($summary->headline)->toBe('No dead stock candidates right now')
         ->and($summary->urgency)->toBe(CardSummary::URGENCY_CALM)
@@ -36,7 +36,7 @@ test('sums stock value across dead-stock candidates and goes to attention', func
         'stock_quantity' => 10, 'status' => 'published', 'created_at' => now()->subYear(),
     ]);
 
-    $summary = (new DeadStockCardProvider())->summarize($data['vendor']->id);
+    $summary = (new DeadStockCardProvider)->summarize($data['vendor']->id);
 
     expect($summary->headline)->toBe('₦4,000.00 tied up in 1 slow-moving/dead product')
         ->and($summary->urgency)->toBe(CardSummary::URGENCY_ATTENTION)
@@ -46,7 +46,7 @@ test('sums stock value across dead-stock candidates and goes to attention', func
 test('the link is null and a note flags that the detail page does not exist yet', function () {
     $data = deadStockCardVendor();
 
-    $summary = (new DeadStockCardProvider())->summarize($data['vendor']->id);
+    $summary = (new DeadStockCardProvider)->summarize($data['vendor']->id);
 
     expect($summary->link)->toBeNull()
         ->and($summary->hasLink())->toBeFalse()
@@ -62,8 +62,8 @@ test('each vendor only sees its own dead stock', function () {
         'stock_quantity' => 10, 'status' => 'published', 'created_at' => now()->subYear(),
     ]);
 
-    $summaryA = (new DeadStockCardProvider())->summarize($dataA['vendor']->id);
-    $summaryB = (new DeadStockCardProvider())->summarize($dataB['vendor']->id);
+    $summaryA = (new DeadStockCardProvider)->summarize($dataA['vendor']->id);
+    $summaryB = (new DeadStockCardProvider)->summarize($dataB['vendor']->id);
 
     expect($summaryA->actionableCount)->toBe(1)
         ->and($summaryB->actionableCount)->toBe(0);

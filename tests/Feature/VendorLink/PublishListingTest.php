@@ -4,15 +4,15 @@ use App\Actions\VendorLink\PublishLinkedListingAction;
 use App\Filament\Vendor\Pages\VendorLinkPage;
 use App\Models\Product;
 use App\Models\ProductStoreStock;
-use App\Models\SupplierLink;
 use App\Models\User;
 use App\Models\Vendor;
+use App\Services\VendorLink\SupplierCatalogue;
 use Database\Factories\ProductFactory;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
-require_once __DIR__ . '/Helpers.php';
+require_once __DIR__.'/Helpers.php';
 
 uses(RefreshDatabase::class);
 
@@ -332,7 +332,7 @@ describe('publishing from inside the panel', function () {
 
         publishPanel($reseller, User::find($reseller->user_id));
 
-        expect(App\Services\VendorLink\SupplierCatalogue::query($link)->count())->toBe(2)
+        expect(SupplierCatalogue::query($link)->count())->toBe(2)
             // And a plain query still is not, so the drop is narrow rather than
             // a hole left open for everything.
             ->and(Product::where('vendor_id', $supplier->id)->count())->toBe(0);

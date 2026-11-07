@@ -15,23 +15,23 @@ class VendorSeeder extends Seeder
         $vendor = Vendor::firstOrCreate(
             ['slug' => 'techhaven'],
             [
-                'user_id'        => $owner->id,
-                'name'           => 'TechHaven',
-                'logo'           => null,
-                'is_verified'    => true,
-                'description'    => 'Your one-stop shop for the latest gadgets, electronics and tech accessories.',
-                'whatsapp'       => '2348012345678',
-                'bank_name'      => 'Guaranty Trust Bank',
+                'user_id' => $owner->id,
+                'name' => 'TechHaven',
+                'logo' => null,
+                'is_verified' => true,
+                'description' => 'Your one-stop shop for the latest gadgets, electronics and tech accessories.',
+                'whatsapp' => '2348012345678',
+                'bank_name' => 'Guaranty Trust Bank',
                 'account_number' => '0123456789',
-                'account_name'   => 'Chidi Okonkwo',
+                'account_name' => 'Chidi Okonkwo',
             ]
         );
 
         // Attach team members (skip if already attached)
         $teamRoles = [
-            'pm@gadgetplug.com'         => 'product_manager',
-            'om@gadgetplug.com'         => 'order_manager',
-            'im@gadgetplug.com'         => 'inventory_manager',
+            'pm@gadgetplug.com' => 'product_manager',
+            'om@gadgetplug.com' => 'order_manager',
+            'im@gadgetplug.com' => 'inventory_manager',
             'storekeeper@gadgetplug.com' => 'storekeeper',
         ];
 

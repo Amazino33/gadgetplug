@@ -29,8 +29,8 @@ class OrderMessages
     public const TEMPLATE_KEY = 'manual_dispatch';
 
     public const PRESETS = [
-        'delayed'         => 'Order delayed',
-        'on_the_way'      => 'Rider on the way',
+        'delayed' => 'Order delayed',
+        'on_the_way' => 'Rider on the way',
         'confirm_address' => 'Please confirm your address',
     ];
 
@@ -52,25 +52,25 @@ class OrderMessages
 
         $candidates = [
             'customer' => [
-                'label'          => 'Customer — '.$order->customer_name,
-                'number'         => $order->customer_phone,
+                'label' => 'Customer — '.$order->customer_name,
+                'number' => $order->customer_phone,
                 'recipient_type' => 'customer',
             ],
             'rider' => [
-                'label'          => $order->rider_name
+                'label' => $order->rider_name
                     ? 'Rider — '.$order->rider_name
                     : 'Logistics company — '.($order->logisticsCompany?->name ?? 'not assigned'),
-                'number'         => $order->riderContactNumber(),
+                'number' => $order->riderContactNumber(),
                 'recipient_type' => 'rider',
             ],
             'storekeeper' => [
-                'label'          => 'Storekeeper — '.($this->stockStore($order)?->name ?? 'store'),
-                'number'         => $this->storekeeperNumber($order),
+                'label' => 'Storekeeper — '.($this->stockStore($order)?->name ?? 'store'),
+                'number' => $this->storekeeperNumber($order),
                 'recipient_type' => 'storekeeper',
             ],
             'owner' => [
-                'label'          => 'Vendor owner — '.($vendor?->name ?? 'vendor'),
-                'number'         => $this->ownerNumber($order),
+                'label' => 'Vendor owner — '.($vendor?->name ?? 'vendor'),
+                'number' => $this->ownerNumber($order),
                 'recipient_type' => 'owner',
             ],
         ];
@@ -85,10 +85,10 @@ class OrderMessages
         $ref = $order->reference;
 
         return match ($key) {
-            'delayed'         => "Hello {$name}, this is GadgetPlug about your order #{$ref}. It is running a little late — sorry. We'll update you as soon as it's on its way.",
-            'on_the_way'      => "Hello {$name}, your GadgetPlug order #{$ref} is on its way with our rider. Please keep your phone close so they can reach you.",
+            'delayed' => "Hello {$name}, this is GadgetPlug about your order #{$ref}. It is running a little late — sorry. We'll update you as soon as it's on its way.",
+            'on_the_way' => "Hello {$name}, your GadgetPlug order #{$ref} is on its way with our rider. Please keep your phone close so they can reach you.",
             'confirm_address' => "Hello {$name}, this is GadgetPlug about order #{$ref}. Please reply with your full delivery address and a landmark nearby, so the rider can find you.",
-            default           => throw new InvalidArgumentException("Unknown message preset [{$key}]."),
+            default => throw new InvalidArgumentException("Unknown message preset [{$key}]."),
         };
     }
 
@@ -115,16 +115,16 @@ class OrderMessages
 
         $message = DeliveryMessage::create([
             // GadgetPlug's own message: tied to the order, filed under no vendor.
-            'vendor_id'      => null,
-            'order_id'       => $order->id,
+            'vendor_id' => null,
+            'order_id' => $order->id,
             'recipient_type' => $target['recipient_type'],
-            'channel'        => $channel,
-            'to_number'      => $target['number'],
-            'body'           => trim($body),
-            'status'         => 'queued',
-            'template_key'   => self::TEMPLATE_KEY,
-            'category'       => DeliveryMessage::CATEGORY_TRANSACTIONAL,
-            'sent_by'        => $sender->id,
+            'channel' => $channel,
+            'to_number' => $target['number'],
+            'body' => trim($body),
+            'status' => 'queued',
+            'template_key' => self::TEMPLATE_KEY,
+            'category' => DeliveryMessage::CATEGORY_TRANSACTIONAL,
+            'sent_by' => $sender->id,
         ]);
 
         // send(), not dispatch(): someone is waiting on this one.

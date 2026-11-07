@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use App\Support\Quantity;
 use App\Casts\AsQuantity;
+use App\Support\Quantity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -12,13 +12,13 @@ class PosSaleItem extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'unit_price'      => 'decimal:2',
+        'unit_price' => 'decimal:2',
         'discount_amount' => 'decimal:2',
-        'total'           => 'decimal:2',
-        'cost_total'      => 'decimal:2',
+        'total' => 'decimal:2',
+        'cost_total' => 'decimal:2',
         'sold_unit_price' => 'decimal:2',
         'half_unit_price' => 'decimal:2',
-        'cost_estimated'  => 'boolean',
+        'cost_estimated' => 'boolean',
         'quantity' => AsQuantity::class,
         'unit_qty' => AsQuantity::class,
     ];
@@ -40,17 +40,17 @@ class PosSaleItem extends Model
 
         if (Quantity::hasHalf($units)) {
             $price = (float) ($this->sold_unit_price ?? $this->unit_price);
-            $half  = $this->half_unit_price !== null ? (float) $this->half_unit_price : null;
+            $half = $this->half_unit_price !== null ? (float) $this->half_unit_price : null;
 
             return [
-                'quantity'   => trim(Quantity::format($units, true).' '.($this->unit_name ?? '')),
+                'quantity' => trim(Quantity::format($units, true).' '.($this->unit_name ?? '')),
                 'unit_price' => $price,
                 'half_price' => $half !== null && abs($half - round($price / 2, 2)) > 0.004 ? $half : null,
             ];
         }
 
         return [
-            'quantity'   => $this->soldInLargerUnit() ? "{$this->unit_qty} {$this->unit_name}" : $this->quantity,
+            'quantity' => $this->soldInLargerUnit() ? "{$this->unit_qty} {$this->unit_name}" : $this->quantity,
             'unit_price' => $this->soldInLargerUnit() ? $this->sold_unit_price : $this->unit_price,
             'half_price' => null,
         ];

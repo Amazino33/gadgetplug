@@ -12,6 +12,7 @@ use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\User;
 use App\Models\Vendor;
+use App\Services\Orders\InvalidOrderTransition;
 use App\Services\Orders\OrderStatusService;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -30,8 +31,8 @@ uses(RefreshDatabase::class);
 function setUpRecognitionVendor(): array
 {
     $owner = User::factory()->create();
-    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Recognition Store ' . uniqid(), 'online_sales_enabled' => true]);
-    $category = Category::create(['name' => 'Recognition Category ' . uniqid()]);
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Recognition Store '.uniqid(), 'online_sales_enabled' => true]);
+    $category = Category::create(['name' => 'Recognition Category '.uniqid()]);
     $product = Product::create([
         'vendor_id' => $vendor->id, 'category_id' => $category->id,
         'name' => 'Recognition Product', 'price' => 5000, 'stock_quantity' => 10, 'status' => 'published',
@@ -48,7 +49,7 @@ function setUpRecognitionVendor(): array
 function makeRecognitionOrder(array $data, string $paymentMethod, string $status): Order
 {
     $order = Order::create([
-        'reference' => 'ORD-REC-' . uniqid(),
+        'reference' => 'ORD-REC-'.uniqid(),
         'customer_name' => 'Jane Customer', 'customer_email' => 'jane@example.com',
         'customer_phone' => '08040000000', 'shipping_address' => '1 Test Street',
         'total_amount' => 5000, 'status' => 'pending', 'payment_method' => $paymentMethod,
@@ -161,7 +162,7 @@ test('cancelled and paid_but_failed_stock orders never recognize revenue', funct
 
     $dataB = setUpRecognitionVendor();
     $orderB = Order::create([
-        'reference' => 'ORD-FAIL-' . uniqid(), 'customer_name' => 'X', 'customer_email' => 'x@example.com',
+        'reference' => 'ORD-FAIL-'.uniqid(), 'customer_name' => 'X', 'customer_email' => 'x@example.com',
         'customer_phone' => '08040000000', 'shipping_address' => 'Y', 'total_amount' => 5000,
         'status' => 'pending', 'payment_method' => 'paystack',
     ]);
@@ -199,7 +200,7 @@ test('a recognized order\'s payment channel cannot be changed directly on the mo
     app(OrderStatusService::class)->recordPaymentReceived($order, $data['admin'], 'cash');
 
     expect(fn () => $order->fresh()->update(['payment_channel' => 'bank_transfer']))
-        ->toThrow(\LogicException::class);
+        ->toThrow(LogicException::class);
 });
 
 test('the Meta Purchase path is untouched by recognition — the paid transition still completes', function () {
@@ -337,7 +338,7 @@ test('a cancelled order cannot be cancelled again, so it is never double-reverse
     app(OrderStatusService::class)->cancel($order, $data['admin'], 'Refunded');
 
     expect(fn () => app(OrderStatusService::class)->cancel($order->fresh(), $data['admin'], 'Again'))
-        ->toThrow(App\Services\Orders\InvalidOrderTransition::class);
+        ->toThrow(InvalidOrderTransition::class);
 
     $original = FinancialLedgerEntry::where('source_type', $order->getMorphClass())
         ->where('source_id', $order->id)->where('direction', 'in')->first();

@@ -15,35 +15,49 @@ class InventoryLedgerResource extends Resource
 
     protected static ?string $tenantOwnershipRelationshipName = 'vendor';
 
-    protected static string|null|\BackedEnum $navigationIcon  = 'heroicon-o-arrows-up-down';
-    protected static string|null|UnitEnum   $navigationGroup = 'Inventory';
-    protected static ?string                $navigationLabel = 'Stock Movement';
+    protected static string|null|\BackedEnum $navigationIcon = 'heroicon-o-arrows-up-down';
+
+    protected static string|null|UnitEnum $navigationGroup = 'Inventory';
+
+    protected static ?string $navigationLabel = 'Stock Movement';
+
     protected static ?int $navigationSort = 5;
 
     public static function canAccess(): bool
     {
-        $user   = auth()->user();
+        $user = auth()->user();
         $vendor = filament()->getTenant();
 
         return $vendor && $user->hasVendorPermission($vendor->id, 'manage_inventory');
     }
 
-    public static function canCreate(): bool   { return false; }
-    public static function canEdit($record): bool   { return false; }
-    public static function canDelete($record): bool { return false; }
+    public static function canCreate(): bool
+    {
+        return false;
+    }
+
+    public static function canEdit($record): bool
+    {
+        return false;
+    }
+
+    public static function canDelete($record): bool
+    {
+        return false;
+    }
 
     private const TYPE_LABELS = [
-        'online_sale'           => 'Online Sale',
-        'pos_sale'               => 'Shop Sale',
-        'pos_void'               => 'Shop Sale Voided',
-        'pos_return'             => 'Shop Return',
-        'restock'                => 'Restock',
-        'audit_correction'       => 'Audit Correction',
-        'refund'                 => 'Refund',
-        'reserved'               => 'Reserved',
-        'dispatched'             => 'Dispatched',
-        'reservation_released'   => 'Reservation Released',
-        'online_return'          => 'Returned (failed delivery)',
+        'online_sale' => 'Online Sale',
+        'pos_sale' => 'Shop Sale',
+        'pos_void' => 'Shop Sale Voided',
+        'pos_return' => 'Shop Return',
+        'restock' => 'Restock',
+        'audit_correction' => 'Audit Correction',
+        'refund' => 'Refund',
+        'reserved' => 'Reserved',
+        'dispatched' => 'Dispatched',
+        'reservation_released' => 'Reservation Released',
+        'online_return' => 'Returned (failed delivery)',
     ];
 
     public static function table(Table $table): Table
@@ -69,8 +83,8 @@ class InventoryLedgerResource extends Resource
                         'restock', 'reservation_released' => 'success',
                         'pos_sale', 'online_sale', 'dispatched' => 'warning',
                         'pos_void', 'pos_return', 'refund', 'online_return' => 'info',
-                        'audit_correction'                       => 'gray',
-                        default                                  => 'gray',
+                        'audit_correction' => 'gray',
+                        default => 'gray',
                     }),
 
                 TextColumn::make('quantity_change')

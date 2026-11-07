@@ -12,6 +12,7 @@ use App\Services\VendorRoles;
 use Database\Seeders\VendorPermissionsSeeder;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Repeater;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\Sanctum;
@@ -21,9 +22,9 @@ uses(RefreshDatabase::class);
 
 function skuShop(string $name = 'Sku Shop', array $vendorAttributes = []): array
 {
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
 
-    $owner  = User::factory()->create();
+    $owner = User::factory()->create();
     $vendor = Vendor::create(array_merge(['user_id' => $owner->id, 'name' => $name.' '.uniqid()], $vendorAttributes));
     VendorRoles::seedFor($vendor);
 
@@ -40,11 +41,11 @@ function skuPanel(User $owner, Vendor $vendor): void
 function skuProduct(Vendor $vendor, array $attributes = []): Product
 {
     return Product::create(array_merge([
-        'vendor_id'   => $vendor->id,
+        'vendor_id' => $vendor->id,
         'category_id' => Category::firstOrCreate(['name' => 'Alcohol'])->id,
-        'name'        => 'Castile lite',
-        'price'       => 10100,
-        'status'      => 'published',
+        'name' => 'Castile lite',
+        'price' => 10100,
+        'status' => 'published',
     ], $attributes));
 }
 
@@ -70,7 +71,7 @@ test('the category falls back to GEN and the name to its first four letters of e
 test('two products with the same name in a shop get different SKUs', function () {
     [, $vendor] = skuShop();
 
-    $first  = skuProduct($vendor);
+    $first = skuProduct($vendor);
     $second = skuProduct($vendor);
 
     expect($first->sku)->not->toBe($second->sku);
@@ -99,7 +100,7 @@ test('a SKU is unique per shop, not across shops', function () {
     expect($other->sku)->toBe('SHARED-1');
 
     expect(fn () => skuProduct($one, ['name' => 'Another', 'sku' => 'SHARED-1']))
-        ->toThrow(\Illuminate\Database\UniqueConstraintViolationException::class);
+        ->toThrow(UniqueConstraintViolationException::class);
 });
 
 test('a product saved with its SKU blanked gets a fresh one rather than null', function () {
@@ -174,10 +175,10 @@ test('editing a product onto another product\'s SKU is refused, but keeping its 
 
 test('the backfill command fills only products with no SKU, and can be run dry', function () {
     [, $vendor] = skuShop();
-    [, $other]  = skuShop('Other');
+    [, $other] = skuShop('Other');
 
-    $kept   = skuProduct($vendor, ['sku' => 'KEEP-1']);
-    $blank  = skuProduct($vendor, ['name' => 'Blank one']);
+    $kept = skuProduct($vendor, ['sku' => 'KEEP-1']);
+    $blank = skuProduct($vendor, ['name' => 'Blank one']);
     $theirs = skuProduct($other, ['name' => 'Their blank']);
 
     // The model fills a SKU on save, so blank them underneath it.
@@ -218,7 +219,7 @@ test('a bigger unit gets its own SKU from the product\'s, and the base unit gets
 test('typing or scanning a unit SKU at the till finds the product and offers that unit', function () {
     [$owner, $vendor] = skuShop();
     $product = skuProduct($vendor, ['show_in_pos' => true, 'stock_quantity' => 50]);
-    $crate   = ProductUnit::create(['product_id' => $product->id, 'name' => 'Crate', 'conversion_factor' => 12, 'price' => 100000]);
+    $crate = ProductUnit::create(['product_id' => $product->id, 'name' => 'Crate', 'conversion_factor' => 12, 'price' => 100000]);
 
     Sanctum::actingAs($owner);
 
@@ -233,7 +234,7 @@ test('typing or scanning a unit SKU at the till finds the product and offers tha
 test('the till explains a unit SKU for a product it cannot sell instead of saying it is unknown', function () {
     [$owner, $vendor] = skuShop();
     $product = skuProduct($vendor, ['status' => 'draft']);
-    $crate   = ProductUnit::create(['product_id' => $product->id, 'name' => 'Crate', 'conversion_factor' => 12, 'price' => 100000]);
+    $crate = ProductUnit::create(['product_id' => $product->id, 'name' => 'Crate', 'conversion_factor' => 12, 'price' => 100000]);
 
     Sanctum::actingAs($owner);
 
@@ -252,8 +253,8 @@ test('the default unit chosen in the form is saved on the product', function () 
 
     Livewire::test(EditProduct::class, ['record' => $product->getRouteKey()])
         ->fillForm([
-            'base_unit'           => 'Bottle',
-            'extraUnits'          => [['name' => 'Crate', 'conversion_factor' => 12, 'price' => 100000, 'is_active' => true, 'barcodes' => []]],
+            'base_unit' => 'Bottle',
+            'extraUnits' => [['name' => 'Crate', 'conversion_factor' => 12, 'price' => 100000, 'is_active' => true, 'barcodes' => []]],
             'default_unit_choice' => 'unit:Crate',
         ])
         ->call('save')

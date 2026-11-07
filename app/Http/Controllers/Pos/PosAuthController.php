@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Pos;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Models\Vendor;
 use App\Services\ActiveStore;
 use App\Services\Inventory\TillStore;
+use App\Support\Pos\TillProfile;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -16,8 +18,8 @@ class PosAuthController extends Controller
     {
         $request->validate([
             'vendor_id' => 'required|integer',
-            'pin'       => 'required|digits:4',
-            'store_id'  => 'nullable|integer',
+            'pin' => 'required|digits:4',
+            'store_id' => 'nullable|integer',
         ]);
 
         // Find users who belong to this vendor and have a POS PIN
@@ -32,7 +34,7 @@ class PosAuthController extends Controller
             return response()->json(['message' => 'Invalid PIN.'], 401);
         }
 
-        $vendor = \App\Models\Vendor::find($request->vendor_id);
+        $vendor = Vendor::find($request->vendor_id);
 
         // Blocked over payment or terms: no token at all, so a cashier cannot
         // ring up a sale the platform has already told the owner it will not
@@ -41,6 +43,14 @@ class PosAuthController extends Controller
         if ($vendor?->isDashboardBlocked() && ! $user->isSuperAdmin()) {
             return response()->json([
                 'message' => $vendor->dashboardBlockMessage(),
+                'blocked' => true,
+            ], 403);
+        }
+
+        // A free (self-signup) shop has no till at all.
+        if ($vendor?->isFreePlan() && ! $user->isSuperAdmin()) {
+            return response()->json([
+                'message' => \App\Models\Vendor::FREE_PLAN_NO_TILL,
                 'blocked' => true,
             ], 403);
         }
@@ -54,7 +64,7 @@ class PosAuthController extends Controller
         if ($stores->isEmpty()) {
             return response()->json([
                 'message' => 'You are not assigned to any branch of this business. Ask a manager to assign you to your branch.',
-                'code'    => 'no_store',
+                'code' => 'no_store',
             ], 422);
         }
 
@@ -70,8 +80,8 @@ class PosAuthController extends Controller
                 'message' => $request->filled('store_id')
                     ? 'You are not assigned to that branch.'
                     : 'Choose the branch you are in.',
-                'code'    => 'choose_store',
-                'stores'  => $stores->map(fn ($s) => ['id' => $s->id, 'name' => $s->name])->values(),
+                'code' => 'choose_store',
+                'stores' => $stores->map(fn ($s) => ['id' => $s->id, 'name' => $s->name])->values(),
             ], 422);
         }
 
@@ -82,19 +92,19 @@ class PosAuthController extends Controller
         $user->withAccessToken($issued->accessToken);
 
         return response()->json([
-            'token'  => $issued->plainTextToken,
-            'user'   => [
-                'id'   => $user->id,
+            'token' => $issued->plainTextToken,
+            'user' => [
+                'id' => $user->id,
                 'name' => $user->name,
             ],
-            'store'  => [
-                'id'   => $store->id,
+            'store' => [
+                'id' => $store->id,
                 'name' => $store->name,
             ],
             // Everything the till needs to print a receipt without asking
             // the server for one. See TillProfile — it is sent again when a
             // session is opened, so a layout change does not wait for a logout.
-            'vendor' => \App\Support\Pos\TillProfile::for($user, $vendor),
+            'vendor' => TillProfile::for($user, $vendor),
         ]);
     }
 

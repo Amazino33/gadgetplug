@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\EnsureDeviceToken;
 use App\Http\Middleware\TrackAffiliateEngagement;
+use App\Http\Responses\LoginResponse;
 use App\Jobs\ClearAffiliateHoldsJob;
 use App\Jobs\DemoteInactiveAffiliatesJob;
 use App\Jobs\ReleaseStaleReservationsJob;
@@ -14,6 +15,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Exceptions\InvalidSignatureException;
 use Illuminate\Session\TokenMismatchException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
@@ -25,7 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->redirectUsersTo(fn (Request $request) => \App\Http\Responses\LoginResponse::resolveDashboardUrl($request->user() ?? auth()->user()));
+        $middleware->redirectUsersTo(fn (Request $request) => LoginResponse::resolveDashboardUrl($request->user() ?? auth()->user()));
 
         // No statefulApi(): the only API is the till's, and it authenticates
         // by bearer token alone (see config/sanctum.php 'guard'). Starting the
@@ -67,11 +69,11 @@ return Application::configure(basePath: dirname(__DIR__))
         // Hourly rather than daily since the hold is measured in days; this keeps
         // a commission from sitting cleared-but-uncredited for up to a day longer
         // than its actual hold window.
-        $schedule->job(new ClearAffiliateHoldsJob())->hourly();
+        $schedule->job(new ClearAffiliateHoldsJob)->hourly();
 
         // Daily, not hourly — a 21-day inactivity window doesn't need
         // hourly granularity the way a multi-day hold does.
-        $schedule->job(new DemoteInactiveAffiliatesJob())->daily();
+        $schedule->job(new DemoteInactiveAffiliatesJob)->daily();
 
         // Ticks hourly and lets each vendor's own reminder_frequency decide whether
         // it is actually due, so per-store cadence and quiet hours are data rather
@@ -97,7 +99,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // staleness window doesn't need finer granularity, but a reservation
         // sitting stuck for up to a day longer than that window blocks real
         // stock from real buyers the whole time it waits.
-        $schedule->job(new ReleaseStaleReservationsJob())->hourly();
+        $schedule->job(new ReleaseStaleReservationsJob)->hourly();
 
         // Packed but not handed over: a reminder to admin dispatch, not the
         // storekeeper. The command keeps its own interval between reminders.
@@ -161,7 +163,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // A rider's dispatch link that has expired, been altered, or been
         // replaced: riders have no account, so the login bounce below would be
         // a dead end. Tell them plainly instead, still as a 403.
-        $exceptions->render(function (\Illuminate\Routing\Exceptions\InvalidSignatureException $e, Request $request) {
+        $exceptions->render(function (InvalidSignatureException $e, Request $request) {
             if (! $request->is('dispatch/*')) {
                 return null;
             }

@@ -19,6 +19,7 @@ use App\Services\Reporting\SalesReportService;
 class PaymentMethodsCardProvider implements ReportCardProvider
 {
     private const CREDIT_SHARE_URGENT = 50.0;
+
     private const CREDIT_SHARE_ATTENTION = 25.0;
 
     private const LABELS = ['cash' => 'Cash', 'bank_transfer' => 'Transfer', 'card' => 'Card'];
@@ -46,7 +47,7 @@ class PaymentMethodsCardProvider implements ReportCardProvider
                 key: 'payment_methods',
                 title: 'Payment Methods',
                 headline: 'No shop sales yet today',
-                comparison: '₦' . number_format($receivedBefore, 2) . ' received yesterday',
+                comparison: '₦'.number_format($receivedBefore, 2).' received yesterday',
                 comparisonDirection: 'flat',
                 link: $link,
             );
@@ -57,14 +58,14 @@ class PaymentMethodsCardProvider implements ReportCardProvider
             ->map(fn (string $label, string $method) => ['label' => $label, 'amount' => $sales[$method]])
             ->filter(fn (array $tender) => $tender['amount'] > 0)
             ->sortByDesc('amount')
-            ->map(fn (array $tender) => $tender['label'] . ' ₦' . number_format($tender['amount'], 2))
+            ->map(fn (array $tender) => $tender['label'].' ₦'.number_format($tender['amount'], 2))
             ->implode(' · ');
 
         return new CardSummary(
             key: 'payment_methods',
             title: 'Payment Methods',
-            headline: '₦' . number_format($received, 2) . ' received today' . ($split !== '' ? " — {$split}" : ''),
-            comparison: 'vs ₦' . number_format($receivedBefore, 2) . ' yesterday',
+            headline: '₦'.number_format($received, 2).' received today'.($split !== '' ? " — {$split}" : ''),
+            comparison: 'vs ₦'.number_format($receivedBefore, 2).' yesterday',
             comparisonDirection: match (true) {
                 $received > $receivedBefore => 'up',
                 $received < $receivedBefore => 'down',
@@ -77,7 +78,7 @@ class PaymentMethodsCardProvider implements ReportCardProvider
             },
             link: $link,
             note: $credit > 0
-                ? '₦' . number_format($credit, 2) . ' sold on credit (' . number_format($creditShare, 0) . '% of sales), not yet received'
+                ? '₦'.number_format($credit, 2).' sold on credit ('.number_format($creditShare, 0).'% of sales), not yet received'
                 : null,
         );
     }

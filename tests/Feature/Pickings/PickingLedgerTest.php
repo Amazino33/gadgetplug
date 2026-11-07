@@ -99,7 +99,7 @@ test('the batch figure matches the single-product one for every product asked ab
     $batch = PickingLedger::heldQuantitiesForProducts([$held->id, $untouched->id], $store->id);
 
     expect($batch)->toBe([
-        $held->id      => 4,
+        $held->id => 4,
         $untouched->id => 0,
     ])
         ->and($batch[$held->id])->toBe(PickingLedger::heldQuantityForProduct($held->id, $store->id));

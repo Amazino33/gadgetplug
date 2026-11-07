@@ -15,6 +15,8 @@ use App\Models\Store;
 use App\Models\Supplier;
 use App\Models\User;
 use App\Models\Vendor;
+use App\Services\VendorRoles;
+use Database\Seeders\VendorPermissionsSeeder;
 
 /**
  * A branch with the two people a delivery needs kept apart: whoever records
@@ -24,7 +26,7 @@ function reviewContext(): array
 {
     $vendor = Vendor::create([
         'user_id' => User::factory()->create()->id,
-        'name'    => 'Review Vendor '.uniqid(),
+        'name' => 'Review Vendor '.uniqid(),
     ]);
 
     $store = $vendor->defaultStore;
@@ -32,8 +34,8 @@ function reviewContext(): array
 
     // Roles only carry permissions that already exist as rows, so the
     // permission seeder has to run first.
-    (new Database\Seeders\VendorPermissionsSeeder())->run();
-    App\Services\VendorRoles::seedFor($vendor);
+    (new VendorPermissionsSeeder)->run();
+    VendorRoles::seedFor($vendor);
     setPermissionsTeamId($vendor->id);
 
     // Records deliveries.
@@ -82,14 +84,14 @@ function reviewProduct(array $ctx, string $name = 'Oraimo Earbuds', ?Store $home
     $store = $home ?? $ctx['store'];
 
     $product = Product::create([
-        'vendor_id'      => $ctx['vendor']->id,
-        'store_id'       => $store->id,
-        'category_id'    => Category::create(['name' => 'Cat '.uniqid()])->id,
-        'name'           => $name,
-        'price'          => 10000,
-        'cost_price'     => 5000,
+        'vendor_id' => $ctx['vendor']->id,
+        'store_id' => $store->id,
+        'category_id' => Category::create(['name' => 'Cat '.uniqid()])->id,
+        'name' => $name,
+        'price' => 10000,
+        'cost_price' => 5000,
         'stock_quantity' => 0,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
     ProductStoreStock::updateOrCreate(
@@ -111,21 +113,21 @@ function reviewDelivery(array $ctx, array $items, ?Store $destination = null): P
     $total = 0;
 
     $procurement = Procurement::create([
-        'vendor_id'      => $ctx['vendor']->id,
-        'store_id'       => ($destination ?? $ctx['store'])->id,
-        'supplier_id'    => $ctx['supplier']->id,
-        'created_by'     => $ctx['keeper']->id,
-        'status'         => Procurement::STATUS_PENDING,
-        'amount_paid'    => 0,
+        'vendor_id' => $ctx['vendor']->id,
+        'store_id' => ($destination ?? $ctx['store'])->id,
+        'supplier_id' => $ctx['supplier']->id,
+        'created_by' => $ctx['keeper']->id,
+        'status' => Procurement::STATUS_PENDING,
+        'amount_paid' => 0,
         'payment_status' => 'credit',
         'payment_method' => 'cash',
     ]);
 
     foreach ($items as [$product, $quantity, $unitCost]) {
         $procurement->items()->create([
-            'product_id'    => $product->id,
-            'quantity'      => $quantity,
-            'unit_cost'     => $unitCost,
+            'product_id' => $product->id,
+            'quantity' => $quantity,
+            'unit_cost' => $unitCost,
             'selling_price' => $unitCost * 2,
         ]);
 

@@ -63,7 +63,7 @@ class ListProcurements extends ListRecords
                     $record->reference,
                     $record->verifiedQuantity(),
                     $record->store->name ?? 'the default store',
-                    "\u{20a6}" . number_format($record->verifiedTotal(), 2),
+                    "\u{20a6}".number_format($record->verifiedTotal(), 2),
                 );
             })
             ->action(function (array $arguments, ProcurementReview $review): void {
@@ -80,7 +80,7 @@ class ListProcurements extends ListRecords
 
                     Notification::make()->title('Procurement Approved, Inventory Updated.')->success()->send();
                 } catch (\Throwable $e) {
-                    Notification::make()->title('Error: ' . $e->getMessage())->danger()->send();
+                    Notification::make()->title('Error: '.$e->getMessage())->danger()->send();
                 }
             });
     }

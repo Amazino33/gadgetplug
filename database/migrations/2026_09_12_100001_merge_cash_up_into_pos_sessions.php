@@ -113,13 +113,13 @@ return new class extends Migration
                 // with the date left null.
                 DB::table('pos_sessions')->where('id', $seen[$key])->update([
                     'business_date' => null,
-                    'status'        => 'closed',
-                    'closed_at'     => $session->opened_at ?? now(),
+                    'status' => 'closed',
+                    'closed_at' => $session->opened_at ?? now(),
                 ]);
             }
 
             DB::table('pos_sessions')->where('id', $session->id)->update([
-                'store_id'      => $storeId,
+                'store_id' => $storeId,
                 'business_date' => $date,
             ]);
 

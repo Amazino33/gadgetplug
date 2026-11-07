@@ -7,8 +7,8 @@ use App\Filament\Vendor\Resources\Pickers\Pages\ViewPicker;
 use App\Models\Picker;
 use App\Services\ActiveStore;
 use BackedEnum;
-use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -32,15 +32,19 @@ class PickerResource extends Resource
 
     protected static ?string $tenantOwnershipRelationshipName = 'vendor';
 
-    protected static string|null|BackedEnum $navigationIcon  = 'heroicon-o-hand-raised';
-    protected static string|null|UnitEnum   $navigationGroup = 'Sales Point';
-    protected static ?string                $navigationLabel = 'Vendor Pickings';
-    protected static ?string                $modelLabel      = 'picker';
-    protected static ?int                   $navigationSort  = 4;
+    protected static string|null|BackedEnum $navigationIcon = 'heroicon-o-hand-raised';
+
+    protected static string|null|UnitEnum $navigationGroup = 'Sales Point';
+
+    protected static ?string $navigationLabel = 'Vendor Pickings';
+
+    protected static ?string $modelLabel = 'picker';
+
+    protected static ?int $navigationSort = 4;
 
     public static function canAccess(): bool
     {
-        $user   = auth()->user();
+        $user = auth()->user();
         $vendor = filament()->getTenant();
 
         return $vendor && (
@@ -50,8 +54,15 @@ class PickerResource extends Resource
         );
     }
 
-    public static function canDelete($record): bool { return false; }
-    public static function canDeleteAny(): bool     { return false; }
+    public static function canDelete($record): bool
+    {
+        return false;
+    }
+
+    public static function canDeleteAny(): bool
+    {
+        return false;
+    }
 
     public static function form(Schema $schema): Schema
     {
@@ -87,7 +98,7 @@ class PickerResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         $vendor = filament()->getTenant();
-        $user   = auth()->user();
+        $user = auth()->user();
 
         // The owner sees every branch. Everyone else sees the branch they are
         // standing in — the one they can hand goods out from and collect for.
@@ -155,7 +166,7 @@ class PickerResource extends Resource
     {
         return [
             'index' => ListPickers::route('/'),
-            'view'  => ViewPicker::route('/{record}'),
+            'view' => ViewPicker::route('/{record}'),
         ];
     }
 }

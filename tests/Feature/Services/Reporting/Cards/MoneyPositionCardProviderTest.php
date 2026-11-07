@@ -15,8 +15,8 @@ use App\Services\Reporting\Cards\MoneyPositionCardProvider;
 function moneyCardVendor(): array
 {
     $owner = User::factory()->create();
-    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Money Card Store ' . uniqid()]);
-    $category = Category::create(['name' => 'Money Card Category ' . uniqid()]);
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Money Card Store '.uniqid()]);
+    $category = Category::create(['name' => 'Money Card Category '.uniqid()]);
 
     // VendorObserver already seeds a zero-balance Bank/Cash account for every
     // new vendor (FinancialAccounts::seedFor) — update those rather than
@@ -36,7 +36,7 @@ function moneyCardVendor(): array
 function deliverForMoneyCard(array $data, int $quantity, $recognizedAt): void
 {
     $order = Order::create([
-        'reference' => 'ORD-MC-' . uniqid(), 'customer_name' => 'Buyer', 'customer_email' => 'b@example.com',
+        'reference' => 'ORD-MC-'.uniqid(), 'customer_name' => 'Buyer', 'customer_email' => 'b@example.com',
         'customer_phone' => '0804', 'shipping_address' => 'Uyo', 'total_amount' => $data['product']->price * $quantity,
         'status' => 'delivered', 'payment_method' => 'pay_on_delivery', 'revenue_recognized_at' => $recognizedAt,
     ]);
@@ -50,7 +50,7 @@ function deliverForMoneyCard(array $data, int $quantity, $recognizedAt): void
 test('headline shows the live bank and cash balances', function () {
     $data = moneyCardVendor();
 
-    $summary = (new MoneyPositionCardProvider())->summarize($data['vendor']->id);
+    $summary = (new MoneyPositionCardProvider)->summarize($data['vendor']->id);
 
     expect($summary->headline)->toBe('Bank ₦15,000.00 · Cash ₦5,000.00');
 });
@@ -62,7 +62,7 @@ test('urgency is urgent when this month\'s net profit is negative', function () 
         'incurred_at' => now(), 'posted_at' => now(),
     ]);
 
-    $summary = (new MoneyPositionCardProvider())->summarize($data['vendor']->id);
+    $summary = (new MoneyPositionCardProvider)->summarize($data['vendor']->id);
 
     expect($summary->urgency)->toBe(CardSummary::URGENCY_URGENT);
 });
@@ -72,7 +72,7 @@ test('urgency is attention when profit is positive but fell from last month', fu
     deliverForMoneyCard($data, 3, now()->subMonthNoOverflow()); // last month: 3*3000 profit = 9000
     deliverForMoneyCard($data, 1, now()); // this month: 1*3000 profit = 3000
 
-    $summary = (new MoneyPositionCardProvider())->summarize($data['vendor']->id);
+    $summary = (new MoneyPositionCardProvider)->summarize($data['vendor']->id);
 
     expect($summary->urgency)->toBe(CardSummary::URGENCY_ATTENTION)
         ->and($summary->comparisonDirection)->toBe('down');
@@ -83,7 +83,7 @@ test('urgency is calm when profit improved on last month', function () {
     deliverForMoneyCard($data, 1, now()->subMonthNoOverflow()); // last month profit 3000
     deliverForMoneyCard($data, 3, now()); // this month profit 9000
 
-    $summary = (new MoneyPositionCardProvider())->summarize($data['vendor']->id);
+    $summary = (new MoneyPositionCardProvider)->summarize($data['vendor']->id);
 
     expect($summary->urgency)->toBe(CardSummary::URGENCY_CALM)
         ->and($summary->comparisonDirection)->toBe('up');
@@ -92,7 +92,7 @@ test('urgency is calm when profit improved on last month', function () {
 test('the link points to the financial report page for this vendor', function () {
     $data = moneyCardVendor();
 
-    $summary = (new MoneyPositionCardProvider())->summarize($data['vendor']->id);
+    $summary = (new MoneyPositionCardProvider)->summarize($data['vendor']->id);
 
     expect($summary->link)->toBe(FinancialReport::getUrl(panel: 'vendor', tenant: $data['vendor']));
 });
@@ -101,8 +101,8 @@ test('each vendor only sees its own money position', function () {
     $dataA = moneyCardVendor();
     $dataB = moneyCardVendor();
 
-    $summaryA = (new MoneyPositionCardProvider())->summarize($dataA['vendor']->id);
-    $summaryB = (new MoneyPositionCardProvider())->summarize($dataB['vendor']->id);
+    $summaryA = (new MoneyPositionCardProvider)->summarize($dataA['vendor']->id);
+    $summaryB = (new MoneyPositionCardProvider)->summarize($dataB['vendor']->id);
 
     // Both stores were seeded identically, but each provider call must hit
     // only its own vendor's FinancialAccount rows, not sum across both.

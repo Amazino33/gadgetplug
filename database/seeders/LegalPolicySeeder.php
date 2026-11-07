@@ -11,13 +11,13 @@ class LegalPolicySeeder extends Seeder
     {
         $policies = [
             [
-                'title'        => 'Privacy Policy',
-                'slug'         => 'privacy-policy',
-                'summary'      => 'How GadgetPlug collects, uses, and protects your personal data.',
-                'sort_order'   => 1,
+                'title' => 'Privacy Policy',
+                'slug' => 'privacy-policy',
+                'summary' => 'How GadgetPlug collects, uses, and protects your personal data.',
+                'sort_order' => 1,
                 'is_published' => true,
                 'published_at' => now(),
-                'content'      => <<<'HTML'
+                'content' => <<<'HTML'
 <h2>1. Introduction</h2>
 <p>Welcome to <strong>GadgetPlug</strong> (operated by Lukratif Enterprise / GadgetPlug Nigeria Ltd.). We respect your privacy and are committed to protecting your personal data in compliance with the Nigeria Data Protection Act (NDPA) and applicable regulations.</p>
 <p>This Privacy Policy explains how we collect, use, store, and share information when you visit our website (gadgetplug.com.ng), make purchases, register as a vendor, or join our Affiliate Partner Program.</p>
@@ -68,13 +68,13 @@ class LegalPolicySeeder extends Seeder
 HTML
             ],
             [
-                'title'        => 'Terms of Service',
-                'slug'         => 'terms-of-service',
-                'summary'      => 'General marketplace rules, user accounts, purchases, and delivery guidelines.',
-                'sort_order'   => 2,
+                'title' => 'Terms of Service',
+                'slug' => 'terms-of-service',
+                'summary' => 'General marketplace rules, user accounts, purchases, and delivery guidelines.',
+                'sort_order' => 2,
                 'is_published' => true,
                 'published_at' => now(),
-                'content'      => <<<'HTML'
+                'content' => <<<'HTML'
 <h2>1. Agreement to Terms</h2>
 <p>By accessing or using <strong>GadgetPlug</strong> (gadgetplug.com.ng), you agree to be bound by these Terms of Service. If you do not agree with any part of these terms, you must not use our website or services.</p>
 
@@ -105,13 +105,13 @@ HTML
 HTML
             ],
             [
-                'title'        => 'Affiliate Program Agreement',
-                'slug'         => 'affiliate-terms',
-                'summary'      => 'Rules, commission structures, payout schedules, and promotional guidelines for affiliates.',
-                'sort_order'   => 3,
+                'title' => 'Affiliate Program Agreement',
+                'slug' => 'affiliate-terms',
+                'summary' => 'Rules, commission structures, payout schedules, and promotional guidelines for affiliates.',
+                'sort_order' => 3,
                 'is_published' => true,
                 'published_at' => now(),
-                'content'      => <<<'HTML'
+                'content' => <<<'HTML'
 <h2>1. Enrollment & Eligibility</h2>
 <p>The GadgetPlug Affiliate Partner Program allows creators, students, marketers, and hustlers to earn commission by promoting verified tech gadgets. To participate, applicants must submit our online application form with valid contact information, state, LGA, and promotional channels. GadgetPlug reserves the right to approve or decline applications at its sole discretion.</p>
 
@@ -152,13 +152,13 @@ HTML
 HTML
             ],
             [
-                'title'        => 'Return, Replacement & Refund Policy',
-                'slug'         => 'refund-policy',
-                'summary'      => 'Doorstep inspection rules, return window, defect replacements, and refund timelines.',
-                'sort_order'   => 4,
+                'title' => 'Return, Replacement & Refund Policy',
+                'slug' => 'refund-policy',
+                'summary' => 'Doorstep inspection rules, return window, defect replacements, and refund timelines.',
+                'sort_order' => 4,
                 'is_published' => true,
                 'published_at' => now(),
-                'content'      => <<<'HTML'
+                'content' => <<<'HTML'
 <h2>1. "Test Before You Pay" Inspection Guarantee</h2>
 <p>We want you to be 100% confident in every device you buy. On eligible deliveries, customers are encouraged to open the delivery parcel, turn on the device, check physical integrity, and test core functionality in the presence of the delivery rider before completing payment.</p>
 

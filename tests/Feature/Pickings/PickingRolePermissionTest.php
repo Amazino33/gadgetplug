@@ -24,7 +24,7 @@ test('writing off stays the owner\'s alone, ungrantable to any role', function (
 });
 
 test('every grantable permission actually exists once seeded', function () {
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
 
     $seeded = Permission::pluck('name')->all();
     $missing = array_diff(RoleResource::GRANTABLE_PERMISSIONS, $seeded);

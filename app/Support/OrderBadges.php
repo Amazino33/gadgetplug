@@ -14,21 +14,21 @@ final class OrderBadges
 {
     /** Filament colours by order status. */
     public const STATUS_COLORS = [
-        'pending'               => 'gray',
-        'confirmed'             => 'info',
-        'paid'                  => 'info',
+        'pending' => 'gray',
+        'confirmed' => 'info',
+        'paid' => 'info',
         'paid_but_failed_stock' => 'danger',
-        'packed'                => 'primary',
-        'shipped'               => 'warning',
-        'delivered'             => 'success',
-        'returned'              => 'gray',
-        'cancelled'             => 'danger',
+        'packed' => 'primary',
+        'shipped' => 'warning',
+        'delivered' => 'success',
+        'returned' => 'gray',
+        'cancelled' => 'danger',
     ];
 
     public const PAYMENT_METHOD_LABELS = [
-        'paystack'        => 'Paid online',
+        'paystack' => 'Paid online',
         'pay_on_delivery' => 'Pay on delivery',
-        'wallet'          => 'Reseller wallet',
+        'wallet' => 'Reseller wallet',
     ];
 
     public static function statusLabel(?string $status): string
@@ -50,10 +50,10 @@ final class OrderBadges
     public static function paymentState(Order $order): string
     {
         return match (true) {
-            $order->payment_method === 'wallet'   => 'Reseller wallet',
+            $order->payment_method === 'wallet' => 'Reseller wallet',
             $order->payment_method === 'paystack' => 'Paid online',
-            $order->isRevenueRecognized()         => 'POD — collected',
-            default                               => 'POD — to collect',
+            $order->isRevenueRecognized() => 'POD — collected',
+            default => 'POD — to collect',
         };
     }
 

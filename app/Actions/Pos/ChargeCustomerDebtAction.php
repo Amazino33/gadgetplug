@@ -60,19 +60,19 @@ class ChargeCustomerDebtAction
 
         return PosCustomerLedgerEntry::create([
             'pos_customer_id' => $sale->customer_id,
-            'vendor_id'       => $sale->vendor_id,
-            'direction'       => PosCustomerLedgerEntry::DIRECTION_CHARGE,
-            'amount'          => $amount,
-            'source_type'     => $sale->getMorphClass(),
-            'source_id'       => $sale->getKey(),
+            'vendor_id' => $sale->vendor_id,
+            'direction' => PosCustomerLedgerEntry::DIRECTION_CHARGE,
+            'amount' => $amount,
+            'source_type' => $sale->getMorphClass(),
+            'source_id' => $sale->getKey(),
             // The branch that handed over the goods. Where it gets repaid is a
             // separate fact, recorded on its own row.
-            'store_id'        => $sale->store_id,
-            'created_by'      => $sale->cashier_id,
+            'store_id' => $sale->store_id,
+            'created_by' => $sale->cashier_id,
             // The business date, which for an offline sale is when it was rung
             // up rather than when it happened to reach the server.
-            'occurred_at'     => BusinessDate::of($sale->completed_at ?? $sale->created_at),
-            'description'     => "Credit sale — {$sale->reference}",
+            'occurred_at' => BusinessDate::of($sale->completed_at ?? $sale->created_at),
+            'description' => "Credit sale — {$sale->reference}",
         ]);
     }
 

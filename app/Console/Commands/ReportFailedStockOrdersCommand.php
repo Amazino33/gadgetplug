@@ -29,7 +29,7 @@ class ReportFailedStockOrdersCommand extends Command
         }
 
         $rows = $orders->map(function (Order $order): array {
-            $linked  = $order->items->filter(fn ($item) => ! $item->tracksStock())->count();
+            $linked = $order->items->filter(fn ($item) => ! $item->tracksStock())->count();
             $tracked = $order->items->count() - $linked;
 
             return [

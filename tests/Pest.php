@@ -1,5 +1,26 @@
 <?php
 
+use App\Actions\Pos\RecordSaleReversalAction;
+use App\Actions\Procurement\ApproveProcurementAction;
+use App\Models\Category;
+use App\Models\FinancialAccount;
+use App\Models\FinancialLedgerEntry;
+use App\Models\Lga;
+use App\Models\PosCustomer;
+use App\Models\PosCustomerLedgerEntry;
+use App\Models\PosSale;
+use App\Models\Procurement;
+use App\Models\ProcurementItem;
+use App\Models\Product;
+use App\Models\ProductStoreStock;
+use App\Models\State;
+use App\Models\StockCostLayer;
+use App\Models\Store;
+use App\Models\Supplier;
+use App\Models\User;
+use App\Models\Vendor;
+use App\Services\Inventory\StockValuation;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /*
@@ -14,7 +35,7 @@ use Tests\TestCase;
 */
 
 pest()->extend(TestCase::class)
-    ->use(Illuminate\Foundation\Testing\RefreshDatabase::class)
+    ->use(RefreshDatabase::class)
     ->in('Feature');
 
 /*
@@ -56,11 +77,11 @@ function something()
  * than written round the guard, so a suite that needs a voided sale is also
  * proving the only path that can produce one still works.
  */
-function voidSaleInTest(App\Models\PosSale $sale, ?string $reason = null): App\Models\PosSale
+function voidSaleInTest(PosSale $sale, ?string $reason = null): PosSale
 {
-    app(App\Actions\Pos\RecordSaleReversalAction::class)->void(
-        sale:   $sale,
-        actor:  App\Models\User::find($sale->cashier_id) ?? App\Models\User::factory()->create(),
+    app(RecordSaleReversalAction::class)->void(
+        sale: $sale,
+        actor: User::find($sale->cashier_id) ?? User::factory()->create(),
         reason: $reason ?? 'Voided by test fixture',
     );
 
@@ -81,27 +102,27 @@ function voidSaleInTest(App\Models\PosSale $sale, ?string $reason = null): App\M
 
 function debtTenderContext(): array
 {
-    $owner  = App\Models\User::factory()->create();
-    $vendor = App\Models\Vendor::create([
+    $owner = User::factory()->create();
+    $vendor = Vendor::create([
         'user_id' => $owner->id, 'name' => 'Credit Store', 'pos_min_margin_percent' => 0,
     ]);
-    $store = App\Models\Store::where('vendor_id', $vendor->id)->where('is_default', true)->first();
+    $store = Store::where('vendor_id', $vendor->id)->where('is_default', true)->first();
 
-    $product = App\Models\Product::create([
-        'vendor_id'                => $vendor->id,
-        'store_id'                 => $store->id,
-        'category_id'              => App\Models\Category::create(['name' => 'C' . uniqid()])->id,
-        'name'                     => 'Credit Widget',
-        'price'                    => 10000,
-        'cost_price'               => 6000,
+    $product = Product::create([
+        'vendor_id' => $vendor->id,
+        'store_id' => $store->id,
+        'category_id' => Category::create(['name' => 'C'.uniqid()])->id,
+        'name' => 'Credit Widget',
+        'price' => 10000,
+        'cost_price' => 6000,
         'allow_pos_price_override' => false,
-        'stock_quantity'           => 50,
-        'reserved_stock'           => 0,
-        'status'                   => 'published',
-        'show_in_pos'              => true,
+        'stock_quantity' => 50,
+        'reserved_stock' => 0,
+        'status' => 'published',
+        'show_in_pos' => true,
     ]);
 
-    $customer = App\Models\PosCustomer::create([
+    $customer = PosCustomer::create([
         'vendor_id' => $vendor->id, 'name' => 'Ada Obi', 'phone' => '08031234567',
     ]);
 
@@ -113,19 +134,19 @@ function debtTenderContext(): array
 function debtSalePayload(array $ctx, array $overrides = []): array
 {
     return array_merge([
-        'vendor_id'      => $ctx['vendor']->id,
-        'customer_id'    => $ctx['customer']->id,
-        'items'          => [[
-            'product_id'   => $ctx['product']->id,
+        'vendor_id' => $ctx['vendor']->id,
+        'customer_id' => $ctx['customer']->id,
+        'items' => [[
+            'product_id' => $ctx['product']->id,
             'product_name' => 'Credit Widget',
-            'unit_price'   => 10000.0,
-            'quantity'     => 1,
-            'total'        => 10000.0,
+            'unit_price' => 10000.0,
+            'quantity' => 1,
+            'total' => 10000.0,
         ]],
-        'vat_rate'        => 0,
-        'payment_method'  => 'debt',
+        'vat_rate' => 0,
+        'payment_method' => 'debt',
         'amount_tendered' => 0,
-        'payments'        => null,
+        'payments' => null,
     ], $overrides);
 }
 
@@ -138,21 +159,21 @@ function repaymentContext(float $owed = 10000.0): array
 {
     $ctx = debtTenderContext();
 
-    App\Models\FinancialAccount::create([
+    FinancialAccount::create([
         'vendor_id' => $ctx['vendor']->id, 'name' => 'Cash Drawer', 'type' => 'cash',
         'opening_balance' => 0, 'is_active' => true,
     ]);
 
     if ($owed > 0) {
-        App\Models\PosCustomerLedgerEntry::create([
+        PosCustomerLedgerEntry::create([
             'pos_customer_id' => $ctx['customer']->id,
-            'vendor_id'       => $ctx['vendor']->id,
-            'direction'       => 'charge',
-            'amount'          => $owed,
-            'store_id'        => $ctx['store']->id,
-            'created_by'      => $ctx['owner']->id,
-            'occurred_at'     => '2026-08-01',
-            'description'     => 'Credit sale — seed',
+            'vendor_id' => $ctx['vendor']->id,
+            'direction' => 'charge',
+            'amount' => $owed,
+            'store_id' => $ctx['store']->id,
+            'created_by' => $ctx['owner']->id,
+            'occurred_at' => '2026-08-01',
+            'description' => 'Credit sale — seed',
         ]);
     }
 
@@ -161,9 +182,9 @@ function repaymentContext(float $owed = 10000.0): array
 
 function cashIn(int $vendorId): float
 {
-    return (float) App\Models\FinancialLedgerEntry::whereIn(
+    return (float) FinancialLedgerEntry::whereIn(
         'financial_account_id',
-        App\Models\FinancialAccount::where('vendor_id', $vendorId)->pluck('id')
+        FinancialAccount::where('vendor_id', $vendorId)->pluck('id')
     )->where('direction', 'in')->sum('amount');
 }
 
@@ -196,14 +217,14 @@ function layersContext(): array
 {
     $ctx = debtTenderContext();
 
-    App\Models\ProductStoreStock::where('product_id', $ctx['product']->id)
+    ProductStoreStock::where('product_id', $ctx['product']->id)
         ->update(['quantity' => 0, 'reserved' => 0]);
-    App\Models\StockCostLayer::where('product_id', $ctx['product']->id)->delete();
+    StockCostLayer::where('product_id', $ctx['product']->id)->delete();
 
     $ctx['product']->update(['cost_price' => null]);
     $ctx['product']->refresh();
 
-    $ctx['supplier'] = App\Models\Supplier::create([
+    $ctx['supplier'] = Supplier::create([
         'vendor_id' => $ctx['vendor']->id, 'name' => 'Supplier',
     ]);
 
@@ -213,25 +234,25 @@ function layersContext(): array
 /** One delivery, received through the real approval path so it lays down a batch. */
 function receiveBatch(array $ctx, int $quantity, float $unitCost): void
 {
-    $procurement = App\Models\Procurement::create([
+    $procurement = Procurement::create([
         'vendor_id' => $ctx['vendor']->id, 'supplier_id' => $ctx['supplier']->id,
         'created_by' => $ctx['owner']->id, 'store_id' => $ctx['store']->id,
         'status' => 'pending', 'total_cost' => $quantity * $unitCost, 'amount_paid' => 0,
         'payment_status' => 'unpaid', 'payment_method' => 'cash',
     ]);
 
-    App\Models\ProcurementItem::create([
+    ProcurementItem::create([
         'procurement_id' => $procurement->id, 'product_id' => $ctx['product']->id,
         'quantity' => $quantity, 'unit_cost' => $unitCost, 'selling_price' => $unitCost * 2,
     ]);
 
-    app(App\Actions\Procurement\ApproveProcurementAction::class)
+    app(ApproveProcurementAction::class)
         ->execute($procurement, $ctx['store']->id);
 }
 
 function stockValue(array $ctx): float
 {
-    return App\Services\Inventory\StockValuation::forVendor($ctx['vendor']->id)['value'];
+    return StockValuation::forVendor($ctx['vendor']->id)['value'];
 }
 
 /*
@@ -246,8 +267,8 @@ function stockValue(array $ctx): float
 /** @return array{0: int, 1: int} [stateId, lgaId] */
 function checkoutLocation(string $lga = 'Uyo', string $state = 'Akwa Ibom'): array
 {
-    $stateId = App\Models\State::where('name', $state)->value('id');
-    $lgaId   = App\Models\Lga::where('state_id', $stateId)->where('name', $lga)->value('id');
+    $stateId = State::where('name', $state)->value('id');
+    $lgaId = Lga::where('state_id', $stateId)->where('name', $lga)->value('id');
 
     if (! $stateId || ! $lgaId) {
         throw new RuntimeException("No LGA {$lga} in {$state}.");

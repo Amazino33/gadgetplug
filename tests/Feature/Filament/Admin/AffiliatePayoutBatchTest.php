@@ -7,6 +7,7 @@ use App\Models\AffiliateSetting;
 use App\Models\User;
 use App\Models\Vendor;
 use App\Models\WalletTransaction;
+use App\Services\Affiliate\WalletService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
@@ -19,18 +20,18 @@ function makePayoutAffiliate(float $availableBalance, bool $withBankDetails = tr
 
     if ($withBankDetails) {
         $affiliate->update([
-            'bank_name'      => 'GTBank',
+            'bank_name' => 'GTBank',
             'account_number' => '0123456789',
-            'account_name'   => $affiliate->user->name,
+            'account_name' => $affiliate->user->name,
         ]);
     }
 
     if ($availableBalance != 0.0) {
         WalletTransaction::create([
             'affiliate_id' => $affiliate->id,
-            'type'         => 'credit',
-            'amount'       => $availableBalance,
-            'description'  => 'Test seed credit',
+            'type' => 'credit',
+            'amount' => $availableBalance,
+            'description' => 'Test seed credit',
         ]);
     }
 
@@ -63,7 +64,7 @@ test('a regular vendor owner cannot access the payout batch page', function () {
 test('only affiliates meeting the minimum payout amount are listed', function () {
     AffiliateSetting::current()->update(['min_payout_amount' => 2000]);
 
-    $eligible   = makePayoutAffiliate(5000);
+    $eligible = makePayoutAffiliate(5000);
     $ineligible = makePayoutAffiliate(500);
 
     $this->actingAs(actingAsSuperAdminForPayout());
@@ -76,7 +77,7 @@ test('only affiliates meeting the minimum payout amount are listed', function ()
 test('running the payout batch on a selected affiliate creates a paid payout and a debit that zeroes the balance', function () {
     AffiliateSetting::current()->update(['min_payout_amount' => 2000]);
 
-    $admin     = actingAsSuperAdminForPayout();
+    $admin = actingAsSuperAdminForPayout();
     $affiliate = makePayoutAffiliate(5000);
 
     $this->actingAs($admin);
@@ -90,7 +91,7 @@ test('running the payout batch on a selected affiliate creates a paid payout and
         ->and($payout->status)->toBe('paid')
         ->and((float) $payout->amount)->toBe(5000.0)
         ->and($payout->paid_by)->toBe($admin->id)
-        ->and(app(App\Services\Affiliate\WalletService::class)->availableBalance($affiliate->id))->toBe(0.0);
+        ->and(app(WalletService::class)->availableBalance($affiliate->id))->toBe(0.0);
 
     $debit = WalletTransaction::where('affiliate_payout_id', $payout->id)->first();
 
@@ -104,14 +105,14 @@ test('paying out one affiliate does not touch another affiliate not selected in 
 
     $this->actingAs(actingAsSuperAdminForPayout());
 
-    $paid    = makePayoutAffiliate(5000);
+    $paid = makePayoutAffiliate(5000);
     $untouched = makePayoutAffiliate(3000);
 
     Livewire::test(AffiliatePayoutBatch::class)
         ->callTableBulkAction('payOut', [$paid->id]);
 
     expect(AffiliatePayout::where('affiliate_id', $untouched->id)->exists())->toBeFalse()
-        ->and(app(App\Services\Affiliate\WalletService::class)->availableBalance($untouched->id))->toBe(3000.0);
+        ->and(app(WalletService::class)->availableBalance($untouched->id))->toBe(3000.0);
 });
 
 test('the paid payout snapshots the affiliate\'s bank details', function () {
@@ -140,7 +141,7 @@ test('an eligible affiliate with no bank details is skipped, not paid', function
         ->callTableBulkAction('payOut', [$affiliate->id]);
 
     expect(AffiliatePayout::where('affiliate_id', $affiliate->id)->exists())->toBeFalse()
-        ->and(app(App\Services\Affiliate\WalletService::class)->availableBalance($affiliate->id))->toBe(5000.0);
+        ->and(app(WalletService::class)->availableBalance($affiliate->id))->toBe(5000.0);
 });
 
 test('the navigation badge shows the count of affiliates eligible for payout', function () {

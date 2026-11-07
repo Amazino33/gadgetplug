@@ -27,7 +27,7 @@ class AffiliateInfolist
 
                     TextEntry::make('lifetime_sales_value')
                         ->label('Lifetime Cleared Sales')
-                        ->getStateUsing(fn (Affiliate $record) => '₦' . number_format(
+                        ->getStateUsing(fn (Affiliate $record) => '₦'.number_format(
                             app(AffiliateLevelProgressionService::class)->lifetimeSalesValue($record->id), 2
                         )),
 
@@ -48,7 +48,7 @@ class AffiliateInfolist
 
                             $remaining = max((float) $nextLevel->target - $lifetimeValue, 0);
 
-                            return "₦" . number_format($remaining, 2) . " more to reach {$nextLevel->name}";
+                            return '₦'.number_format($remaining, 2)." more to reach {$nextLevel->name}";
                         }),
 
                     TextEntry::make('demotion_risk')
@@ -82,7 +82,7 @@ class AffiliateInfolist
                             return match (true) {
                                 $daysLeft <= 0 => 'danger',
                                 $daysLeft <= 5 => 'warning',
-                                default        => 'success',
+                                default => 'success',
                             };
                         })
                         ->visible(fn (Affiliate $record) => $record->level !== null),
@@ -109,7 +109,7 @@ class AffiliateInfolist
                 ->schema([
                     TextEntry::make('pending_balance')
                         ->label('Pending Balance')
-                        ->getStateUsing(fn (Affiliate $record) => '₦' . number_format(
+                        ->getStateUsing(fn (Affiliate $record) => '₦'.number_format(
                             app(WalletService::class)->pendingBalance($record->id), 2
                         ))
                         ->helperText('Commissions still held (pending or in the return window) — not yet earned.'),
@@ -118,7 +118,7 @@ class AffiliateInfolist
                         ->label('Available Balance')
                         ->weight('bold')
                         ->color('success')
-                        ->getStateUsing(fn (Affiliate $record) => '₦' . number_format(
+                        ->getStateUsing(fn (Affiliate $record) => '₦'.number_format(
                             app(WalletService::class)->availableBalance($record->id), 2
                         ))
                         ->helperText('The only balance that is withdrawable/payable.'),

@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Actions\Inventory;
 
-use App\Support\Quantity;
 use App\Models\AuditSession;
 use App\Models\BlindCountSession;
 use App\Models\PhysicalStockCount;
 use App\Models\PhysicalStockCountLine;
 use App\Models\Product;
 use App\Models\User;
+use App\Support\Quantity;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
 
@@ -75,8 +75,8 @@ class AdoptAuditCountAction
             $agreed = $lines
                 ->map(fn (AuditSession $line) => [
                     'product_id' => (int) $line->product_id,
-                    'counted'    => $this->agreedCount($line),
-                    'system'     => Quantity::of($line->system_quantity),
+                    'counted' => $this->agreedCount($line),
+                    'system' => Quantity::of($line->system_quantity),
                 ])
                 ->filter(fn (array $row) => $row['counted'] !== null)
                 ->values();
@@ -87,15 +87,15 @@ class AdoptAuditCountAction
 
             $count = PhysicalStockCount::create([
                 'vendor_id' => $session->vendor_id,
-                'store_id'  => $session->store_id,
+                'store_id' => $session->store_id,
                 // Whoever adopted it, not whoever counted: this record is the
                 // act of bringing the count into the settlement, and the
                 // counters are already named on the session it came from.
                 'counted_by' => $actor->id,
                 'blind_count_session_id' => $session->id,
                 'period_start' => $session->created_at,
-                'period_end'   => $session->updated_at,
-                'counted_at'   => $session->updated_at,
+                'period_end' => $session->updated_at,
+                'counted_at' => $session->updated_at,
                 'note' => sprintf(
                     'Adopted from inventory count #%d. %d of %d lines agreed.',
                     $session->id,
@@ -118,14 +118,14 @@ class AdoptAuditCountAction
             foreach ($agreed as $row) {
                 PhysicalStockCountLine::create([
                     'physical_stock_count_id' => $count->id,
-                    'product_id'       => $row['product_id'],
+                    'product_id' => $row['product_id'],
                     'counted_quantity' => $row['counted'],
                     // The baseline the blind count itself froze, carried over
                     // rather than re-read, so the variance this count found is
                     // the variance it still reports.
-                    'system_quantity'  => $row['system'],
-                    'unit_cost'        => $products[$row['product_id']]?->cost_price,
-                    'unit_price'       => $products[$row['product_id']]?->price,
+                    'system_quantity' => $row['system'],
+                    'unit_cost' => $products[$row['product_id']]?->cost_price,
+                    'unit_price' => $products[$row['product_id']]?->price,
                 ]);
             }
 

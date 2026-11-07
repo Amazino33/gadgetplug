@@ -57,9 +57,9 @@ return new class extends Migration
 
                     $rows[] = [
                         'product_id' => $product->id,
-                        'store_id'   => $storeId,
-                        'quantity'   => (int) $product->stock_quantity,
-                        'reserved'   => (int) $product->reserved_stock,
+                        'store_id' => $storeId,
+                        'quantity' => (int) $product->stock_quantity,
+                        'reserved' => (int) $product->reserved_stock,
                         'created_at' => $now,
                         'updated_at' => $now,
                     ];
@@ -89,11 +89,11 @@ return new class extends Migration
 
         foreach ($missing as $vendorId) {
             DB::table('stores')->insert([
-                'vendor_id'  => $vendorId,
-                'name'       => 'Main Store',
-                'slug'       => $this->uniqueSlug($vendorId, 'Main Store'),
+                'vendor_id' => $vendorId,
+                'name' => 'Main Store',
+                'slug' => $this->uniqueSlug($vendorId, 'Main Store'),
                 'is_default' => true,
-                'is_active'  => true,
+                'is_active' => true,
                 'created_at' => $now,
                 'updated_at' => $now,
             ]);

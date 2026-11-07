@@ -23,14 +23,17 @@ class MessageTemplateResource extends Resource
 
     protected static ?string $tenantOwnershipRelationshipName = 'vendor';
 
-    protected static string|null|\BackedEnum $navigationIcon  = 'heroicon-o-chat-bubble-left-right';
-    protected static string|null|\UnitEnum  $navigationGroup = 'Logistics';
-    protected static ?string                $navigationLabel = 'Message Templates';
+    protected static string|null|\BackedEnum $navigationIcon = 'heroicon-o-chat-bubble-left-right';
+
+    protected static string|null|\UnitEnum $navigationGroup = 'Logistics';
+
+    protected static ?string $navigationLabel = 'Message Templates';
+
     protected static ?int $navigationSort = 3;
 
     public static function canAccess(): bool
     {
-        $user   = auth()->user();
+        $user = auth()->user();
         $vendor = filament()->getTenant();
 
         return $vendor && $user->hasVendorPermission($vendor->id, 'manage_logistics');
@@ -50,10 +53,10 @@ class MessageTemplateResource extends Resource
                     // behind those alerts could not be edited without the form
                     // silently rewriting their recipient to customer or rider.
                     ->options([
-                        'customer'    => 'Customer',
-                        'rider'       => 'Rider',
+                        'customer' => 'Customer',
+                        'rider' => 'Rider',
                         'storekeeper' => 'Storekeeper',
-                        'owner'       => 'Owner (daily summary)',
+                        'owner' => 'Owner (daily summary)',
                     ])
                     ->required(),
 
@@ -90,10 +93,10 @@ class MessageTemplateResource extends Resource
             ])
             ->filters([
                 SelectFilter::make('recipient_type')->options([
-                    'customer'    => 'Customer',
-                    'rider'       => 'Rider',
+                    'customer' => 'Customer',
+                    'rider' => 'Rider',
                     'storekeeper' => 'Storekeeper',
-                    'owner'       => 'Owner (daily summary)',
+                    'owner' => 'Owner (daily summary)',
                 ]),
                 SelectFilter::make('channel')->options(['whatsapp' => 'WhatsApp', 'sms' => 'SMS']),
             ])

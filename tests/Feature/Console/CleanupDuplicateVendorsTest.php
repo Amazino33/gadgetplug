@@ -1,9 +1,12 @@
 <?php
 
 use App\Models\Category;
+use App\Models\MessageTemplate;
 use App\Models\Product;
 use App\Models\User;
 use App\Models\Vendor;
+use App\Services\VendorRoles;
+use Spatie\Permission\Models\Role;
 
 // Deleting a vendor cascades into twenty-odd tables, so the important
 // behaviour here is what the command refuses to do.
@@ -15,7 +18,7 @@ function duplicateVendors(User $owner, int $count, string $name = 'Geophone Gadg
     foreach (range(1, $count) as $i) {
         $vendors[] = Vendor::create([
             'user_id' => $owner->id,
-            'name'    => $name,
+            'name' => $name,
         ]);
     }
 
@@ -27,12 +30,12 @@ function giveVendorAProduct(Vendor $vendor): Product
     $category = Category::firstOrCreate(['name' => 'Smartphones']);
 
     return Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'name'           => 'Attached Product '.$vendor->id,
-        'price'          => 1000,
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'Attached Product '.$vendor->id,
+        'price' => 1000,
         'stock_quantity' => 1,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 }
 
@@ -48,7 +51,7 @@ it('reports without deleting anything unless forced', function () {
 });
 
 it('deletes the empty copies and keeps the one holding the data', function () {
-    $owner   = User::factory()->create();
+    $owner = User::factory()->create();
     $vendors = duplicateVendors($owner, 5);
 
     // The fourth copy is the one that was actually used.
@@ -63,7 +66,7 @@ it('deletes the empty copies and keeps the one holding the data', function () {
 });
 
 it('never deletes a duplicate that has data of its own', function () {
-    $owner   = User::factory()->create();
+    $owner = User::factory()->create();
     $vendors = duplicateVendors($owner, 3);
 
     // Two of the three have real data; neither may be removed, even though only
@@ -102,18 +105,18 @@ it('does not delete a lone vendor even when it is empty', function () {
 });
 
 it('can be told a table does not count as real data', function () {
-    $owner   = User::factory()->create();
+    $owner = User::factory()->create();
     $vendors = duplicateVendors($owner, 3);
 
     // Every vendor gets the same seeded message templates, so without --ignore
     // no duplicate is ever removable.
     foreach ($vendors as $vendor) {
-        App\Models\MessageTemplate::create([
-            'vendor_id'      => $vendor->id,
-            'key'            => 'order_confirmed',
+        MessageTemplate::create([
+            'vendor_id' => $vendor->id,
+            'key' => 'order_confirmed',
             'recipient_type' => 'customer',
-            'channel'        => 'whatsapp',
-            'body'           => 'Default body',
+            'channel' => 'whatsapp',
+            'body' => 'Default body',
         ]);
     }
 
@@ -125,7 +128,7 @@ it('can be told a table does not count as real data', function () {
 
     // With it: the copies carrying nothing but templates go.
     $this->artisan('vendors:cleanup-duplicates', [
-        '--force'  => true,
+        '--force' => true,
         '--ignore' => ['message_templates', 'financial_accounts', 'stores'],
     ])->assertSuccessful();
 
@@ -134,7 +137,7 @@ it('can be told a table does not count as real data', function () {
 });
 
 it('still refuses when an ignored table is not the only thing attached', function () {
-    $owner   = User::factory()->create();
+    $owner = User::factory()->create();
     $vendors = duplicateVendors($owner, 2);
 
     giveVendorAProduct($vendors[0]);
@@ -143,7 +146,7 @@ it('still refuses when an ignored table is not the only thing attached', functio
     giveVendorAProduct($vendors[1]);
 
     $this->artisan('vendors:cleanup-duplicates', [
-        '--force'  => true,
+        '--force' => true,
         '--ignore' => ['message_templates'],
     ])->assertSuccessful();
 
@@ -153,29 +156,29 @@ it('still refuses when an ignored table is not the only thing attached', functio
 it('removes duplicates that have seeded roles with users assigned to them', function () {
     // Reproduces the live failure: role assignments in model_has_roles pointed
     // at the vendor's roles, and tidying those blew up the whole run.
-    $owner   = User::factory()->create();
-    $staff   = User::factory()->create();
+    $owner = User::factory()->create();
+    $staff = User::factory()->create();
     $vendors = duplicateVendors($owner, 3);
 
     giveVendorAProduct($vendors[0]);
 
     foreach ($vendors as $vendor) {
-        App\Services\VendorRoles::seedFor($vendor);
+        VendorRoles::seedFor($vendor);
 
-        $role = Spatie\Permission\Models\Role::where('team_id', $vendor->id)
+        $role = Role::where('team_id', $vendor->id)
             ->where('name', 'storekeeper')
             ->first();
 
         DB::table(config('permission.table_names.model_has_roles'))->insert([
-            'role_id'    => $role->id,
+            'role_id' => $role->id,
             'model_type' => User::class,
-            'model_id'   => $staff->id,
-            'team_id'    => $vendor->id,
+            'model_id' => $staff->id,
+            'team_id' => $vendor->id,
         ]);
     }
 
     $this->artisan('vendors:cleanup-duplicates', [
-        '--force'  => true,
+        '--force' => true,
         '--ignore' => ['message_templates', 'financial_accounts', 'stores'],
     ])->assertSuccessful();
 
@@ -183,5 +186,5 @@ it('removes duplicates that have seeded roles with users assigned to them', func
         ->and(Vendor::first()->id)->toBe($vendors[0]->id);
 
     // The removed vendors leave no role rows behind.
-    expect(Spatie\Permission\Models\Role::whereIn('team_id', [$vendors[1]->id, $vendors[2]->id])->count())->toBe(0);
+    expect(Role::whereIn('team_id', [$vendors[1]->id, $vendors[2]->id])->count())->toBe(0);
 });

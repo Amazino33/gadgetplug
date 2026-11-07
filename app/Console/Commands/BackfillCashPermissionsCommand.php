@@ -53,7 +53,7 @@ class BackfillCashPermissionsCommand extends Command
             ->reject(fn (string $name) => Permission::where('name', $name)->where('guard_name', 'web')->exists());
 
         if ($missing->isNotEmpty()) {
-            $this->error('These permissions do not exist yet: ' . $missing->implode(', '));
+            $this->error('These permissions do not exist yet: '.$missing->implode(', '));
             $this->line('Run the vendor permissions seeder first.');
 
             return self::FAILURE;

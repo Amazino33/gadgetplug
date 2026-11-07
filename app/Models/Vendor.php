@@ -2,11 +2,10 @@
 
 namespace App\Models;
 
+use App\Support\Quantity;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Collection;
-use App\Models\VendorPayout;
-use App\Support\Quantity;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Spatie\Sluggable\HasSlug;
@@ -26,24 +25,51 @@ class Vendor extends Model
         'restock_window_days', 'restock_lead_time_days', 'restock_target_cover_days', 'restock_safety_buffer_days',
         'allow_negative_stock', 'pos_ask_quantity', 'pos_allow_price_change', 'enable_gadget_fields',
         'allow_half_quantities', 'sku_style', 'sku_prefix',
+        // Free plan (self-signup). See FreeShopApplications for who writes these.
+        'plan', 'status', 'category', 'verification_photo', 'social_link',
+        'review_note', 'info_requested', 'applied_at', 'approved_at', 'approved_by',
+    ];
+
+    public const PLAN_FREE = 'free';
+    public const PLAN_PAID = 'paid';
+
+    public const STATUS_PENDING   = 'pending';
+    public const STATUS_APPROVED  = 'approved';
+    public const STATUS_REJECTED  = 'rejected';
+    public const STATUS_SUSPENDED = 'suspended';
+
+    public const FREE_PLAN_NO_TILL        = 'The Sales Point is not part of the free plan.';
+    public const FREE_PLAN_NO_BACK_OFFICE = 'This is not part of the free plan.';
+
+    public const STATUSES = [
+        self::STATUS_PENDING, self::STATUS_APPROVED, self::STATUS_REJECTED, self::STATUS_SUSPENDED,
+    ];
+
+    /** What a free shop picks on the signup form. */
+    public const BUSINESS_CATEGORIES = [
+        'Phones & Tablets', 'Laptops & Computers', 'Accessories', 'Gaming',
+        'Audio & Wearables', 'Smart Home & Electronics', 'Repairs & Parts', 'Other',
     ];
 
     protected $casts = [
-        'pos_min_margin_percent'     => 'decimal:2',
-        'allow_negative_stock'      => 'boolean',
-        'enable_gadget_fields'      => 'boolean',
-        'pos_ask_quantity'          => 'boolean',
-        'pos_allow_price_change'    => 'boolean',
-        'allow_half_quantities'     => 'boolean',
+        'pos_min_margin_percent' => 'decimal:2',
+        'allow_negative_stock' => 'boolean',
+        'enable_gadget_fields' => 'boolean',
+        'pos_ask_quantity' => 'boolean',
+        'pos_allow_price_change' => 'boolean',
+        'allow_half_quantities' => 'boolean',
         'half_quantities_disabled_at' => 'datetime',
-        'online_sales_enabled'      => 'boolean',
-        'dashboard_blocked'         => 'boolean',
-        'dashboard_blocked_at'      => 'datetime',
-        'initial_capital'           => 'decimal:2',
-        'restock_window_days'       => 'integer',
-        'restock_lead_time_days'    => 'integer',
+        'online_sales_enabled' => 'boolean',
+        'dashboard_blocked' => 'boolean',
+        'dashboard_blocked_at' => 'datetime',
+        'initial_capital' => 'decimal:2',
+        'restock_window_days' => 'integer',
+        'restock_lead_time_days' => 'integer',
         'restock_target_cover_days' => 'integer',
         'restock_safety_buffer_days' => 'integer',
+        'info_requested'            => 'boolean',
+        'applied_at'                => 'datetime',
+        'approved_at'               => 'datetime',
     ];
 
     protected static function booted(): void
@@ -152,9 +178,9 @@ class Vendor extends Model
     public function restockSettings(): array
     {
         return [
-            'windowDays'       => $this->restock_window_days ?? 30,
-            'leadTimeDays'     => $this->restock_lead_time_days ?? 5,
-            'targetCoverDays'  => $this->restock_target_cover_days ?? 30,
+            'windowDays' => $this->restock_window_days ?? 30,
+            'leadTimeDays' => $this->restock_lead_time_days ?? 5,
+            'targetCoverDays' => $this->restock_target_cover_days ?? 30,
             'safetyBufferDays' => $this->restock_safety_buffer_days,
         ];
     }
@@ -235,6 +261,64 @@ class Vendor extends Model
         return $this->user_id === $user->id;
     }
 
+    // ── Free plan ──────────────────────────────────────────────────────────
+    //
+    // Everything below only means something when plan = 'free'. A paid vendor
+    // (every vendor that existed before self-signup) is always 'approved' and
+    // none of the free-plan gates look at it.
+
+    public function isFreePlan(): bool
+    {
+        return $this->plan === self::PLAN_FREE;
+    }
+
+    public function hasStatus(string $status): bool
+    {
+        return ($this->status ?? self::STATUS_APPROVED) === $status;
+    }
+
+    /** Pending with an outstanding "please send more info" from the admin. */
+    public function isAwaitingInfo(): bool
+    {
+        return $this->hasStatus(self::STATUS_PENDING) && (bool) $this->info_requested;
+    }
+
+    /** Whether the owner may still edit the application form (and its link). */
+    public function canEditApplication(): bool
+    {
+        return $this->isFreePlan()
+            && ($this->isAwaitingInfo() || $this->hasStatus(self::STATUS_REJECTED));
+    }
+
+    /** "gadgetplug.com.ng/joy-gadgets" — the shop link as the owner reads it. */
+    public function shopLinkLabel(): string
+    {
+        return self::shopLinkPrefix().$this->slug;
+    }
+
+    public function shopLinkUrl(): string
+    {
+        return rtrim((string) config('app.shop_link_base'), '/').'/'.$this->slug;
+    }
+
+    /** "gadgetplug.com.ng/" — the host part of the shop link, for the signup field. */
+    public static function shopLinkPrefix(): string
+    {
+        $host = parse_url((string) config('app.shop_link_base'), PHP_URL_HOST) ?: 'gadgetplug.com.ng';
+
+        return preg_replace('/^www\./', '', $host).'/';
+    }
+
+    public function statusLogs()
+    {
+        return $this->hasMany(VendorStatusLog::class)->latest('id');
+    }
+
+    public function approver()
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
+
     public function canSellOnline(): bool
     {
         return (bool) $this->online_sales_enabled;
@@ -279,7 +363,7 @@ class Vendor extends Model
         return $user->hasRole('super_admin') || $this->isOwner($user);
     }
 
-    public static function getTenantsForUser(\App\Models\User $user): Collection
+    public static function getTenantsForUser(User $user): Collection
     {
         if ($user->hasRole('super_admin')) {
             return static::all();
@@ -297,7 +381,8 @@ class Vendor extends Model
     public function hasOtherApprovers(int $excludeUserId): bool
     {
         $allUsers = collect([$this->user])->merge($this->users);
+
         return $allUsers->where('id', '!=', $excludeUserId)
-                 ->contains(fn (User $user) => $user->hasVendorPermission($this->id, 'approve_procurement'));
+            ->contains(fn (User $user) => $user->hasVendorPermission($this->id, 'approve_procurement'));
     }
 }

@@ -15,24 +15,24 @@ use Livewire\Volt\Volt;
 
 function makeCheckoutProduct(): Product
 {
-    $owner    = User::factory()->create();
-    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Checkout Attribution Store', 'online_sales_enabled' => true]);
+    $owner = User::factory()->create();
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Checkout Attribution Store', 'online_sales_enabled' => true]);
     $category = Category::create(['name' => 'Checkout Attribution Category']);
 
     return Product::create([
-        'vendor_id'       => $vendor->id,
-        'category_id'     => $category->id,
-        'name'            => 'Checkout Attribution Product',
-        'price'           => 5000,
-        'stock_quantity'  => 10,
-        'status'          => 'published',
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'Checkout Attribution Product',
+        'price' => 5000,
+        'stock_quantity' => 10,
+        'status' => 'published',
         'commission_rate' => 10.0,
     ]);
 }
 
 test('a referral code entered at checkout creates a real commission on the resulting order', function () {
     $affiliate = Affiliate::findOrCreateForUser(User::factory()->create());
-    $product   = makeCheckoutProduct();
+    $product = makeCheckoutProduct();
 
     Session::put('cart', [$product->id => ['quantity' => 1]]);
 

@@ -7,6 +7,7 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Models\Vendor;
 use Illuminate\Http\Response;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 
 // /sitemap.xml — every page a search engine should index on the storefront.
@@ -74,7 +75,7 @@ class SitemapController extends Controller
             $line = '  <url><loc>'.htmlspecialchars($loc, ENT_XML1).'</loc>';
 
             if ($lastmod) {
-                $line .= '<lastmod>'.\Illuminate\Support\Carbon::parse($lastmod)->toAtomString().'</lastmod>';
+                $line .= '<lastmod>'.Carbon::parse($lastmod)->toAtomString().'</lastmod>';
             }
 
             return $line.'</url>';

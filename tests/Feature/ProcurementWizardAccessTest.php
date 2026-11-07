@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Category;
 use App\Models\Product;
 use App\Models\Supplier;
 use App\Models\User;
@@ -32,7 +33,7 @@ test('a user with no vendor at all is refused instead of falling back to an arbi
 });
 
 test('a vendor member without manage_procurement cannot open the procurement wizard', function () {
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
 
     $owner = User::factory()->create();
     $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Procurement Test Store']);
@@ -51,7 +52,7 @@ test('a vendor member without manage_procurement cannot open the procurement wiz
 });
 
 test('the vendor owner can open the procurement wizard', function () {
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
 
     $owner = User::factory()->create();
     $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Owner Procurement Store']);
@@ -64,14 +65,14 @@ test('the vendor owner can open the procurement wizard', function () {
 });
 
 test('a role granted manage_procurement can reach the items step and see cost price there', function () {
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
 
     $owner = User::factory()->create();
     $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Manager Procurement Store']);
     VendorRoles::seedFor($vendor);
     $supplier = Supplier::create(['vendor_id' => $vendor->id, 'name' => 'Test Supplier']);
     Product::create([
-        'vendor_id' => $vendor->id, 'category_id' => \App\Models\Category::create(['name' => 'Cat'])->id,
+        'vendor_id' => $vendor->id, 'category_id' => Category::create(['name' => 'Cat'])->id,
         'name' => 'Procured Widget', 'price' => 5000, 'cost_price' => 3000, 'status' => 'published',
     ]);
 
@@ -83,7 +84,7 @@ test('a role granted manage_procurement can reach the items step and see cost pr
     $this->actingAs($manager)
         ->withSession([
             'procurement.supplier_id' => $supplier->id,
-            'procurement.store_id'    => $vendor->defaultStore->id,
+            'procurement.store_id' => $vendor->defaultStore->id,
         ])
         ->get(route('procurement.items'))
         ->assertOk()

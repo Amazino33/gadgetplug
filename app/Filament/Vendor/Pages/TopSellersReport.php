@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Vendor\Pages;
 
 use App\Models\Category;
+use App\Models\Product;
 use App\Services\Reporting\ProductVelocityService;
 use App\Services\Reporting\ReportPeriod;
 use BackedEnum;
@@ -88,7 +89,7 @@ class TopSellersReport extends Page
     {
         $vendorId = filament()->getTenant()->id;
 
-        $categoryIds = \App\Models\Product::where('vendor_id', $vendorId)->distinct()->pluck('category_id');
+        $categoryIds = Product::where('vendor_id', $vendorId)->distinct()->pluck('category_id');
 
         return Category::whereIn('id', $categoryIds)->orderBy('name')->get(['id', 'name']);
     }

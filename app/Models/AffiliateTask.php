@@ -14,12 +14,12 @@ class AffiliateTask extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'auto_target'                   => 'decimal:2',
-        'reward_amount'                 => 'decimal:2',
-        'counts_toward_level'           => 'boolean',
-        'level_progress_value'          => 'decimal:2',
-        'is_active'                     => 'boolean',
-        'points_reward'                 => 'integer',
+        'auto_target' => 'decimal:2',
+        'reward_amount' => 'decimal:2',
+        'counts_toward_level' => 'boolean',
+        'level_progress_value' => 'decimal:2',
+        'is_active' => 'boolean',
+        'points_reward' => 'integer',
     ];
 
     public function scopeDailyShare($query)

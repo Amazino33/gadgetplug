@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services\Export;
 
-use App\Support\Quantity;
 use App\Models\Product;
 use App\Models\Vendor;
 use App\Support\Import\ProductField;
+use App\Support\Quantity;
 use Illuminate\Database\Eloquent\Builder;
 use OpenSpout\Common\Entity\Row;
 use OpenSpout\Writer\CSV\Writer as CsvWriter;
@@ -31,7 +31,7 @@ class ProductExporter
 
     /**
      * @param  array{category_id?: int|null, status?: string|null, low_stock_only?: bool}  $filters
-     * @return string  absolute path to the written file
+     * @return string absolute path to the written file
      */
     public function export(Vendor $vendor, string $format = 'csv', array $filters = [], ?string $path = null): string
     {
@@ -81,33 +81,33 @@ class ProductExporter
             // each priced by hand. "Unit" is the base unit, and stock and
             // Quantity are counted in it.
             $writeRow(collect(ProductField::exportColumns())->map(fn (ProductField $f) => match ($f) {
-                ProductField::Name              => 'Anker 20W USB-C Charger',
+                ProductField::Name => 'Anker 20W USB-C Charger',
                 // Blank: set by GadgetPlug, and ignored on a vendor's import.
-                ProductField::OnlineName        => '',
-                ProductField::MetaDescription   => '',
-                ProductField::Sku               => 'ANK-20W-01',
-                ProductField::Barcode           => '6009880123456',
-                ProductField::Category          => 'Chargers',
-                ProductField::Brand             => 'Anker',
-                ProductField::Description       => 'Fast charger with USB-C output',
-                ProductField::MeasurementUnit   => 'pcs',
-                ProductField::CostPrice         => '7500',
-                ProductField::Price             => '11000',
-                ProductField::Supplier          => 'Lagos Electronics Ltd',
-                ProductField::ReorderPoint      => '10',
+                ProductField::OnlineName => '',
+                ProductField::MetaDescription => '',
+                ProductField::Sku => 'ANK-20W-01',
+                ProductField::Barcode => '6009880123456',
+                ProductField::Category => 'Chargers',
+                ProductField::Brand => 'Anker',
+                ProductField::Description => 'Fast charger with USB-C output',
+                ProductField::MeasurementUnit => 'pcs',
+                ProductField::CostPrice => '7500',
+                ProductField::Price => '11000',
+                ProductField::Supplier => 'Lagos Electronics Ltd',
+                ProductField::ReorderPoint => '10',
                 ProductField::PreferredQuantity => '50',
                 ProductField::LowStockThreshold => '5',
-                ProductField::IsService         => 'No',
-                ProductField::Status            => 'Yes',
-                ProductField::ShowOnline        => 'Yes',
-                ProductField::ShowInPos         => 'Yes',
+                ProductField::IsService => 'No',
+                ProductField::Status => 'Yes',
+                ProductField::ShowOnline => 'Yes',
+                ProductField::ShowInPos => 'Yes',
                 // Opening stock for a new product, in base units (chargers).
                 // Blank here so the example adds nothing to a real shelf.
-                ProductField::Quantity          => '',
-                ProductField::Unit2Name         => 'Pack of 10',
-                ProductField::Unit2Contains     => '10',
-                ProductField::Unit2Price        => '105000',
-                default                         => '',
+                ProductField::Quantity => '',
+                ProductField::Unit2Name => 'Pack of 10',
+                ProductField::Unit2Contains => '10',
+                ProductField::Unit2Price => '105000',
+                default => '',
             })->all());
         });
 
@@ -129,23 +129,23 @@ class ProductExporter
             ProductField::Supplier => (string) ($product->supplier?->name ?? ''),
             // Written as words rather than 1/0 so the file reads plainly in
             // Excel, and read back by RowParser which accepts both.
-            ProductField::IsService  => $this->yesNo($product->is_service),
+            ProductField::IsService => $this->yesNo($product->is_service),
             ProductField::ShowOnline => $this->yesNo($product->show_online),
-            ProductField::ShowInPos  => $this->yesNo($product->show_in_pos),
-            ProductField::Status     => (string) $product->status,
+            ProductField::ShowInPos => $this->yesNo($product->show_in_pos),
+            ProductField::Status => (string) $product->status,
             // Blank, not "0", when there is no cost. Zero is a claim about the
             // margin; blank is the truth that nobody has entered one.
-            ProductField::CostPrice  => $product->cost_price === null ? '' : (string) $product->cost_price,
-            ProductField::Quantity   => (string) $product->stock_quantity,
+            ProductField::CostPrice => $product->cost_price === null ? '' : (string) $product->cost_price,
+            ProductField::Quantity => (string) $product->stock_quantity,
             // The base unit - the form's base_unit is the source of truth now.
             // The old measurement_unit fills in only for a product that never
             // had a base unit chosen (still the "Piece" default).
             ProductField::MeasurementUnit => (string) (($product->base_unit && $product->base_unit !== 'Piece')
                 ? $product->base_unit
                 : ($product->measurement_unit ?: '')),
-            ProductField::WholesalePrice  => $product->wholesale_price === null ? '' : (string) $product->wholesale_price,
-            ProductField::AltBarcode      => (string) ($this->altBarcode($product) ?? ''),
-            default                  => $field->unitSlot() !== null
+            ProductField::WholesalePrice => $product->wholesale_price === null ? '' : (string) $product->wholesale_price,
+            ProductField::AltBarcode => (string) ($this->altBarcode($product) ?? ''),
+            default => $field->unitSlot() !== null
                 ? $this->unitCell($product, $field)
                 : (string) ($product->{$field->value} ?? ''),
         };
@@ -175,12 +175,12 @@ class ProductExporter
         $parts = ProductField::unitFields($field->unitSlot());
 
         return match ($field) {
-            $parts['name']      => (string) $unit->name,
-            $parts['contains']  => (string) $unit->conversion_factor,
-            $parts['price']     => (string) $unit->price,
+            $parts['name'] => (string) $unit->name,
+            $parts['contains'] => (string) $unit->conversion_factor,
+            $parts['price'] => (string) $unit->price,
             $parts['wholesale'] => $unit->wholesale_price === null ? '' : (string) $unit->wholesale_price,
-            $parts['barcode']   => (string) ($product->barcodes->firstWhere('product_unit_id', $unit->id)?->barcode ?? ''),
-            default             => '',
+            $parts['barcode'] => (string) ($product->barcodes->firstWhere('product_unit_id', $unit->id)?->barcode ?? ''),
+            default => '',
         };
     }
 
@@ -206,7 +206,7 @@ class ProductExporter
     /** @param  callable(callable(array<int, string>): void): void  $emit */
     private function write(string $path, string $format, callable $emit): void
     {
-        $writer = $format === 'xlsx' ? new XlsxWriter() : new CsvWriter();
+        $writer = $format === 'xlsx' ? new XlsxWriter : new CsvWriter;
         $writer->openToFile($path);
 
         try {

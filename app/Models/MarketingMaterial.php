@@ -20,7 +20,7 @@ class MarketingMaterial extends Model implements HasMedia
     protected $guarded = [];
 
     protected $casts = [
-        'is_active'  => 'boolean',
+        'is_active' => 'boolean',
         'sort_order' => 'integer',
     ];
 

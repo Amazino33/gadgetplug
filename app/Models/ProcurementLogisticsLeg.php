@@ -11,7 +11,7 @@ class ProcurementLogisticsLeg extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'amount'    => 'decimal:2',
+        'amount' => 'decimal:2',
         'posted_at' => 'datetime',
     ];
 

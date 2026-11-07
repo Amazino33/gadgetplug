@@ -18,6 +18,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Session;
+use Livewire\Features\SupportTesting\Testable;
 use Livewire\Volt\Volt;
 
 uses(RefreshDatabase::class);
@@ -31,17 +32,17 @@ const SPLIT_PAYSTACK_SECRET = 'sk_test_split_secret';
 function splitProduct(Vendor $vendor, float $price, int $stock = 10, string $name = ''): Product
 {
     return ProductFactory::new()->withPhoto()->create([
-        'vendor_id'      => $vendor->id,
-        'store_id'       => $vendor->defaultStore->id,
-        'name'           => $name ?: 'Split Product '.uniqid(),
-        'price'          => $price,
-        'cost_price'     => $price * 0.6,
+        'vendor_id' => $vendor->id,
+        'store_id' => $vendor->defaultStore->id,
+        'name' => $name ?: 'Split Product '.uniqid(),
+        'price' => $price,
+        'cost_price' => $price * 0.6,
         'stock_quantity' => $stock,
     ]);
 }
 
 /** @param array<int, array{0: Product, 1: int}> $lines */
-function splitCheckoutForm(array $lines, string $method = 'pay_on_delivery'): \Livewire\Features\SupportTesting\Testable
+function splitCheckoutForm(array $lines, string $method = 'pay_on_delivery'): Testable
 {
     Session::forget('payment_success');
     Session::put('cart', collect($lines)->mapWithKeys(fn ($l) => [$l[0]->id => ['quantity' => $l[1], 'max' => 10]])->all());
@@ -61,8 +62,8 @@ function twoVendorBasket(): array
     $b = Vendor::factory()->onlineSalesEnabled()->create(['name' => 'Beta Phones']);
 
     return [
-        'a'  => $a,
-        'b'  => $b,
+        'a' => $a,
+        'b' => $b,
         'a1' => splitProduct($a, 10000),
         'a2' => splitProduct($a, 2500),
         'b1' => splitProduct($b, 40000),
@@ -74,11 +75,11 @@ function paystackVerifies(Checkout $checkout, ?int $kobo = null): void
     Http::fake([
         'api.paystack.co/transaction/verify/*' => Http::response([
             'status' => true,
-            'data'   => [
-                'status'    => 'success',
+            'data' => [
+                'status' => 'success',
                 'reference' => $checkout->reference,
-                'amount'    => $kobo ?? (int) round((float) $checkout->grand_total * 100),
-                'currency'  => 'NGN',
+                'amount' => $kobo ?? (int) round((float) $checkout->grand_total * 100),
+                'currency' => 'NGN',
             ],
         ]),
     ]);

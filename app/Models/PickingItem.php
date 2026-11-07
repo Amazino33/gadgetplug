@@ -19,7 +19,7 @@ class PickingItem extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'quantity'  => AsQuantity::class,
+        'quantity' => AsQuantity::class,
         'unit_cost' => 'decimal:2',
     ];
 

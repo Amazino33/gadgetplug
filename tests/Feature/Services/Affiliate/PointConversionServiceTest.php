@@ -19,9 +19,9 @@ function conversionAffiliate(int $points = 0): Affiliate
 
     if ($points !== 0) {
         $affiliate->plugPointTransactions()->create([
-            'type'        => 'credit',
-            'points'      => $points,
-            'source'      => 'adjustment',
+            'type' => 'credit',
+            'points' => $points,
+            'source' => 'adjustment',
             'description' => 'Test seed',
         ]);
     }
@@ -86,9 +86,9 @@ test('a repeated conversion with the same idempotency key spends the points once
     AffiliateSetting::current()->update(['naira_per_point' => 1.0, 'min_points_conversion' => 10]);
 
     $affiliate = conversionAffiliate(1000);
-    $service   = app(PointConversionService::class);
+    $service = app(PointConversionService::class);
 
-    $first  = $service->convert($affiliate, 200, 'double-click');
+    $first = $service->convert($affiliate, 200, 'double-click');
     $second = $service->convert($affiliate, 200, 'double-click');
 
     expect($second->id)->toBe($first->id)
@@ -101,7 +101,7 @@ test('two different conversions both land, each with its own key', function () {
     AffiliateSetting::current()->update(['naira_per_point' => 1.0, 'min_points_conversion' => 10]);
 
     $affiliate = conversionAffiliate(1000);
-    $service   = app(PointConversionService::class);
+    $service = app(PointConversionService::class);
 
     $service->convert($affiliate, 200, 'key-a');
     $service->convert($affiliate, 300, 'key-b');

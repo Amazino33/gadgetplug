@@ -22,14 +22,14 @@ function linkContext(): array
     $category = Category::firstOrCreate(['name' => 'Chargers']);
 
     $products = collect(range(1, 3))->map(fn (int $i) => Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'name'           => "Product {$i}",
-        'slug'           => "product-{$i}",
-        'price'          => 1000,
-        'cost_price'     => 500,
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => "Product {$i}",
+        'slug' => "product-{$i}",
+        'price' => 1000,
+        'cost_price' => 500,
         'stock_quantity' => 10,
-        'status'         => 'published',
+        'status' => 'published',
     ]));
 
     return compact('owner', 'staff', 'vendor', 'products');
@@ -38,24 +38,24 @@ function linkContext(): array
 function historicSession(array $c, $products, $submittedAt): BlindCountSession
 {
     return BlindCountSession::create([
-        'vendor_id'        => $c['vendor']->id,
+        'vendor_id' => $c['vendor']->id,
         'storekeeper_a_id' => $c['staff']->id,
-        'status'           => 'completed',
-        'frequency'        => 'daily',
-        'product_order'    => $products->pluck('id')->all(),
-        'a_submitted_at'   => $submittedAt,
-        'b_submitted_at'   => $submittedAt,
+        'status' => 'completed',
+        'frequency' => 'daily',
+        'product_order' => $products->pluck('id')->all(),
+        'a_submitted_at' => $submittedAt,
+        'b_submitted_at' => $submittedAt,
     ]);
 }
 
 function historicLine(array $c, Product $product, $createdAt): AuditSession
 {
     $line = AuditSession::create([
-        'vendor_id'        => $c['vendor']->id,
-        'product_id'       => $product->id,
+        'vendor_id' => $c['vendor']->id,
+        'product_id' => $product->id,
         'storekeeper_a_id' => $c['staff']->id,
-        'count_a'          => 9,
-        'status'           => 'verified',
+        'count_a' => 9,
+        'status' => 'verified',
     ]);
 
     // created_at is not fillable; the real rows were written by the counting flow.
@@ -109,7 +109,7 @@ it('refuses a line that two counts could both claim', function () {
     $at = now()->subDays(3);
 
     // Two counts by the same person minutes apart, both covering the product.
-    $first  = historicSession($c, $c['products'], $at);
+    $first = historicSession($c, $c['products'], $at);
     $second = historicSession($c, $c['products'], $at->copy()->addMinutes(2));
 
     historicLine($c, $c['products'][0], $at->copy()->addSeconds(30));

@@ -18,21 +18,21 @@ function poVendor(): Vendor
 {
     return Vendor::create([
         'user_id' => User::factory()->create()->id,
-        'name'    => 'PO Vendor '.uniqid(),
+        'name' => 'PO Vendor '.uniqid(),
     ]);
 }
 
 function poProduct(Vendor $vendor, string $name, Store $home, int $quantity = 0): Product
 {
     $product = Product::create([
-        'vendor_id'      => $vendor->id,
-        'store_id'       => $home->id,
-        'category_id'    => Category::create(['name' => 'Cat '.uniqid()])->id,
-        'name'           => $name,
-        'price'          => 1000,
-        'cost_price'     => 500,
+        'vendor_id' => $vendor->id,
+        'store_id' => $home->id,
+        'category_id' => Category::create(['name' => 'Cat '.uniqid()])->id,
+        'name' => $name,
+        'price' => 1000,
+        'cost_price' => 500,
         'stock_quantity' => 0,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
     if ($quantity > 0) {
@@ -50,19 +50,19 @@ function poFor(Vendor $vendor, ?Store $destination, array $items): Procurement
     $supplier = Supplier::create(['vendor_id' => $vendor->id, 'name' => 'S '.uniqid()]);
 
     $procurement = Procurement::create([
-        'vendor_id'   => $vendor->id,
-        'store_id'    => $destination?->id,
+        'vendor_id' => $vendor->id,
+        'store_id' => $destination?->id,
         'supplier_id' => $supplier->id,
-        'reference'   => 'PO-'.uniqid(),
-        'status'      => 'pending',
-        'created_by'  => $vendor->user_id,
+        'reference' => 'PO-'.uniqid(),
+        'status' => 'pending',
+        'created_by' => $vendor->user_id,
     ]);
 
     foreach ($items as [$product, $quantity]) {
         $procurement->items()->create([
-            'product_id'    => $product->id,
-            'quantity'      => $quantity,
-            'unit_cost'     => 500,
+            'product_id' => $product->id,
+            'quantity' => $quantity,
+            'unit_cost' => 500,
             'selling_price' => 1000,
         ]);
     }
@@ -114,7 +114,7 @@ test('an item stocked at another branch is refused, and the whole order rolls ba
     $vendor = poVendor();
     $branch = Store::create(['vendor_id' => $vendor->id, 'name' => 'Uyo Branch']);
 
-    $stocked  = poProduct($vendor, 'JBL Speaker', $vendor->defaultStore, 6);
+    $stocked = poProduct($vendor, 'JBL Speaker', $vendor->defaultStore, 6);
     $received = poProduct($vendor, 'Fine To Receive', $branch, 0);
     $procurement = poFor($vendor, $branch, [[$received, 4], [$stocked, 3]]);
 

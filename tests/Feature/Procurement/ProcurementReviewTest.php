@@ -3,6 +3,7 @@
 use App\Models\Procurement;
 use App\Models\ProcurementItemCorrection;
 use App\Models\StockCostLayer;
+use App\Models\Store;
 use App\Services\Procurement\ProcurementReview;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\UnauthorizedException;
@@ -384,7 +385,7 @@ test('somebody who may not receive at that branch is refused', function () {
 
     // A second branch is what makes the branch rule bite at all — a one-branch
     // shop has no branches to keep apart.
-    $other = App\Models\Store::create(['vendor_id' => $ctx['vendor']->id, 'name' => 'Uyo Branch']);
+    $other = Store::create(['vendor_id' => $ctx['vendor']->id, 'name' => 'Uyo Branch']);
 
     $product = reviewProduct($ctx, 'Branch Stock', $other);
     $delivery = reviewDelivery($ctx, [[$product, 12, 5000]], $other);

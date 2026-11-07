@@ -1,12 +1,16 @@
 <?php
 
 use App\Models\Category;
+use App\Models\Checkout;
 use App\Models\Order;
 use App\Models\Product;
 use App\Models\User;
 use App\Models\Vendor;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Session;
+use Livewire\Features\SupportTesting\Testable;
 use Livewire\Volt\Volt;
 
 uses(RefreshDatabase::class);
@@ -17,25 +21,25 @@ uses(RefreshDatabase::class);
 
 function duplicateGuardProduct(int $stock = 10): Product
 {
-    $owner    = User::factory()->create();
-    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Duplicate Guard Store', 'online_sales_enabled' => true]);
+    $owner = User::factory()->create();
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Duplicate Guard Store', 'online_sales_enabled' => true]);
     $category = Category::create(['name' => 'Duplicate Guard Category']);
 
     return Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'name'           => 'Duplicate Guard Product',
-        'price'          => 6500,
-        'cost_price'     => 4000,
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'Duplicate Guard Product',
+        'price' => 6500,
+        'cost_price' => 4000,
         'stock_quantity' => $stock,
         'reserved_stock' => 0,
-        'status'         => 'published',
-        'show_online'    => true,
+        'status' => 'published',
+        'show_online' => true,
     ]);
 }
 
 /** A checkout filled in and ready to submit, exactly as the form would be. */
-function readyCheckout(Product $product, int $quantity = 1): \Livewire\Features\SupportTesting\Testable
+function readyCheckout(Product $product, int $quantity = 1): Testable
 {
     // A completed checkout leaves this behind for the confirmation screen. A
     // real customer's next visit consumes it on render; a fresh component in
@@ -108,20 +112,20 @@ test('every checkout carries a key, so the database itself can refuse a second o
 
     readyCheckout($product)->call('processCheckout');
 
-    $checkout = App\Models\Checkout::firstOrFail();
+    $checkout = Checkout::firstOrFail();
 
     expect($checkout->idempotency_key)->not->toBeNull()
         // The unique index is the backstop for two genuinely concurrent
         // requests, which the pre-check alone would race.
-        ->and(fn () => App\Models\Checkout::create([
-            'reference'        => 'GP-SECONDONE',
-            'idempotency_key'  => $checkout->idempotency_key,
-            'customer_name'    => 'Someone Else',
-            'customer_email'   => 'other@example.com',
-            'customer_phone'   => '08000000000',
+        ->and(fn () => Checkout::create([
+            'reference' => 'GP-SECONDONE',
+            'idempotency_key' => $checkout->idempotency_key,
+            'customer_name' => 'Someone Else',
+            'customer_email' => 'other@example.com',
+            'customer_phone' => '08000000000',
             'shipping_address' => 'Uyo',
-            'payment_method'   => 'pay_on_delivery',
-        ]))->toThrow(Illuminate\Database\QueryException::class);
+            'payment_method' => 'pay_on_delivery',
+        ]))->toThrow(QueryException::class);
 });
 
 test('a different basket is a different checkout and gets its own order', function () {
@@ -152,7 +156,7 @@ test('two taps either side of a window boundary are still one order', function (
 
     // Pin the clock one second before a 120-second window rolls over, so the
     // second submission computes a different window number than the first.
-    $boundary = Illuminate\Support\Carbon::createFromTimestamp(
+    $boundary = Carbon::createFromTimestamp(
         (intdiv(now()->getTimestamp(), 120) + 1) * 120 - 1
     );
     $this->travelTo($boundary);

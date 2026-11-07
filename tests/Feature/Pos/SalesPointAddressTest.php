@@ -15,7 +15,7 @@ function salesPointVendor(): Vendor
 {
     return Vendor::create([
         'user_id' => User::factory()->create()->id,
-        'name'    => 'Zeelink Tech '.uniqid(),
+        'name' => 'Zeelink Tech '.uniqid(),
     ]);
 }
 

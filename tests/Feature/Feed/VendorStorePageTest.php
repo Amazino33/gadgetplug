@@ -2,10 +2,11 @@
 
 use App\Models\Category;
 use App\Models\Product;
-use Database\Factories\ProductFactory;
 use App\Models\User;
 use App\Models\Vendor;
 use App\Models\Wishlist;
+use App\Services\Feed\FeedQuery;
+use Database\Factories\ProductFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Livewire\Volt\Volt;
@@ -15,8 +16,8 @@ uses(RefreshDatabase::class);
 function storePageVendor(bool $online = true): Vendor
 {
     return Vendor::create([
-        'user_id'              => User::factory()->create()->id,
-        'name'                 => 'Store Page Shop '.uniqid(),
+        'user_id' => User::factory()->create()->id,
+        'name' => 'Store Page Shop '.uniqid(),
         'online_sales_enabled' => $online,
     ]);
 }
@@ -24,15 +25,15 @@ function storePageVendor(bool $online = true): Vendor
 function storePageProduct(Vendor $vendor, array $over = []): Product
 {
     return ProductFactory::new()->withPhoto()->create(array_merge([
-        'vendor_id'      => $vendor->id,
-        'store_id'       => $vendor->defaultStore->id,
-        'category_id'    => Category::firstOrCreate(['name' => 'Store Page Cat'])->id,
-        'name'           => 'Shelf Item '.Str::random(6),
-        'price'          => 12000,
+        'vendor_id' => $vendor->id,
+        'store_id' => $vendor->defaultStore->id,
+        'category_id' => Category::firstOrCreate(['name' => 'Store Page Cat'])->id,
+        'name' => 'Shelf Item '.Str::random(6),
+        'price' => 12000,
         'stock_quantity' => 4,
-        'status'         => 'published',
-        'published_at'   => now(),
-        'show_online'    => true,
+        'status' => 'published',
+        'published_at' => now(),
+        'show_online' => true,
     ], $over));
 }
 
@@ -169,7 +170,7 @@ describe('the feed links here', function () {
         $vendor = storePageVendor();
         storePageProduct($vendor);
 
-        $post = app(App\Services\Feed\FeedQuery::class)
+        $post = app(FeedQuery::class)
             ->page(0, null, null, null, 5)['posts']->first();
 
         expect($post['store']['url'])->toBe(route('store.show', $vendor->slug));

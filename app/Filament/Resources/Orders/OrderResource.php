@@ -37,9 +37,11 @@ class OrderResource extends Resource
 {
     protected static ?string $model = Order::class;
 
-    protected static string|BackedEnum|null $navigationIcon  = Heroicon::OutlinedShoppingBag;
-    protected static ?string                $navigationLabel = 'Orders';
-    protected static ?int                   $navigationSort  = 3;
+    protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedShoppingBag;
+
+    protected static ?string $navigationLabel = 'Orders';
+
+    protected static ?int $navigationSort = 3;
 
     public static function getNavigationGroup(): ?string
     {
@@ -55,11 +57,30 @@ class OrderResource extends Resource
 
     // Shield's View:Order permissions are vendor-side; dispatch access is the
     // gate here, for the list and the order page alike.
-    public static function canViewAny(): bool    { return static::canAccess(); }
-    public static function canView(Model $record): bool { return static::canAccess(); }
-    public static function canCreate(): bool   { return false; }
-    public static function canEdit($r): bool   { return false; }
-    public static function canDelete($r): bool { return false; }
+    public static function canViewAny(): bool
+    {
+        return static::canAccess();
+    }
+
+    public static function canView(Model $record): bool
+    {
+        return static::canAccess();
+    }
+
+    public static function canCreate(): bool
+    {
+        return false;
+    }
+
+    public static function canEdit($r): bool
+    {
+        return false;
+    }
+
+    public static function canDelete($r): bool
+    {
+        return false;
+    }
 
     public static function getEloquentQuery(): Builder
     {
@@ -225,9 +246,9 @@ class OrderResource extends Resource
                 SelectFilter::make('payment_method')
                     ->label('Payment')
                     ->options([
-                        'paystack'        => 'Paystack',
+                        'paystack' => 'Paystack',
                         'pay_on_delivery' => 'Pay on Delivery',
-                        'wallet'          => 'Reseller (Wallet)',
+                        'wallet' => 'Reseller (Wallet)',
                     ]),
 
                 SelectFilter::make('logistics_company_id')
@@ -254,7 +275,7 @@ class OrderResource extends Resource
     {
         return [
             'index' => Pages\ListOrders::route('/'),
-            'view'  => Pages\ViewOrder::route('/{record}'),
+            'view' => Pages\ViewOrder::route('/{record}'),
         ];
     }
 }

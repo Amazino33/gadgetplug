@@ -2,17 +2,16 @@
 
 namespace App\Filament\Resources\VendorApplications\Tables;
 
+use App\Models\Vendor;
 use App\Models\VendorApplication;
 use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
-use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
-use App\Models\Vendor;
 use Illuminate\Support\Facades\DB;
 
 class VendorApplicationsTable
@@ -24,7 +23,7 @@ class VendorApplicationsTable
                 TextColumn::make('user.name')
                     ->label('Applicant')
                     ->searchable()
-                    ->description(fn(VendorApplication $r) => $r->user->email ?? ''),
+                    ->description(fn (VendorApplication $r) => $r->user->email ?? ''),
 
                 TextColumn::make('store_name')
                     ->label('Store Name')
@@ -42,11 +41,11 @@ class VendorApplicationsTable
 
                 TextColumn::make('status')
                     ->badge()
-                    ->color(fn($state) => match($state) {
-                        'pending'  => 'warning',
+                    ->color(fn ($state) => match ($state) {
+                        'pending' => 'warning',
                         'approved' => 'success',
                         'rejected' => 'danger',
-                        default    => 'gray',
+                        default => 'gray',
                     }),
 
                 TextColumn::make('created_at')
@@ -58,7 +57,7 @@ class VendorApplicationsTable
             ->filters([
                 SelectFilter::make('status')
                     ->options([
-                        'pending'  => 'Pending',
+                        'pending' => 'Pending',
                         'approved' => 'Approved',
                         'rejected' => 'Rejected',
                     ]),
@@ -89,8 +88,8 @@ class VendorApplicationsTable
 
                             // Slug is auto-generated uniquely by spatie/laravel-sluggable
                             $vendor = Vendor::create([
-                                'user_id'     => $locked->user_id,
-                                'name'        => $locked->store_name,
+                                'user_id' => $locked->user_id,
+                                'name' => $locked->store_name,
                                 'is_verified' => true,
                             ]);
 
@@ -104,7 +103,7 @@ class VendorApplicationsTable
 
                             // Mark application approved
                             $locked->update([
-                                'status'      => 'approved',
+                                'status' => 'approved',
                                 'admin_notes' => $data['admin_notes'] ?? null,
                             ]);
 
@@ -124,12 +123,12 @@ class VendorApplicationsTable
                         $panelUrl = route('filament.vendor.home', ['tenant' => $vendor->slug]);
 
                         Notification::make()
-                            ->title('Application approved — ' . $record->store_name)
-                            ->body('Vendor panel: ' . $panelUrl)
+                            ->title('Application approved — '.$record->store_name)
+                            ->body('Vendor panel: '.$panelUrl)
                             ->success()
                             ->send();
                     })
-                    ->visible(fn(VendorApplication $r) => $r->status === 'pending'),
+                    ->visible(fn (VendorApplication $r) => $r->status === 'pending'),
 
                 Action::make('reject')
                     ->label('Reject')
@@ -143,7 +142,7 @@ class VendorApplicationsTable
                     ])
                     ->action(function (VendorApplication $record, array $data): void {
                         $record->update([
-                            'status'      => 'rejected',
+                            'status' => 'rejected',
                             'admin_notes' => $data['admin_notes'],
                         ]);
 
@@ -152,7 +151,7 @@ class VendorApplicationsTable
                             ->warning()
                             ->send();
                     })
-                    ->visible(fn(VendorApplication $r) => $r->status === 'pending'),
+                    ->visible(fn (VendorApplication $r) => $r->status === 'pending'),
             ]);
     }
 }

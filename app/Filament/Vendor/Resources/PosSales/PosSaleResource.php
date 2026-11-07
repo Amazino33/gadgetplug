@@ -2,11 +2,16 @@
 
 namespace App\Filament\Vendor\Resources\PosSales;
 
+use App\Actions\Finance\RecognizePosSaleRevenueAction;
+use App\Actions\Inventory\AdjustStockAction;
+use App\Actions\Pos\RecordSaleReversalAction;
 use App\Actions\Pos\ReverseCustomerDebtAction;
+use App\Models\PosCustomer;
 use App\Models\PosSale;
 use App\Services\ActiveStore;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Textarea;
 use Filament\Resources\Resource;
 use Filament\Tables\Columns\Summarizers\Sum;
 use Filament\Tables\Columns\TextColumn;
@@ -14,6 +19,8 @@ use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use UnitEnum;
 
 // Read-only — the actual voiding/return workflow lives in the POS app itself,
@@ -26,20 +33,23 @@ class PosSaleResource extends Resource
 
     protected static ?string $tenantOwnershipRelationshipName = 'vendor';
 
-    protected static string|null|\BackedEnum $navigationIcon  = 'heroicon-o-receipt-percent';
-    protected static string|null|UnitEnum   $navigationGroup = 'Sales Point';
-    protected static ?string                $navigationLabel = 'Shop Sales';
+    protected static string|null|\BackedEnum $navigationIcon = 'heroicon-o-receipt-percent';
+
+    protected static string|null|UnitEnum $navigationGroup = 'Sales Point';
+
+    protected static ?string $navigationLabel = 'Shop Sales';
 
     // Named for people rather than the class: in Nigeria "POS" is the card
     // machine, so a page headed "Pos Sales" read as card payments only.
-    protected static ?string                $modelLabel = 'shop sale';
+    protected static ?string $modelLabel = 'shop sale';
 
-    protected static ?string                $pluralModelLabel = 'shop sales';
+    protected static ?string $pluralModelLabel = 'shop sales';
+
     protected static ?int $navigationSort = 2;
 
     public static function canAccess(): bool
     {
-        $user   = auth()->user();
+        $user = auth()->user();
         $vendor = filament()->getTenant();
 
         return $vendor && (
@@ -49,9 +59,20 @@ class PosSaleResource extends Resource
         );
     }
 
-    public static function canCreate(): bool   { return false; }
-    public static function canEdit($record): bool   { return false; }
-    public static function canDelete($record): bool { return false; }
+    public static function canCreate(): bool
+    {
+        return false;
+    }
+
+    public static function canEdit($record): bool
+    {
+        return false;
+    }
+
+    public static function canDelete($record): bool
+    {
+        return false;
+    }
 
     public static function getEloquentQuery(): Builder
     {
@@ -93,27 +114,27 @@ class PosSaleResource extends Resource
                     ->label('Payment')
                     ->badge()
                     ->formatStateUsing(fn ($state) => match ($state) {
-                        'cash'          => 'Cash',
-                        'card'          => 'Card',
+                        'cash' => 'Cash',
+                        'card' => 'Card',
                         'bank_transfer' => 'Bank Transfer',
-                        'split'         => 'Split',
-                        default         => ucfirst($state),
+                        'split' => 'Split',
+                        default => ucfirst($state),
                     }),
 
                 TextColumn::make('status')
                     ->badge()
                     ->formatStateUsing(fn ($state) => match ($state) {
-                        'completed'      => 'Completed',
-                        'voided'         => 'Voided',
-                        'refunded'       => 'Refunded',
+                        'completed' => 'Completed',
+                        'voided' => 'Voided',
+                        'refunded' => 'Refunded',
                         'partial_refund' => 'Partial Refund',
-                        default          => ucfirst($state),
+                        default => ucfirst($state),
                     })
                     ->color(fn ($state) => match ($state) {
-                        'completed'                       => 'success',
-                        'voided'                          => 'danger',
-                        'refunded', 'partial_refund'      => 'warning',
-                        default                           => 'gray',
+                        'completed' => 'success',
+                        'voided' => 'danger',
+                        'refunded', 'partial_refund' => 'warning',
+                        default => 'gray',
                     }),
 
                 // Summed over exactly the rows on screen, so the figure always
@@ -143,7 +164,7 @@ class PosSaleResource extends Resource
                     ->modalHeading('Void Shop Sale')
                     ->modalDescription('Are you sure you want to void this sale? The stock will be returned to inventory and revenue will be reversed. This cannot be undone.')
                     ->form([
-                        \Filament\Forms\Components\Textarea::make('reason')
+                        Textarea::make('reason')
                             ->label('Reason for voiding')
                             ->required()
                             ->maxLength(255)
@@ -156,9 +177,9 @@ class PosSaleResource extends Resource
                     )))
                     ->action(function (PosSale $record, array $data) {
                         $user = auth()->user();
-                        $adjustStock = app(\App\Actions\Inventory\AdjustStockAction::class);
-                        $revenue = app(\App\Actions\Finance\RecognizePosSaleRevenueAction::class);
-                        \Illuminate\Support\Facades\DB::transaction(function () use ($record, $data, $adjustStock, $revenue, $user) {
+                        $adjustStock = app(AdjustStockAction::class);
+                        $revenue = app(RecognizePosSaleRevenueAction::class);
+                        DB::transaction(function () use ($record, $data, $adjustStock, $revenue, $user) {
                             // Ordered by product id, as the sale is: these row
                             // locks can otherwise deadlock against a concurrent
                             // till, and voiding a run of duplicates is exactly
@@ -180,9 +201,9 @@ class PosSaleResource extends Resource
                             // Written before stock and revenue are answered for,
                             // so the record of who withdrew this sale survives
                             // even if a later step here fails.
-                            app(\App\Actions\Pos\RecordSaleReversalAction::class)->void(
-                                sale:   $record,
-                                actor:  $user,
+                            app(RecordSaleReversalAction::class)->void(
+                                sale: $record,
+                                actor: $user,
                                 reason: $data['reason'],
                             );
 
@@ -201,11 +222,11 @@ class PosSaleResource extends Resource
                                 ->log("Voided sale {$record->reference}. Reason: {$data['reason']}");
 
                             if ($record->customer_id) {
-                                \App\Models\PosCustomer::where('id', $record->customer_id)->decrement('total_spent', $record->total);
-                                \App\Models\PosCustomer::where('id', $record->customer_id)->decrement('total_transactions');
+                                PosCustomer::where('id', $record->customer_id)->decrement('total_spent', $record->total);
+                                PosCustomer::where('id', $record->customer_id)->decrement('total_transactions');
                             }
                         });
-                    })
+                    }),
             ])
             ->filters([
                 // Daily is the question this page is actually asked, so both
@@ -224,14 +245,14 @@ class PosSaleResource extends Resource
                             $data['from'] ?? null,
                             fn (Builder $q, $date) => $q->whereRaw(
                                 'COALESCE(pos_sales.completed_at, pos_sales.created_at) >= ?',
-                                [\Illuminate\Support\Carbon::parse($date)->startOfDay()],
+                                [Carbon::parse($date)->startOfDay()],
                             ),
                         )
                         ->when(
                             $data['until'] ?? null,
                             fn (Builder $q, $date) => $q->whereRaw(
                                 'COALESCE(pos_sales.completed_at, pos_sales.created_at) <= ?',
-                                [\Illuminate\Support\Carbon::parse($date)->endOfDay()],
+                                [Carbon::parse($date)->endOfDay()],
                             ),
                         ))
                     ->indicateUsing(function (array $data): ?string {
@@ -243,30 +264,30 @@ class PosSaleResource extends Resource
                         }
 
                         if ($from && $until && $from === $until) {
-                            return \Illuminate\Support\Carbon::parse($from)->isToday()
+                            return Carbon::parse($from)->isToday()
                                 ? 'Today'
-                                : \Illuminate\Support\Carbon::parse($from)->format('d M Y');
+                                : Carbon::parse($from)->format('d M Y');
                         }
 
-                        return trim(($from ? \Illuminate\Support\Carbon::parse($from)->format('d M Y') : '…')
+                        return trim(($from ? Carbon::parse($from)->format('d M Y') : '…')
                             .' — '
-                            .($until ? \Illuminate\Support\Carbon::parse($until)->format('d M Y') : '…'));
+                            .($until ? Carbon::parse($until)->format('d M Y') : '…'));
                     }),
 
                 SelectFilter::make('status')
                     ->options([
-                        'completed'      => 'Completed',
-                        'voided'         => 'Voided',
-                        'refunded'       => 'Refunded',
+                        'completed' => 'Completed',
+                        'voided' => 'Voided',
+                        'refunded' => 'Refunded',
                         'partial_refund' => 'Partial Refund',
                     ]),
                 SelectFilter::make('payment_method')
                     ->label('Payment')
                     ->options([
-                        'cash'          => 'Cash',
-                        'card'          => 'Card',
+                        'cash' => 'Cash',
+                        'card' => 'Card',
                         'bank_transfer' => 'Bank Transfer',
-                        'split'         => 'Split',
+                        'split' => 'Split',
                     ]),
                 SelectFilter::make('cashier_id')
                     ->label('Cashier')

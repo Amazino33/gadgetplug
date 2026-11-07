@@ -23,37 +23,37 @@ class ViewProcurement extends ViewRecord
             Section::make('Overview')->schema([
                 Grid::make(3)->schema([
                     Placeholder::make('reference')->label('Reference')
-                        ->content(new HtmlString('<span class="font-bold font-mono">' . e($record->reference) . '</span>')),
+                        ->content(new HtmlString('<span class="font-bold font-mono">'.e($record->reference).'</span>')),
                     Placeholder::make('vendor')->label('Store')
                         ->content($record->vendor->name ?? '—'),
                     Placeholder::make('supplier')->label('Supplier')
                         ->content($record->supplier->name ?? '—'),
                     Placeholder::make('status')->label('Status')
                         ->content(new HtmlString($this->badgeHtml($record->status, match ($record->status) {
-                            'pending'  => 'warning',
+                            'pending' => 'warning',
                             'approved' => 'success',
-                            'voided'   => 'danger',
-                            default    => 'gray',
+                            'voided' => 'danger',
+                            default => 'gray',
                         }))),
                     Placeholder::make('payment_status')->label('Payment')
                         ->content(new HtmlString($this->badgeHtml(
                             match ($record->payment_status) {
-                                'full'         => 'Fully Paid',
+                                'full' => 'Fully Paid',
                                 'part_payment' => 'Part-Payment',
-                                'credit'       => 'Credit (₦0 paid)',
-                                default        => $record->payment_status,
+                                'credit' => 'Credit (₦0 paid)',
+                                default => $record->payment_status,
                             },
                             match ($record->payment_status) {
-                                'full'         => 'success',
+                                'full' => 'success',
                                 'part_payment' => 'warning',
-                                'credit'       => 'danger',
-                                default        => 'gray',
+                                'credit' => 'danger',
+                                default => 'gray',
                             }
                         ))),
                     Placeholder::make('total_cost')->label('Total Cost')
-                        ->content('₦' . number_format($record->total_cost, 2)),
+                        ->content('₦'.number_format($record->total_cost, 2)),
                     Placeholder::make('amount_paid')->label('Amount Paid')
-                        ->content('₦' . number_format($record->amount_paid, 2)),
+                        ->content('₦'.number_format($record->amount_paid, 2)),
                     Placeholder::make('creator')->label('Logged By')
                         ->content($record->creator->name ?? '—'),
                     Placeholder::make('created_at')->label('Submitted')
@@ -71,7 +71,7 @@ class ViewProcurement extends ViewRecord
             Section::make('Waybill Image')->schema([
                 Placeholder::make('waybill')->label('')
                     ->content(new HtmlString(
-                        '<img src="' . asset('storage/' . $record->waybill_image) . '" class="max-h-80 rounded-xl object-contain border" />'
+                        '<img src="'.asset('storage/'.$record->waybill_image).'" class="max-h-80 rounded-xl object-contain border" />'
                     )),
             ])->visible((bool) $record->waybill_image),
 
@@ -86,22 +86,22 @@ class ViewProcurement extends ViewRecord
     {
         $rows = '';
         foreach ($record->items()->with('product')->get() as $item) {
-            $pct      = $item->costVariancePct();
+            $pct = $item->costVariancePct();
             $variance = $pct === null
                 ? '<span class="text-gray-400 text-xs">—</span>'
-                : '<span class="text-xs font-semibold px-2 py-0.5 rounded-full ' .
-                  (abs($pct) > 10 ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-700') . '">' .
-                  ($pct > 0 ? '+' : '') . number_format($pct, 1) . '%</span>';
+                : '<span class="text-xs font-semibold px-2 py-0.5 rounded-full '.
+                  (abs($pct) > 10 ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-700').'">'.
+                  ($pct > 0 ? '+' : '').number_format($pct, 1).'%</span>';
 
             $rows .= "<tr class='border-b border-gray-100 dark:border-gray-700'>
-                <td class='px-4 py-3 text-sm font-medium'>" . e($item->product->name ?? '—') . "</td>
-                <td class='px-4 py-3 text-xs text-gray-500'>" . e($item->barcode ?? '—') . "</td>
+                <td class='px-4 py-3 text-sm font-medium'>".e($item->product->name ?? '—')."</td>
+                <td class='px-4 py-3 text-xs text-gray-500'>".e($item->barcode ?? '—')."</td>
                 <td class='px-4 py-3 text-sm text-center'>{$item->quantity}</td>
-                <td class='px-4 py-3 text-sm'>₦" . number_format($item->unit_cost, 2) . "</td>
-                <td class='px-4 py-3 text-sm'>₦" . number_format($item->selling_price, 2) . "</td>
+                <td class='px-4 py-3 text-sm'>₦".number_format($item->unit_cost, 2)."</td>
+                <td class='px-4 py-3 text-sm'>₦".number_format($item->selling_price, 2)."</td>
                 <td class='px-4 py-3'>{$variance}</td>
-                <td class='px-4 py-3 text-sm font-semibold'>₦" . number_format($item->lineTotal(), 2) . "</td>
-            </tr>";
+                <td class='px-4 py-3 text-sm font-semibold'>₦".number_format($item->lineTotal(), 2).'</td>
+            </tr>';
         }
 
         return "<div class='overflow-x-auto'>
@@ -127,9 +127,10 @@ class ViewProcurement extends ViewRecord
         $classes = match ($color) {
             'success' => 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
             'warning' => 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
-            'danger'  => 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-            default   => 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
+            'danger' => 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+            default => 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
         };
+
         return "<span class='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold {$classes}'>{$label}</span>";
     }
 }

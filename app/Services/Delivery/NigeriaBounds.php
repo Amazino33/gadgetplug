@@ -10,8 +10,11 @@ namespace App\Services\Delivery;
 final class NigeriaBounds
 {
     public const MIN_LAT = 4.0;
+
     public const MAX_LAT = 14.0;
+
     public const MIN_LNG = 2.5;
+
     public const MAX_LNG = 15.0;
 
     public static function contains(float $lat, float $lng): bool

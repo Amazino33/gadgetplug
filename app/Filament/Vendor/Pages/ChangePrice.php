@@ -6,41 +6,57 @@ namespace App\Filament\Vendor\Pages;
 
 use App\Models\Product;
 use App\Models\ProductUnit;
+use App\Services\ActiveStore;
 use App\Support\Quantity;
+use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Filament\Notifications\Notification;
-use App\Services\ActiveStore;
 
 class ChangePrice extends Page
 {
     protected static string|null|\BackedEnum $navigationIcon = 'heroicon-o-currency-dollar';
+
     protected static ?string $navigationLabel = 'Change Price';
+
     protected static ?string $title = 'Change Price';
+
     protected static ?string $slug = 'change-price';
+
     protected static ?int $navigationSort = 3;
+
     protected static string|null|\UnitEnum $navigationGroup = 'Products';
 
     protected string $view = 'filament.vendor.pages.change-price';
 
     public $search = '';
+
     public $selectedProductId = null;
+
     // The unit whose price is being changed. Null is the product's own (base)
     // unit — the single price this page has always changed.
     public $selectedUnitId = null;
+
     public $newPrice = null;
+
     // Half of the chosen unit, for a shop that sells halves. Blank = exactly half.
     public $newHalfPrice = null;
+
     public $requiresConfirmation = false;
+
     public $isSuccess = false;
 
     public static function canAccess(): bool
     {
         $user = auth()->user();
         $vendor = filament()->getTenant();
-        if (!$vendor || !$user) return false;
-        if ($user->isSuperAdmin() || $vendor->isOwner($user)) return true;
+        if (! $vendor || ! $user) {
+            return false;
+        }
+        if ($user->isSuperAdmin() || $vendor->isOwner($user)) {
+            return true;
+        }
+
         return $user->hasVendorPermission($vendor->id, 'edit_products');
     }
 
@@ -56,8 +72,8 @@ class ChangePrice extends Page
         return Product::where('vendor_id', $vendor->id)
             ->where(function ($q) {
                 $q->where('name', 'like', "%{$this->search}%")
-                  ->orWhere('sku', 'like', "%{$this->search}%")
-                  ->orWhere('barcode', 'like', "%{$this->search}%");
+                    ->orWhere('sku', 'like', "%{$this->search}%")
+                    ->orWhere('barcode', 'like', "%{$this->search}%");
             })
             // Only products in the active store if one exists, otherwise all
             ->when($activeStoreId, function ($q) use ($activeStoreId) {
@@ -71,7 +87,10 @@ class ChangePrice extends Page
 
     public function getSelectedProductProperty()
     {
-        if (!$this->selectedProductId) return null;
+        if (! $this->selectedProductId) {
+            return null;
+        }
+
         return Product::where('vendor_id', filament()->getTenant()->id)
             ->find($this->selectedProductId);
     }
@@ -157,14 +176,17 @@ class ChangePrice extends Page
     public function savePrice()
     {
         $product = $this->selectedProduct;
-        if (!$product) return;
+        if (! $product) {
+            return;
+        }
 
         $unit = $this->selectedUnit;
         $newPriceFloat = (float) $this->newPrice;
         $cost = $this->selectedCost;
 
-        if ($cost > 0 && $newPriceFloat < $cost && !$this->requiresConfirmation) {
+        if ($cost > 0 && $newPriceFloat < $cost && ! $this->requiresConfirmation) {
             $this->requiresConfirmation = true;
+
             return; // pause and require explicit confirmation
         }
 

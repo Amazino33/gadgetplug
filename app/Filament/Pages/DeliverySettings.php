@@ -259,7 +259,7 @@ class DeliverySettings extends Page
 
         return [
             'states' => State::orderBy('name')->get(['id', 'name', 'latitude', 'longitude'])->map(fn (State $s) => [
-                'id'   => $s->id,
+                'id' => $s->id,
                 'name' => $s->name,
             ])->values()->all(),
             'lgas' => Lga::query()->with(['overrideRule', 'state.defaultRule'])->orderBy('name')->get()->map(function (Lga $lga) use ($distance) {
@@ -267,22 +267,22 @@ class DeliverySettings extends Page
                 $nearest = $distance->nearestHub($lga);
 
                 return [
-                    'id'       => $lga->id,
-                    'name'     => $lga->name,
+                    'id' => $lga->id,
+                    'name' => $lga->name,
                     'state_id' => $lga->state_id,
-                    'lat'      => (float) $lga->latitude,
-                    'lng'      => (float) $lga->longitude,
-                    'mode'     => $rule['mode'],
-                    'label'    => DeliveryRule::describe($rule['mode'], $rule['fee']),
-                    'km'       => $nearest ? round($nearest['km'], 1) : null,
-                    'hub_id'   => $nearest['store']->id ?? null,
+                    'lat' => (float) $lga->latitude,
+                    'lng' => (float) $lga->longitude,
+                    'mode' => $rule['mode'],
+                    'label' => DeliveryRule::describe($rule['mode'], $rule['fee']),
+                    'km' => $nearest ? round($nearest['km'], 1) : null,
+                    'hub_id' => $nearest['store']->id ?? null,
                 ];
             })->values()->all(),
             'hubs' => $distance->hubs()->map(fn (Store $store) => [
-                'id'   => $store->id,
+                'id' => $store->id,
                 'name' => $store->name,
-                'lat'  => (float) $store->latitude,
-                'lng'  => (float) $store->longitude,
+                'lat' => (float) $store->latitude,
+                'lng' => (float) $store->longitude,
             ])->values()->all(),
         ];
     }
@@ -354,7 +354,7 @@ class DeliverySettings extends Page
         ])->validate();
 
         Store::findOrFail($storeId)->update([
-            'latitude'  => $data['lat'] !== null ? round((float) $data['lat'], 6) : null,
+            'latitude' => $data['lat'] !== null ? round((float) $data['lat'], 6) : null,
             'longitude' => $data['lng'] !== null ? round((float) $data['lng'], 6) : null,
         ]);
 
@@ -440,7 +440,7 @@ class DeliverySettings extends Page
                 ? round($nearest['km'], 1).' km straight-line from '.$nearest['store']->name.' (road is longer)'
                 : 'No store pinned yet, so no distance',
             'Now: '.DeliveryRule::describe($rule['mode'], $rule['fee']).' — '.match ($rule['source']) {
-                'lga'   => 'this LGA\'s own rule',
+                'lga' => 'this LGA\'s own rule',
                 'state' => $lga->state->name.' default',
                 default => 'no rule set',
             },
@@ -454,8 +454,8 @@ class DeliverySettings extends Page
         $by = collect($this->bandPreview)->countBy('to_mode');
 
         $parts = collect([
-            DeliveryRule::FREE          => 'free',
-            DeliveryRule::FEE           => 'paid',
+            DeliveryRule::FREE => 'free',
+            DeliveryRule::FEE => 'paid',
             DeliveryRule::NOT_DELIVERED => 'not delivered',
         ])->filter(fn ($label, $mode) => ($by[$mode] ?? 0) > 0)
             ->map(fn ($label, $mode) => $by[$mode].' '.$label);
@@ -467,9 +467,9 @@ class DeliverySettings extends Page
     private function previewRows(): array
     {
         return collect($this->bandPreview)->map(fn (array $row) => [
-            'lga'   => $row['lga'].', '.$row['state'],
-            'km'    => $row['km'].' km',
-            'now'   => DeliveryRule::describe($row['from_mode'], $row['from_fee']),
+            'lga' => $row['lga'].', '.$row['state'],
+            'km' => $row['km'].' km',
+            'now' => DeliveryRule::describe($row['from_mode'], $row['from_fee']),
             'after' => DeliveryRule::describe($row['to_mode'], $row['to_fee']),
         ])->all();
     }
@@ -486,9 +486,9 @@ class DeliverySettings extends Page
     private static function labelColor(string $label): string
     {
         return match ($label) {
-            DeliveryRule::LABELS[DeliveryRule::FREE]          => DeliveryRule::COLORS[DeliveryRule::FREE],
+            DeliveryRule::LABELS[DeliveryRule::FREE] => DeliveryRule::COLORS[DeliveryRule::FREE],
             DeliveryRule::LABELS[DeliveryRule::NOT_DELIVERED] => DeliveryRule::COLORS[DeliveryRule::NOT_DELIVERED],
-            default                                           => DeliveryRule::COLORS[DeliveryRule::FEE],
+            default => DeliveryRule::COLORS[DeliveryRule::FEE],
         };
     }
 }

@@ -1,6 +1,5 @@
 <?php
 
-use App\Models\Category;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
@@ -15,8 +14,9 @@ use App\Services\VendorLink\Rounding\RoundingRules;
 use App\Services\VendorLink\SupplierPayable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Spatie\Permission\Models\Role;
 
-require_once __DIR__ . '/Helpers.php';
+require_once __DIR__.'/Helpers.php';
 
 uses(RefreshDatabase::class);
 
@@ -112,7 +112,7 @@ describe('marking a listing as resold', function () {
 
 describe('the rounding rule', function () {
     test('rounds up to end in 990', function () {
-        $rule = new EndsIn990();
+        $rule = new EndsIn990;
 
         expect($rule->apply(14000))->toBe(14990.0)
             ->and($rule->apply(14980))->toBe(14990.0)
@@ -122,7 +122,7 @@ describe('the rounding rule', function () {
     });
 
     test('never rounds down, because that would sell below the markup', function () {
-        $rule = new EndsIn990();
+        $rule = new EndsIn990;
 
         foreach ([1, 500, 991, 1200, 99999] as $amount) {
             expect($rule->apply($amount))->toBeGreaterThanOrEqual((float) $amount);
@@ -130,7 +130,7 @@ describe('the rounding rule', function () {
     });
 
     test('rounds to the closest 100, which is what this shop quotes', function () {
-        $rule = new Nearest100();
+        $rule = new Nearest100;
 
         expect($rule->apply(14000))->toBe(14000.0)
             // Down by 40, which is noise on a marked-up price.
@@ -143,7 +143,7 @@ describe('the rounding rule', function () {
     });
 
     test('the closest 100 never lands on a free product', function () {
-        $rule = new Nearest100();
+        $rule = new Nearest100;
 
         // The nearest hundred to 30 is zero, and zero is free rather than cheap.
         expect($rule->apply(30))->toBe(100.0)
@@ -182,7 +182,7 @@ describe('the payable ledger', function () {
 
         $payable = app(SupplierPayable::class);
 
-        $first  = $payable->charge($link, $item, 2, 10000);
+        $first = $payable->charge($link, $item, 2, 10000);
         // Delivery fired again — a status flipped back and forth, a retried job.
         $second = $payable->charge($link, $item, 2, 10000);
 
@@ -271,7 +271,7 @@ describe('the payable ledger', function () {
 describe('who may create a link', function () {
     test('a super admin may', function () {
         $admin = User::factory()->create();
-        $admin->assignRole(Spatie\Permission\Models\Role::firstOrCreate(
+        $admin->assignRole(Role::firstOrCreate(
             ['name' => 'super_admin', 'guard_name' => 'web'],
         ));
 
@@ -292,7 +292,7 @@ describe('who may create a link', function () {
 
     test('nobody deletes a link, because listings and debts point at it', function () {
         $admin = User::factory()->create();
-        $admin->assignRole(Spatie\Permission\Models\Role::firstOrCreate(
+        $admin->assignRole(Role::firstOrCreate(
             ['name' => 'super_admin', 'guard_name' => 'web'],
         ));
         $link = makeLink(linkVendor('Reseller'), linkVendor('Wholesaler'));
@@ -305,22 +305,22 @@ describe('who may create a link', function () {
 function payableOrderItem(Vendor $reseller): OrderItem
 {
     $order = Order::create([
-        'user_id'          => User::factory()->create()->id,
-        'reference'        => 'ORD-'.Str::random(8),
-        'customer_name'    => 'A Customer',
-        'customer_email'   => 'customer@example.test',
-        'customer_phone'   => '08000000000',
+        'user_id' => User::factory()->create()->id,
+        'reference' => 'ORD-'.Str::random(8),
+        'customer_name' => 'A Customer',
+        'customer_email' => 'customer@example.test',
+        'customer_phone' => '08000000000',
         'shipping_address' => '1 Test Street',
-        'total_amount'     => 0,
-        'status'           => 'pending',
-        'payment_method'   => 'pay_on_delivery',
+        'total_amount' => 0,
+        'status' => 'pending',
+        'payment_method' => 'pay_on_delivery',
     ]);
 
     return OrderItem::create([
-        'order_id'   => $order->id,
+        'order_id' => $order->id,
         'product_id' => linkProduct($reseller)->id,
-        'vendor_id'  => $reseller->id,
-        'quantity'   => 1,
+        'vendor_id' => $reseller->id,
+        'quantity' => 1,
         'unit_price' => 14990,
     ]);
 }

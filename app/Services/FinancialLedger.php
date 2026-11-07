@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Models\FinancialAccount;
 use App\Models\FinancialLedgerEntry;
+use App\Models\Order;
+use App\Models\VendorPayout;
 use App\Support\Pos\BusinessDate;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
@@ -40,15 +42,15 @@ class FinancialLedger
         // Checked here, where every posting passes, so no picker or tampered
         // request can spend from it or pay into it by hand.
         if ($account->isGadgetplugDue() && ! (
-            ($source instanceof \App\Models\Order && $direction === 'in')
+            ($source instanceof Order && $direction === 'in')
             || ($source instanceof FinancialLedgerEntry && $direction === 'out' && $source->financial_account_id === $account->id)
-            || ($source instanceof \App\Models\VendorPayout && $direction === 'out')
+            || ($source instanceof VendorPayout && $direction === 'out')
         )) {
             throw new InvalidArgumentException('The Due from GadgetPlug account only moves through online revenue and payouts.');
         }
 
         $sourceType = $source?->getMorphClass();
-        $sourceId   = $source?->getKey();
+        $sourceId = $source?->getKey();
 
         // Keyed on direction too, not just the source — the same source can
         // legitimately need both an 'out' and an 'in' entry (e.g. an Order
@@ -70,18 +72,18 @@ class FinancialLedger
         try {
             $entry = FinancialLedgerEntry::create([
                 'financial_account_id' => $account->id,
-                'direction'            => $direction,
-                'amount'               => $amount,
-                'source_type'          => $sourceType,
-                'source_id'            => $sourceId,
-                'description'          => $description,
-                'occurred_at'          => BusinessDate::of($occurredAt) ?? BusinessDate::today(),
-                'created_by'           => $createdBy,
+                'direction' => $direction,
+                'amount' => $amount,
+                'source_type' => $sourceType,
+                'source_id' => $sourceId,
+                'description' => $description,
+                'occurred_at' => BusinessDate::of($occurredAt) ?? BusinessDate::today(),
+                'created_by' => $createdBy,
                 // Which branch the money actually moved through. Optional and
                 // last so every existing caller keeps working unchanged; they
                 // pass nothing and keep writing null, which is honest — a
                 // vendor-level entry has no branch to claim.
-                'store_id'             => $storeId,
+                'store_id' => $storeId,
             ]);
         } catch (UniqueConstraintViolationException) {
             // Lost the race against a concurrent post for the same source +
@@ -98,8 +100,8 @@ class FinancialLedger
             ->performedOn($entry)
             ->withProperties([
                 'financial_account_id' => $account->id,
-                'direction'            => $direction,
-                'amount'               => $amount,
+                'direction' => $direction,
+                'amount' => $amount,
             ])
             ->log('Ledger entry posted');
 

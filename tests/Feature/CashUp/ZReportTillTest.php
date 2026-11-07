@@ -2,6 +2,7 @@
 
 use App\Models\PosSale;
 use App\Models\PosSession;
+use App\Models\User;
 use App\Support\Pos\BusinessDate;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -29,19 +30,19 @@ function zSale(array $ctx, array $over = []): PosSale
     $total = $over['total'] ?? 10000;
 
     return PosSale::create(array_merge([
-        'reference'       => 'POS-'.Str::random(10),
-        'vendor_id'       => $ctx['vendor']->id,
-        'store_id'        => $ctx['store']->id,
-        'cashier_id'      => $ctx['cashier']->id,
-        'subtotal'        => $total,
+        'reference' => 'POS-'.Str::random(10),
+        'vendor_id' => $ctx['vendor']->id,
+        'store_id' => $ctx['store']->id,
+        'cashier_id' => $ctx['cashier']->id,
+        'subtotal' => $total,
         'discount_amount' => 0,
-        'vat_amount'      => 0,
-        'total'           => $total,
-        'payment_method'  => 'cash',
+        'vat_amount' => 0,
+        'total' => $total,
+        'payment_method' => 'cash',
         'amount_tendered' => $total,
-        'change_given'    => 0,
-        'status'          => 'completed',
-        'completed_at'    => now(),
+        'change_given' => 0,
+        'status' => 'completed',
+        'completed_at' => now(),
     ], $over));
 }
 
@@ -115,7 +116,7 @@ test('shows only the signed-in cashier\'s own sales', function () {
     zOpen($ctx);
 
     zSale($ctx, ['total' => 2000]);
-    zSale($ctx, ['total' => 9999, 'cashier_id' => \App\Models\User::factory()->create()->id]);
+    zSale($ctx, ['total' => 9999, 'cashier_id' => User::factory()->create()->id]);
 
     expect((float) todayZ($ctx)->json('total_sales'))->toBe(2000.0);
 });

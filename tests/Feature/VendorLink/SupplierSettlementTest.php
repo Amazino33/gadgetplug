@@ -1,18 +1,23 @@
 <?php
 
+use App\Actions\VendorLink\BookSupplierPayableAction;
 use App\Actions\VendorLink\PublishLinkedListingAction;
+use App\Filament\Vendor\Pages\SupplierPayablePage;
 use App\Models\Order;
 use App\Models\OrderItem;
 use App\Models\Product;
 use App\Models\SupplierPayableEntry;
 use App\Models\User;
+use App\Models\Vendor;
+use App\Services\Orders\OrderStatusService;
 use App\Services\Reporting\SalesReportService;
 use App\Services\VendorLink\SupplierPayable;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Spatie\Permission\Models\Role;
 
-require_once __DIR__ . '/Helpers.php';
+require_once __DIR__.'/Helpers.php';
 
 uses(RefreshDatabase::class);
 
@@ -28,24 +33,24 @@ function orderForListing(int $quantity = 1, float $supplierPrice = 10000, float 
     $listing = Product::linked()->firstOrFail();
 
     $order = Order::create([
-        'user_id'          => User::factory()->create()->id,
-        'reference'        => 'ORD-'.Str::random(8),
-        'customer_name'    => 'A Customer',
-        'customer_email'   => 'customer@example.test',
-        'customer_phone'   => '08000000000',
+        'user_id' => User::factory()->create()->id,
+        'reference' => 'ORD-'.Str::random(8),
+        'customer_name' => 'A Customer',
+        'customer_email' => 'customer@example.test',
+        'customer_phone' => '08000000000',
         'shipping_address' => '1 Test Street',
-        'total_amount'     => (float) $listing->price * $quantity,
-        'status'           => 'pending',
-        'payment_method'   => 'pay_on_delivery',
+        'total_amount' => (float) $listing->price * $quantity,
+        'status' => 'pending',
+        'payment_method' => 'pay_on_delivery',
     ]);
 
     $item = OrderItem::create([
-        'order_id'   => $order->id,
+        'order_id' => $order->id,
         'product_id' => $listing->id,
-        'vendor_id'  => $reseller->id,
-        'quantity'   => $quantity,
+        'vendor_id' => $reseller->id,
+        'quantity' => $quantity,
         'unit_price' => $listing->price,
-        'unit_cost'  => null,
+        'unit_cost' => null,
     ]);
 
     return compact('order', 'item', 'listing', 'source', 'link', 'reseller');
@@ -59,7 +64,7 @@ function orderForListing(int $quantity = 1, float $supplierPrice = 10000, float 
 function receiveSupplierOrderPayment(Order $order): ?string
 {
     $admin = User::factory()->create();
-    Spatie\Permission\Models\Role::firstOrCreate(['name' => 'super_admin', 'guard_name' => 'web', 'team_id' => null]);
+    Role::firstOrCreate(['name' => 'super_admin', 'guard_name' => 'web', 'team_id' => null]);
     setPermissionsTeamId(null);
     $admin->assignRole('super_admin');
 
@@ -69,7 +74,7 @@ function receiveSupplierOrderPayment(Order $order): ?string
         $order->updateQuietly(['status' => 'shipped']);
     }
 
-    return app(App\Services\Orders\OrderStatusService::class)->recordPaymentReceived($order->fresh(), $admin, 'cash');
+    return app(OrderStatusService::class)->recordPaymentReceived($order->fresh(), $admin, 'cash');
 }
 
 describe('booking what the supplier is owed', function () {
@@ -113,7 +118,7 @@ describe('booking what the supplier is owed', function () {
         receiveSupplierOrderPayment($order);
         // Two tabs, a double click.
         receiveSupplierOrderPayment($order);
-        app(App\Actions\VendorLink\BookSupplierPayableAction::class)->execute($order->fresh());
+        app(BookSupplierPayableAction::class)->execute($order->fresh());
 
         expect(SupplierPayableEntry::charges()->count())->toBe(1)
             ->and(app(SupplierPayable::class)->balance($link))->toBe(20000.0);
@@ -124,7 +129,7 @@ describe('booking what the supplier is owed', function () {
 
         receiveSupplierOrderPayment($order);
         $source->update(['price' => 18000]);
-        app(App\Actions\VendorLink\BookSupplierPayableAction::class)->execute($order->fresh());
+        app(BookSupplierPayableAction::class)->execute($order->fresh());
 
         expect(app(SupplierPayable::class)->balance($link))->toBe(10000.0);
     });
@@ -135,7 +140,7 @@ describe('booking what the supplier is owed', function () {
         // Revenue and the cost of earning it land together on both channels:
         // Paystack at paid, pay-on-delivery at payment received.
         $order->update(['payment_method' => 'paystack']);
-        app(App\Services\Orders\OrderStatusService::class)->markPaid($order->fresh());
+        app(OrderStatusService::class)->markPaid($order->fresh());
 
         expect(SupplierPayableEntry::charges()->count())->toBe(1)
             ->and(app(SupplierPayable::class)->balance($link))->toBe(20000.0)
@@ -147,15 +152,15 @@ describe('booking what the supplier is owed', function () {
         $product = linkProduct($vendor, price: 5000, stock: 10);
 
         $order = Order::create([
-            'user_id'          => User::factory()->create()->id,
-            'reference'        => 'ORD-'.Str::random(8),
-            'customer_name'    => 'A Customer',
-            'customer_email'   => 'c@example.test',
-            'customer_phone'   => '08000000000',
+            'user_id' => User::factory()->create()->id,
+            'reference' => 'ORD-'.Str::random(8),
+            'customer_name' => 'A Customer',
+            'customer_email' => 'c@example.test',
+            'customer_phone' => '08000000000',
             'shipping_address' => '1 Test Street',
-            'total_amount'     => 5000,
-            'status'           => 'pending',
-            'payment_method'   => 'pay_on_delivery',
+            'total_amount' => 5000,
+            'status' => 'pending',
+            'payment_method' => 'pay_on_delivery',
         ]);
         OrderItem::create([
             'order_id' => $order->id, 'product_id' => $product->id, 'vendor_id' => $vendor->id,
@@ -239,7 +244,7 @@ describe('the settlement screen', function () {
 
         settlementPanel($reseller, User::find($reseller->user_id));
 
-        $page = Livewire\Livewire::test(App\Filament\Vendor\Pages\SupplierPayablePage::class)->assertOk();
+        $page = Livewire\Livewire::test(SupplierPayablePage::class)->assertOk();
         $rows = $page->instance()->balances();
 
         expect($rows)->toHaveCount(1)
@@ -254,7 +259,7 @@ describe('the settlement screen', function () {
         receiveSupplierOrderPayment($order);
         settlementPanel($reseller, User::find($reseller->user_id));
 
-        Livewire\Livewire::test(App\Filament\Vendor\Pages\SupplierPayablePage::class)
+        Livewire\Livewire::test(SupplierPayablePage::class)
             ->callAction('pay', data: ['amount' => 7500, 'note' => 'Cash'], arguments: ['link' => $link->id]);
 
         expect(app(SupplierPayable::class)->balance($link->fresh()))->toBe(12500.0)
@@ -270,7 +275,7 @@ describe('the settlement screen', function () {
 
         settlementPanel($reseller, User::find($reseller->user_id));
 
-        Livewire\Livewire::test(App\Filament\Vendor\Pages\SupplierPayablePage::class)
+        Livewire\Livewire::test(SupplierPayablePage::class)
             ->callAction('pay', data: ['amount' => 5000], arguments: ['link' => $othersLink->id]);
 
         // The link is re-checked against this tenant, so a posted id buys
@@ -285,14 +290,14 @@ describe('the settlement screen', function () {
         $reseller->users()->syncWithoutDetaching([$member->id]);
 
         settlementPanel($reseller, User::find($reseller->user_id));
-        expect(App\Filament\Vendor\Pages\SupplierPayablePage::canAccess())->toBeTrue();
+        expect(SupplierPayablePage::canAccess())->toBeTrue();
 
         settlementPanel($reseller, $member);
-        expect(App\Filament\Vendor\Pages\SupplierPayablePage::canAccess())->toBeFalse();
+        expect(SupplierPayablePage::canAccess())->toBeFalse();
     });
 });
 
-function settlementPanel(App\Models\Vendor $vendor, User $user): void
+function settlementPanel(Vendor $vendor, User $user): void
 {
     test()->actingAs($user);
     Filament\Facades\Filament::setCurrentPanel(Filament\Facades\Filament::getPanel('vendor'));
@@ -304,19 +309,19 @@ describe('cancelling after the debt was booked', function () {
     test('cancelling a paid order reverses its supplier charge with an append-only entry', function () {
         ['order' => $order, 'link' => $link, 'item' => $item] = orderForListing(quantity: 2, supplierPrice: 10000);
         $order->update(['payment_method' => 'paystack']);
-        $service = app(App\Services\Orders\OrderStatusService::class);
+        $service = app(OrderStatusService::class);
         $service->markPaid($order->fresh());
 
         expect(app(SupplierPayable::class)->balance($link))->toBe(20000.0);
 
         $admin = User::factory()->create();
-        Spatie\Permission\Models\Role::firstOrCreate(['name' => 'super_admin', 'guard_name' => 'web', 'team_id' => null]);
+        Role::firstOrCreate(['name' => 'super_admin', 'guard_name' => 'web', 'team_id' => null]);
         setPermissionsTeamId(null);
         $admin->assignRole('super_admin');
 
         $service->cancel($order->fresh(), $admin, 'Customer refunded');
 
-        $charge   = SupplierPayableEntry::charges()->sole();
+        $charge = SupplierPayableEntry::charges()->sole();
         $reversal = SupplierPayableEntry::reversals()->sole();
 
         expect(app(SupplierPayable::class)->balance($link))->toBe(0.0)

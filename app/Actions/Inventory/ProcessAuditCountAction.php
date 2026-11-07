@@ -2,10 +2,10 @@
 
 namespace App\Actions\Inventory;
 
-use App\Support\Quantity;
 use App\Models\AuditSession;
-use Illuminate\Support\Facades\DB;
+use App\Support\Quantity;
 use Exception;
+use Illuminate\Support\Facades\DB;
 
 class ProcessAuditCountAction
 {
@@ -23,11 +23,11 @@ class ProcessAuditCountAction
 
             // 2. Validate the rules
             if ($audit->status !== 'pending') {
-                throw new Exception("This audit session has already been processed.");
+                throw new Exception('This audit session has already been processed.');
             }
 
             if ($audit->storekeeper_a_id === $storeKeeperBId) {
-                throw new Exception("Security Alert: You cannot verify your own count.");
+                throw new Exception('Security Alert: You cannot verify your own count.');
             }
 
             // 3. Record Storekeeper B's count
@@ -43,7 +43,7 @@ class ProcessAuditCountAction
                 // mirror, which would compare one branch's count against
                 // every branch's stock and "correct" a store that was never
                 // counted while the one actually walked stays wrong.
-                $storeId            = $audit->resolvedStoreId();
+                $storeId = $audit->resolvedStoreId();
                 $currentSystemStock = $audit->branchSystemStock();
                 $quantityDifference = Quantity::sub($audit->count_b, $currentSystemStock);
 

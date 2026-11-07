@@ -29,7 +29,7 @@ class CheckProductIdentifierDuplicatesCommand extends Command
     public function handle(): int
     {
         $vendorId = $this->option('vendor');
-        $show     = max(1, (int) $this->option('show'));
+        $show = max(1, (int) $this->option('show'));
 
         $this->line('Read-only. Nothing below writes to the database.');
         $this->newLine();

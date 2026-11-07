@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Category;
+use App\Models\PosSale;
 use App\Models\PosSaleItem;
 use App\Models\Product;
 use App\Models\ProductUnit;
@@ -16,25 +17,25 @@ function unitsContext(array $productAttributes = [], array $vendorAttributes = [
     $owner = User::factory()->create();
 
     $vendor = Vendor::create(array_merge([
-        'user_id'                => $owner->id,
-        'name'                   => 'Drinks Depot',
+        'user_id' => $owner->id,
+        'name' => 'Drinks Depot',
         'pos_min_margin_percent' => 0,
     ], $vendorAttributes));
 
     $category = Category::create(['name' => 'Drinks']);
 
     $product = Product::create(array_merge([
-        'vendor_id'                => $vendor->id,
-        'category_id'              => $category->id,
-        'name'                     => 'Coke 50cl',
-        'base_unit'                => 'Bottle',
-        'price'                    => 450,
-        'wholesale_price'          => 420,
-        'cost_price'               => 350,
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'Coke 50cl',
+        'base_unit' => 'Bottle',
+        'price' => 450,
+        'wholesale_price' => 420,
+        'cost_price' => 350,
         'allow_pos_price_override' => false,
-        'stock_quantity'           => 60,
-        'status'                   => 'published',
-        'show_in_pos'              => true,
+        'stock_quantity' => 60,
+        'status' => 'published',
+        'show_in_pos' => true,
     ], $productAttributes));
 
     $crate = ProductUnit::create([
@@ -55,24 +56,24 @@ function unitSale(array $ctx, array $items)
     Sanctum::actingAs($ctx['owner']);
 
     return test()->postJson('/api/pos/sales', [
-        'vendor_id'       => $ctx['vendor']->id,
-        'items'           => $items,
-        'payment_method'  => 'cash',
+        'vendor_id' => $ctx['vendor']->id,
+        'items' => $items,
+        'payment_method' => 'cash',
         'amount_tendered' => 100000,
-        'vat_rate'        => 0,
+        'vat_rate' => 0,
     ]);
 }
 
 function unitLine(array $ctx, ?ProductUnit $unit, int $qty, float $price, string $type = 'retail'): array
 {
     return array_filter([
-        'product_id'      => $ctx['product']->id,
-        'product_name'    => 'Coke 50cl',
-        'unit_price'      => $price,
-        'quantity'        => $qty * ($unit?->conversion_factor ?? 1),
+        'product_id' => $ctx['product']->id,
+        'product_name' => 'Coke 50cl',
+        'unit_price' => $price,
+        'quantity' => $qty * ($unit?->conversion_factor ?? 1),
         'product_unit_id' => $unit?->id,
-        'unit_qty'        => $unit ? $qty : null,
-        'price_type'      => $type,
+        'unit_qty' => $unit ? $qty : null,
+        'price_type' => $type,
     ], fn ($v) => $v !== null);
 }
 
@@ -207,14 +208,14 @@ it('syncs an offline crate sale the same way', function () {
 
     $this->postJson('/api/pos/sync', [
         'vendor_id' => $ctx['vendor']->id,
-        'sales'     => [[
-            'offline_id'     => 'offline-crate-1',
-            'items'          => [unitLine($ctx, $ctx['crate'], 1, 9700) + ['total' => 9700]],
+        'sales' => [[
+            'offline_id' => 'offline-crate-1',
+            'items' => [unitLine($ctx, $ctx['crate'], 1, 9700) + ['total' => 9700]],
             'payment_method' => 'cash',
-            'subtotal'       => 9700,
-            'total'          => 9700,
-            'vat_amount'     => 0,
-            'completed_at'   => now()->toIso8601String(),
+            'subtotal' => 9700,
+            'total' => 9700,
+            'vat_amount' => 0,
+            'completed_at' => now()->toIso8601String(),
         ]],
     ])->assertOk()->assertJsonFragment(['status' => 'synced']);
 
@@ -253,22 +254,22 @@ it('with price changes off, reprices a tampered offline sale and works its total
 
     $this->postJson('/api/pos/sync', [
         'vendor_id' => $ctx['vendor']->id,
-        'sales'     => [[
-            'offline_id'     => 'tampered-1',
-            'items'          => [
+        'sales' => [[
+            'offline_id' => 'tampered-1',
+            'items' => [
                 unitLine($ctx, $ctx['crate'], 1, 100) + ['total' => 100],
                 // A line from an older till, no unit: base unit at retail.
                 ['product_id' => $ctx['product']->id, 'product_name' => 'Coke 50cl', 'unit_price' => 1, 'quantity' => 2, 'total' => 2],
             ],
             'payment_method' => 'cash',
-            'subtotal'       => 102,
-            'total'          => 102,
-            'vat_amount'     => 0,
-            'completed_at'   => now()->toIso8601String(),
+            'subtotal' => 102,
+            'total' => 102,
+            'vat_amount' => 0,
+            'completed_at' => now()->toIso8601String(),
         ]],
     ])->assertOk()->assertJsonFragment(['status' => 'synced']);
 
-    $sale = \App\Models\PosSale::firstOrFail();
+    $sale = PosSale::firstOrFail();
 
     expect((float) $sale->subtotal)->toBe(10600.0)       // 9,700 + 2 × 450
         ->and((float) $sale->total)->toBe(10600.0)

@@ -1,17 +1,22 @@
 <?php
 
+use App\Actions\Inventory\AdjustStockAction;
+use App\Actions\Procurement\ApproveProcurementAction;
 use App\Filament\Vendor\Pages\StoreSelector;
 use App\Filament\Vendor\Resources\Products\Pages\ListProducts;
 use App\Filament\Vendor\Resources\Products\ProductResource;
 use App\Models\Category;
 use App\Models\InventoryLedger;
+use App\Models\Procurement;
 use App\Models\Product;
 use App\Models\ProductStoreStock;
 use App\Models\Store;
+use App\Models\Supplier;
 use App\Models\User;
 use App\Models\Vendor;
 use App\Services\ActiveStore;
 use App\Services\VendorRoles;
+use Database\Seeders\VendorPermissionsSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -22,7 +27,7 @@ function panelVendor(): Vendor
 {
     return Vendor::create([
         'user_id' => User::factory()->create()->id,
-        'name'    => 'Panel Vendor '.uniqid(),
+        'name' => 'Panel Vendor '.uniqid(),
     ]);
 }
 
@@ -41,14 +46,14 @@ function panelProduct(Vendor $vendor, string $name, Store $store, int $quantity)
     // no longer moves the product between branches — the home store is what
     // decides, and ProductObserver opens the stock row there.
     $product = Product::create([
-        'vendor_id'      => $vendor->id,
-        'store_id'       => $store->id,
-        'category_id'    => Category::create(['name' => 'Cat '.uniqid()])->id,
-        'name'           => $name,
-        'price'          => 1000,
-        'cost_price'     => 500,
+        'vendor_id' => $vendor->id,
+        'store_id' => $store->id,
+        'category_id' => Category::create(['name' => 'Cat '.uniqid()])->id,
+        'name' => $name,
+        'price' => 1000,
+        'cost_price' => 500,
         'stock_quantity' => 0,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
     ProductStoreStock::where('product_id', $product->id)
@@ -65,7 +70,7 @@ test('the product list shows only products held at the active store', function (
     $vendor = panelVendor();
     $branch = Store::create(['vendor_id' => $vendor->id, 'name' => 'Branch']);
 
-    $atMain   = panelProduct($vendor, 'Main Only', $vendor->defaultStore, 5);
+    $atMain = panelProduct($vendor, 'Main Only', $vendor->defaultStore, 5);
     $atBranch = panelProduct($vendor, 'Branch Only', $branch, 7);
 
     actAsInPanel($vendor, $vendor->user);
@@ -168,7 +173,7 @@ test('the grid hides the cost value from a member without view_cost_price', func
     // attaches whatever Permission rows it finds, so seeding it after would
     // give the storekeeper a role carrying nothing. Same order the repo's
     // other permission tests use.
-    (new Database\Seeders\VendorPermissionsSeeder)->run();
+    (new VendorPermissionsSeeder)->run();
 
     $vendor = panelVendor();
     panelProduct($vendor, 'Costed', $vendor->defaultStore, 10);
@@ -220,7 +225,7 @@ test('a panel stock adjustment lands on the active store, not the default', func
     actAsInPanel($vendor, $vendor->user);
     ActiveStore::set($vendor, $vendor->user, $branch->id);
 
-    app(App\Actions\Inventory\AdjustStockAction::class)->execute(
+    app(AdjustStockAction::class)->execute(
         productId: $product->id,
         quantityChanged: 6,
         transactionType: 'restock',
@@ -244,8 +249,8 @@ test('procurement approval receives into the store it is given', function () {
     $branch = Store::create(['vendor_id' => $vendor->id, 'name' => 'Receiving Branch']);
     $product = panelProduct($vendor, 'Received', $branch, 2);
 
-    $supplier = App\Models\Supplier::create(['vendor_id' => $vendor->id, 'name' => 'S '.uniqid()]);
-    $procurement = App\Models\Procurement::create([
+    $supplier = Supplier::create(['vendor_id' => $vendor->id, 'name' => 'S '.uniqid()]);
+    $procurement = Procurement::create([
         'vendor_id' => $vendor->id, 'supplier_id' => $supplier->id,
         'reference' => 'PO-'.uniqid(), 'status' => 'pending', 'created_by' => $vendor->user_id,
     ]);
@@ -254,7 +259,7 @@ test('procurement approval receives into the store it is given', function () {
         'unit_cost' => 500, 'selling_price' => 1000,
     ]);
 
-    app(App\Actions\Procurement\ApproveProcurementAction::class)->execute($procurement, $branch->id);
+    app(ApproveProcurementAction::class)->execute($procurement, $branch->id);
 
     $rows = ProductStoreStock::where('product_id', $product->id)->get()->keyBy('store_id');
 
@@ -269,7 +274,7 @@ test('outside the panel the actions still fall back to the default store', funct
 
     expect(ActiveStore::currentId())->toBeNull();
 
-    app(App\Actions\Inventory\AdjustStockAction::class)->execute(
+    app(AdjustStockAction::class)->execute(
         productId: $product->id, quantityChanged: 3, transactionType: 'restock',
     );
 

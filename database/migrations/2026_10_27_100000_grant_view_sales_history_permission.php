@@ -26,7 +26,7 @@ return new class extends Migration
             ->where('guard_name', 'web')
             ->value('id')
             ?? DB::table('permissions')->insertGetId([
-                'name'       => self::PERMISSION,
+                'name' => self::PERMISSION,
                 'guard_name' => 'web',
                 'created_at' => $now,
                 'updated_at' => $now,
@@ -52,9 +52,9 @@ return new class extends Migration
             foreach ($direct as $grant) {
                 DB::table('model_has_permissions')->insertOrIgnore([
                     'permission_id' => $permissionId,
-                    'model_type'    => $grant->model_type,
-                    'model_id'      => $grant->model_id,
-                    'team_id'       => $grant->team_id,
+                    'model_type' => $grant->model_type,
+                    'model_id' => $grant->model_id,
+                    'team_id' => $grant->team_id,
                 ]);
             }
         }

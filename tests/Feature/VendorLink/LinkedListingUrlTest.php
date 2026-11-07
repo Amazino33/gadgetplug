@@ -3,11 +3,11 @@
 use App\Actions\VendorLink\PublishLinkedListingAction;
 use App\Models\Category;
 use App\Models\Product;
-use Database\Factories\ProductFactory;
 use App\Models\Vendor;
+use Database\Factories\ProductFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
-require_once __DIR__ . '/Helpers.php';
+require_once __DIR__.'/Helpers.php';
 
 uses(RefreshDatabase::class);
 
@@ -21,14 +21,14 @@ uses(RefreshDatabase::class);
 function namedProduct(Vendor $vendor, string $name, float $price = 10000, int $stock = 5): Product
 {
     return Product::create([
-        'vendor_id'      => $vendor->id,
-        'store_id'       => $vendor->defaultStore->id,
-        'category_id'    => Category::firstOrCreate(['name' => 'VendorLink Cat'])->id,
-        'name'           => $name,
-        'price'          => $price,
-        'cost_price'     => $price * 0.6,
+        'vendor_id' => $vendor->id,
+        'store_id' => $vendor->defaultStore->id,
+        'category_id' => Category::firstOrCreate(['name' => 'VendorLink Cat'])->id,
+        'name' => $name,
+        'price' => $price,
+        'cost_price' => $price * 0.6,
         'stock_quantity' => $stock,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 }
 
@@ -65,7 +65,7 @@ test('the colliding slug is the accepted state, and routing is what resolves it'
     expect($listing->slug)->toBe($source->fresh()->slug)
         ->and($listing->id)->toBeGreaterThan($source->id);
 
-    $resolved = (new Product())->resolveRouteBinding($listing->slug);
+    $resolved = (new Product)->resolveRouteBinding($listing->slug);
 
     // The visible one wins over the lower id.
     expect($resolved->id)->toBe($listing->id);
@@ -86,7 +86,7 @@ test('two ordinary vendors sharing a product name no longer hide each other', fu
 
     $this->get(route('product.show', $opensProduct->slug))->assertOk();
 
-    expect((new Product())->resolveRouteBinding($opensProduct->slug)->id)->toBe($opensProduct->id);
+    expect((new Product)->resolveRouteBinding($opensProduct->slug)->id)->toBe($opensProduct->id);
 });
 
 test('a product nobody can see still reaches the page, which refuses it there', function () {
@@ -96,7 +96,7 @@ test('a product nobody can see still reaches the page, which refuses it there', 
     // The fallback matters: binding must not start returning null for rows that
     // used to resolve, or a 404 decision quietly moves out of the page that
     // owns it and into the router.
-    expect((new Product())->resolveRouteBinding($product->slug)?->id)->toBe($product->id);
+    expect((new Product)->resolveRouteBinding($product->slug)?->id)->toBe($product->id);
 
     $this->get(route('product.show', $product->slug))->assertNotFound();
 });

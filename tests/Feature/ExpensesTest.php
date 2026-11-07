@@ -4,6 +4,7 @@ use App\Models\Expense;
 use App\Models\FinancialAccount;
 use App\Models\User;
 use App\Models\Vendor;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Activitylog\Models\Activity;
 
@@ -12,7 +13,7 @@ uses(RefreshDatabase::class);
 function expenseTestVendor(): array
 {
     $owner = User::factory()->create();
-    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Expense Test Store ' . uniqid()]);
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Expense Test Store '.uniqid()]);
 
     return compact('owner', 'vendor');
 }
@@ -20,12 +21,12 @@ function expenseTestVendor(): array
 function makeExpense(array $data, array $overrides = []): Expense
 {
     return Expense::create(array_merge([
-        'vendor_id'    => $data['vendor']->id,
-        'category'     => 'advertising',
-        'amount'       => 5000,
-        'description'  => 'Facebook ads — August',
-        'incurred_at'  => now()->toDateString(),
-        'created_by'   => $data['owner']->id,
+        'vendor_id' => $data['vendor']->id,
+        'category' => 'advertising',
+        'amount' => 5000,
+        'description' => 'Facebook ads — August',
+        'incurred_at' => now()->toDateString(),
+        'created_by' => $data['owner']->id,
     ], $overrides));
 }
 
@@ -45,7 +46,7 @@ test('amount, incurred_at, and posted_at are cast to real types', function () {
     $expense = makeExpense($data);
 
     expect((float) $expense->amount)->toBe(5000.0)
-        ->and($expense->incurred_at)->toBeInstanceOf(\Carbon\CarbonImmutable::class)
+        ->and($expense->incurred_at)->toBeInstanceOf(CarbonImmutable::class)
         ->and($expense->posted_at)->toBeNull()
         ->and($expense->isPosted())->toBeFalse();
 });
@@ -68,8 +69,8 @@ test('a posted expense\'s category and amount cannot be changed', function () {
     $expense = makeExpense($data);
     $expense->update(['financial_account_id' => $account->id, 'posted_at' => now()]);
 
-    expect(fn () => $expense->update(['amount' => 9999]))->toThrow(\LogicException::class);
-    expect(fn () => $expense->update(['category' => 'other']))->toThrow(\LogicException::class);
+    expect(fn () => $expense->update(['amount' => 9999]))->toThrow(LogicException::class);
+    expect(fn () => $expense->update(['category' => 'other']))->toThrow(LogicException::class);
 });
 
 test('setting financial_account_id and posted_at together for the first time does not trip the guard', function () {

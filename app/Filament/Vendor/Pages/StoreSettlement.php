@@ -4,12 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Vendor\Pages;
 
-use App\Filament\Support\QuantityInput;
-use App\Support\Quantity;
 use App\Actions\Cash\GenerateSettlementStatementAction;
-use App\Filament\Vendor\Pages\AccountClose;
 use App\Actions\Inventory\ApproveStockCountAction;
 use App\Actions\Inventory\RecordPhysicalCountAction;
+use App\Filament\Support\QuantityInput;
 use App\Models\PhysicalStockCount;
 use App\Models\Product;
 use App\Models\SettlementResolution;
@@ -20,6 +18,7 @@ use App\Services\ActiveStore;
 use App\Services\Auth\StorePermission;
 use App\Services\Cash\StoreReconciliation;
 use App\Services\Reporting\ReportPeriod;
+use App\Support\Quantity;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
@@ -183,11 +182,11 @@ class StoreSettlement extends Page
 
                     try {
                         $count = app(RecordPhysicalCountAction::class)->execute(
-                            countedBy:   auth()->user(),
-                            store:       $store,
+                            countedBy: auth()->user(),
+                            store: $store,
                             periodStart: $period->from,
-                            periodEnd:   $period->to,
-                            counts:      $counts,
+                            periodEnd: $period->to,
+                            counts: $counts,
                         );
                     } catch (Throwable $e) {
                         Notification::make()->title($e->getMessage())->danger()->send();
@@ -200,10 +199,10 @@ class StoreSettlement extends Page
                     Notification::make()
                         ->title($variance['units'] === 0
                             ? 'Counted — everything adds up'
-                            : $variance['units'] . ' unit(s) unaccounted for')
+                            : $variance['units'].' unit(s) unaccounted for')
                         ->body($variance['units'] === 0
                             ? 'The shelf matches the books.'
-                            : 'Worth ₦' . number_format($variance['missing_at_selling'], 2) . ' at selling price.')
+                            : 'Worth ₦'.number_format($variance['missing_at_selling'], 2).' at selling price.')
                         ->{$variance['units'] === 0 ? 'success' : 'warning'}()
                         ->send();
                 }),
@@ -223,7 +222,7 @@ class StoreSettlement extends Page
                     ? sprintf(
                         '%d unit(s) unaccounted for, worth %s at selling price. Approving corrects the stock — say where the loss goes.',
                         $c->variance()['units'],
-                        '₦' . number_format($c->variance()['missing_at_selling'], 2),
+                        '₦'.number_format($c->variance()['missing_at_selling'], 2),
                     )
                     : null)
                 ->schema([
@@ -231,7 +230,7 @@ class StoreSettlement extends Page
                         ->label('What happened to the missing stock?')
                         ->options([
                             PhysicalStockCount::OUTCOME_WRITTEN_OFF => 'Write it off — the business absorbs it',
-                            PhysicalStockCount::OUTCOME_CHARGED     => 'Charge it to somebody',
+                            PhysicalStockCount::OUTCOME_CHARGED => 'Charge it to somebody',
                         ])
                         ->default(PhysicalStockCount::OUTCOME_WRITTEN_OFF)
                         ->required()
@@ -261,13 +260,13 @@ class StoreSettlement extends Page
 
                     try {
                         app(ApproveStockCountAction::class)->approve(
-                            count:    $count,
+                            count: $count,
                             approver: auth()->user(),
-                            outcome:  $data['outcome'],
+                            outcome: $data['outcome'],
                             chargeTo: filled($data['charged_to'] ?? null)
                                 ? User::find($data['charged_to'])
                                 : null,
-                            note:     $data['note'] ?? null,
+                            note: $data['note'] ?? null,
                         );
                     } catch (Throwable $e) {
                         Notification::make()->title($e->getMessage())->danger()->send();
@@ -340,21 +339,21 @@ class StoreSettlement extends Page
                         ->label('What it is about')
                         ->options([
                             'true_shortage' => 'The unexplained shortage',
-                            'disputed'      => 'A disputed handover',
-                            'unsubmitted'   => 'Cash not handed over',
-                            'stock'         => 'Missing stock',
-                            'unpaid_debt'   => 'Customer debt',
+                            'disputed' => 'A disputed handover',
+                            'unsubmitted' => 'Cash not handed over',
+                            'stock' => 'Missing stock',
+                            'unpaid_debt' => 'Customer debt',
                         ])
                         ->required(),
 
                     Select::make('outcome')
                         ->label('What was decided')
                         ->options([
-                            SettlementResolution::OUTCOME_REPAYMENT_PLAN     => 'Repayment plan agreed',
+                            SettlementResolution::OUTCOME_REPAYMENT_PLAN => 'Repayment plan agreed',
                             SettlementResolution::OUTCOME_WRITE_OFF_REFERRAL => 'Referred for write-off',
-                            SettlementResolution::OUTCOME_RESOLVED_NO_ISSUE  => 'Looked into it — no issue',
-                            SettlementResolution::OUTCOME_RECOUNT            => 'Count or check it again',
-                            SettlementResolution::OUTCOME_OTHER              => 'Something else',
+                            SettlementResolution::OUTCOME_RESOLVED_NO_ISSUE => 'Looked into it — no issue',
+                            SettlementResolution::OUTCOME_RECOUNT => 'Count or check it again',
+                            SettlementResolution::OUTCOME_OTHER => 'Something else',
                         ])
                         ->required(),
 
@@ -375,10 +374,10 @@ class StoreSettlement extends Page
                         SettlementResolution::create([
                             'store_settlement_statement_id' => $data['statement_id'],
                             'recorded_by' => auth()->id(),
-                            'outcome'     => $data['outcome'],
-                            'concerns'    => $data['concerns'],
-                            'amount'      => filled($data['amount'] ?? null) ? (float) $data['amount'] : null,
-                            'note'        => $data['note'],
+                            'outcome' => $data['outcome'],
+                            'concerns' => $data['concerns'],
+                            'amount' => filled($data['amount'] ?? null) ? (float) $data['amount'] : null,
+                            'note' => $data['note'],
                         ]);
                     } catch (Throwable $e) {
                         Notification::make()->title($e->getMessage())->danger()->send();
@@ -426,9 +425,9 @@ class StoreSettlement extends Page
                     try {
                         $statement = app(GenerateSettlementStatementAction::class)->execute(
                             generatedBy: auth()->user(),
-                            store:       $store,
-                            from:        $period->from,
-                            to:          $period->to,
+                            store: $store,
+                            from: $period->from,
+                            to: $period->to,
                         );
                     } catch (Throwable $e) {
                         Notification::make()->title($e->getMessage())->danger()->send();
@@ -437,7 +436,7 @@ class StoreSettlement extends Page
                     }
 
                     Notification::make()
-                        ->title($statement->reference . ' frozen')
+                        ->title($statement->reference.' frozen')
                         ->body('Open it to print or sign off.')
                         ->success()
                         ->send();
@@ -449,10 +448,10 @@ class StoreSettlement extends Page
     protected function getViewData(): array
     {
         return [
-            'period'     => $this->period(),
-            'store'      => $this->store(),
-            'recon'      => $this->reconciliation(),
-            'branches'   => $this->branches(),
+            'period' => $this->period(),
+            'store' => $this->store(),
+            'recon' => $this->reconciliation(),
+            'branches' => $this->branches(),
             'stockCount' => $this->stockCount(),
             'statements' => $this->statements(),
         ];

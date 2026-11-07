@@ -5,12 +5,12 @@ namespace App\Filament\Resources\MarketingMaterials;
 use App\Filament\Resources\MarketingMaterials\Pages\ManageMarketingMaterials;
 use App\Models\MarketingMaterial;
 use BackedEnum;
+use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
-use Filament\Forms\Components\SpatieMediaLibraryFileUpload;
 
 // Branded creative affiliates post. One stored image serves everyone; the
 // per-affiliate part is the caption, which carries their code/link. Burning the
@@ -19,9 +19,11 @@ class MarketingMaterialResource extends Resource
 {
     protected static ?string $model = MarketingMaterial::class;
 
-    protected static string|null|BackedEnum $navigationIcon  = 'heroicon-o-photo';
-    protected static ?string                $navigationLabel = 'Marketing Material';
-    protected static ?int                   $navigationSort  = 8;
+    protected static string|null|BackedEnum $navigationIcon = 'heroicon-o-photo';
+
+    protected static ?string $navigationLabel = 'Marketing Material';
+
+    protected static ?int $navigationSort = 8;
 
     public static function getNavigationGroup(): ?string
     {

@@ -39,7 +39,7 @@ it('reduces what the customer owes and credits the cash account', function () {
         ->and($payment->collected_by)->toBe($ctx['owner']->id);
 
     $account = FinancialAccount::where('vendor_id', $ctx['vendor']->id)->where('type', 'cash')->first();
-    $entry   = FinancialLedgerEntry::where('financial_account_id', $account->id)->where('direction', 'in')->first();
+    $entry = FinancialLedgerEntry::where('financial_account_id', $account->id)->where('direction', 'in')->first();
 
     expect((float) $entry->amount)->toBe(4000.0);
 });

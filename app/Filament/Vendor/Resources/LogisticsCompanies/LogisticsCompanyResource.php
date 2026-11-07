@@ -5,8 +5,8 @@ namespace App\Filament\Vendor\Resources\LogisticsCompanies;
 use App\Models\LogisticsCompany;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
-use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Section;
@@ -21,14 +21,17 @@ class LogisticsCompanyResource extends Resource
 
     protected static ?string $tenantOwnershipRelationshipName = 'vendor';
 
-    protected static string|null|\BackedEnum $navigationIcon  = 'heroicon-o-building-office-2';
-    protected static string|null|\UnitEnum  $navigationGroup = 'Logistics';
-    protected static ?string                $navigationLabel = 'Logistics Companies';
+    protected static string|null|\BackedEnum $navigationIcon = 'heroicon-o-building-office-2';
+
+    protected static string|null|\UnitEnum $navigationGroup = 'Logistics';
+
+    protected static ?string $navigationLabel = 'Logistics Companies';
+
     protected static ?int $navigationSort = 1;
 
     public static function canAccess(): bool
     {
-        $user   = auth()->user();
+        $user = auth()->user();
         $vendor = filament()->getTenant();
 
         return $vendor && $user->hasVendorPermission($vendor->id, 'manage_logistics');

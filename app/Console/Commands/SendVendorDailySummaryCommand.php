@@ -24,7 +24,7 @@ class SendVendorDailySummaryCommand extends Command
 
     public function handle(DailySummaryNotifier $notifier): int
     {
-        $now   = Carbon::now();
+        $now = Carbon::now();
         $force = (bool) $this->option('force');
 
         $vendors = Vendor::query()

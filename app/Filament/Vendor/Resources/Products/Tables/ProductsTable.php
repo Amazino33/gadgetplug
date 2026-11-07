@@ -3,10 +3,10 @@
 namespace App\Filament\Vendor\Resources\Products\Tables;
 
 use App\Filament\Support\QuantityInput;
-use App\Support\Quantity;
 use App\Filament\Vendor\Resources\Products\Schemas\ProductForm;
 use App\Models\AuditSession;
 use App\Models\Product;
+use App\Support\Quantity;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
@@ -26,7 +26,7 @@ use Filament\Tables\Table;
 class ProductsTable
 {
     // Neutral gray box + photo glyph — used wherever a product has no image.
-    private const PLACEHOLDER_IMAGE = 'data:image/svg+xml,' . '<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="%23e5e7eb"/><path d="M28 68l16-22 11 13 9-11 18 24" stroke="%239ca3af" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="37" cy="36" r="7" fill="%239ca3af"/></svg>';
+    private const PLACEHOLDER_IMAGE = 'data:image/svg+xml,'.'<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="100" fill="%23e5e7eb"/><path d="M28 68l16-22 11 13 9-11 18 24" stroke="%239ca3af" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="37" cy="36" r="7" fill="%239ca3af"/></svg>';
 
     public static function configure(Table $table): Table
     {
@@ -50,8 +50,7 @@ class ProductsTable
                 Split::make([
                     ImageColumn::make('thumb')
                         ->label('')
-                        ->getStateUsing(fn (Product $record): ?string =>
-                            $record->catalogueImageUrl('thumb') ?: null
+                        ->getStateUsing(fn (Product $record): ?string => $record->catalogueImageUrl('thumb') ?: null
                         )
                         ->defaultImageUrl(self::PLACEHOLDER_IMAGE)
                         ->size(44)
@@ -66,8 +65,7 @@ class ProductsTable
 
                         TextColumn::make('eyebrow')
                             ->label('')
-                            ->getStateUsing(fn (Product $record): ?string =>
-                                trim(collect([$record->category?->name, $record->brand])->filter()->implode(' · ')) ?: null
+                            ->getStateUsing(fn (Product $record): ?string => trim(collect([$record->category?->name, $record->brand])->filter()->implode(' · ')) ?: null
                             )
                             ->color('gray')
                             ->size(TextSize::ExtraSmall),
@@ -84,7 +82,7 @@ class ProductsTable
                     ->money('NGN')
                     ->weight(FontWeight::Bold)
                     ->description(fn (Product $record): ?string => ($canSeeCostPrice && $record->cost_price !== null)
-                        ? 'Cost ₦' . number_format((float) $record->cost_price, 2)
+                        ? 'Cost ₦'.number_format((float) $record->cost_price, 2)
                         : null, position: 'above')
                     ->sortable()
                     ->hidden($isGrid),
@@ -120,14 +118,13 @@ class ProductsTable
                         0,
                         Quantity::sub($record->store_quantity ?? 0, $record->store_reserved ?? 0),
                     ))
-                    ->sortable(query: fn ($query, $direction) =>
-                        $query->orderByRaw("COALESCE(store_quantity, 0) - COALESCE(store_reserved, 0) {$direction}")
+                    ->sortable(query: fn ($query, $direction) => $query->orderByRaw("COALESCE(store_quantity, 0) - COALESCE(store_reserved, 0) {$direction}")
                     )
                     ->badge()
                     ->color(fn (int $state): string => match (true) {
                         $state === 0 => 'danger',
-                        $state < 5   => 'warning',
-                        default      => 'success',
+                        $state < 5 => 'warning',
+                        default => 'success',
                     })
                     ->hidden($isGrid),
 
@@ -142,14 +139,15 @@ class ProductsTable
                         if ($record->status === 'published' && $record->unpublish_at?->isPast()) {
                             return 'expired';
                         }
+
                         return $record->status;
                     })
                     ->color(fn (string $state): string => match ($state) {
                         'published' => 'success',
-                        'draft'     => 'gray',
-                        'archived'  => 'warning',
-                        'expired'   => 'danger',
-                        default     => 'gray',
+                        'draft' => 'gray',
+                        'archived' => 'warning',
+                        'expired' => 'danger',
+                        default => 'gray',
                     })
                     ->formatStateUsing(fn (string $state): string => ucfirst($state))
                     ->hidden($isGrid),
@@ -165,9 +163,9 @@ class ProductsTable
             ->filters([
                 SelectFilter::make('status')
                     ->options([
-                        'draft'     => 'Draft',
+                        'draft' => 'Draft',
                         'published' => 'Published',
-                        'archived'  => 'Archived',
+                        'archived' => 'Archived',
                     ]),
             ])
             ->recordActions([
@@ -194,17 +192,16 @@ class ProductsTable
                             ->label('My Physical Count')
                             ->required(),
                     ])
-                    ->visible(fn (?Product $record): bool =>
-                        $record !== null &&
-                        !AuditSession::where('product_id', $record->id)->where('status', 'pending')->exists()
+                    ->visible(fn (?Product $record): bool => $record !== null &&
+                        ! AuditSession::where('product_id', $record->id)->where('status', 'pending')->exists()
                     )
                     ->action(function (Product $record, array $data): void {
                         AuditSession::create([
-                            'vendor_id'         => $record->vendor_id,
-                            'product_id'        => $record->id,
-                            'storekeeper_a_id'  => auth()->id(),
-                            'count_a'           => Quantity::of($data['count_a']),
-                            'status'            => 'pending',
+                            'vendor_id' => $record->vendor_id,
+                            'product_id' => $record->id,
+                            'storekeeper_a_id' => auth()->id(),
+                            'count_a' => Quantity::of($data['count_a']),
+                            'status' => 'pending',
                         ]);
                     })
                     ->successNotificationTitle('Audit started — waiting for Storekeeper B to verify.'),

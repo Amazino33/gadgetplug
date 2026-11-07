@@ -37,9 +37,9 @@ test('saving the form persists new values to the single settings row', function 
     Livewire::test(AffiliateSettings::class)
         ->fillForm([
             'platform_default_rate' => 7.5,
-            'return_window_days'    => 5,
-            'cookie_window_days'    => 45,
-            'min_payout_amount'     => 3000,
+            'return_window_days' => 5,
+            'cookie_window_days' => 45,
+            'min_payout_amount' => 3000,
         ])
         ->call('save')
         ->assertHasNoFormErrors();
@@ -84,9 +84,9 @@ test('the engaged visit reward controls persist, including the kill switch', fun
         ->assertSet('data.click_rewards_enabled', true)
         ->assertSet('data.click_reward_amount', '2.00')
         ->fillForm([
-            'click_rewards_enabled'       => false,
-            'click_reward_amount'         => 3.50,
-            'click_reward_daily_cap'      => 500,
+            'click_rewards_enabled' => false,
+            'click_reward_amount' => 3.50,
+            'click_reward_daily_cap' => 500,
             'click_reward_daily_ip_limit' => 2,
         ])
         ->call('save')
@@ -108,13 +108,13 @@ test('the Plug Points and daily-share controls persist, so no reward number is h
 
     Livewire::test(AffiliateSettings::class)
         ->fillForm([
-            'naira_per_point'         => 0.75,
-            'min_points_conversion'   => 2500,
-            'share_timezone'          => 'Africa/Lagos',
-            'share_window_opens_at'   => '09:30',
-            'share_window_closes_at'  => '21:00',
-            'daily_share_points_cap'  => 90,
-            'streak_bonus_points'     => 40,
+            'naira_per_point' => 0.75,
+            'min_points_conversion' => 2500,
+            'share_timezone' => 'Africa/Lagos',
+            'share_window_opens_at' => '09:30',
+            'share_window_closes_at' => '21:00',
+            'daily_share_points_cap' => 90,
+            'streak_bonus_points' => 40,
             'streak_bonus_every_days' => 5,
         ])
         ->call('save')

@@ -49,7 +49,8 @@ class OrderItem extends Model
             ?? 'Item';
     }
 
-    public function order() {
+    public function order()
+    {
         return $this->belongsTo(Order::class);
     }
 
@@ -83,6 +84,6 @@ class OrderItem extends Model
             ->logOnly(['quantity', 'unit_price', 'product_id'])
             ->logOnlyDirty()
             ->dontSubmitEmptyLogs()
-            ->setDescriptionForEvent(fn (string $event) => 'Order item ' . $event);
+            ->setDescriptionForEvent(fn (string $event) => 'Order item '.$event);
     }
 }

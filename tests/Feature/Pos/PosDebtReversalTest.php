@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Pos\RecordCustomerPaymentAction;
 use App\Models\FinancialAccount;
 use App\Models\FinancialLedgerEntry;
 use App\Models\PosCustomer;
@@ -42,7 +43,7 @@ function creditSale(array $ctx, array $overrides = []): PosSale
 // ─── Void ───────────────────────────────────────────────────────────────
 
 it('cancels the whole debt when a credit sale is voided', function () {
-    $ctx  = reversalContext();
+    $ctx = reversalContext();
     $sale = creditSale($ctx);
 
     expect(app(CustomerDebtService::class)->outstanding($ctx['customer']->id))->toBe(10000.0);
@@ -54,7 +55,7 @@ it('cancels the whole debt when a credit sale is voided', function () {
 });
 
 it('records the cancellation rather than erasing the charge', function () {
-    $ctx  = reversalContext();
+    $ctx = reversalContext();
     $sale = creditSale($ctx);
 
     $this->postJson("/api/pos/sales/{$sale->id}/void", ['reason' => 'Error'])->assertSuccessful();
@@ -70,7 +71,7 @@ it('records the cancellation rather than erasing the charge', function () {
 });
 
 it('does not cancel twice when a void is retried', function () {
-    $ctx  = reversalContext();
+    $ctx = reversalContext();
     $sale = creditSale($ctx);
 
     $this->postJson("/api/pos/sales/{$sale->id}/void", ['reason' => 'Error'])->assertSuccessful();
@@ -81,10 +82,10 @@ it('does not cancel twice when a void is retried', function () {
 });
 
 it('leaves a fully paid customer alone when their sale is voided', function () {
-    $ctx  = reversalContext();
+    $ctx = reversalContext();
     $sale = creditSale($ctx);
 
-    app(App\Actions\Pos\RecordCustomerPaymentAction::class)->execute(
+    app(RecordCustomerPaymentAction::class)->execute(
         customer: $ctx['customer'], amount: 10000, collectedBy: $ctx['owner'], storeId: $ctx['store']->id,
     );
 
@@ -99,13 +100,13 @@ it('leaves a fully paid customer alone when their sale is voided', function () {
 // ─── Return ─────────────────────────────────────────────────────────────
 
 it('cancels the debt for goods handed back', function () {
-    $ctx  = reversalContext();
+    $ctx = reversalContext();
     $sale = creditSale($ctx);
 
     $this->postJson("/api/pos/sales/{$sale->id}/return", [
-        'items'         => [['product_id' => $ctx['product']->id, 'quantity' => 1]],
+        'items' => [['product_id' => $ctx['product']->id, 'quantity' => 1]],
         'refund_method' => 'store_credit',
-        'reason'        => 'Faulty',
+        'reason' => 'Faulty',
     ])->assertSuccessful();
 
     expect(app(CustomerDebtService::class)->outstanding($ctx['customer']->id))->toBe(0.0);
@@ -116,9 +117,9 @@ it('cancels only the returned share of a part-paid credit sale', function () {
 
     // 4,000 paid at the till, 6,000 on credit.
     $sale = creditSale($ctx, [
-        'payment_method'  => 'split',
+        'payment_method' => 'split',
         'amount_tendered' => 4000.0,
-        'payments'        => [
+        'payments' => [
             ['method' => 'cash', 'amount' => 4000.0],
             ['method' => 'debt', 'amount' => 6000.0],
         ],
@@ -127,7 +128,7 @@ it('cancels only the returned share of a part-paid credit sale', function () {
     expect(app(CustomerDebtService::class)->outstanding($ctx['customer']->id))->toBe(6000.0);
 
     $this->postJson("/api/pos/sales/{$sale->id}/return", [
-        'items'         => [['product_id' => $ctx['product']->id, 'quantity' => 1]],
+        'items' => [['product_id' => $ctx['product']->id, 'quantity' => 1]],
         'refund_method' => 'store_credit',
     ])->assertSuccessful();
 
@@ -137,11 +138,11 @@ it('cancels only the returned share of a part-paid credit sale', function () {
 });
 
 it('leaves a cash sale return well alone', function () {
-    $ctx  = reversalContext();
+    $ctx = reversalContext();
     $sale = creditSale($ctx, ['payment_method' => 'cash', 'amount_tendered' => 10000.0]);
 
     $this->postJson("/api/pos/sales/{$sale->id}/return", [
-        'items'         => [['product_id' => $ctx['product']->id, 'quantity' => 1]],
+        'items' => [['product_id' => $ctx['product']->id, 'quantity' => 1]],
         'refund_method' => 'cash',
     ])->assertSuccessful();
 
@@ -157,19 +158,19 @@ it('recognises revenue for a cash sale that synced from offline', function () {
 
     $this->postJson('/api/pos/sync', [
         'vendor_id' => $ctx['vendor']->id,
-        'sales'     => [[
-            'offline_id'      => 'till-cash-1',
-            'customer_id'     => null,
-            'items'           => [[
+        'sales' => [[
+            'offline_id' => 'till-cash-1',
+            'customer_id' => null,
+            'items' => [[
                 'product_id' => $ctx['product']->id, 'product_name' => 'Credit Widget',
                 'unit_price' => 10000.0, 'quantity' => 1, 'total' => 10000.0,
             ]],
-            'total'           => 10000.0,
-            'vat_amount'      => 0,
-            'payment_method'  => 'cash',
+            'total' => 10000.0,
+            'vat_amount' => 0,
+            'payment_method' => 'cash',
             'amount_tendered' => 10000.0,
-            'completed_at'    => '2026-09-01 10:00:00',
-            'payments'        => null,
+            'completed_at' => '2026-09-01 10:00:00',
+            'payments' => null,
         ]],
     ])->assertSuccessful();
 
@@ -184,18 +185,18 @@ it('still defers the debt slice on a synced credit sale', function () {
 
     $this->postJson('/api/pos/sync', [
         'vendor_id' => $ctx['vendor']->id,
-        'sales'     => [[
-            'offline_id'     => 'till-debt-1',
-            'customer_id'    => $ctx['customer']->id,
-            'items'          => [[
+        'sales' => [[
+            'offline_id' => 'till-debt-1',
+            'customer_id' => $ctx['customer']->id,
+            'items' => [[
                 'product_id' => $ctx['product']->id, 'product_name' => 'Credit Widget',
                 'unit_price' => 10000.0, 'quantity' => 1, 'total' => 10000.0,
             ]],
-            'total'          => 10000.0,
-            'vat_amount'     => 0,
+            'total' => 10000.0,
+            'vat_amount' => 0,
             'payment_method' => 'debt',
-            'completed_at'   => '2026-09-01 10:00:00',
-            'payments'       => null,
+            'completed_at' => '2026-09-01 10:00:00',
+            'payments' => null,
         ]],
     ])->assertSuccessful();
 

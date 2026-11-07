@@ -2,9 +2,9 @@
 
 use App\Models\Category;
 use App\Models\Product;
-use Database\Factories\ProductFactory;
 use App\Models\User;
 use App\Models\Vendor;
+use Database\Factories\ProductFactory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 
@@ -13,8 +13,8 @@ uses(RefreshDatabase::class);
 function directoryVendor(array $over = []): Vendor
 {
     return Vendor::create(array_merge([
-        'user_id'              => User::factory()->create()->id,
-        'name'                 => 'Directory Shop '.uniqid(),
+        'user_id' => User::factory()->create()->id,
+        'name' => 'Directory Shop '.uniqid(),
         'online_sales_enabled' => true,
     ], $over));
 }
@@ -22,15 +22,15 @@ function directoryVendor(array $over = []): Vendor
 function directoryProduct(Vendor $vendor, array $over = []): Product
 {
     return ProductFactory::new()->withPhoto()->create(array_merge([
-        'vendor_id'      => $vendor->id,
-        'store_id'       => $vendor->defaultStore->id,
-        'category_id'    => Category::firstOrCreate(['name' => 'Directory Cat'])->id,
-        'name'           => 'Directory Item '.Str::random(6),
-        'price'          => 12000,
+        'vendor_id' => $vendor->id,
+        'store_id' => $vendor->defaultStore->id,
+        'category_id' => Category::firstOrCreate(['name' => 'Directory Cat'])->id,
+        'name' => 'Directory Item '.Str::random(6),
+        'price' => 12000,
         'stock_quantity' => 4,
-        'status'         => 'published',
-        'published_at'   => now(),
-        'show_online'    => true,
+        'status' => 'published',
+        'published_at' => now(),
+        'show_online' => true,
     ], $over));
 }
 

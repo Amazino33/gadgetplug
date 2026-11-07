@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Models\PosSession;
 use App\Models\User;
+use App\Models\Vendor;
 
 /**
  * Authorization for end-of-day cash-ups.
@@ -91,7 +92,7 @@ class PosSessionPolicy
             return true;
         }
 
-        $vendor = \App\Models\Vendor::find($vendorId);
+        $vendor = Vendor::find($vendorId);
 
         return $vendor?->isOwner($user) === true
             || $user->hasVendorPermission($vendorId, 'receive_cash');

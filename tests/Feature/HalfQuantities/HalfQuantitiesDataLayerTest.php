@@ -27,24 +27,24 @@ function halvesShop(bool $halves = true, array $product = []): array
     $owner = User::factory()->create();
 
     $vendor = Vendor::create([
-        'user_id'                => $owner->id,
-        'name'                   => $halves ? 'Veruzo Wholesale Drink' : 'Corner Supermarket',
+        'user_id' => $owner->id,
+        'name' => $halves ? 'Veruzo Wholesale Drink' : 'Corner Supermarket',
         'pos_min_margin_percent' => 0,
-        'allow_half_quantities'  => $halves,
+        'allow_half_quantities' => $halves,
     ]);
 
     $product = Product::create(array_merge([
-        'vendor_id'                => $vendor->id,
-        'category_id'              => Category::create(['name' => 'Drinks '.uniqid()])->id,
-        'name'                     => 'Hero Lager',
-        'base_unit'                => 'Crate',
-        'price'                    => 10100,
-        'wholesale_price'          => 9600,
-        'cost_price'               => 8000,
+        'vendor_id' => $vendor->id,
+        'category_id' => Category::create(['name' => 'Drinks '.uniqid()])->id,
+        'name' => 'Hero Lager',
+        'base_unit' => 'Crate',
+        'price' => 10100,
+        'wholesale_price' => 9600,
+        'cost_price' => 8000,
         'allow_pos_price_override' => false,
-        'stock_quantity'           => 20,
-        'status'                   => 'published',
-        'show_in_pos'              => true,
+        'stock_quantity' => 20,
+        'status' => 'published',
+        'show_in_pos' => true,
     ], $product));
 
     $base = ProductUnit::where('product_id', $product->id)->where('is_base', true)->first();
@@ -60,13 +60,13 @@ function shelf(Product $product): ProductStoreStock
 function line(array $ctx, int|float|string $qty, string $type = 'retail', ?float $price = null): array
 {
     return [
-        'product_id'      => $ctx['product']->id,
-        'product_name'    => 'Hero Lager',
-        'unit_price'      => $price ?? ($type === 'wholesale' ? 9600 : 10100),
-        'quantity'        => $qty,
+        'product_id' => $ctx['product']->id,
+        'product_name' => 'Hero Lager',
+        'unit_price' => $price ?? ($type === 'wholesale' ? 9600 : 10100),
+        'quantity' => $qty,
         'product_unit_id' => $ctx['base']->id,
-        'unit_qty'        => $qty,
-        'price_type'      => $type,
+        'unit_qty' => $qty,
+        'price_type' => $type,
     ];
 }
 
@@ -215,7 +215,7 @@ it('keeps a product with only half a crate left out of the online catalogue', fu
 it('charges exactly half when no half price is set: ½ crate of ₦10,100 is ₦5,050', function () {
     $ctx = halvesShop();
 
-    $half    = resolveOne($ctx, line($ctx, 0.5));
+    $half = resolveOne($ctx, line($ctx, 0.5));
     $andHalf = resolveOne($ctx, line($ctx, 1.5));
 
     expect($half['line_gross'])->toBe(5050.0)

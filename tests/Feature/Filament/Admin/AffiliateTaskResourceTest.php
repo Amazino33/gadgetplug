@@ -40,10 +40,10 @@ test('creating a manual task from the admin UI persists it correctly', function 
 
     Livewire::test(CreateAffiliateTask::class)
         ->fillForm([
-            'name'               => 'Post to Facebook',
-            'task_type'          => 'manual',
-            'points_reward'      => 500,
-            'is_active'          => true,
+            'name' => 'Post to Facebook',
+            'task_type' => 'manual',
+            'points_reward' => 500,
+            'is_active' => true,
         ])
         ->call('create')
         ->assertHasNoFormErrors();
@@ -61,12 +61,12 @@ test('creating an auto task persists the metric and target correctly', function 
 
     Livewire::test(CreateAffiliateTask::class)
         ->fillForm([
-            'name'               => 'Reach ₦50,000',
-            'task_type'          => 'auto',
-            'auto_metric'        => 'cleared_sales_value',
-            'auto_target'        => 50000,
-            'points_reward'      => 1000,
-            'is_active'          => true,
+            'name' => 'Reach ₦50,000',
+            'task_type' => 'auto',
+            'auto_metric' => 'cleared_sales_value',
+            'auto_target' => 50000,
+            'points_reward' => 1000,
+            'is_active' => true,
         ])
         ->call('create')
         ->assertHasNoFormErrors();
@@ -82,11 +82,11 @@ test('the tasks list shows name, type, reward and submission count', function ()
     $this->actingAs(actingAsSuperAdminForTasks());
 
     AffiliateTask::create([
-        'name'               => 'Refer a friend',
-        'task_type'          => 'manual',
-        'verification_type'  => 'manual',
-        'points_reward'      => 250,
-        'is_active'          => true,
+        'name' => 'Refer a friend',
+        'task_type' => 'manual',
+        'verification_type' => 'manual',
+        'points_reward' => 250,
+        'is_active' => true,
     ]);
 
     Livewire::test(ListAffiliateTasks::class)

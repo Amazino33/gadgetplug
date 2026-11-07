@@ -37,19 +37,19 @@ class PosSession extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'business_date'     => 'date',
-        'opening_float'     => 'decimal:2',
-        'closing_float'     => 'decimal:2',
-        'counted_cash'      => 'decimal:2',
-        'counted_terminal'  => 'decimal:2',
-        'expected_cash'     => 'decimal:2',
+        'business_date' => 'date',
+        'opening_float' => 'decimal:2',
+        'closing_float' => 'decimal:2',
+        'counted_cash' => 'decimal:2',
+        'counted_terminal' => 'decimal:2',
+        'expected_cash' => 'decimal:2',
         'expected_terminal' => 'decimal:2',
-        'cash_variance'     => 'decimal:2',
+        'cash_variance' => 'decimal:2',
         'terminal_variance' => 'decimal:2',
-        'breakdown'         => 'array',
-        'opened_at'         => 'datetime',
-        'closed_at'         => 'datetime',
-        'reviewed_at'       => 'datetime',
+        'breakdown' => 'array',
+        'opened_at' => 'datetime',
+        'closed_at' => 'datetime',
+        'reviewed_at' => 'datetime',
     ];
 
     /** Trading. Counting has not happened yet. */

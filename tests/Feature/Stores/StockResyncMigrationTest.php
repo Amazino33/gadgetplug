@@ -6,6 +6,11 @@ use App\Models\ProductStoreStock;
 use App\Models\Store;
 use App\Models\User;
 use App\Models\Vendor;
+use Database\Seeders\CategorySeeder;
+use Database\Seeders\ProductSeeder;
+use Database\Seeders\UserSeeder;
+use Database\Seeders\VendorPermissionsSeeder;
+use Database\Seeders\VendorSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 
@@ -20,7 +25,7 @@ function resyncVendor(): Vendor
 {
     return Vendor::create([
         'user_id' => User::factory()->create()->id,
-        'name'    => 'Resync Vendor '.uniqid(),
+        'name' => 'Resync Vendor '.uniqid(),
     ]);
 }
 
@@ -30,11 +35,11 @@ function resyncVendor(): Vendor
 function resyncProduct(Vendor $vendor, int $quantity, int $reserved = 0): Product
 {
     $product = Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => Category::create(['name' => 'Cat '.uniqid()])->id,
-        'name'           => 'Resync Product '.uniqid(),
-        'price'          => 1000,
-        'status'         => 'published',
+        'vendor_id' => $vendor->id,
+        'category_id' => Category::create(['name' => 'Cat '.uniqid()])->id,
+        'name' => 'Resync Product '.uniqid(),
+        'price' => 1000,
+        'status' => 'published',
     ]);
 
     DB::table('products')->where('id', $product->id)->update([
@@ -128,9 +133,9 @@ test('it aborts loudly when a product already holds stock at a second store', fu
     $second = Store::create(['vendor_id' => $vendor->id, 'name' => 'Second Branch']);
     DB::table('product_store_stock')->insert([
         'product_id' => $product->id,
-        'store_id'   => $second->id,
-        'quantity'   => 12,
-        'reserved'   => 0,
+        'store_id' => $second->id,
+        'quantity' => 12,
+        'reserved' => 0,
     ]);
 
     expect(fn () => runStockResync())
@@ -152,11 +157,11 @@ test('a freshly seeded database reconciles', function () {
     // migrate:fresh --seed must not produce a drifted database. ProductSeeder
     // needs the techhaven vendor and the category rows, so the chain runs in
     // the same order DatabaseSeeder uses.
-    $this->seed(Database\Seeders\VendorPermissionsSeeder::class);
-    $this->seed(Database\Seeders\CategorySeeder::class);
-    $this->seed(Database\Seeders\UserSeeder::class);
-    $this->seed(Database\Seeders\VendorSeeder::class);
-    $this->seed(Database\Seeders\ProductSeeder::class);
+    $this->seed(VendorPermissionsSeeder::class);
+    $this->seed(CategorySeeder::class);
+    $this->seed(UserSeeder::class);
+    $this->seed(VendorSeeder::class);
+    $this->seed(ProductSeeder::class);
 
     expect(Product::count())->toBeGreaterThan(0)
         ->and(ProductStoreStock::count())->toBe(Product::count());

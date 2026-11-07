@@ -1,20 +1,19 @@
 <?php
 
-use App\Filament\Vendor\Resources\CashSubmissions\CashSubmissionResource;
+use App\Actions\Cash\SubmitCashAction;
 use App\Filament\Vendor\Resources\CashSubmissions\Pages\ListCashSubmissions;
 use App\Filament\Vendor\Resources\Roles\RoleResource;
-use App\Models\CashSubmission;
 use App\Models\User;
-use App\Services\VendorRoles;
+use App\Models\Vendor;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
-require_once __DIR__ . '/Helpers.php';
+require_once __DIR__.'/Helpers.php';
 
 uses(RefreshDatabase::class);
 
-function cashPanel(App\Models\Vendor $vendor, User $user): void
+function cashPanel(Vendor $vendor, User $user): void
 {
     test()->actingAs($user);
     Filament::setCurrentPanel(Filament::getPanel('vendor'));
@@ -42,7 +41,7 @@ test('a handover is listed with both names and the difference', function () {
     $chioma = User::factory()->create(['name' => 'Chioma']);
 
     cashSale($vendor, $store, $chioma->id, ['total' => 50000]);
-    app(App\Actions\Cash\SubmitCashAction::class)
+    app(SubmitCashAction::class)
         ->execute($chioma, $oga, $store, 47000, 'Bought diesel');
 
     cashPanel($vendor, $oga);
@@ -63,7 +62,7 @@ test('only the receiver is offered the confirm action', function () {
     $chioma->assignRole('storekeeper');
 
     cashSale($vendor, $store, $chioma->id, ['total' => 50000]);
-    $submission = app(App\Actions\Cash\SubmitCashAction::class)->execute($chioma, $oga, $store, 50000);
+    $submission = app(SubmitCashAction::class)->execute($chioma, $oga, $store, 50000);
 
     cashPanel($vendor, $oga);
     Livewire::test(ListCashSubmissions::class)
@@ -90,8 +89,8 @@ test('a storekeeper sees only handovers they are part of', function () {
     cashSale($vendor, $store, $chioma->id, ['total' => 20000]);
     cashSale($vendor, $store, $ibrahim->id, ['total' => 90000]);
 
-    $mine = app(App\Actions\Cash\SubmitCashAction::class)->execute($chioma, $oga, $store, 20000);
-    $theirs = app(App\Actions\Cash\SubmitCashAction::class)->execute($ibrahim, $oga, $store, 90000);
+    $mine = app(SubmitCashAction::class)->execute($chioma, $oga, $store, 20000);
+    $theirs = app(SubmitCashAction::class)->execute($ibrahim, $oga, $store, 90000);
 
     cashPanel($vendor, $chioma);
 

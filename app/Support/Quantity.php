@@ -48,7 +48,7 @@ final class Quantity
         // "19½" is 19.5 and "½" is 0.5; nothing else is rewritten.
         if (str_ends_with($text, '½')) {
             $whole = trim(mb_substr($text, 0, -1));
-            $text  = ($whole === '' ? '0' : $whole).'.5';
+            $text = ($whole === '' ? '0' : $whole).'.5';
         }
 
         return is_numeric($text) ? self::of($text) : null;
@@ -168,7 +168,7 @@ final class Quantity
             return '';
         }
 
-        $quantity    = self::of($value);
+        $quantity = self::of($value);
         $allowHalves = is_bool($halves) ? $halves : self::allowsHalves($halves);
 
         if (is_int($quantity)) {
@@ -176,7 +176,7 @@ final class Quantity
         }
 
         if ($allowHalves && self::hasHalf($quantity)) {
-            $sign  = $quantity < 0 ? '-' : '';
+            $sign = $quantity < 0 ? '-' : '';
             $whole = self::wholePart(abs($quantity));
 
             return $sign.($whole > 0 ? $whole : '').'½';

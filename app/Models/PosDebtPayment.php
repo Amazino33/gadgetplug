@@ -19,9 +19,9 @@ class PosDebtPayment extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'amount'       => 'decimal:2',
+        'amount' => 'decimal:2',
         'collected_at' => 'date',
-        'created_at'   => 'datetime',
+        'created_at' => 'datetime',
     ];
 
     public const METHODS = ['cash', 'card', 'bank_transfer'];

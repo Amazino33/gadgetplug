@@ -61,11 +61,11 @@ return new class extends Migration
     private function createDefaultStore(int $vendorId, $now): int
     {
         return (int) DB::table('stores')->insertGetId([
-            'vendor_id'  => $vendorId,
-            'name'       => self::DEFAULT_STORE_NAME,
-            'slug'       => $this->uniqueSlug($vendorId, self::DEFAULT_STORE_NAME),
+            'vendor_id' => $vendorId,
+            'name' => self::DEFAULT_STORE_NAME,
+            'slug' => $this->uniqueSlug($vendorId, self::DEFAULT_STORE_NAME),
             'is_default' => true,
-            'is_active'  => true,
+            'is_active' => true,
             'created_at' => $now,
             'updated_at' => $now,
         ]);
@@ -92,8 +92,8 @@ return new class extends Migration
         $rows = $memberIds->unique()
             ->diff($alreadyLinked)
             ->map(fn ($userId) => [
-                'store_id'   => $storeId,
-                'user_id'    => $userId,
+                'store_id' => $storeId,
+                'user_id' => $userId,
                 'created_at' => $now,
                 'updated_at' => $now,
             ])

@@ -2,9 +2,10 @@
 
 use App\Models\User;
 use App\Models\Vendor;
+use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Role;
+
 use function Pest\Laravel\actingAs;
-use function Pest\Laravel\get;
 use function Pest\Laravel\post;
 
 it('redirects customers to the storefront after login', function () {
@@ -31,7 +32,7 @@ it('redirects vendors to the vendor dashboard after login', function () {
     $user = User::factory()->create();
     $vendor = Vendor::factory()->create();
     // Attach user to vendor
-    \Illuminate\Support\Facades\DB::table('vendor_users')->insert([
+    DB::table('vendor_users')->insert([
         'vendor_id' => $vendor->id,
         'user_id' => $user->id,
     ]);
@@ -39,20 +40,20 @@ it('redirects vendors to the vendor dashboard after login', function () {
     post('/login', [
         'email' => $user->email,
         'password' => 'password',
-    ])->assertRedirect('/plug/' . $vendor->slug);
+    ])->assertRedirect('/plug/'.$vendor->slug);
 });
 
 it('bounces logged-in vendors off the storefront root', function () {
     $user = User::factory()->create();
     $vendor = Vendor::factory()->create();
-    \Illuminate\Support\Facades\DB::table('vendor_users')->insert([
+    DB::table('vendor_users')->insert([
         'vendor_id' => $vendor->id,
         'user_id' => $user->id,
     ]);
 
     actingAs($user)
         ->get('/')
-        ->assertRedirect('/plug/' . $vendor->slug);
+        ->assertRedirect('/plug/'.$vendor->slug);
 });
 
 it('lets logged-in customers visit the storefront root', function () {
@@ -66,12 +67,12 @@ it('lets logged-in customers visit the storefront root', function () {
 it('bounces logged-in vendors off the login page', function () {
     $user = User::factory()->create();
     $vendor = Vendor::factory()->create();
-    \Illuminate\Support\Facades\DB::table('vendor_users')->insert([
+    DB::table('vendor_users')->insert([
         'vendor_id' => $vendor->id,
         'user_id' => $user->id,
     ]);
 
     actingAs($user)
         ->get('/login')
-        ->assertRedirect('/plug/' . $vendor->slug);
+        ->assertRedirect('/plug/'.$vendor->slug);
 });

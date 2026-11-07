@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Validation\ValidationException;
 
 /**
  * A barcode that identifies a product, and optionally which unit of it.
@@ -40,7 +41,7 @@ class ProductBarcode extends Model
                 ->exists();
 
             if ($taken) {
-                throw \Illuminate\Validation\ValidationException::withMessages([
+                throw ValidationException::withMessages([
                     'barcode' => "Barcode {$barcode->barcode} is already used in this shop.",
                 ]);
             }

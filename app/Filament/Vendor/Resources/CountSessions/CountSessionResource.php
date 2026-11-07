@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Filament\Vendor\Resources\CountSessions;
 
-use App\Filament\Vendor\Resources\CountSessions\Pages;
 use App\Filament\Vendor\Resources\Products\Schemas\ProductForm;
 use App\Models\BlindCountSession;
 use Filament\Resources\Resource;
@@ -23,12 +22,15 @@ class CountSessionResource extends Resource
 
     protected static ?string $tenantOwnershipRelationshipName = 'vendor';
 
-    protected static string|null|\BackedEnum $navigationIcon  = 'heroicon-o-clipboard-document-check';
-    protected static string|null|UnitEnum    $navigationGroup = 'Inventory';
+    protected static string|null|\BackedEnum $navigationIcon = 'heroicon-o-clipboard-document-check';
+
+    protected static string|null|UnitEnum $navigationGroup = 'Inventory';
+
     // "Audit Sessions" is what this is called in the business. It replaces the
     // old screen of that name, which listed every counted line flat with
     // nothing grouping them — you audit a count, not a wall of product rows.
-    protected static ?string                 $navigationLabel = 'Audit Sessions';
+    protected static ?string $navigationLabel = 'Audit Sessions';
+
     protected static ?int $navigationSort = 4;
 
     // Without these, Filament titles the page from the model name and it reads
@@ -39,17 +41,26 @@ class CountSessionResource extends Resource
 
     public static function canAccess(): bool
     {
-        $user   = auth()->user();
+        $user = auth()->user();
         $vendor = filament()->getTenant();
 
         return $vendor && $user?->hasVendorPermission($vendor->id, 'view_audit_sessions');
     }
 
-    public static function canCreate(): bool { return false; }
+    public static function canCreate(): bool
+    {
+        return false;
+    }
 
-    public static function canEdit($record): bool { return false; }
+    public static function canEdit($record): bool
+    {
+        return false;
+    }
 
-    public static function canDelete($record): bool { return false; }
+    public static function canDelete($record): bool
+    {
+        return false;
+    }
 
     public static function getNavigationBadge(): ?string
     {
@@ -95,16 +106,16 @@ class CountSessionResource extends Resource
                     ->formatStateUsing(fn (string $state): string => match ($state) {
                         'a_counting' => 'First count in progress',
                         'b_counting' => 'Awaiting second counter',
-                        'completed'  => 'Completed',
-                        'cancelled'  => 'Cancelled',
-                        default      => ucfirst($state),
+                        'completed' => 'Completed',
+                        'cancelled' => 'Cancelled',
+                        default => ucfirst($state),
                     })
                     ->color(fn (string $state): string => match ($state) {
                         'a_counting' => 'warning',
                         'b_counting' => 'info',
-                        'completed'  => 'success',
-                        'cancelled'  => 'danger',
-                        default      => 'gray',
+                        'completed' => 'success',
+                        'cancelled' => 'danger',
+                        default => 'gray',
                     }),
 
                 TextColumn::make('storekeeperA.name')
@@ -133,9 +144,9 @@ class CountSessionResource extends Resource
                         return (string) $r->varianceLines()->count();
                     })
                     ->color(fn (BlindCountSession $r): string => match (true) {
-                        $r->isEntirelyUnmeasurable()    => 'gray',
+                        $r->isEntirelyUnmeasurable() => 'gray',
                         $r->varianceLines()->count() > 0 => 'danger',
-                        default                          => 'success',
+                        default => 'success',
                     })
                     ->tooltip(fn (BlindCountSession $r): ?string => $r->hasUnmeasurableLines()
                         ? $r->unmeasurableLines()->count().' line(s) have no recorded system figure, so their variance cannot be worked out.'
@@ -183,8 +194,8 @@ class CountSessionResource extends Resource
                     ->options([
                         'a_counting' => 'First count in progress',
                         'b_counting' => 'Awaiting second counter',
-                        'completed'  => 'Completed',
-                        'cancelled'  => 'Cancelled',
+                        'completed' => 'Completed',
+                        'cancelled' => 'Cancelled',
                     ]),
             ])
             // The row itself opens the session — this list exists to be drilled
@@ -203,7 +214,7 @@ class CountSessionResource extends Resource
     {
         return [
             'index' => Pages\ListCountSessions::route('/'),
-            'view'  => Pages\ViewCountSession::route('/{record}'),
+            'view' => Pages\ViewCountSession::route('/{record}'),
         ];
     }
 }

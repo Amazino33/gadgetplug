@@ -53,7 +53,7 @@ class MetaEventHasher
 
         return [
             'first' => $parts[0] ?? null,
-            'last'  => $parts[1] ?? null,
+            'last' => $parts[1] ?? null,
         ];
     }
 

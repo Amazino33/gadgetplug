@@ -28,7 +28,7 @@ class DistanceBandPricer
 
     /**
      * @param  array<int, array{from: mixed, to: mixed, mode: string, fee?: mixed}>  $bands
-     * @return Collection<int, array<string, mixed>>  one row per LGA that would change
+     * @return Collection<int, array<string, mixed>> one row per LGA that would change
      */
     public function preview(array $bands, ?int $stateId = null): Collection
     {
@@ -59,15 +59,15 @@ class DistanceBandPricer
                 }
 
                 return [
-                    'lga_id'       => $lga->id,
-                    'lga'          => $lga->name,
-                    'state'        => $lga->state->name,
-                    'km'           => $km,
-                    'from_mode'    => $current->mode,
-                    'from_fee'     => $current->fee,
-                    'from_source'  => $current->source,
-                    'to_mode'      => $band['mode'],
-                    'to_fee'       => $newFee,
+                    'lga_id' => $lga->id,
+                    'lga' => $lga->name,
+                    'state' => $lga->state->name,
+                    'km' => $km,
+                    'from_mode' => $current->mode,
+                    'from_fee' => $current->fee,
+                    'from_source' => $current->source,
+                    'to_mode' => $band['mode'],
+                    'to_fee' => $newFee,
                 ];
             })
             ->filter()
@@ -90,8 +90,8 @@ class DistanceBandPricer
             $existing = DeliveryRule::where('lga_id', $lga->id)->first();
 
             DeliveryRule::setForLga($lga, [
-                'mode'          => $change['to_mode'],
-                'fee'           => $change['to_fee'],
+                'mode' => $change['to_mode'],
+                'fee' => $change['to_fee'],
                 'expected_cost' => $existing?->expected_cost,
                 'delivery_days' => $existing?->delivery_days,
             ]);
@@ -107,9 +107,9 @@ class DistanceBandPricer
 
         foreach ($bands as $band) {
             $from = (float) ($band['from'] ?? 0);
-            $to   = filled($band['to'] ?? null) ? (float) $band['to'] : INF;
+            $to = filled($band['to'] ?? null) ? (float) $band['to'] : INF;
             $mode = (string) ($band['mode'] ?? '');
-            $fee  = (float) ($band['fee'] ?? 0);
+            $fee = (float) ($band['fee'] ?? 0);
 
             if (! in_array($mode, DeliveryRule::MODES, true)) {
                 throw new InvalidArgumentException('Each band needs a mode: free, fee or not delivered.');

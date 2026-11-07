@@ -50,7 +50,7 @@ class DeadStockCardProvider implements ReportCardProvider
 
         $headline = $deadStock->isEmpty()
             ? 'No dead stock candidates right now'
-            : '₦' . number_format($tiedUpValue, 2) . ' tied up in ' . $deadStock->count() . ' slow-moving/dead product' . ($deadStock->count() === 1 ? '' : 's');
+            : '₦'.number_format($tiedUpValue, 2).' tied up in '.$deadStock->count().' slow-moving/dead product'.($deadStock->count() === 1 ? '' : 's');
 
         return new CardSummary(
             key: 'dead_stock',

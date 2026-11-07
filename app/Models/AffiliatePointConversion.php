@@ -10,9 +10,9 @@ class AffiliatePointConversion extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'points_spent'    => 'integer',
+        'points_spent' => 'integer',
         'naira_per_point' => 'decimal:4',
-        'amount'          => 'decimal:2',
+        'amount' => 'decimal:2',
     ];
 
     public function affiliate(): BelongsTo

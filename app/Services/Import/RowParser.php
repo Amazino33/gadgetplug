@@ -21,17 +21,18 @@ use App\Support\Import\ProductField;
 class RowParser
 {
     private const TRUTHY = ['1', 'true', 'yes', 'y', 't', 'enabled', 'active', 'published', 'on', 'visible'];
-    private const FALSY  = ['0', 'false', 'no', 'n', 'f', 'disabled', 'inactive', 'draft', 'off', 'hidden'];
+
+    private const FALSY = ['0', 'false', 'no', 'n', 'f', 'disabled', 'inactive', 'draft', 'off', 'hidden'];
 
     /**
      * @param  array<string, string>  $record  header => raw cell
      * @param  array<string, string>  $mapping  header => ProductField value
-     * @return array{0: array<string, mixed>, 1: array<int, string>, 2: array<int, string>}  [values, errors, warnings]
+     * @return array{0: array<string, mixed>, 1: array<int, string>, 2: array<int, string>} [values, errors, warnings]
      */
     public function parse(array $record, array $mapping): array
     {
-        $values   = [];
-        $errors   = [];
+        $values = [];
+        $errors = [];
         $warnings = [];
 
         foreach ($mapping as $header => $fieldValue) {
@@ -82,7 +83,7 @@ class RowParser
                 FieldType::Decimal => $this->number($raw),
                 FieldType::Integer => $this->integer($raw),
                 FieldType::Boolean => $this->boolean($raw),
-                FieldType::Text    => $raw,
+                FieldType::Text => $raw,
             };
 
             if ($parsed === null && $field->type() !== FieldType::Text) {
@@ -173,7 +174,7 @@ class RowParser
             FieldType::Decimal => 'amount',
             FieldType::Integer => 'whole number',
             FieldType::Boolean => 'yes/no value',
-            FieldType::Text    => 'value',
+            FieldType::Text => 'value',
         };
     }
 }

@@ -22,12 +22,17 @@ use Throwable;
 // must be NGN before anything is marked paid.
 class ConfirmPaystackPaymentAction
 {
-    public const PAID         = 'paid';
-    public const ALREADY      = 'already';      // not pending any more — nothing done
+    public const PAID = 'paid';
+
+    public const ALREADY = 'already';      // not pending any more — nothing done
+
     public const FAILED_STOCK = 'failed_stock'; // paid, but a unit could not be reserved
-    public const NOT_FOUND    = 'not_found';    // no order with this reference
-    public const UNVERIFIED   = 'unverified';   // Paystack could not confirm (may be transient)
-    public const MISMATCH     = 'mismatch';     // Paystack says paid, but not for this order
+
+    public const NOT_FOUND = 'not_found';    // no order with this reference
+
+    public const UNVERIFIED = 'unverified';   // Paystack could not confirm (may be transient)
+
+    public const MISMATCH = 'mismatch';     // Paystack says paid, but not for this order
 
     public function __construct(
         private PaystackClient $paystack,
@@ -66,12 +71,12 @@ class ConfirmPaystackPaymentAction
         if ((int) ($transaction['amount'] ?? -1) !== $expectedKobo
             || strtoupper((string) ($transaction['currency'] ?? '')) !== 'NGN') {
             Log::error('Paystack payment does not match the order — not marking paid.', [
-                'checkout_id'   => $checkout?->id,
-                'order_ids'     => $orders->pluck('id')->all(),
-                'reference'     => $reference,
+                'checkout_id' => $checkout?->id,
+                'order_ids' => $orders->pluck('id')->all(),
+                'reference' => $reference,
                 'expected_kobo' => $expectedKobo,
-                'paid_kobo'     => $transaction['amount'] ?? null,
-                'currency'      => $transaction['currency'] ?? null,
+                'paid_kobo' => $transaction['amount'] ?? null,
+                'currency' => $transaction['currency'] ?? null,
             ]);
 
             return self::MISMATCH;
@@ -110,9 +115,9 @@ class ConfirmPaystackPaymentAction
                             }
 
                             $this->reserveStock->execute(
-                                productId:   $item->product_id,
-                                quantity:    $item->quantity,
-                                reference:   $order->reference,
+                                productId: $item->product_id,
+                                quantity: $item->quantity,
+                                reference: $order->reference,
                                 description: 'Reserved on Paystack payment confirmation.',
                                 orderItemId: $item->id,
                             );

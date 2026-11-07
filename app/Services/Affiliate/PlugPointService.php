@@ -63,10 +63,10 @@ class PlugPointService
 
         return $submission->plugPointTransactions()->create([
             'affiliate_id' => $submission->affiliate_id,
-            'type'         => 'credit',
-            'points'       => $points,
-            'source'       => $source,
-            'description'  => $description,
+            'type' => 'credit',
+            'points' => $points,
+            'source' => $source,
+            'description' => $description,
         ]);
     }
 
@@ -78,9 +78,9 @@ class PlugPointService
     public function adjust(Affiliate $affiliate, int $points, string $description): PlugPointTransaction
     {
         return $affiliate->plugPointTransactions()->create([
-            'type'        => $points >= 0 ? 'credit' : 'debit',
-            'points'      => $points,
-            'source'      => 'adjustment',
+            'type' => $points >= 0 ? 'credit' : 'debit',
+            'points' => $points,
+            'source' => 'adjustment',
             'description' => $description,
         ]);
     }

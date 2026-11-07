@@ -9,6 +9,7 @@ use App\Models\SupplierPayableEntry;
 use App\Models\User;
 use App\Models\WalletTransaction;
 use App\Services\Affiliate\ResellerCheckoutService;
+use App\Services\Affiliate\WalletService;
 use App\Services\Orders\InvalidOrderTransition;
 use App\Services\Orders\OrderStatusService;
 use App\Services\VendorLink\SupplierPayable;
@@ -111,7 +112,7 @@ it('credits the reseller\'s wallet back when a wallet order is cancelled', funct
         ['product' => $c['product'], 'quantity' => 2],
     ], 'Uyo — test address')->orders->sole();
 
-    $wallet = app(App\Services\Affiliate\WalletService::class);
+    $wallet = app(WalletService::class);
     $afterPurchase = $wallet->availableBalance($buyer->id);
 
     oss()->cancel($order->fresh(), $c['admin'], 'Out of stock');
@@ -142,7 +143,7 @@ it('refunds only the cancelled part of a mixed wallet checkout', function () {
 
     oss()->cancel($cancelled->fresh(), $a['admin'], 'This part is out of stock');
 
-    expect(app(App\Services\Affiliate\WalletService::class)->availableBalance($buyer->id))
+    expect(app(WalletService::class)->availableBalance($buyer->id))
         ->toBe(100000.0 - (float) $kept->total_amount)
         ->and(WalletTransaction::where('order_id', $kept->id)->where('type', 'credit')->exists())->toBeFalse()
         ->and(ossDue($a)->balance())->toBe((float) $kept->total_amount);
@@ -164,7 +165,7 @@ it('refunds once — a second refund attempt books nothing', function () {
     $refund->invoke(app(OrderStatusService::class), $order->fresh());
 
     expect(WalletTransaction::where('order_id', $order->id)->where('type', 'credit')->count())->toBe(1)
-        ->and(app(App\Services\Affiliate\WalletService::class)->availableBalance($buyer->id))->toBe(50000.0);
+        ->and(app(WalletService::class)->availableBalance($buyer->id))->toBe(50000.0);
 });
 
 it('never touches a wallet when a non-wallet order is cancelled', function () {

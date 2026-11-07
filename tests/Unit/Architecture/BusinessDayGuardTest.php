@@ -54,6 +54,8 @@ const OVERFLOW_RULE = [
 
 const UNTIL_FILTERS = 'until fix/lagos-day-filters (group C of the day-boundary audit)';
 
+const UNTIL_ASSISTANT_PHASE_1 = 'until assistant Phase 1 (hardening the existing assistant: the Lagos day everywhere)';
+
 /**
  * [file, rule, a fragment of the offending line, reason].
  * Matched by fragment, not line number, so unrelated edits don't break it.
@@ -81,6 +83,18 @@ const ALLOWLIST = [
     ['app/Services/Affiliate/ClickRewardService.php', "whereDate on timestamp 'qualified_at'", "whereDate('qualified_at'", UNTIL_FILTERS],
     // ReportPeriod "last month" overflows on 29–31 March etc.; NoOverflow on the next branch.
     ['app/Services/Reporting/ReportPeriod.php', 'overflowing month/year', "'last_month' => [\$now->subMonth()", UNTIL_FILTERS],
+
+    // ── The existing assistant (ab1860d): UTC-day usage, window and filters ──
+    // Fixed by Phase 1 of the assistant build (hardening the existing
+    // assistant, item 2 "the Lagos day everywhere"); see
+    // docs/ai-assistant/PROGRESS.md on feat/assistant-hardening.
+    ['app/Actions/Assistant/AskAssistantAction.php', 'now()->startOf/endOf', 'now()->subDays(7)->startOfDay()', UNTIL_ASSISTANT_PHASE_1],
+    ['app/Actions/Assistant/AskAssistantAction.php', 'today()', "->where('date', today())", UNTIL_ASSISTANT_PHASE_1],
+    ['app/Actions/Assistant/AskAssistantAction.php', 'today()', "'date' => today(),", UNTIL_ASSISTANT_PHASE_1],
+    ['app/Models/AssistantDailyUsage.php', 'today()', "'date' => today(),", UNTIL_ASSISTANT_PHASE_1],
+    ['app/Models/AssistantDailyUsage.php', 'today()', "->where('date', today())", UNTIL_ASSISTANT_PHASE_1],
+    ['app/Filament/Pages/AssistantUsageReport.php', 'today()', "->where('date', today())", UNTIL_ASSISTANT_PHASE_1],
+    ['app/Filament/Resources/AssistantMessages/Tables/AssistantMessagesTable.php', "whereDate on timestamp 'created_at'", "whereDate('created_at'", UNTIL_ASSISTANT_PHASE_1],
 
     // ── Not a trading-day question ────────────────────────────────────────
     ['app/Services/Messaging/MessagingService.php', 'now()->toDateString()', "'messaging.redirect-warned.'.now()->toDateString()",

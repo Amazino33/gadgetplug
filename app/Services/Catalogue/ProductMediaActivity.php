@@ -41,16 +41,16 @@ class ProductMediaActivity
     public static function log(Product $product, array $before, array $after, ?Authenticatable $causer): ?Activity
     {
         $beforeIds = array_column($before, 'id');
-        $afterIds  = array_column($after, 'id');
+        $afterIds = array_column($after, 'id');
 
-        $added   = array_values(array_filter($after, fn ($m) => ! in_array($m['id'], $beforeIds, true)));
+        $added = array_values(array_filter($after, fn ($m) => ! in_array($m['id'], $beforeIds, true)));
         $removed = array_values(array_filter($before, fn ($m) => ! in_array($m['id'], $afterIds, true)));
 
         // Reordered: the photos present both before and after no longer sit in
         // the same relative order. Additions and removals alone don't count.
-        $kept       = array_values(array_intersect($beforeIds, $afterIds));
-        $keptAfter  = array_values(array_intersect($afterIds, $beforeIds));
-        $reordered  = $kept !== $keptAfter;
+        $kept = array_values(array_intersect($beforeIds, $afterIds));
+        $keptAfter = array_values(array_intersect($afterIds, $beforeIds));
+        $reordered = $kept !== $keptAfter;
 
         $primaryChanged = ($beforeIds[0] ?? null) !== ($afterIds[0] ?? null);
 
@@ -63,12 +63,12 @@ class ProductMediaActivity
             ->causedBy($causer)
             ->event('media_updated')
             ->withProperties([
-                'added'           => $added,
-                'removed'         => $removed,
-                'reordered'       => $reordered,
+                'added' => $added,
+                'removed' => $removed,
+                'reordered' => $reordered,
                 'primary_changed' => $primaryChanged,
-                'before'          => $beforeIds,
-                'after'           => $afterIds,
+                'before' => $beforeIds,
+                'after' => $afterIds,
             ])
             ->tap(function (Activity $activity) use ($product): void {
                 // Same column Product::tapActivity fills, so the entry shows up

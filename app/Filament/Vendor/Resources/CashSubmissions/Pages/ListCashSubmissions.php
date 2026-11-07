@@ -83,9 +83,9 @@ class ListCashSubmissions extends ListRecords
                     try {
                         app(LogTillExpenseAction::class)->execute(
                             loggedBy: auth()->user(),
-                            store:    ActiveStore::currentId() ?? $vendor->defaultStore->id,
-                            amount:   (float) $data['amount'],
-                            reason:   $data['reason'],
+                            store: ActiveStore::currentId() ?? $vendor->defaultStore->id,
+                            amount: (float) $data['amount'],
+                            reason: $data['reason'],
                         );
                     } catch (Throwable $e) {
                         Notification::make()->title($e->getMessage())->danger()->send();
@@ -95,7 +95,7 @@ class ListCashSubmissions extends ListRecords
 
                     Notification::make()
                         ->title('Spending recorded')
-                        ->body('₦' . number_format((float) $data['amount'], 2) . ' comes off what you owe.')
+                        ->body('₦'.number_format((float) $data['amount'], 2).' comes off what you owe.')
                         ->success()
                         ->send();
                 }),
@@ -205,8 +205,8 @@ class ListCashSubmissions extends ListRecords
                     ->badge()
                     ->color(fn (string $state) => match ($state) {
                         CashSubmission::STATUS_CONFIRMED => 'success',
-                        CashSubmission::STATUS_DISPUTED  => 'danger',
-                        default                          => 'warning',
+                        CashSubmission::STATUS_DISPUTED => 'danger',
+                        default => 'warning',
                     })
                     ->description(fn (CashSubmission $record) => $record->dispute_note),
 
@@ -218,9 +218,9 @@ class ListCashSubmissions extends ListRecords
             ->filters([
                 Tables\Filters\SelectFilter::make('status')
                     ->options([
-                        CashSubmission::STATUS_PENDING   => 'Waiting to be confirmed',
+                        CashSubmission::STATUS_PENDING => 'Waiting to be confirmed',
                         CashSubmission::STATUS_CONFIRMED => 'Confirmed',
-                        CashSubmission::STATUS_DISPUTED  => 'Disputed',
+                        CashSubmission::STATUS_DISPUTED => 'Disputed',
                     ]),
 
                 Tables\Filters\Filter::make('short')
@@ -297,9 +297,9 @@ class ListCashSubmissions extends ListRecords
                         Radio::make('outcome')
                             ->label('What was agreed?')
                             ->options([
-                                CashSubmission::OUTCOME_ACCEPTED     => 'The full amount did arrive — accept the claim',
-                                CashSubmission::OUTCOME_CHARGED      => 'The difference is down to the submitter — charge them',
-                                CashSubmission::OUTCOME_WRITTEN_OFF  => 'Write the difference off — nobody pays it',
+                                CashSubmission::OUTCOME_ACCEPTED => 'The full amount did arrive — accept the claim',
+                                CashSubmission::OUTCOME_CHARGED => 'The difference is down to the submitter — charge them',
+                                CashSubmission::OUTCOME_WRITTEN_OFF => 'Write the difference off — nobody pays it',
                             ])
                             ->required(),
 

@@ -18,8 +18,8 @@ class CreateStore extends CreateRecord
         // vendor_id is set here rather than by Filament's tenancy: this
         // resource deliberately does not declare tenant ownership (see
         // StoreResource), so nothing else would fill it.
-        $data['vendor_id']  = filament()->getTenant()->id;
-        $data['is_active']  = true;
+        $data['vendor_id'] = filament()->getTenant()->id;
+        $data['is_active'] = true;
         $data['is_default'] = false;
 
         return $data;

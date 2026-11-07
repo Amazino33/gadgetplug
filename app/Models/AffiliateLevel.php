@@ -14,9 +14,9 @@ class AffiliateLevel extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'target'     => 'decimal:2',
+        'target' => 'decimal:2',
         'rate_value' => 'decimal:2',
-        'is_active'  => 'boolean',
+        'is_active' => 'boolean',
     ];
 
     public function getActivitylogOptions(): LogOptions

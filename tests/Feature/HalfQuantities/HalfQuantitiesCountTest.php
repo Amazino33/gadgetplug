@@ -20,15 +20,15 @@ use Livewire\Livewire;
 
 function halvesCountShop(bool $halves, int $participants, int|float $onShelf): array
 {
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
 
-    $owner  = User::factory()->create();
+    $owner = User::factory()->create();
     $vendor = Vendor::create([
-        'user_id'                      => $owner->id,
-        'name'                         => ($halves ? 'Veruzo Count ' : 'Mart Count ').uniqid(),
+        'user_id' => $owner->id,
+        'name' => ($halves ? 'Veruzo Count ' : 'Mart Count ').uniqid(),
         'pos_blind_count_participants' => $participants,
-        'pos_blind_count_frequency'    => 'none',
-        'allow_half_quantities'        => $halves,
+        'pos_blind_count_frequency' => 'none',
+        'allow_half_quantities' => $halves,
     ]);
     VendorRoles::seedFor($vendor);
 
@@ -42,15 +42,15 @@ function halvesCountShop(bool $halves, int $participants, int|float $onShelf): a
     });
 
     $product = Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => Category::create(['name' => 'Count Cat '.uniqid()])->id,
-        'name'           => 'Hero Lager',
-        'base_unit'      => 'Crate',
-        'price'          => 10100,
-        'cost_price'     => 8000,
+        'vendor_id' => $vendor->id,
+        'category_id' => Category::create(['name' => 'Count Cat '.uniqid()])->id,
+        'name' => 'Hero Lager',
+        'base_unit' => 'Crate',
+        'price' => 10100,
+        'cost_price' => 8000,
         'stock_quantity' => 0,
-        'status'         => 'published',
-        'published_at'   => now(),
+        'status' => 'published',
+        'published_at' => now(),
     ]);
     // Through the model, so the observer keeps products.stock_quantity in step.
     ProductStoreStock::where('product_id', $product->id)->firstOrFail()->update(['quantity' => $onShelf]);

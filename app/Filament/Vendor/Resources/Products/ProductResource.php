@@ -23,9 +23,13 @@ use Illuminate\Database\Eloquent\Model;
 class ProductResource extends Resource
 {
     protected static ?int $navigationSort = 1;
+
     protected static string|null|\UnitEnum $navigationGroup = 'Products';
+
     protected static ?string $model = Product::class;
+
     protected static ?string $tenantOwnershipRelationshipName = 'vendor';
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
     public static function form(Schema $schema): Schema
@@ -97,7 +101,8 @@ class ProductResource extends Resource
     public static function canAccess(): bool
     {
         $vendor = filament()->getTenant();
-        $user   = auth()->user();
+        $user = auth()->user();
+
         return $vendor && (
             $user->isSuperAdmin() ||
             $user->hasVendorPermission($vendor->id, 'view_any_products')
@@ -107,7 +112,8 @@ class ProductResource extends Resource
     public static function canCreate(): bool
     {
         $vendor = filament()->getTenant();
-        $user   = auth()->user();
+        $user = auth()->user();
+
         return $vendor && (
             $user->isSuperAdmin() ||
             $user->hasVendorPermission($vendor->id, 'create_products')
@@ -117,7 +123,8 @@ class ProductResource extends Resource
     public static function canView($record): bool
     {
         $vendor = filament()->getTenant();
-        $user   = auth()->user();
+        $user = auth()->user();
+
         return $vendor && (
             $user->isSuperAdmin() ||
             $user->hasVendorPermission($vendor->id, 'view_products')
@@ -127,7 +134,8 @@ class ProductResource extends Resource
     public static function canEdit($record): bool
     {
         $vendor = filament()->getTenant();
-        $user   = auth()->user();
+        $user = auth()->user();
+
         return $vendor && (
             $user->isSuperAdmin() ||
             $user->hasVendorPermission($vendor->id, 'edit_products')
@@ -137,7 +145,8 @@ class ProductResource extends Resource
     public static function canDelete($record): bool
     {
         $vendor = filament()->getTenant();
-        $user   = auth()->user();
+        $user = auth()->user();
+
         return $vendor && (
             $user->isSuperAdmin() ||
             $vendor->isOwner($user) ||
@@ -171,8 +180,9 @@ class ProductResource extends Resource
     public static function getDeleteAnyAuthorizationResponse(): Response
     {
         $vendor = filament()->getTenant();
-        $user   = auth()->user();
+        $user = auth()->user();
         $allowed = $vendor && ($user->isSuperAdmin() || $vendor->isOwner($user));
+
         return $allowed ? Response::allow() : Response::deny();
     }
 }

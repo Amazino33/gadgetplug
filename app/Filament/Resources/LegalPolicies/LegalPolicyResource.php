@@ -108,9 +108,9 @@ class LegalPolicyResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index'  => ListLegalPolicies::route('/'),
+            'index' => ListLegalPolicies::route('/'),
             'create' => CreateLegalPolicy::route('/create'),
-            'edit'   => EditLegalPolicy::route('/{record}/edit'),
+            'edit' => EditLegalPolicy::route('/{record}/edit'),
         ];
     }
 }

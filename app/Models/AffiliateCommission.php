@@ -11,10 +11,10 @@ class AffiliateCommission extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'amount'                   => 'decimal:2',
+        'amount' => 'decimal:2',
         'return_window_started_at' => 'datetime',
-        'available_at'             => 'datetime',
-        'rejected_at'              => 'datetime',
+        'available_at' => 'datetime',
+        'rejected_at' => 'datetime',
     ];
 
     public function affiliate(): BelongsTo

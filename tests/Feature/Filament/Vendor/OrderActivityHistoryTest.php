@@ -17,34 +17,34 @@ uses(RefreshDatabase::class);
 
 function setUpActivityHistoryVendor(): array
 {
-    $owner    = User::factory()->create(['name' => 'Jane Owner']);
-    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Activity History Store', 'online_sales_enabled' => true]);
+    $owner = User::factory()->create(['name' => 'Jane Owner']);
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Activity History Store', 'online_sales_enabled' => true]);
     $category = Category::create(['name' => 'Activity History Category']);
-    $product  = Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'name'           => 'Activity History Product',
-        'price'          => 4000,
+    $product = Product::create([
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'Activity History Product',
+        'price' => 4000,
         'stock_quantity' => 10,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
     $order = Order::create([
-        'reference'        => 'ORD-ACTIVITY-' . uniqid(),
-        'customer_name'    => 'Jane Customer',
-        'customer_email'   => 'jane@example.com',
-        'customer_phone'   => '08040000000',
+        'reference' => 'ORD-ACTIVITY-'.uniqid(),
+        'customer_name' => 'Jane Customer',
+        'customer_email' => 'jane@example.com',
+        'customer_phone' => '08040000000',
         'shipping_address' => '1 Test Street',
-        'total_amount'     => 4000,
-        'status'           => 'paid',
-        'payment_method'   => 'paystack',
+        'total_amount' => 4000,
+        'status' => 'paid',
+        'payment_method' => 'paystack',
     ]);
 
     $item = OrderItem::create([
-        'order_id'   => $order->id,
+        'order_id' => $order->id,
         'product_id' => $product->id,
-        'vendor_id'  => $vendor->id,
-        'quantity'   => 1,
+        'vendor_id' => $vendor->id,
+        'quantity' => 1,
         'unit_price' => 4000,
     ]);
 

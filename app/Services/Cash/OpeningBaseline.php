@@ -33,10 +33,10 @@ final class OpeningBaseline
 
     /**
      * @param  ?PhysicalStockCount  $selected  What the user picked, which is
-     *   only ever honoured on a first close. Passing one when a prior close
-     *   exists is refused rather than ignored — a caller passing it believes it
-     *   will be used, and silently substituting would break the chain in the
-     *   one place nobody would think to look.
+     *                                         only ever honoured on a first close. Passing one when a prior close
+     *                                         exists is refused rather than ignored — a caller passing it believes it
+     *                                         will be used, and silently substituting would break the chain in the
+     *                                         one place nobody would think to look.
      */
     public static function resolve(Store $store, ?PhysicalStockCount $selected = null): self
     {

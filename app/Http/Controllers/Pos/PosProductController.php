@@ -2,17 +2,17 @@
 
 namespace App\Http\Controllers\Pos;
 
-use App\Services\Pos\HalfPricing;
-use App\Support\Quantity;
 use App\Http\Controllers\Controller;
 use App\Models\Product;
 use App\Models\ProductBarcode;
 use App\Models\ProductStoreStock;
 use App\Models\ProductUnit;
-use App\Services\Inventory\NegativeStock;
 use App\Models\Vendor;
+use App\Services\Inventory\NegativeStock;
 use App\Services\Inventory\TillStore;
+use App\Services\Pos\HalfPricing;
 use App\Services\Pos\PosPriceFloor;
+use App\Support\Quantity;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -37,8 +37,8 @@ class PosProductController extends Controller
             // the request died, and the till silently kept whatever copy it
             // had — so only products a cashier had searched for would scan.
             // The till now asks for a page at a time, in id order.
-            'after_id'  => 'nullable|integer|min:0',
-            'limit'     => 'nullable|integer|min:1|max:1000',
+            'after_id' => 'nullable|integer|min:0',
+            'limit' => 'nullable|integer|min:1|max:1000',
         ]);
 
         $vendor = Vendor::findOrFail($request->vendor_id);
@@ -70,7 +70,7 @@ class PosProductController extends Controller
     {
         $request->validate([
             'vendor_id' => 'required|integer',
-            'code'      => 'required|string|max:100',
+            'code' => 'required|string|max:100',
         ]);
 
         $code = trim($request->code);
@@ -93,25 +93,23 @@ class PosProductController extends Controller
         }
 
         $storeId = TillStore::resolve($request->user(), (int) $request->vendor_id);
-        $vendor  = Vendor::find($request->vendor_id);
+        $vendor = Vendor::find($request->vendor_id);
 
         $live = Product::whereKey($product->id)->published()->exists();
-        $row  = ProductStoreStock::where('product_id', $product->id)->where('store_id', $storeId)->first();
+        $row = ProductStoreStock::where('product_id', $product->id)->where('store_id', $storeId)->first();
         $onShelf = $row ? Quantity::sub($row->quantity, $row->reserved) : 0;
 
         $reason = match (true) {
-            ! $live                       => 'it is not published (it is a draft, archived or scheduled). Set its Status to Published.',
-            ! $product->show_in_pos       => '"Show in POS" is turned off on the product.',
-            (int) $product->store_id !== $storeId
-                                          => 'it belongs to another branch.',
-            $onShelf <= 0 && ! NegativeStock::allowed($product, $vendor)
-                                          => 'it has no stock at this branch. Add stock with a count, a procurement or Stock Adjustment — or allow selling below zero.',
-            default                       => null,
+            ! $live => 'it is not published (it is a draft, archived or scheduled). Set its Status to Published.',
+            ! $product->show_in_pos => '"Show in POS" is turned off on the product.',
+            (int) $product->store_id !== $storeId => 'it belongs to another branch.',
+            $onShelf <= 0 && ! NegativeStock::allowed($product, $vendor) => 'it has no stock at this branch. Add stock with a count, a procurement or Stock Adjustment — or allow selling below zero.',
+            default => null,
         };
 
         return response()->json([
-            'found'  => true,
-            'name'   => $product->name,
+            'found' => true,
+            'name' => $product->name,
             'reason' => $reason,
         ]);
     }
@@ -127,7 +125,7 @@ class PosProductController extends Controller
     {
         $request->validate([
             'vendor_id' => 'required|integer',
-            'unit_id'   => 'required|integer',
+            'unit_id' => 'required|integer',
         ]);
 
         $product = Product::where('vendor_id', $request->vendor_id)->findOrFail($productId);
@@ -146,11 +144,11 @@ class PosProductController extends Controller
     {
         $request->validate([
             'vendor_id' => 'required|integer',
-            'q'         => 'required|string|min:1',
+            'q' => 'required|string|min:1',
         ]);
 
         $vendor = Vendor::findOrFail($request->vendor_id);
-        $q      = $request->q;
+        $q = $request->q;
 
         // Scoped identically to index(). Search matters just as much: it is
         // the till's fallback when a barcode misses the local cache, so an
@@ -246,41 +244,41 @@ class PosProductController extends Controller
         $minPrice = $this->priceFloor->floorFor($p, (float) ($vendor->pos_min_margin_percent ?? 0));
 
         return [
-            'id'              => $p->id,
-            'name'            => $p->name,
-            'sku'             => $p->sku,
-            'barcode'         => $p->barcode,
-            'price'           => (float) $p->price,
-            'min_price'       => $minPrice,
+            'id' => $p->id,
+            'name' => $p->name,
+            'sku' => $p->sku,
+            'barcode' => $p->barcode,
+            'price' => (float) $p->price,
+            'min_price' => $minPrice,
             // False when the product is locked, has no recorded cost, or is
             // already priced at its floor — in every case there's nothing to
             // haggle over, so the till shouldn't offer the option.
-            'can_negotiate'   => $minPrice < (float) $p->price,
+            'can_negotiate' => $minPrice < (float) $p->price,
             // The branch's own figures — storeAvailable()/isStoreLowStock()
             // read the store_quantity/store_reserved selected above and fall
             // back to the mirror when they are absent.
             'available_stock' => $p->storeAvailable(),
-            'is_low_stock'    => $p->isStoreLowStock(),
+            'is_low_stock' => $p->isStoreLowStock(),
             // Shown to the cashier so an override of an online reservation is
             // a deliberate choice, not a blind one — the goods are still
             // physically here (available_stock already accounts for this),
             // but someone is counting on them.
-            'reserved'        => $p->storeReserved(),
-            'image'           => $p->getFirstMediaUrl('product-images', 'thumb'),
+            'reserved' => $p->storeReserved(),
+            'image' => $p->getFirstMediaUrl('product-images', 'thumb'),
 
             // ── Selling units ──
             // Signed, unlike available_stock: a product sold below zero shows
             // what is owed rather than a flat 0.
-            'on_hand'         => $p->storeQuantity(),
-            'base_unit'       => $p->base_unit ?: 'Piece',
+            'on_hand' => $p->storeQuantity(),
+            'base_unit' => $p->base_unit ?: 'Piece',
             'default_unit_id' => $p->default_unit_id,
-            'allow_negative'  => NegativeStock::allowed($p, $vendor),
-            'units'           => $this->formatUnits($p, $vendor),
+            'allow_negative' => NegativeStock::allowed($p, $vendor),
+            'units' => $this->formatUnits($p, $vendor),
             // Every code this product answers to; unit_id null = base unit.
             // A bigger unit's SKU is listed with its barcodes: the till already
             // opens the right unit for any code in this list, and a SKU typed
             // or scanned is just another code for it.
-            'barcodes'        => $p->relationLoaded('barcodes')
+            'barcodes' => $p->relationLoaded('barcodes')
                 ? $p->barcodes->map(fn ($b) => ['barcode' => $b->barcode, 'unit_id' => $b->product_unit_id])
                     ->concat($p->relationLoaded('units')
                         ? $p->units->filter(fn ($u) => ! $u->is_base && filled($u->sku))
@@ -309,7 +307,7 @@ class PosProductController extends Controller
         return $p->units->where('is_active', true)->map(function (ProductUnit $u) use ($p, $margin, $halves) {
             // The base unit's retail price is the product's own price, which
             // for a resold listing is quoted live from the supplier.
-            $price     = $u->is_base ? (float) $p->price : (float) $u->price;
+            $price = $u->is_base ? (float) $p->price : (float) $u->price;
             $wholesale = $u->is_base
                 ? ($p->wholesale_price !== null ? (float) $p->wholesale_price : null)
                 : ($u->wholesale_price !== null ? (float) $u->wholesale_price : null);
@@ -320,17 +318,17 @@ class PosProductController extends Controller
             $half = $halves ? ['half_price' => HalfPricing::listHalfPrice($p, $u, 'retail')] : [];
 
             return $half + [
-                'id'                  => $u->id,
-                'name'                => $u->name,
-                'conversion_factor'   => (int) $u->conversion_factor,
-                'is_base'             => (bool) $u->is_base,
-                'price'               => $price,
-                'wholesale_price'     => $wholesale,
-                'min_price'           => $this->priceFloor->floorForUnit($p, $u, 'retail', $margin),
+                'id' => $u->id,
+                'name' => $u->name,
+                'conversion_factor' => (int) $u->conversion_factor,
+                'is_base' => (bool) $u->is_base,
+                'price' => $price,
+                'wholesale_price' => $wholesale,
+                'min_price' => $this->priceFloor->floorForUnit($p, $u, 'retail', $margin),
                 'wholesale_min_price' => $wholesale !== null
                     ? $this->priceFloor->floorForUnit($p, $u, 'wholesale', $margin)
                     : null,
-                'sort_order'          => (int) $u->sort_order,
+                'sort_order' => (int) $u->sort_order,
             ];
         })->values()->all();
     }

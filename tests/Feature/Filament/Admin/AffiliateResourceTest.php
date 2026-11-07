@@ -36,7 +36,7 @@ test('a regular vendor owner cannot access the affiliate resource', function () 
 });
 
 test('the affiliate resource cannot be deleted from', function () {
-    expect(AffiliateResource::canDelete(new Affiliate()))->toBeFalse();
+    expect(AffiliateResource::canDelete(new Affiliate))->toBeFalse();
 });
 
 test('creating an affiliate from an existing user auto-generates a unique code', function () {
@@ -46,7 +46,7 @@ test('creating an affiliate from an existing user auto-generates a unique code',
 
     Livewire::test(CreateAffiliate::class)
         ->fillForm([
-            'user_id'   => $candidate->id,
+            'user_id' => $candidate->id,
             'is_active' => true,
         ])
         ->call('create')

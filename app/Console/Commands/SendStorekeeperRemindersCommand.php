@@ -52,7 +52,7 @@ class SendStorekeeperRemindersCommand extends Command
             try {
                 $messages = array_filter([
                     'awaiting dispatch' => $notifier->undispatchedReminder($vendor, $now),
-                    'low stock'         => $notifier->lowStockAlert($vendor),
+                    'low stock' => $notifier->lowStockAlert($vendor),
                 ]);
             } catch (Throwable $e) {
                 Log::warning('Storekeeper reminder failed.', [

@@ -2,10 +2,10 @@
 
 namespace App\Filament\Vendor\Resources\Products\Pages;
 
-use App\Support\Quantity;
 use App\Filament\Vendor\Resources\Products\ProductResource;
 use App\Filament\Vendor\Resources\Products\Schemas\ProductForm;
 use App\Models\Product;
+use App\Support\Quantity;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Placeholder;
 use Filament\Resources\Pages\ViewRecord;
@@ -47,16 +47,16 @@ class ViewProduct extends ViewRecord
                                 ->label('')
                                 ->content(new HtmlString(
                                     '<div class="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">'
-                                        . e(trim(collect([$record->category?->name, $record->brand])->filter()->implode(' · ')) ?: '—')
-                                        . '<span>&middot;</span>'
-                                        . $this->statusBadge($record)
-                                    . '</div>'
+                                        .e(trim(collect([$record->category?->name, $record->brand])->filter()->implode(' · ')) ?: '—')
+                                        .'<span>&middot;</span>'
+                                        .$this->statusBadge($record)
+                                    .'</div>'
                                 )),
 
                             Placeholder::make('name')
                                 ->label('')
                                 ->content(new HtmlString(
-                                    '<h2 class="text-xl font-bold text-gray-950 dark:text-white">' . e($record->name) . '</h2>'
+                                    '<h2 class="text-xl font-bold text-gray-950 dark:text-white">'.e($record->name).'</h2>'
                                 )),
 
                             // Read-only here: GadgetPlug sets these for online search.
@@ -94,24 +94,24 @@ class ViewProduct extends ViewRecord
 
         $classes = match ($status) {
             'published' => 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-            'draft'     => 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
-            'archived'  => 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
-            'expired'   => 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-            default     => 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
+            'draft' => 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
+            'archived' => 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
+            'expired' => 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+            default => 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
         };
 
-        return '<span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ' . $classes . '">'
-            . e(ucfirst($status)) . '</span>';
+        return '<span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold '.$classes.'">'
+            .e(ucfirst($status)).'</span>';
     }
 
     private function money(?float $value): string
     {
-        return $value === null ? '—' : '₦' . number_format($value, 2);
+        return $value === null ? '—' : '₦'.number_format($value, 2);
     }
 
     private function percent(?float $value): string
     {
-        return $value === null ? '—' : number_format($value, 1) . '%';
+        return $value === null ? '—' : number_format($value, 1).'%';
     }
 
     private function pricingBlock(Product $record): string
@@ -136,9 +136,9 @@ class ViewProduct extends ViewRecord
         $html = '<div class="mt-4 rounded-xl border border-gray-200 dark:border-white/10 divide-y divide-gray-100 dark:divide-white/5">';
         foreach ($rows as [$label, $value]) {
             $html .= '<div class="flex items-center justify-between px-4 py-2.5">'
-                . '<span class="text-sm text-gray-500 dark:text-gray-400">' . e($label) . '</span>'
-                . '<span class="text-sm font-semibold text-gray-950 dark:text-white">' . e($value) . '</span>'
-                . '</div>';
+                .'<span class="text-sm text-gray-500 dark:text-gray-400">'.e($label).'</span>'
+                .'<span class="text-sm font-semibold text-gray-950 dark:text-white">'.e($value).'</span>'
+                .'</div>';
         }
         $html .= '</div>';
 
@@ -149,7 +149,7 @@ class ViewProduct extends ViewRecord
     {
         // The shop's own figures, halves included ("19½" for a shop that sells
         // them) — not available_stock, which is the online whole-unit figure.
-        $halves    = filament()->getTenant();
+        $halves = filament()->getTenant();
         $available = max(0, Quantity::sub($record->stock_quantity, $record->reserved_stock));
 
         $tiles = [
@@ -157,17 +157,17 @@ class ViewProduct extends ViewRecord
             ['Reserved', Quantity::format($record->reserved_stock, $halves), $record->reserved_stock > 0 ? 'text-yellow-600 dark:text-yellow-400' : 'text-gray-950 dark:text-white'],
             ['Available', Quantity::format($available, $halves), match (true) {
                 $available === 0 => 'text-red-600 dark:text-red-400',
-                $record->is_low_stock           => 'text-yellow-600 dark:text-yellow-400',
-                default                         => 'text-green-600 dark:text-green-400',
+                $record->is_low_stock => 'text-yellow-600 dark:text-yellow-400',
+                default => 'text-green-600 dark:text-green-400',
             }],
         ];
 
         $html = '<div class="mt-4 grid grid-cols-3 gap-3">';
         foreach ($tiles as [$label, $value, $colorClass]) {
             $html .= '<div class="rounded-xl border border-gray-200 dark:border-white/10 p-3 text-center">'
-                . '<p class="text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">' . e($label) . '</p>'
-                . '<p class="mt-1 text-xl font-bold ' . $colorClass . '">' . e((string) $value) . '</p>'
-                . '</div>';
+                .'<p class="text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">'.e($label).'</p>'
+                .'<p class="mt-1 text-xl font-bold '.$colorClass.'">'.e((string) $value).'</p>'
+                .'</div>';
         }
         $html .= '</div>';
 

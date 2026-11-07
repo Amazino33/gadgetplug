@@ -16,18 +16,18 @@ uses(RefreshDatabase::class);
 
 function cartServiceProduct(int $stock = 5): Product
 {
-    $owner    = User::factory()->create();
-    $vendor   = Vendor::create(['user_id' => $owner->id, 'name' => 'Cart Service Store', 'online_sales_enabled' => true]);
+    $owner = User::factory()->create();
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Cart Service Store', 'online_sales_enabled' => true]);
     $category = Category::create(['name' => 'Cart Service Category']);
 
     return Product::create([
-        'vendor_id'      => $vendor->id,
-        'category_id'    => $category->id,
-        'name'           => 'Cart Service Product',
-        'price'          => 2000,
+        'vendor_id' => $vendor->id,
+        'category_id' => $category->id,
+        'name' => 'Cart Service Product',
+        'price' => 2000,
         'stock_quantity' => $stock,
-        'status'         => 'published',
-        'show_online'    => true,
+        'status' => 'published',
+        'show_online' => true,
     ]);
 }
 

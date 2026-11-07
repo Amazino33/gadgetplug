@@ -1,6 +1,7 @@
 <?php
 
 use App\Filament\Vendor\Pages\NotificationSettings;
+use App\Models\DeliveryMessage;
 use App\Models\User;
 use App\Models\Vendor;
 use App\Models\VendorNotificationSetting;
@@ -9,6 +10,7 @@ use Database\Seeders\VendorPermissionsSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Spatie\Permission\Models\Role;
 
 uses(RefreshDatabase::class);
 
@@ -27,7 +29,7 @@ function actAsSettingsVendor(): array
 }
 
 test('a storekeeper cannot access the WhatsApp alert settings page', function () {
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
 
     $owner = User::factory()->create();
     $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Storekeeper Visibility Store']);
@@ -48,7 +50,7 @@ test('a storekeeper cannot access the WhatsApp alert settings page', function ()
 });
 
 test('a role explicitly granted manage_notification_settings can access the page', function () {
-    (new VendorPermissionsSeeder())->run();
+    (new VendorPermissionsSeeder)->run();
 
     $owner = User::factory()->create();
     $vendor = Vendor::create(['user_id' => $owner->id, 'name' => 'Delegated Settings Store']);
@@ -59,7 +61,7 @@ test('a role explicitly granted manage_notification_settings can access the page
     setPermissionsTeamId($vendor->id);
     $manager->assignRole('store_admin');
 
-    \Spatie\Permission\Models\Role::where(['name' => 'store_admin', 'team_id' => $vendor->id])
+    Role::where(['name' => 'store_admin', 'team_id' => $vendor->id])
         ->first()
         ->givePermissionTo('manage_notification_settings');
 
@@ -165,5 +167,5 @@ test('the test-reminder action warns instead of sending when no number is saved'
         ->callAction('sendTestReminder')
         ->assertNotified();
 
-    expect(\App\Models\DeliveryMessage::count())->toBe(0);
+    expect(DeliveryMessage::count())->toBe(0);
 });

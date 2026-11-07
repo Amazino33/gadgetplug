@@ -28,14 +28,17 @@ class DeliveryPersonResource extends Resource
 
     protected static ?string $tenantOwnershipRelationshipName = 'vendor';
 
-    protected static string|null|\BackedEnum $navigationIcon  = 'heroicon-o-truck';
-    protected static string|null|\UnitEnum  $navigationGroup = 'Logistics';
-    protected static ?string                $navigationLabel = 'Riders';
+    protected static string|null|\BackedEnum $navigationIcon = 'heroicon-o-truck';
+
+    protected static string|null|\UnitEnum $navigationGroup = 'Logistics';
+
+    protected static ?string $navigationLabel = 'Riders';
+
     protected static ?int $navigationSort = 2;
 
     public static function canAccess(): bool
     {
-        $user   = auth()->user();
+        $user = auth()->user();
         $vendor = filament()->getTenant();
 
         return $vendor && $user->hasVendorPermission($vendor->id, 'manage_logistics');

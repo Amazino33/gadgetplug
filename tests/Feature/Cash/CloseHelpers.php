@@ -7,38 +7,46 @@
 // declared in a sibling test vanishes when that file is run on its own.
 
 use App\Actions\Cash\CloseStoreAccountAction;
+use App\Actions\Cash\ResolveCashSubmissionAction;
+use App\Actions\Cash\SubmitCashAction;
 use App\Actions\Inventory\RecordPhysicalCountAction;
+use App\Models\AuditSession;
+use App\Models\BlindCountSession;
 use App\Models\Category;
+use App\Models\InventoryLedger;
 use App\Models\PhysicalStockCount;
+use App\Models\PosSale;
+use App\Models\PosSalePayment;
 use App\Models\Product;
 use App\Models\ProductStoreStock;
 use App\Models\Store;
 use App\Models\StoreAccountClose;
 use App\Models\User;
+use App\Services\Cash\StoreAccountCloseBalance;
 use Carbon\CarbonInterface;
 
-require_once __DIR__ . '/Helpers.php';
+require_once __DIR__.'/Helpers.php';
 
 /**
  * A branch with one product on the shelf and an owner who can close it.
  */
 function closeContext(int $onShelf = 10): array
 {
-    $vendor  = cashVendor();
-    $store   = $vendor->defaultStore;
-    $owner   = User::find($vendor->user_id);
+    $vendor = cashVendor();
+    $store = $vendor->defaultStore;
+    $owner = User::find($vendor->user_id);
     $cashier = User::factory()->create();
 
     $product = Product::create([
-        'vendor_id'      => $vendor->id,
-        'store_id'       => $store->id,
-        'category_id'    => Category::create(['name' => 'C' . uniqid()])->id,
-        'name'           => 'Closed Phone',
-        'price'          => 100000,
-        'cost_price'     => 60000,
+        'vendor_id' => $vendor->id,
+        'store_id' => $store->id,
+        'category_id' => Category::create(['name' => 'C'.uniqid()])->id,
+        'name' => 'Closed Phone',
+        'price' => 100000,
+        'cost_price' => 60000,
         'stock_quantity' => $onShelf,
         'reserved_stock' => 0,
-        'status'         => 'published',
+        'status' => 'published',
     ]);
 
     ProductStoreStock::updateOrCreate(
@@ -53,11 +61,11 @@ function closeContext(int $onShelf = 10): array
 function closeCount(array $ctx, int $found, ?Store $store = null): PhysicalStockCount
 {
     return app(RecordPhysicalCountAction::class)->execute(
-        countedBy:   $ctx['owner'],
-        store:       $store ?? $ctx['store'],
+        countedBy: $ctx['owner'],
+        store: $store ?? $ctx['store'],
         periodStart: now()->subWeek(),
-        periodEnd:   now(),
-        counts:      [$ctx['product']->id => $found],
+        periodEnd: now(),
+        counts: [$ctx['product']->id => $found],
     );
 }
 
@@ -71,11 +79,11 @@ function closeFigures(array $over = []): array
 {
     return array_replace_recursive([
         'balance' => [
-            'value_sold'      => 100000.0,
+            'value_sold' => 100000.0,
             'submitted_total' => 100000.0,
-            'till_expenses'   => 0.0,
-            'period_debt'     => 0.0,
-            'shortage'        => 0.0,
+            'till_expenses' => 0.0,
+            'period_debt' => 0.0,
+            'shortage' => 0.0,
         ],
         'count_variance' => [
             'at_selling' => 0.0,
@@ -92,12 +100,12 @@ function closePeriod(
     array $figures = [],
 ): StoreAccountClose {
     return app(CloseStoreAccountAction::class)->execute(
-        closedBy:     $ctx['owner'],
-        store:        $ctx['store'],
-        from:         $from ?? now()->subMonth(),
-        to:           $to ?? now(),
+        closedBy: $ctx['owner'],
+        store: $ctx['store'],
+        from: $from ?? now()->subMonth(),
+        to: $to ?? now(),
         closingCount: $closingCount,
-        figures:      closeFigures($figures),
+        figures: closeFigures($figures),
         openingCount: $openingCount,
     );
 }
@@ -109,21 +117,21 @@ function closePeriod(
  * till writes and what every downstream reader sums — a fixture that skipped
  * them would be testing a shape production never produces.
  */
-function closeSale(array $ctx, string $method = 'cash', float $total = 100000, array $over = []): App\Models\PosSale
+function closeSale(array $ctx, string $method = 'cash', float $total = 100000, array $over = []): PosSale
 {
     $sale = cashSale($ctx['vendor'], $ctx['store'], $ctx['cashier']->id, array_merge([
-        'total'           => $total,
-        'subtotal'        => $total,
-        'payment_method'  => $method,
+        'total' => $total,
+        'subtotal' => $total,
+        'payment_method' => $method,
         'amount_tendered' => $method === 'cash' ? $total : 0,
-        'change_given'    => 0,
+        'change_given' => 0,
     ], $over));
 
     if ($method === 'debt') {
-        App\Models\PosSalePayment::create([
+        PosSalePayment::create([
             'pos_sale_id' => $sale->id,
-            'method'      => 'debt',
-            'amount'      => $total,
+            'method' => 'debt',
+            'amount' => $total,
         ]);
     }
 
@@ -131,21 +139,21 @@ function closeSale(array $ctx, string $method = 'cash', float $total = 100000, a
 }
 
 /** A split sale, with one tender row per leg exactly as the till writes it. */
-function closeSplitSale(array $ctx, float $cash, float $card): App\Models\PosSale
+function closeSplitSale(array $ctx, float $cash, float $card): PosSale
 {
     $sale = cashSale($ctx['vendor'], $ctx['store'], $ctx['cashier']->id, [
-        'total'           => $cash + $card,
-        'subtotal'        => $cash + $card,
-        'payment_method'  => 'split',
+        'total' => $cash + $card,
+        'subtotal' => $cash + $card,
+        'payment_method' => 'split',
         'amount_tendered' => $cash + $card,
-        'change_given'    => 0,
+        'change_given' => 0,
     ]);
 
     foreach ([['cash', $cash], ['card', $card]] as [$method, $amount]) {
-        App\Models\PosSalePayment::create([
+        PosSalePayment::create([
             'pos_sale_id' => $sale->id,
-            'method'      => $method,
-            'amount'      => $amount,
+            'method' => $method,
+            'amount' => $amount,
         ]);
     }
 
@@ -161,39 +169,39 @@ function closeSplitSale(array $ctx, float $cash, float $card): App\Models\PosSal
  */
 function closeRemit(array $ctx, float $amount, string $reason = 'Fixture handover'): void
 {
-    $submission = app(App\Actions\Cash\SubmitCashAction::class)->execute(
+    $submission = app(SubmitCashAction::class)->execute(
         submitter: $ctx['cashier'],
-        receiver:  $ctx['owner'],
-        store:     $ctx['store'],
-        amount:    $amount,
-        reason:    $reason,
+        receiver: $ctx['owner'],
+        store: $ctx['store'],
+        amount: $amount,
+        reason: $reason,
     );
 
-    app(App\Actions\Cash\ResolveCashSubmissionAction::class)->confirm($submission, $ctx['owner']);
+    app(ResolveCashSubmissionAction::class)->confirm($submission, $ctx['owner']);
 }
 
 /** A stock movement the branch made that was neither a sale nor a delivery. */
 function closeMovement(array $ctx, string $type, int $change): void
 {
-    App\Models\InventoryLedger::create([
-        'vendor_id'        => $ctx['vendor']->id,
-        'store_id'         => $ctx['store']->id,
-        'product_id'       => $ctx['product']->id,
+    InventoryLedger::create([
+        'vendor_id' => $ctx['vendor']->id,
+        'store_id' => $ctx['store']->id,
+        'product_id' => $ctx['product']->id,
         'transaction_type' => $type,
-        'quantity_change'  => $change,
+        'quantity_change' => $change,
     ]);
 }
 
 /** The live close view, over a window wide enough to hold everything just written. */
 function closeBalance(
     array $ctx,
-    ?App\Models\PhysicalStockCount $closingCount = null,
-    ?App\Models\PhysicalStockCount $openingCount = null,
+    ?PhysicalStockCount $closingCount = null,
+    ?PhysicalStockCount $openingCount = null,
 ): array {
-    return app(App\Services\Cash\StoreAccountCloseBalance::class)->for(
-        store:        $ctx['store'],
-        from:         now()->subMonth(),
-        to:           now()->addDay(),
+    return app(StoreAccountCloseBalance::class)->for(
+        store: $ctx['store'],
+        from: now()->subMonth(),
+        to: now()->addDay(),
         closingCount: $closingCount,
         openingCount: $openingCount,
     );
@@ -205,30 +213,30 @@ function closeBalance(
  *
  * @param  array<int, array{counted: ?int, system: int, status?: string, override?: int}>  $lines
  */
-function closeAuditSession(array $ctx, array $lines, array $over = []): App\Models\BlindCountSession
+function closeAuditSession(array $ctx, array $lines, array $over = []): BlindCountSession
 {
-    $session = App\Models\BlindCountSession::create(array_merge([
-        'vendor_id'        => $ctx['vendor']->id,
-        'store_id'         => $ctx['store']->id,
-        'status'           => 'completed',
-        'frequency'        => 'daily',
-        'product_order'    => array_keys($lines),
+    $session = BlindCountSession::create(array_merge([
+        'vendor_id' => $ctx['vendor']->id,
+        'store_id' => $ctx['store']->id,
+        'status' => 'completed',
+        'frequency' => 'daily',
+        'product_order' => array_keys($lines),
         'storekeeper_a_id' => $ctx['cashier']->id,
         'storekeeper_b_id' => $ctx['owner']->id,
     ], $over));
 
     foreach ($lines as $productId => $line) {
-        App\Models\AuditSession::create([
-            'vendor_id'              => $ctx['vendor']->id,
+        AuditSession::create([
+            'vendor_id' => $ctx['vendor']->id,
             'blind_count_session_id' => $session->id,
-            'product_id'             => $productId,
-            'system_quantity'        => $line['system'],
-            'storekeeper_a_id'       => $ctx['cashier']->id,
-            'storekeeper_b_id'       => $ctx['owner']->id,
-            'count_a'                => $line['counted'] ?? 0,
-            'count_b'                => $line['counted'] ?? 0,
+            'product_id' => $productId,
+            'system_quantity' => $line['system'],
+            'storekeeper_a_id' => $ctx['cashier']->id,
+            'storekeeper_b_id' => $ctx['owner']->id,
+            'count_a' => $line['counted'] ?? 0,
+            'count_b' => $line['counted'] ?? 0,
             'manager_override_count' => $line['override'] ?? null,
-            'status'                 => $line['status'] ?? 'verified',
+            'status' => $line['status'] ?? 'verified',
         ]);
     }
 
