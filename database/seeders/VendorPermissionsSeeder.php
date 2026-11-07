@@ -116,6 +116,17 @@ class VendorPermissionsSeeder extends Seeder
 
             // Reports Hub
             'view_reports_hub',
+
+            // Ask GadgetPlug (the AI assistant). All three are granted to no
+            // default role — owner only until a vendor hands them out. Also
+            // created by migration 2026_11_06_100001 for existing installs.
+            //   use_ai_assistant    — open the assistant at all
+            //   view_ai_alerts      — see the assistant's "worth checking" alerts
+            //   view_staff_activity — ask what other staff did (own activity
+            //                         needs no permission)
+            'use_ai_assistant',
+            'view_ai_alerts',
+            'view_staff_activity',
         ];
 
         foreach ($permissions as $permission) {

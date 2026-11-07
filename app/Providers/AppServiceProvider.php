@@ -29,7 +29,16 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Ask GadgetPlug. The model sits behind an interface so tests can
+        // script it; the tool list comes from config/assistant.php.
+        $this->app->bind(
+            \App\Services\Assistant\Llm\LanguageModel::class,
+            fn () => new \App\Services\Assistant\Llm\AnthropicLanguageModel,
+        );
+        $this->app->bind(
+            \App\Services\Assistant\Tools\ToolRegistry::class,
+            fn () => \App\Services\Assistant\Tools\ToolRegistry::fromConfig(),
+        );
     }
 
     /**
