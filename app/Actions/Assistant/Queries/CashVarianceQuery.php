@@ -9,6 +9,12 @@ use Carbon\CarbonInterface;
 
 class CashVarianceQuery extends BaseAssistantQuery
 {
+    /** Same gate as the Store Settlement screen. */
+    public function requiredPermission(): ?string
+    {
+        return 'view_store_settlement';
+    }
+
     public function supportsAggregate(): bool
     {
         return false;

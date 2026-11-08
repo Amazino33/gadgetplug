@@ -11,8 +11,10 @@ use App\Models\AssistantMessage;
 use App\Models\AssistantThread;
 use App\Models\Store;
 use App\Models\User;
+use App\Models\Vendor;
 use App\Services\ActiveStore;
 use App\Services\Assistant\AssistantAccess;
+use App\Services\Assistant\AssistantScope;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -30,10 +32,24 @@ class SendMessageAction
     /**
      * @return array{user_message: AssistantMessage, assistant_message: AssistantMessage, thread: AssistantThread}
      */
-    public function execute(User $user, ?AssistantThread $thread, string $content, ?int $storeId = null): array
+    /**
+     * @param  Vendor|null  $vendor  The business the question is asked in — the
+     *                               panel tenant. Null: no business context, and data is limited to
+     *                               stores the user owns (AssistantScope).
+     */
+    public function execute(User $user, ?AssistantThread $thread, string $content, ?int $storeId = null, ?Vendor $vendor = null): array
     {
+        // A thread belongs to one business. Continuing it from another
+        // business's panel is refused, not quietly answered with either's data.
+        if ($vendor && $thread && $thread->vendor_id !== null && (int) $thread->vendor_id !== (int) $vendor->id) {
+            throw new AuthorizationException('That conversation belongs to a different business.');
+        }
+
+        $vendor ??= $thread?->vendor;
+        $scope = AssistantScope::for($user, $vendor);
+
         // 1. Guard access
-        if (! AssistantAccess::isEnabledFor($user)) {
+        if (! AssistantAccess::isEnabledFor($user, $vendor)) {
             throw new AuthorizationException('AI Assistant is currently disabled.');
         }
 
@@ -52,13 +68,22 @@ class SendMessageAction
 
         // Snapshot current active store: thread.store_id is the primary store anchor
         $effectiveStoreId = $thread?->store_id ?? $storeId ?? ActiveStore::currentId() ?? $user->assistantSetting?->active_store_id;
+
+        // Only a store this user may see in this business is remembered or
+        // answered for; anything else (another business's active store, a
+        // revoked branch) is dropped here rather than stored as context.
+        if ($effectiveStoreId !== null && ! $scope->allows((int) $effectiveStoreId)) {
+            $effectiveStoreId = null;
+        }
+
         $activeStore = $effectiveStoreId ? Store::query()->find($effectiveStoreId) : null;
         $storeNameSnapshot = $activeStore?->name;
 
         // Step 1: Short transaction to persist user message and update store snapshot
-        [$currentThread, $userMessage] = DB::transaction(function () use ($user, $thread, $trimmed, $effectiveStoreId, $storeNameSnapshot) {
+        [$currentThread, $userMessage] = DB::transaction(function () use ($user, $thread, $trimmed, $effectiveStoreId, $storeNameSnapshot, $vendor) {
             $currentThread = $thread ?? AssistantThread::create([
                 'user_id' => $user->id,
+                'vendor_id' => $vendor?->id,
                 'last_message_at' => now(),
             ]);
 
@@ -79,9 +104,7 @@ class SendMessageAction
         });
 
         // Step 2: Ensure thread store is assigned
-        $ownedStores = Store::query()
-            ->whereHas('vendor', fn ($v) => $v->where('user_id', $user->id))
-            ->get();
+        $ownedStores = $scope->stores();
 
         if ($currentThread->store_id === null) {
             if ($ownedStores->count() === 1) {

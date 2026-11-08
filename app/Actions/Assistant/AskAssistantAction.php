@@ -16,6 +16,7 @@ use App\Models\Store;
 use App\Services\Assistant\AiClient;
 use App\Services\Assistant\AssistantAccess;
 use App\Services\Assistant\AssistantQueryRegistry;
+use App\Services\Assistant\AssistantScope;
 use App\Services\Assistant\CostCalculator;
 use App\Services\Assistant\PromptBuilder;
 use Carbon\Carbon;
@@ -45,8 +46,24 @@ class AskAssistantAction
     ): AssistantMessage {
         $user = $userMessage->user;
 
+        // The question is answered for the business the thread belongs to,
+        // and every query the model calls reads this same scope (see
+        // BaseAssistantQuery::accessScope()), not whatever auth() says.
+        $scope = AssistantScope::for($user, $thread->vendor);
+
+        return $scope->run(fn () => $this->answer($thread, $userMessage, $activeStore, $scope));
+    }
+
+    private function answer(
+        AssistantThread $thread,
+        AssistantMessage $userMessage,
+        ?Store $activeStore,
+        AssistantScope $scope,
+    ): AssistantMessage {
+        $user = $userMessage->user;
+
         // 1. Guard AssistantAccess and thread ownership
-        if (! AssistantAccess::isEnabledFor($user)) {
+        if (! AssistantAccess::isEnabledFor($user, $thread->vendor)) {
             throw new AuthorizationException('Assistant access is currently disabled for this user.');
         }
 
@@ -54,16 +71,9 @@ class AskAssistantAction
             throw new AuthorizationException('You do not own this assistant thread.');
         }
 
-        // 2. Active store defense-in-depth ownership verification
-        if ($activeStore !== null && ! $user->isSuperAdmin()) {
-            $isOwner = Store::query()
-                ->where('id', $activeStore->id)
-                ->whereHas('vendor', fn ($v) => $v->where('user_id', $user->id))
-                ->exists();
-
-            if (! $isOwner) {
-                throw new UnauthorizedStoreAccess("Store [{$activeStore->id}] is not owned by the authenticated vendor.");
-            }
+        // 2. Active store defense-in-depth: one this user may see in this business
+        if ($activeStore !== null && ! $scope->allows((int) $activeStore->id)) {
+            throw new UnauthorizedStoreAccess("Store [{$activeStore->id}] is not accessible to this user in this business.");
         }
 
         // 3. Load global settings at runtime (not cached)
@@ -73,10 +83,7 @@ class AskAssistantAction
         $maxTokens = (int) ($settings->max_tokens ?? 800);
 
         // 4. Build prompt & message history
-        $ownedStoreNames = Store::query()
-            ->whereHas('vendor', fn ($v) => $v->where('user_id', $user->id))
-            ->pluck('name')
-            ->all();
+        $ownedStoreNames = $scope->storeNames();
 
         $systemPrompt = $this->promptBuilder->systemPrompt(now(), $activeStore, $ownedStoreNames);
         $historyMessages = $this->promptBuilder->history($thread, $historyWindow, $userMessage->id);
@@ -166,7 +173,7 @@ class AskAssistantAction
 
                     if ($queryKey === 'switch_store') {
                         $targetStoreName = trim((string) ($args['store_name'] ?? ''));
-                        $resolved = app(SetThreadStoreAction::class)->resolveStoreByName((int) $user->id, $targetStoreName);
+                        $resolved = app(SetThreadStoreAction::class)->resolveStoreByName((int) $user->id, $targetStoreName, $scope);
 
                         if ($resolved['store'] === null) {
                             $toolPayload = ['error' => $resolved['error'] ?? 'No store with that exact name, or multiple matches.'];

@@ -15,6 +15,7 @@ class AssistantThread extends Model
 
     protected $fillable = [
         'user_id',
+        'vendor_id',
         'store_id',
         'store_removed_at',
         'store_removed_name',
@@ -40,6 +41,12 @@ class AssistantThread extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /** The business this conversation belongs to (the panel tenant it was started in). */
+    public function vendor(): BelongsTo
+    {
+        return $this->belongsTo(Vendor::class);
     }
 
     public function store(): BelongsTo

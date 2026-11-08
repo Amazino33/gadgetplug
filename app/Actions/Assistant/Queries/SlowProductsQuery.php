@@ -13,6 +13,12 @@ use Illuminate\Support\Facades\DB;
 
 class SlowProductsQuery extends BaseAssistantQuery
 {
+    /** Same gate as the Inventory reports screen. */
+    public function requiredPermission(): ?string
+    {
+        return 'view_inventory_reports';
+    }
+
     public function supportsAggregate(): bool
     {
         return false;

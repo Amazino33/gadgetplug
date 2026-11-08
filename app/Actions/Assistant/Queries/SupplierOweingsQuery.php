@@ -9,6 +9,12 @@ use Carbon\CarbonInterface;
 
 class SupplierOweingsQuery extends BaseAssistantQuery
 {
+    /** Same gate as the Supplier Payables (owner-only page) screen. */
+    public function ownerOnly(): bool
+    {
+        return true;
+    }
+
     public function supportsAggregate(): bool
     {
         return true;

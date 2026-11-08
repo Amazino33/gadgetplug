@@ -10,6 +10,12 @@ use Carbon\CarbonInterface;
 
 class PickerItemsOutQuery extends BaseAssistantQuery
 {
+    /** Same gate as the Pickers screen. */
+    public function requiredPermission(): ?string
+    {
+        return 'manage_pickings';
+    }
+
     public function supportsAggregate(): bool
     {
         return false;

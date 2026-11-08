@@ -12,6 +12,12 @@ use Illuminate\Support\Facades\DB;
 
 class SalesSummaryQuery extends BaseAssistantQuery
 {
+    /** Same gate as the Sales Report / dashboard sales screen. */
+    public function requiredPermission(): ?string
+    {
+        return 'view_inventory_reports';
+    }
+
     public function supportsAggregate(): bool
     {
         return true;

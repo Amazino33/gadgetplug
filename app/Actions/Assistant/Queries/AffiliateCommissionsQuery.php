@@ -10,6 +10,12 @@ use Carbon\CarbonInterface;
 
 class AffiliateCommissionsQuery extends BaseAssistantQuery
 {
+    /** Same gate as the no vendor screen; owner-only screen. */
+    public function ownerOnly(): bool
+    {
+        return true;
+    }
+
     public function supportsAggregate(): bool
     {
         return true;

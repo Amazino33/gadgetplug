@@ -11,6 +11,12 @@ use Illuminate\Support\Carbon;
 
 class CustomerDebtsQuery extends BaseAssistantQuery
 {
+    /** Same gate as the Customer Debts screen. */
+    public function requiredPermission(): ?string
+    {
+        return 'view_customer_debts';
+    }
+
     public function supportsAggregate(): bool
     {
         return true;

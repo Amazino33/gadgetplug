@@ -10,6 +10,12 @@ use Illuminate\Support\Facades\DB;
 
 class ExpenseSummaryQuery extends BaseAssistantQuery
 {
+    /** Same gate as the Expenses screen. */
+    public function requiredPermission(): ?string
+    {
+        return 'manage_expenses';
+    }
+
     public function supportsAggregate(): bool
     {
         return false;

@@ -26,7 +26,7 @@ test('system prompt contains today date and active store name', function () {
     expect($prompt)
         ->toContain(now()->format('Y-m-d'))
         ->toContain('Flagship Store')
-        ->toContain('Flagship Store, Online Store')
+        ->toContain('"Flagship Store", "Online Store"')
         ->toContain('GadgetPlug')
         ->toContain('divide ALL kobo values by 100 to get Naira before showing the user');
 });
@@ -149,6 +149,7 @@ test('systemPrompt contains each of the reason translations and stays in sync wi
         'no_sales_yet' => 'nothing has sold yet',
         'not_configured' => 'that isn\'t set up yet',
         'internal_error' => 'something went wrong on our side',
+        'no_access' => "you don't have access to that",
     ];
 
     foreach (QueryResult::REASONS as $reason) {

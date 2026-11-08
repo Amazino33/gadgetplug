@@ -7,6 +7,7 @@ namespace App\Services\Assistant;
 use App\Models\AssistantGlobalSetting;
 use App\Models\AssistantSetting;
 use App\Models\User;
+use App\Models\Vendor;
 use Illuminate\Database\QueryException;
 
 class AssistantAccess
@@ -15,9 +16,17 @@ class AssistantAccess
      * Check if the assistant is enabled for this user.
      * Pure read operation — never writes to DB or triggers race conditions under concurrency.
      */
-    public static function isEnabledFor(?User $user): bool
+    public static function isEnabledFor(?User $user, ?Vendor $vendor = null): bool
     {
         if (! $user) {
+            return false;
+        }
+
+        // Inside a business (the chat bubble's panel tenant), the assistant is
+        // a permission like any other: owner-only by default, grantable to a
+        // role. Without a vendor the old switches alone decide, and data is
+        // then limited to stores the user owns (see AssistantScope).
+        if ($vendor && ! AssistantScope::for($user, $vendor)->can('use_ai_assistant')) {
             return false;
         }
 

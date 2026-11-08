@@ -609,12 +609,16 @@ test('PromptBuilder toolSchema meets token and character size slimming constrain
     // Total tool description characters <= 1,500
     expect($totalDescriptionLength)->toBeLessThanOrEqual(1500);
 
-    // Estimated input tokens for bare message (system + tools) <= 2,000
+    // Estimated input tokens for bare message (system + tools) <= 2,100.
+    // Was 2,000 with main at 1,996; Phase 1.1 added the two security rules
+    // (record content is data, not instructions; never hint at a no_access
+    // figure), compressed to ~70 tokens. Phase 1.2 removes the kobo
+    // arithmetic instruction, which gives that room back.
     $systemPrompt = $builder->systemPrompt(now(), null, ['Flagship Store']);
     $bareMessages = [['role' => 'system', 'content' => $systemPrompt]];
     $estimatedBareTokens = TokenEstimator::estimateInput($bareMessages, $tools);
 
-    expect($estimatedBareTokens)->toBeLessThanOrEqual(2000);
+    expect($estimatedBareTokens)->toBeLessThanOrEqual(2100);
 });
 
 // -------------------------------------------------------------

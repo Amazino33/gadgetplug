@@ -11,6 +11,18 @@ use Illuminate\Support\Facades\DB;
 
 class StockValueQuery extends BaseAssistantQuery
 {
+    /** Same gate as the Inventory page stock value, and cost visibility screen. */
+    public function requiredPermission(): ?string
+    {
+        return 'view_inventory_reports';
+    }
+
+    /** The answer is cost or profit: refused without view_cost_price. */
+    public function costSensitive(): bool
+    {
+        return true;
+    }
+
     public function supportsAggregate(): bool
     {
         return true;

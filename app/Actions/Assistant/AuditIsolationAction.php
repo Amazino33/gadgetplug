@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace App\Actions\Assistant;
 
 use App\Models\AssistantThread;
-use App\Models\Store;
 use App\Models\User;
+use App\Models\Vendor;
+use App\Services\Assistant\AssistantScope;
 
 class AuditIsolationAction
 {
@@ -27,13 +28,12 @@ class AuditIsolationAction
     }
 
     /**
-     * Determines whether the attempting user can query the given store (vendor-owner relationship).
+     * Whether the attempting user can query the given store — the same rule
+     * the queries enforce (AssistantScope): within a business, the stores
+     * ActiveStore gives them; without one, the stores they own.
      */
-    public function canQueryStore(User $attempting, int $storeId): bool
+    public function canQueryStore(User $attempting, int $storeId, ?Vendor $vendor = null): bool
     {
-        return Store::query()
-            ->where('id', $storeId)
-            ->whereHas('vendor', fn ($v) => $v->where('user_id', $attempting->id))
-            ->exists();
+        return AssistantScope::for($attempting, $vendor)->allows($storeId);
     }
 }

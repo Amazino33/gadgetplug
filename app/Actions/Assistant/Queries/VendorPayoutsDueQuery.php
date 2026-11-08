@@ -18,6 +18,12 @@ use Carbon\CarbonInterface;
  */
 class VendorPayoutsDueQuery extends BaseAssistantQuery
 {
+    /** Same gate as the Payouts screen. */
+    public function requiredPermission(): ?string
+    {
+        return 'view_payouts';
+    }
+
     public function supportsAggregate(): bool
     {
         return false;
