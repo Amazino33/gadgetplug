@@ -59,8 +59,8 @@ class VendorPayoutsDueQuery extends BaseAssistantQuery
         $paidNaira = (float) $payouts->where('status', 'paid')->sum('amount');
 
         return QueryResult::withData([
-            'pending_total' => (int) round($pendingNaira * 100),
-            'paid_total' => (int) round($paidNaira * 100),
+            ...self::naira('pending_total', $pendingNaira),
+            ...self::naira('paid_total', $paidNaira),
         ]);
     }
 }

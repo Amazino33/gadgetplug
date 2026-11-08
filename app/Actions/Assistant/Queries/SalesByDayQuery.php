@@ -4,14 +4,22 @@ declare(strict_types=1);
 
 namespace App\Actions\Assistant\Queries;
 
+use App\Exceptions\Assistant\DateRangeTooLarge;
 use App\Models\OrderItemStoreAllocation;
 use App\Models\PosSale;
 use App\Models\Store;
+use App\Services\Assistant\ReportedSales;
 use Carbon\CarbonInterface;
-use Illuminate\Support\Facades\DB;
 
+/**
+ * Revenue and orders per business day — one dashboard summary per day
+ * (ReportedSales::byDay), so each day matches the dashboard's own figure.
+ */
 class SalesByDayQuery extends BaseAssistantQuery
 {
+    /** One summary per day: a quarter at a time keeps it to a few hundred queries. */
+    public const MAX_DAYS = 92;
+
     /** Same gate as the Sales Report screen. */
     public function requiredPermission(): ?string
     {
@@ -37,51 +45,17 @@ class SalesByDayQuery extends BaseAssistantQuery
             }
         }
 
-        // 1. Grouped POS sales by day
-        $posDays = PosSale::query()
-            ->whereIn('pos_sales.store_id', $storeIds)
-            ->where('pos_sales.status', '!=', 'voided')
-            ->where(DB::raw('COALESCE(pos_sales.completed_at, pos_sales.created_at)'), '>=', $from)
-            ->where(DB::raw('COALESCE(pos_sales.completed_at, pos_sales.created_at)'), '<=', $to)
-            ->selectRaw('DATE(COALESCE(pos_sales.completed_at, pos_sales.created_at)) as day')
-            ->selectRaw('COALESCE(SUM(pos_sales.subtotal - pos_sales.discount_amount), 0) as revenue')
-            ->selectRaw('COUNT(*) as orders')
-            ->groupBy('day')
-            ->get()
-            ->keyBy('day');
-
-        // 2. Grouped Online sales by day
-        $onlineDays = OrderItemStoreAllocation::query()
-            ->join('order_items', 'order_items.id', '=', 'order_item_store_allocations.order_item_id')
-            ->join('orders', 'orders.id', '=', 'order_items.order_id')
-            ->whereIn('order_item_store_allocations.store_id', $storeIds)
-            ->whereNotNull('orders.revenue_recognized_at')
-            ->where('orders.revenue_recognized_at', '>=', $from)
-            ->where('orders.revenue_recognized_at', '<=', $to)
-            ->where('orders.status', '!=', 'cancelled')
-            ->selectRaw('DATE(orders.revenue_recognized_at) as day')
-            ->selectRaw('COALESCE(SUM(order_item_store_allocations.quantity * order_items.unit_price), 0) as revenue')
-            ->selectRaw('COUNT(DISTINCT orders.id) as orders')
-            ->groupBy('day')
-            ->get()
-            ->keyBy('day');
-
-        $allDates = $posDays->keys()->merge($onlineDays->keys())->unique()->sort()->values();
-
-        $days = [];
-        foreach ($allDates as $dateStr) {
-            $pos = $posDays->get($dateStr);
-            $online = $onlineDays->get($dateStr);
-
-            $revenueNaira = (float) ($pos->revenue ?? 0) + (float) ($online->revenue ?? 0);
-            $orders = (int) ($pos->orders ?? 0) + (int) ($online->orders ?? 0);
-
-            $days[] = [
-                'date' => (string) $dateStr,
-                'revenue' => (int) round($revenueNaira * 100),
-                'orders' => $orders,
-            ];
+        if ($from->diffInDays($to) > self::MAX_DAYS) {
+            throw new DateRangeTooLarge('sales_by_day covers up to '.self::MAX_DAYS.' days at a time; use sales_summary for longer periods.');
         }
+
+        // Days with nothing sold are left out, as before: a 30-day answer
+        // should not read out twenty zeros.
+        $days = collect(app(ReportedSales::class)->byDay($storeIds, $from, $to))
+            ->filter(fn (array $d) => $d['orders'] > 0 || $d['revenue'] != 0.0)
+            ->map(fn (array $d) => ['date' => $d['date'], ...self::naira('revenue', $d['revenue']), 'orders' => $d['orders']])
+            ->values()
+            ->all();
 
         return QueryResult::withData([
             'days' => $days,

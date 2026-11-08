@@ -94,7 +94,7 @@ class TopProductsQuery extends BaseAssistantQuery
             $combined[] = [
                 'product_id' => (int) $pId,
                 'name' => (string) ($productNames->get($pId) ?? 'Unknown Product'),
-                'revenue' => (int) round($revNaira * 100),
+                ...self::naira('revenue', $revNaira),
                 'units' => $units,
             ];
         }

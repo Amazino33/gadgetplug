@@ -52,7 +52,7 @@ class SupplierOweingsQuery extends BaseAssistantQuery
         }
 
         return QueryResult::withData([
-            'total_unpaid' => (int) round($totalUnpaidNaira * 100),
+            ...self::naira('total_unpaid', $totalUnpaidNaira),
             'invoices_count' => $unpaidProcurements->count(),
             'due_dates' => array_values(array_unique($dueDates)),
         ]);

@@ -171,7 +171,7 @@ test('staff see their assigned branch and are refused the other, which owners us
     $mine = scopingRun($staff, $ctx['vendor'], new SalesSummaryQuery, ['store_id' => $ctx['main']->id]);
 
     expect($mine['has_data'])->toBeTrue()
-        ->and($mine['revenue'])->toBe(400000)
+        ->and($mine['revenue'])->toBe(4000.0)
         ->and(AssistantScope::for($staff, $ctx['vendor'])->storeIds())->toBe([$ctx['main']->id])
         ->and(fn () => scopingRun($staff, $ctx['vendor'], new SalesSummaryQuery, ['store_id' => $ctx['branch']->id]))
         ->toThrow(UnauthorizedStoreAccess::class);
@@ -245,7 +245,7 @@ test('profit and stock-at-cost are refused without view_cost_price, and answered
     expect(scopingRun($manager, $ctx['vendor'], new ProfitQuery, $scope))->toBe(['has_data' => false, 'reason' => 'no_access'])
         ->and(scopingRun($manager, $ctx['vendor'], new StockValueQuery, $scope))->toBe(['has_data' => false, 'reason' => 'no_access'])
         // Revenue is theirs to see.
-        ->and(scopingRun($manager, $ctx['vendor'], new SalesSummaryQuery, $scope)['revenue'])->toBe(500000);
+        ->and(scopingRun($manager, $ctx['vendor'], new SalesSummaryQuery, $scope)['revenue'])->toBe(5000.0);
 
     Role::where('name', 'store_admin')->where('team_id', $ctx['vendor']->id)->first()->givePermissionTo('view_cost_price');
     app(PermissionRegistrar::class)->forgetCachedPermissions();

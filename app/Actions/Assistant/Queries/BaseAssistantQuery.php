@@ -10,6 +10,7 @@ use App\Exceptions\Assistant\InvalidScope;
 use App\Exceptions\Assistant\UnauthorizedStoreAccess;
 use App\Services\Assistant\AssistantScope;
 use App\Services\Assistant\CostFieldStripper;
+use App\Support\Naira;
 use Carbon\CarbonInterface;
 
 abstract class BaseAssistantQuery
@@ -63,6 +64,39 @@ abstract class BaseAssistantQuery
     public function costSensitive(): bool
     {
         return false;
+    }
+
+    /**
+     * A money figure as the model must quote it: naira, rounded to kobo, and
+     * the display string worked out here. The model is told to repeat the
+     * _display value and never to calculate money itself — so every total,
+     * difference and percentage it states comes from code.
+     *
+     * @return array<string, float|string>
+     */
+    protected static function naira(string $key, float|int|string|null $amount): array
+    {
+        $value = round((float) $amount, 2);
+
+        return [
+            $key => $value,
+            "{$key}_display" => Naira::format($value, '₦0'),
+        ];
+    }
+
+    /**
+     * A percentage worked out in code, with its display string (e.g. "+12.5%").
+     *
+     * @return array<string, float|string>
+     */
+    protected static function percent(string $key, float $value): array
+    {
+        $value = round($value, 1);
+
+        return [
+            $key => $value,
+            "{$key}_display" => ($value > 0 ? '+' : '').number_format($value, 1).'%',
+        ];
     }
 
     /**

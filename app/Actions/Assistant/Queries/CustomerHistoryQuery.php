@@ -77,7 +77,7 @@ class CustomerHistoryQuery extends BaseAssistantQuery
                 'date' => $date,
                 'product_name' => (string) $row->product_name,
                 'quantity' => fmod($qty, 1.0) === 0.0 ? (int) $qty : $qty,
-                'total_amount' => (int) round(((float) $row->total) * 100),
+                ...self::naira('total_amount', ((float) $row->total)),
             ];
         })->all();
 

@@ -52,9 +52,9 @@ class AffiliateCommissionsQuery extends BaseAssistantQuery
         $paidNaira = (float) $commissions->whereIn('status', ['available', 'paid'])->sum('amount');
 
         return QueryResult::withData([
-            'earned_total' => (int) round($earnedNaira * 100),
-            'pending_total' => (int) round($pendingNaira * 100),
-            'paid_total' => (int) round($paidNaira * 100),
+            ...self::naira('earned_total', $earnedNaira),
+            ...self::naira('pending_total', $pendingNaira),
+            ...self::naira('paid_total', $paidNaira),
         ]);
     }
 }

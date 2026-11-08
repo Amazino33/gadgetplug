@@ -28,7 +28,8 @@ test('system prompt contains today date and active store name', function () {
         ->toContain('Flagship Store')
         ->toContain('"Flagship Store", "Online Store"')
         ->toContain('GadgetPlug')
-        ->toContain('divide ALL kobo values by 100 to get Naira before showing the user');
+        ->toContain('quote each *_display value exactly')
+        ->not->toContain('kobo');
 });
 
 test('tool schema has 20 entries with valid JSON schema and slimmed descriptions', function () {
@@ -126,7 +127,7 @@ test('systemPrompt contains each of the reason translations and stays in sync wi
         ->and($prompt)->toContain("Never use filler phrases like 'Certainly!', 'I can help with that', or 'Great question'. Answer directly and concisely.")
         ->and($prompt)->toContain('If the CustomerDebtsQuery returns a debtors array, you may list their names and amounts if asked.')
         ->and($prompt)->toContain('If the user asks for multiple days, use the sales_by_day tool with a date range covering all requested days.')
-        ->and($prompt)->toContain('All currency values from tools are in KOBO. This includes nested fields inside arrays (like variance or amount). You must divide ALL kobo values by 100 to get Naira before showing the user.')
+        ->and($prompt)->toContain('Money in tool results is naira: quote each *_display value exactly. Never calculate money yourself.')
         ->and($prompt)->not->toContain("If the user asks for 'profit' or 'margin', you must reply: 'I can only track revenue right now, not profit margins.' Never substitute revenue for profit.")
         ->and($prompt)->not->toContain('but I can tell you about')
         ->and($prompt)->toContain("If the user asks something no tool can answer, say 'I can't check that yet.' You may offer alternatives if relevant, but do not read a fixed list of categories.")

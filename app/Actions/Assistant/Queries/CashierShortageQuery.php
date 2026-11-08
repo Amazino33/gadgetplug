@@ -49,7 +49,7 @@ class CashierShortageQuery extends BaseAssistantQuery
         foreach ($zReports as $report) {
             $shortages[] = [
                 'cashier_name' => (string) $report->cashier_name,
-                'variance' => (int) round(((float) $report->cash_variance) * 100),
+                ...self::naira('variance', ((float) $report->cash_variance)),
                 'date' => Carbon::parse($report->shortage_date)->format('Y-m-d'),
             ];
         }
@@ -74,7 +74,7 @@ class CashierShortageQuery extends BaseAssistantQuery
             foreach ($sessions as $session) {
                 $shortages[] = [
                     'cashier_name' => (string) $session->cashier_name,
-                    'variance' => (int) round(((float) $session->cash_variance) * 100),
+                    ...self::naira('variance', ((float) $session->cash_variance)),
                     'date' => Carbon::parse($session->shortage_date)->format('Y-m-d'),
                 ];
             }

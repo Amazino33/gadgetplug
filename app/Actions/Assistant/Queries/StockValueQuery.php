@@ -4,11 +4,16 @@ declare(strict_types=1);
 
 namespace App\Actions\Assistant\Queries;
 
-use App\Models\ProductStoreStock;
-use App\Models\StockCostLayer;
+use App\Services\Inventory\StoreStockMetrics;
 use Carbon\CarbonInterface;
-use Illuminate\Support\Facades\DB;
 
+/**
+ * Stock on hand at cost and at selling price — StoreStockMetrics, the figures
+ * the Stores overview, the Store Selector and Checkmate show for a branch.
+ * Valued at the product's current cost price; products with no cost price
+ * count as nothing and are reported, so a low total is never presented as
+ * complete.
+ */
 class StockValueQuery extends BaseAssistantQuery
 {
     /** Same gate as the Inventory page stock value, and cost visibility screen. */
@@ -31,31 +36,13 @@ class StockValueQuery extends BaseAssistantQuery
     protected function run(array $scope, CarbonInterface $from, CarbonInterface $to, array $options = []): array
     {
         $storeIds = $scope['resolved_store_ids'] ?? [];
-
-        // Total units across selected stores
-        $totalUnits = (int) ProductStoreStock::query()
-            ->whereIn('store_id', $storeIds)
-            ->sum('quantity');
-
-        // Check stock cost layers first
-        $layerCostNaira = (float) StockCostLayer::query()
-            ->whereIn('store_id', $storeIds)
-            ->where('quantity_remaining', '>', 0)
-            ->sum(DB::raw('quantity_remaining * unit_cost'));
-
-        if ($layerCostNaira <= 0) {
-            $stockTable = (new ProductStoreStock)->getTable();
-            // Fallback to product catalogue cost_price * store stock quantity
-            $layerCostNaira = (float) ProductStoreStock::query()
-                ->join('products', 'products.id', '=', "{$stockTable}.product_id")
-                ->whereIn("{$stockTable}.store_id", $storeIds)
-                ->where("{$stockTable}.quantity", '>', 0)
-                ->sum(DB::raw("{$stockTable}.quantity * COALESCE(products.cost_price, 0)"));
-        }
+        $metrics = StoreStockMetrics::forStores($storeIds);
 
         return QueryResult::withData([
-            'total_cost_value' => (int) round($layerCostNaira * 100),
-            'total_units' => $totalUnits,
+            ...self::naira('total_cost_value', $metrics->sum('cost_value')),
+            ...self::naira('total_retail_value', $metrics->sum('retail_value')),
+            'total_units' => $metrics->sum('units'),
+            'products_without_cost_price' => (int) $metrics->sum('missing_cost_count'),
         ]);
     }
 }

@@ -31,7 +31,7 @@ Source prompt: pasted at session start (2026-11-06). In a new session, re-paste 
 | Phase | What | Covered by main's assistant | Status |
 |---|---|---|---|
 | 0 | Recon (redone against `origin/main`, read-only) | — | **awaiting review** |
-| 1 | **Harden the existing assistant**: 1.1 security → 1.2 correctness → 1.3 visibility/cost → 1.4 provider | foundations exist | 1.1 done; **1.2 in progress** |
+| 1 | **Harden the existing assistant**: 1.1 security → 1.2 correctness → 1.3 visibility/cost → 1.4 provider | foundations exist | 1.1 done; 1.2 part one done (approved 2026-11-08); **1.3 in progress**; Lagos day + own sales wait for the merge |
 | 2 | Sales, products, prices, stock tools | **partly**: sales_summary, sales_by_day, top/slow products, revenue_vs_previous, low/out-of-stock, stock_value. **Missing:** find_product (fuzzy), product_price, per-store/combined stock_levels, search_records; reuse of SalesReportService | not started |
 | 3 | Margins + product movement | **partly**: profit (store-level), dead_stock, slow_products. **Missing:** per-product listed vs realized margin, below-cost list, velocity/days of cover (ProductVelocityService) | not started |
 | 4 | "Who did what" + logging gaps | **missing** | not started |
@@ -133,6 +133,42 @@ Four gates, each with its own review stop:
 - Money is still kobo, with the model dividing by 100 (1.2).
 - Report-service reuse and the Lagos day (1.2).
 - Till-only staff get `no_access` on sales rather than "your own sales" (an option for 1.2).
+
+### Phase 1.2 — correctness (part one done and approved 2026-11-08; Lagos day and own sales wait for `fix/lagos-day-boundary` on `main`)
+
+**Money is calculated in code.**
+- Every query returns naira (rounded to kobo) plus a `*_display` string formatted in code (`App\Support\Naira`), via `BaseAssistantQuery::naira()` / `percent()`. No kobo integers remain in any query.
+- The prompt's "divide ALL kobo values by 100" instruction is gone. It now says: "Money in tool results is naira: quote each *_display value exactly. Never calculate money yourself."
+- Percentages and differences the answer needs come from code: `revenue_vs_previous` returns `difference` and `percentage_change` with display strings, and `profit` returns `margin_percent`.
+
+**Report-service reuse, so the figures match the dashboard for the same store and range.**
+
+| Query | Now uses | Matches |
+|---|---|---|
+| sales_summary | `SalesReportService::summary()` via `ReportedSales` | dashboard Today's Sales / Sales Report (refunds netted, VAT excluded); all of a business's stores (more than one) = the dashboard's "All Stores" |
+| profit | same summary: revenue, cost, profit, margin, `cost_is_estimated` | dashboard profit |
+| revenue_vs_previous | two summaries, the same-length previous window | Sales Report "vs previous" |
+| sales_by_day | one summary per Lagos business day (`ReportedSales::byDay`), at most 92 days per call | each day = that day's dashboard figure; whole business = the revenue-trend chart's days |
+| customer_debts | `CustomerDebtService::aged()` (read-time FIFO); whole business = vendor-wide | Customer Debts widget (`vendorOutstanding`); adds **aging buckets** and days-oldest per debtor |
+| stock_value | `StoreStockMetrics::forStores()` | Stores overview / Store Selector / Checkmate |
+
+**Definition changes (deliberate, so the chat says what the screens say):**
+- Sales and profit now **net refunds**, which the old SQL did not.
+- Stock value now uses the **current cost price**, as the store screens do, instead of purchase cost layers. Products with no cost price are counted and reported.
+- Customer debt now applies **payments oldest-first** across branches, as the ledger does. The old query summed entries per branch, so a payment taken at another branch left a charge looking unpaid.
+
+**Left on their own SQL (no matching dashboard figure per store):** top_products, slow_products, dead_stock, cash_variance, cashier_shortages, supplier_oweings, vendor_payouts_due, affiliate_commissions, customer_history, expenses. All of them now return naira and display strings.
+
+**Tests:**
+- `tests/Feature/Assistant/Correctness/DashboardParityTest.php` (8). Each figure equals the dashboard service's for the same store and range, with refunds in the fixtures. All 8 fail against the 1.1 code and pass now.
+- Existing assistant tests were updated from the "integer kobo" contract to naira plus `*_display`, with the same money values (39 money assertions; 14 `is_int` checks became display-string checks).
+- Assistant and unit tests: 185 passed, plus the 1 baseline failure.
+
+**Owner decision (2026-11-08):** the three definition changes above are accepted.
+
+**Token ceiling:** prompt plus tools estimate is now **2,013** (it was 2,067 after 1.1). The test cap stays at 2,100 until the end of 1.2, when the Lagos-day and own-sales prompt changes are in, then comes back to 2,000 or lower, as decided.
+
+**Still to do in 1.2, once `fix/lagos-day-boundary` is merged to `main`:** the Lagos day throughout the assistant (prompt "today", `date_from`/`date_to` parsing, the 7-day default, the daily-usage date, the guard's "until assistant Phase 1" entries), then own sales for till-only staff (decided 2026-11-08).
 
 ## Phase 0 (redo) — gap analysis of main's assistant (origin/main `6f7d01c`, read-only, 2026-11-07)
 

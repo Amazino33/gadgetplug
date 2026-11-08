@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Actions\Assistant\Queries;
 
-use App\Models\OrderItemStoreAllocation;
-use App\Models\PosSale;
+use App\Services\Assistant\ReportedSales;
 use Carbon\CarbonInterface;
-use Illuminate\Support\Facades\DB;
 
+/**
+ * This period's revenue against the period of the same length just before
+ * it, both the dashboard's figure (SalesReportService::summary). The change
+ * is worked out here, never by the model.
+ */
 class RevenueVsPreviousQuery extends BaseAssistantQuery
 {
     /** Same gate as the Sales Report screen. */
@@ -25,50 +28,27 @@ class RevenueVsPreviousQuery extends BaseAssistantQuery
     protected function run(array $scope, CarbonInterface $from, CarbonInterface $to, array $options = []): array
     {
         $storeIds = $scope['resolved_store_ids'] ?? [];
+        $sales = app(ReportedSales::class);
 
-        $currentKobo = $this->calculateRevenue($storeIds, $from, $to);
+        $current = $sales->summary($storeIds, $from, $to)['revenue'];
 
         $durationSeconds = $from->diffInSeconds($to);
         $prevTo = $from->copy();
         $prevFrom = $from->copy()->subSeconds($durationSeconds);
 
-        $previousKobo = $this->calculateRevenue($storeIds, $prevFrom, $prevTo);
+        $previous = $sales->summary($storeIds, $prevFrom, $prevTo)['revenue'];
 
-        if ($previousKobo === 0) {
-            $percentageChange = $currentKobo > 0 ? 100.0 : 0.0;
-        } else {
-            $percentageChange = round((($currentKobo - $previousKobo) / $previousKobo) * 100, 2);
-        }
+        $percentageChange = $previous == 0.0
+            ? ($current > 0 ? 100.0 : 0.0)
+            : (($current - $previous) / $previous) * 100;
 
         return QueryResult::withData([
-            'current_revenue' => $currentKobo,
-            'previous_revenue' => $previousKobo,
-            'percentage_change' => $percentageChange,
+            ...self::naira('current_revenue', $current),
+            ...self::naira('previous_revenue', $previous),
+            ...self::naira('difference', $current - $previous),
+            ...self::percent('percentage_change', $percentageChange),
+            'previous_from' => $prevFrom->toDateString(),
+            'previous_to' => $prevTo->toDateString(),
         ]);
-    }
-
-    /**
-     * @param  array<int>  $storeIds
-     */
-    private function calculateRevenue(array $storeIds, CarbonInterface $from, CarbonInterface $to): int
-    {
-        $posRevenue = (float) (PosSale::query()
-            ->whereIn('pos_sales.store_id', $storeIds)
-            ->where('pos_sales.status', '!=', 'voided')
-            ->where(DB::raw('COALESCE(pos_sales.completed_at, pos_sales.created_at)'), '>=', $from)
-            ->where(DB::raw('COALESCE(pos_sales.completed_at, pos_sales.created_at)'), '<', $to)
-            ->sum(DB::raw('pos_sales.subtotal - pos_sales.discount_amount')) ?? 0);
-
-        $onlineRevenue = (float) (OrderItemStoreAllocation::query()
-            ->join('order_items', 'order_items.id', '=', 'order_item_store_allocations.order_item_id')
-            ->join('orders', 'orders.id', '=', 'order_items.order_id')
-            ->whereIn('order_item_store_allocations.store_id', $storeIds)
-            ->whereNotNull('orders.revenue_recognized_at')
-            ->where('orders.revenue_recognized_at', '>=', $from)
-            ->where('orders.revenue_recognized_at', '<', $to)
-            ->where('orders.status', '!=', 'cancelled')
-            ->sum(DB::raw('order_item_store_allocations.quantity * order_items.unit_price')) ?? 0);
-
-        return (int) round(($posRevenue + $onlineRevenue) * 100);
     }
 }

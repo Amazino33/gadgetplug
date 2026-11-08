@@ -627,7 +627,7 @@ test('multi-tool execution limit executes maximum 3 tool calls and sends synthet
     expect(AssistantQueryRun::where('message_id', $reply->id)->count())->toBe(3);
 });
 
-test('sales_by_day returns exact kobo integer 44220000 for 442200 naira sale on specific date', function () {
+test('sales_by_day returns exact naira 442200 with its display string for a 442200 naira sale on a specific date', function () {
     [$user, $vendor, $store] = createVendorContext();
     $thread = AssistantThread::create(['user_id' => $user->id]);
 
@@ -698,7 +698,8 @@ test('sales_by_day returns exact kobo integer 44220000 for 442200 naira sale on 
     expect($capturedToolPayload)->not->toBeNull()
         ->and($capturedToolPayload['has_data'])->toBeTrue()
         ->and($capturedToolPayload['days'])->toHaveCount(1)
-        ->and($capturedToolPayload['days'][0]['revenue'])->toBe(44220000)
+        ->and($capturedToolPayload['days'][0]['revenue'])->toEqual(442200)
+        ->and($capturedToolPayload['days'][0]['revenue_display'])->toBe('₦442,200')
         ->and($reply->content)->toContain('₦442,200.00');
 });
 
@@ -825,7 +826,7 @@ test('asking for customer history passes customer_name option to customer_histor
         ->and($run->success)->toBeTrue();
 });
 
-test('nested array kobo values are formatted as Naira in final response', function () {
+test('nested money values reach the model as naira with display strings, so it never converts them', function () {
     [$user, $vendor, $store] = createVendorContext();
     $thread = AssistantThread::create(['user_id' => $user->id]);
 
@@ -847,7 +848,8 @@ test('nested array kobo values are formatted as Naira in final response', functi
         ->withArgs(function ($messages) {
             $systemMsg = collect($messages)->firstWhere('role', 'system');
 
-            return str_contains($systemMsg['content'] ?? '', 'This includes nested fields inside arrays (like variance or amount). You must divide ALL kobo values by 100 to get Naira before showing the user.');
+            return str_contains($systemMsg['content'] ?? '', 'quote each *_display value exactly')
+                && ! str_contains($systemMsg['content'] ?? '', 'kobo');
         })
         ->andReturn([
             'content' => null,
@@ -865,7 +867,7 @@ test('nested array kobo values are formatted as Naira in final response', functi
             'usage' => ['prompt_tokens' => 80, 'completion_tokens' => 15, 'total_tokens' => 95],
         ]);
 
-    // In AI call #2, tool result has nested variance: 50000 (kobo), AI formats it to ₦500
+    // In AI call #2, the tool result has nested variance -500.0 with variance_display, quoted as is
     $mockAiClient->shouldReceive('chat')
         ->once()
         ->withArgs(function ($messages) {

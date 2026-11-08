@@ -55,17 +55,17 @@ class CashVarianceQuery extends BaseAssistantQuery
 
             $cashUps[] = [
                 'date' => $report->created_at->format('Y-m-d H:i:s'),
-                'expected' => (int) round($expected * 100),
-                'counted' => (int) round($counted * 100),
-                'variance' => (int) round($variance * 100),
+                ...self::naira('expected', $expected),
+                ...self::naira('counted', $counted),
+                ...self::naira('variance', $variance),
             ];
         }
 
         return QueryResult::withData([
             'cash_ups' => $cashUps,
-            'total_expected' => (int) round($totalExpectedNaira * 100),
-            'total_counted' => (int) round($totalCountedNaira * 100),
-            'total_variance' => (int) round($totalVarianceNaira * 100),
+            ...self::naira('total_expected', $totalExpectedNaira),
+            ...self::naira('total_counted', $totalCountedNaira),
+            ...self::naira('total_variance', $totalVarianceNaira),
         ]);
     }
 }

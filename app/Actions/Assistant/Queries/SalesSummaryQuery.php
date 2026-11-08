@@ -7,9 +7,13 @@ namespace App\Actions\Assistant\Queries;
 use App\Models\OrderItemStoreAllocation;
 use App\Models\PosSale;
 use App\Models\Store;
+use App\Services\Assistant\ReportedSales;
 use Carbon\CarbonInterface;
-use Illuminate\Support\Facades\DB;
 
+/**
+ * Revenue and orders — the dashboard's figure (SalesReportService::summary),
+ * net of discounts and refunds, excluding VAT. See ReportedSales.
+ */
 class SalesSummaryQuery extends BaseAssistantQuery
 {
     /** Same gate as the Sales Report / dashboard sales screen. */
@@ -37,35 +41,14 @@ class SalesSummaryQuery extends BaseAssistantQuery
             }
         }
 
-        // 1. POS sales
-        $posRow = PosSale::query()
-            ->whereIn('pos_sales.store_id', $storeIds)
-            ->where('pos_sales.status', '!=', 'voided')
-            ->where(DB::raw('COALESCE(pos_sales.completed_at, pos_sales.created_at)'), '>=', $from)
-            ->where(DB::raw('COALESCE(pos_sales.completed_at, pos_sales.created_at)'), '<=', $to)
-            ->selectRaw('COALESCE(SUM(pos_sales.subtotal - pos_sales.discount_amount), 0) as revenue')
-            ->selectRaw('COUNT(*) as orders')
-            ->first();
-
-        // 2. Online orders allocated to these branches
-        $onlineRow = OrderItemStoreAllocation::query()
-            ->join('order_items', 'order_items.id', '=', 'order_item_store_allocations.order_item_id')
-            ->join('orders', 'orders.id', '=', 'order_items.order_id')
-            ->whereIn('order_item_store_allocations.store_id', $storeIds)
-            ->whereNotNull('orders.revenue_recognized_at')
-            ->where('orders.revenue_recognized_at', '>=', $from)
-            ->where('orders.revenue_recognized_at', '<=', $to)
-            ->where('orders.status', '!=', 'cancelled')
-            ->selectRaw('COALESCE(SUM(order_item_store_allocations.quantity * order_items.unit_price), 0) as revenue')
-            ->selectRaw('COUNT(DISTINCT orders.id) as orders')
-            ->first();
-
-        $totalRevenueNaira = (float) ($posRow->revenue ?? 0) + (float) ($onlineRow->revenue ?? 0);
-        $totalOrders = (int) ($posRow->orders ?? 0) + (int) ($onlineRow->orders ?? 0);
+        $s = app(ReportedSales::class)->summary($storeIds, $from, $to);
 
         return QueryResult::withData([
-            'revenue' => (int) round($totalRevenueNaira * 100),
-            'orders' => $totalOrders,
+            ...self::naira('revenue', $s['revenue']),
+            'orders' => $s['orders'],
+            'units' => $s['units'],
+            ...self::naira('pos_revenue', $s['pos_revenue']),
+            ...self::naira('online_revenue', $s['online_revenue']),
         ]);
     }
 }
