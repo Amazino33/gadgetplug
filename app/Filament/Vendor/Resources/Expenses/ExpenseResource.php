@@ -7,6 +7,7 @@ use App\Filament\Vendor\Resources\Expenses\Pages\EditExpense;
 use App\Filament\Vendor\Resources\Expenses\Pages\ListExpenses;
 use App\Models\Expense;
 use App\Models\FinancialAccount;
+use App\Support\Pos\BusinessDate;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -85,7 +86,9 @@ class ExpenseResource extends Resource
                     DatePicker::make('incurred_at')
                         ->label('Date This Happened')
                         ->required()
-                        ->default(now())
+                        // The shop's today, not the server's: before 01:00 Lagos
+                        // now() is still yesterday in UTC.
+                        ->default(fn (): string => BusinessDate::today())
                         ->helperText('When the cost was incurred — not necessarily the same day you pay it.'),
 
                     Select::make('financial_account_id')

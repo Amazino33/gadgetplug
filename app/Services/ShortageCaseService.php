@@ -10,6 +10,7 @@ use App\Models\AuditSession;
 use App\Models\InventoryShortageCase;
 use App\Models\User;
 use App\Support\Accountability\FrozenLossSnapshot;
+use App\Support\Pos\BusinessDate;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -123,7 +124,7 @@ class ShortageCaseService
             round((float) $case->cost_component, 2),
             round((float) $case->margin_component, 2),
             'disposition',
-            now()->toDateString(),
+            BusinessDate::today(),
         );
 
         return $case->refresh();
@@ -172,7 +173,7 @@ class ShortageCaseService
                 round((float) $case->margin_component, 2),
                 round((float) $case->charge_amount, 2),
                 (bool) $case->price_fallback,
-                now()->toDateString(),
+                BusinessDate::today(),
             );
 
             return $case->refresh();
@@ -271,7 +272,7 @@ class ShortageCaseService
                 $split['recovered_cost'],
                 $split['recovered_margin'],
                 round(max($outstandingAfter, 0.0), 2),
-                now()->toDateString(),
+                BusinessDate::today(),
             );
 
             return $entry;
@@ -326,7 +327,7 @@ class ShortageCaseService
                 $split['unrecovered_cost'],
                 $split['unrecovered_margin'],
                 'conversion',
-                now()->toDateString(),
+                BusinessDate::today(),
             );
 
             return $entry;

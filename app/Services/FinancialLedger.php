@@ -6,6 +6,7 @@ use App\Models\FinancialAccount;
 use App\Models\FinancialLedgerEntry;
 use App\Models\Order;
 use App\Models\VendorPayout;
+use App\Support\Pos\BusinessDate;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -76,7 +77,7 @@ class FinancialLedger
                 'source_type' => $sourceType,
                 'source_id' => $sourceId,
                 'description' => $description,
-                'occurred_at' => $occurredAt?->toDateString() ?? now()->toDateString(),
+                'occurred_at' => BusinessDate::of($occurredAt) ?? BusinessDate::today(),
                 'created_by' => $createdBy,
                 // Which branch the money actually moved through. Optional and
                 // last so every existing caller keeps working unchanged; they

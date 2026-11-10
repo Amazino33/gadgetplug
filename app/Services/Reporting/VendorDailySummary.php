@@ -10,6 +10,7 @@ use App\Models\PosSalePayment;
 use App\Models\Procurement;
 use App\Models\Store;
 use App\Models\Vendor;
+use App\Support\Pos\BusinessDate;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 
@@ -39,8 +40,10 @@ class VendorDailySummary
      */
     public function build(Vendor $vendor, CarbonInterface $date): array
     {
-        $from = $date->copy()->startOfDay();
-        $to = $date->copy()->endOfDay();
+        // $date is a calendar date (the shop's yesterday, or --date). Its own
+        // startOfDay() was Lagos-zoned and compared as if UTC, so the summary
+        // covered 01:00–01:00; BusinessDate converts the trading day properly.
+        [$from, $to] = BusinessDate::boundsFor($date->toDateString());
 
         $vendorTotals = StoreSalesQuery::totals($vendor->id, null, $from, $to);
         $stores = $this->storeRows($vendor, $from, $to);

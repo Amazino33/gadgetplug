@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\AuditSession;
 use App\Models\StockAccountabilityEntry;
 use App\Models\User;
+use App\Support\Pos\BusinessDate;
 use App\Support\Quantity;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -92,7 +93,7 @@ class StockAccountabilityLedger
                 'reason_code' => $reasonCode,
                 'note' => $note,
                 'resolved_by' => $resolvedBy,
-                'occurred_at' => now()->toDateString(),
+                'occurred_at' => BusinessDate::today(),
             ]);
         });
     }
@@ -129,7 +130,7 @@ class StockAccountabilityLedger
                 'note' => $note,
                 'reverses_entry_id' => $entry->id,
                 'resolved_by' => $resolvedBy,
-                'occurred_at' => now()->toDateString(),
+                'occurred_at' => BusinessDate::today(),
             ]);
         });
     }
