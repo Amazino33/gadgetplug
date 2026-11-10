@@ -7,6 +7,7 @@ use App\Models\AssistantGlobalSetting;
 use App\Models\AssistantMessage;
 use App\Models\AssistantThread;
 use App\Models\AssistantVendorDailyUsage;
+use App\Models\Store;
 use App\Models\User;
 use App\Models\Vendor;
 use App\Services\Assistant\AiClient;
@@ -130,6 +131,35 @@ test('it counts toward the business\'s cap and stops at it, like the panel', fun
         ->expectsOutputToContain("Your business has used all 1 of today's questions")
         ->expectsOutputToContain('cap_reached')
         ->assertSuccessful();
+});
+
+test('with several branches, --store picks the branch, as choosing one in the chat bubble does', function () {
+    $ctx = askCmdVendor();
+    $branch = Store::create(['vendor_id' => $ctx['vendor']->id, 'name' => 'Terminal Ikeja']);
+    $branch->forceFill(['created_at' => now()->subDays(60)])->save();
+    askCmdModel([['content' => 'Hello from Ikeja.', 'tool_calls' => [], 'finish_reason' => 'stop', 'usage' => ['prompt_tokens' => 10, 'completion_tokens' => 2]]]);
+
+    // Without --store, a business with several branches is asked to pick one.
+    $this->artisan('assistant:ask', ['question' => 'Hi', '--user' => $ctx['owner']->id])
+        ->expectsOutputToContain('Pick a store to start.')
+        ->assertSuccessful();
+
+    $this->artisan('assistant:ask', ['question' => 'Hi', '--user' => $ctx['owner']->id, '--store' => $branch->id])
+        ->expectsOutputToContain('Hello from Ikeja.')
+        ->assertSuccessful();
+
+    expect(AssistantThread::query()->latest('id')->first()->store_id)->toBe($branch->id);
+});
+
+test('--store refuses a branch of another business', function () {
+    $a = askCmdVendor('Terminal A');
+    $b = askCmdVendor('Terminal B');
+
+    $this->artisan('assistant:ask', ['question' => 'Hi', '--user' => $a['owner']->id, '--store' => $b['vendor']->defaultStore->id])
+        ->expectsOutputToContain('cannot see that store')
+        ->assertFailed();
+
+    expect(AssistantMessage::count())->toBe(0);
 });
 
 test('an unknown user is an error, not a crash', function () {

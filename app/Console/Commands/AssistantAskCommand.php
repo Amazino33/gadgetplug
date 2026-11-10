@@ -4,13 +4,18 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Actions\Assistant\CreateThreadAction;
 use App\Actions\Assistant\PreflightCheckAction;
 use App\Actions\Assistant\SendMessageAction;
+use App\Actions\Assistant\SetThreadStoreAction;
+use App\Exceptions\Assistant\UnauthorizedStoreAccess;
 use App\Models\AssistantQueryRun;
 use App\Models\AssistantThread;
 use App\Models\AssistantVendorDailyUsage;
+use App\Models\Store;
 use App\Models\User;
 use App\Models\Vendor;
+use App\Services\Assistant\AssistantScope;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Auth;
@@ -62,6 +67,46 @@ class AssistantAskCommand extends Command
 
         // As in the panel: the asker is the signed-in user.
         Auth::setUser($user);
+
+        if ($thread !== null && ((int) $thread->user_id !== (int) $user->id || ($thread->vendor_id !== null && (int) $thread->vendor_id !== (int) $vendor->id))) {
+            $this->error('Refused: that conversation belongs to someone else or another business.');
+
+            return self::FAILURE;
+        }
+
+        // --store does what picking a branch in the chat bubble does: it sets
+        // the conversation's store. SendMessageAction answers a business with
+        // several branches only once its conversation has one.
+        if ($this->option('store') !== null) {
+            $store = Store::query()->find((int) $this->option('store'));
+
+            if (! $store) {
+                $this->error('No store with id '.$this->option('store').'.');
+
+                return self::FAILURE;
+            }
+
+            // Checked before anything is created, so a refusal leaves no trace.
+            if (! AssistantScope::for($user, $vendor)->allows((int) $store->id)) {
+                $this->error("Refused: {$user->email} cannot see that store in {$vendor->name}.");
+
+                return self::FAILURE;
+            }
+
+            $thread ??= app(CreateThreadAction::class)->execute($user, $vendor);
+
+            if ((int) $thread->store_id !== (int) $store->id) {
+                try {
+                    app(SetThreadStoreAction::class)->execute($thread, $store, 'cli');
+                } catch (UnauthorizedStoreAccess) {
+                    $this->error("Refused: {$user->email} cannot see that store in {$vendor->name}.");
+
+                    return self::FAILURE;
+                }
+
+                $thread = $thread->fresh();
+            }
+        }
 
         try {
             $result = $send->execute(
