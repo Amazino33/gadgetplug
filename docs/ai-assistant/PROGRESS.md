@@ -31,8 +31,8 @@ Source prompt: pasted at session start (2026-11-06). In a new session, re-paste 
 | Phase | What | Covered by main's assistant | Status |
 |---|---|---|---|
 | 0 | Recon (redone against `origin/main`, read-only) | — | **awaiting review** |
-| 1 | **Harden the existing assistant**: 1.1 security → 1.2 correctness → 1.3 visibility/cost → 1.4 provider | foundations exist | 1.1 done; 1.2 part one done; 1.3 done (committed); **1.2 part two (Lagos day) awaiting review**; own sales next |
-| 2 | Sales, products, prices, stock tools | **partly**: sales_summary, sales_by_day, top/slow products, revenue_vs_previous, low/out-of-stock, stock_value. **Missing:** find_product (fuzzy), product_price, per-store/combined stock_levels, search_records; reuse of SalesReportService | not started |
+| 1 | **Harden the existing assistant**: 1.1 security → 1.2 correctness → 1.3 visibility/cost → 1.4 provider | foundations exist | 1.1 done; 1.2 part one done; 1.3 done (committed); 1.2 part two done and on main (`f28581a`, 2026-11-10); own sales and 1.4 still to do |
+| 2 | Sales, products, prices, stock tools | **partly**: sales_summary, sales_by_day, top/slow products, revenue_vs_previous, low/out-of-stock, stock_value. **Missing:** find_product (fuzzy), product_price, per-store/combined stock_levels, search_records; reuse of SalesReportService | **built on feat/assistant-phase2, awaiting review** (find_products; low/out of stock rewritten) |
 | 3 | Margins + product movement | **partly**: profit (store-level), dead_stock, slow_products. **Missing:** per-product listed vs realized margin, below-cost list, velocity/days of cover (ProductVelocityService) | not started |
 | 4 | "Who did what" + logging gaps | **missing** | not started |
 | 5 | Purchase suggestions | **missing** | not started |
@@ -290,6 +290,70 @@ The 5 cap-wording assertions in CostControlsAndGuardrailsTest now expect the res
 **Decision (owner, 2026-11-10): failed questions count.** A question that reached the model counts toward the business's and the user's daily allowance even if it then failed (provider error, tool error, reply failed), so repeated failures cannot run up credit unchecked. That is how main's per-user counter already works. Briefly reversed the same day and put back before anything was committed. Refusals at the cap, and short-circuits that never call the model (new store, store not picked), do not count.
 
 **Deploy:** `php artisan migrate --force`. No seeder or permission change.
+
+## Phase 2: products, prices and stock (built 2026-11-10 on `feat/assistant-phase2`, awaiting review)
+
+**Why.** Live on 2026-11-10, "list all the power banks we have in store" and "how much is 20000mah power bank?" both got "I can't check that yet": there was no tool that could look up a product.
+
+**Recon findings (read-only):**
+- **One home store per product.** A product row belongs to one branch (`products.store_id`). Its stock is that branch's `product_store_stock` row, and the Products screen and the till both read that row. The same item at two branches is two rows, each with its own price, SKU and stock.
+- **A SKU is unique within a business** (`vendor_id + sku`), so two branches' rows never share one. Phase 0 decision 6 ("exact SKU first, then exact normalized name") therefore comes down to the normalized name as the only key that can join branches. A SKU or barcode still finds its own row exactly, and the same-named rows at other branches are brought in with it.
+- Prices:
+  - one selling price per product row, plus optional wholesale and half prices;
+  - extra selling units (crate = 12) carry their own price;
+  - resold ("linked") listings price and stock live from the supplier;
+  - services have no stock.
+- Quantities are DECIMAL and can hold halves (`Quantity`).
+- **The existing low_stock / out_of_stock tools disagreed with the screens.** They:
+  - looked at one store;
+  - answered `not_configured` unless the model invented a threshold;
+  - ignored each product's own `low_stock_threshold`;
+  - listed drafts, resold listings and services;
+  - dropped halves.
+- **Flag, not fixed: the dashboard Low Stock tile, for one store,** joins that store's stock row and otherwise falls back to the product's business-wide figure. It doesn't filter `products.store_id`, so a product homed at another branch can be counted in this store's tile. That is harmless while every product has a row only at its home store, but it is a latent miscount. It was left alone per the "flag, don't patch" rule and needs an owner decision.
+
+**Built:**
+- **`find_products`** (new tool, permission `view_any_products`, like the Products screen). It finds by exact code (SKU, barcode, an extra barcode, a unit's SKU), else by name word for word. That reuses the storefront's own `Product::searchCatalogue`: name, online name, brand, category. Each word loses a plural "s", so "power banks" finds "Power Bank". Failing that, it matches loosely, ignoring spaces, dashes and dots, as `match: possible`, and the prompt says to confirm a possible match before answering. Results:
+  - are grouped by item across branches, up to 8, most stock first;
+  - give price, wholesale price and cost per branch (cost is stripped without `view_cost_price`);
+  - give available stock with halves, plus a low-stock flag;
+  - list extra units and their prices;
+  - mark not-on-sale, resold and service items;
+  - give a combined total, and say whether the price differs by branch.
+  `in_stock_only` drops empty rows. Shared code is in `App\Services\Assistant\ProductCatalogue`.
+- **`low_stock` rewritten.** It uses each product's own low-stock level (0 < available < level), the rule behind the Products screen badge and the dashboard tile. An explicit threshold overrides it. It covers every branch in scope, only products on sale with their own stock, keeps halves, and returns up to 25 items plus a count.
+- **`out_of_stock` rewritten** the same way: available ≤ 0, products on sale with their own stock, every branch.
+- Prompt: one line for find_products. Five wordy lines were tightened to fit the new tool under the 2,000-token ceiling, which is now **1,982**.
+
+**Live check (local data, real key):**
+- "how much is iphone 15 pro and how many do we have?" gave ₦850,100, 2 at Main Store. The store row is 2, which is what the Products screen shows.
+- "list all the samsung products we have in store" gave the Galaxy Watch 6 (13) and Galaxy S24 (9, which is 10 less 1 reserved).
+- "do we have airpods?" gave AirPods Pro (2nd Gen), ₦160,000, 25.
+- "what is running low?" gave iPhone 15 Pro (2, level 5), the same as the dashboard tile for that store.
+
+**Tests:** `tests/Feature/Assistant/Products/FindProductsTest.php` (11) covers:
+- the live power-bank question, with a row per branch and a combined total;
+- plurals and in-stock-only;
+- SKU and barcode, with the other branch brought in;
+- possible matches, and no match;
+- halves, units, wholesale price and drafts;
+- staff limited to their branch, and no cost without `view_cost_price`;
+- refused without `view_any_products`;
+- another business never appears;
+- low stock and out of stock against the new rules;
+- through the model end to end.
+
+Updated tests:
+- the tool count is now 21 (22 with switch_store) across 6 files;
+- the prompt wording;
+- low stock without a threshold now uses product levels;
+- the "not set up" phrasing test now uses find_products with no query;
+- the aggregate refusal test now uses slow_products;
+- the old low/out test gives its products a home store.
+
+**Gate (2026-11-10, 13:51 to 14:28 UTC):** 3,332 tests (3,310 passed, 3 skipped). **19 failures, the baseline list by name**: nothing new, nothing gone.
+
+**Not in this phase:** `search_records` from the original phase table (searching customers, sales or other records) isn't built. It needs its own decisions about which records and who may see them.
 
 ## Phase 0 (redo) — gap analysis of main's assistant (origin/main `6f7d01c`, read-only, 2026-11-07)
 

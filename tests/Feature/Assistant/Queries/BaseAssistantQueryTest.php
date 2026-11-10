@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Actions\Assistant\Queries\LowStockQuery;
 use App\Actions\Assistant\Queries\SalesSummaryQuery;
+use App\Actions\Assistant\Queries\SlowProductsQuery;
 use App\Exceptions\Assistant\AggregateNotSupported;
 use App\Exceptions\Assistant\DateRangeTooLarge;
 use App\Exceptions\Assistant\InvalidScope;
@@ -81,8 +82,8 @@ test('multi-store scope on non-aggregate query throws AggregateNotSupported', fu
 
     $this->actingAs($user);
 
-    // LowStockQuery does NOT support aggregate
-    $query = new LowStockQuery;
+    // SlowProductsQuery does NOT support aggregate (LowStockQuery does since Phase 2)
+    $query = new SlowProductsQuery;
     expect(fn () => $query->execute([
         'store_ids' => [$store1->id, $store2->id],
     ], now()->subDays(7), now()))->toThrow(AggregateNotSupported::class);

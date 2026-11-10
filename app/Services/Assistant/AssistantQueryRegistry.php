@@ -12,6 +12,7 @@ use App\Actions\Assistant\Queries\CustomerDebtsQuery;
 use App\Actions\Assistant\Queries\CustomerHistoryQuery;
 use App\Actions\Assistant\Queries\DeadStockQuery;
 use App\Actions\Assistant\Queries\ExpenseSummaryQuery;
+use App\Actions\Assistant\Queries\FindProductsQuery;
 use App\Actions\Assistant\Queries\GlossaryQuery;
 use App\Actions\Assistant\Queries\LowStockQuery;
 use App\Actions\Assistant\Queries\OutOfStockQuery;
@@ -72,13 +73,13 @@ class AssistantQueryRegistry
         'low_stock' => [
             'class' => LowStockQuery::class,
             'description' => 'Products below stock threshold.',
-            'supports_aggregate' => false,
+            'supports_aggregate' => true,
             'default_period' => null,
         ],
         'out_of_stock' => [
             'class' => OutOfStockQuery::class,
             'description' => 'Products with zero stock.',
-            'supports_aggregate' => false,
+            'supports_aggregate' => true,
             'default_period' => null,
         ],
         'dead_stock' => [
@@ -127,6 +128,12 @@ class AssistantQueryRegistry
             'class' => PickerItemsOutQuery::class,
             'description' => 'Items released to pickers.',
             'supports_aggregate' => false,
+            'default_period' => null,
+        ],
+        'find_products' => [
+            'class' => FindProductsQuery::class,
+            'description' => 'Find products by name, SKU or barcode: price and stock per branch.',
+            'supports_aggregate' => true,
             'default_period' => null,
         ],
         'glossary' => [

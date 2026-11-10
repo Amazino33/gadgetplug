@@ -257,6 +257,11 @@ class AskAssistantAction
                         if (isset($args['term']) && ! isset($options['term'])) {
                             $options['term'] = $args['term'];
                         }
+                        foreach (['query', 'in_stock_only'] as $option) {
+                            if (isset($args[$option]) && ! isset($options[$option])) {
+                                $options[$option] = $args[$option];
+                            }
+                        }
 
                         // Execute query with duration measurement
                         $startTime = microtime(true);

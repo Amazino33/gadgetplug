@@ -166,14 +166,17 @@ test('DeadStockQuery on store < 30 days old returns empty with store_too_new', f
         ->and($result['reason'])->toBe('store_too_new');
 });
 
-test('LowStockQuery with no threshold option returns empty with not_configured', function () {
+// Phase 2: low stock used to answer "not set up" unless the model invented a
+// threshold. It now uses each product's own low-stock level, as the screens do.
+test('LowStockQuery with no threshold option uses each product\'s own low-stock level', function () {
     [$user, $vendor, $store] = setupHonestVendor(30);
 
     $query = new LowStockQuery;
     $result = $query->execute(['store_id' => $store->id], now()->subDays(7), now());
 
-    expect($result['has_data'])->toBeFalse()
-        ->and($result['reason'])->toBe('not_configured');
+    expect($result['has_data'])->toBeTrue()
+        ->and($result['threshold'])->toBe('each product\'s own low-stock level')
+        ->and($result['count'])->toBe(0);
 });
 
 test('GlossaryQuery with unknown term returns withData with found false', function () {
@@ -422,7 +425,7 @@ test('AI phrasing: refusal receives structured has_data false, phrases with offe
         ->and(preg_match('/\d/', $reply->content))->toBe(0);
 });
 
-test('AI phrasing: low stock without config returns set up explanation', function () {
+test('AI phrasing: a tool called without what it needs returns set up explanation', function () {
     [$user, $vendor, $store] = setupHonestVendor(30);
     $thread = AssistantThread::create(['user_id' => $user->id, 'store_id' => $store->id]);
 
@@ -431,7 +434,7 @@ test('AI phrasing: low stock without config returns set up explanation', functio
         'user_id' => $user->id,
         'store_id' => $store->id,
         'role' => 'user',
-        'content' => 'What is low on stock?',
+        'content' => 'Find me a product',
     ]);
 
     $mockAiClient = Mockery::mock(AiClient::class);
@@ -446,7 +449,7 @@ test('AI phrasing: low stock without config returns set up explanation', functio
                     'id' => 'call_ls_1',
                     'type' => 'function',
                     'function' => [
-                        'name' => 'low_stock',
+                        'name' => 'find_products',
                         'arguments' => json_encode(['store_id' => $store->id]),
                     ],
                 ],

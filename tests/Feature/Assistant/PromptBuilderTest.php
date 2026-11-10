@@ -39,7 +39,7 @@ test('tool schema has 20 entries with valid JSON schema and slimmed descriptions
 
     $tools = $builder->toolSchema($registry);
 
-    expect($tools)->toHaveCount(20);
+    expect($tools)->toHaveCount(21);
 
     $registryKeys = $registry->keys();
 
@@ -129,20 +129,19 @@ test('systemPrompt contains each of the reason translations and stays in sync wi
 
     expect($prompt)->toContain('When a tool returns has_data: false')
         ->and($prompt)->not->toContain('always add one sentence offering what you CAN answer')
-        ->and($prompt)->toContain('If the data is empty, answer honestly. You may briefly offer alternatives, but do not repeat the same list of categories every time. Vary your phrasing.')
+        ->and($prompt)->toContain("If data is empty, answer honestly and vary your phrasing; don't list categories.")
         ->and($prompt)->toContain("Never use filler phrases like 'Certainly!', 'I can help with that', or 'Great question'. Answer directly and concisely.")
-        ->and($prompt)->toContain('If the CustomerDebtsQuery returns a debtors array, you may list their names and amounts if asked.')
+        ->and($prompt)->toContain("customer_debts: list debtors' names and amounts if asked.")
         ->and($prompt)->toContain('For several days, use sales_by_day over the whole range.')
         ->and($prompt)->toContain('Money in tool results is naira: quote each *_display value exactly. Never calculate money yourself.')
         ->and($prompt)->not->toContain("If the user asks for 'profit' or 'margin', you must reply: 'I can only track revenue right now, not profit margins.' Never substitute revenue for profit.")
         ->and($prompt)->not->toContain('but I can tell you about')
-        ->and($prompt)->toContain("If the user asks something no tool can answer, say 'I can't check that yet.' You may offer alternatives if relevant, but do not read a fixed list of categories.")
+        ->and($prompt)->toContain("If no tool can answer, say 'I can't check that yet.'")
         ->and($prompt)->toContain('You now have tools for profit, customer history, expenses, and cashier shortages. Use them when the user asks about these topics.')
         ->and($prompt)->toContain('You now have a profit tool. Use it when the user asks about margins or profit. If no data exists, state that.')
-        ->and($prompt)->toContain('For customer_history, you must pass the customer_name option based on who the user asks about.')
-        ->and($prompt)->toContain('When using the customer_history tool, inform the user which store the purchase was made in, since customers can shop across multiple branches.')
-        ->and($prompt)->toContain('For cashier_shortages, summarize which cashier had a variance and the amount.')
-        ->and($prompt)->toContain('For expenses, explain the total spent on till expenses.')
+        ->and($prompt)->toContain('customer_history: pass customer_name, and say which store each purchase was in.')
+        ->and($prompt)->toContain('find_products: pass query (a name, SKU or barcode). If several products match, or match is possible, list them and ask which one.')
+        ->and($prompt)->toContain('cashier_shortages: name each cashier and amount. expenses: give the till-expense total.')
         ->and($prompt)->toContain('For a follow-up about an earlier result, call the same tool with the same period.');
 
     $expectedTranslations = [
