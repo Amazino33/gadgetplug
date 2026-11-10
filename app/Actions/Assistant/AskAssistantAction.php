@@ -17,11 +17,11 @@ use App\Models\AssistantQueryRun;
 use App\Models\AssistantThread;
 use App\Models\AssistantVendorDailyUsage;
 use App\Models\Store;
-use App\Services\Assistant\AiClient;
 use App\Services\Assistant\AssistantAccess;
 use App\Services\Assistant\AssistantPeriod;
 use App\Services\Assistant\AssistantQueryRegistry;
 use App\Services\Assistant\AssistantScope;
+use App\Services\Assistant\ChatModel;
 use App\Services\Assistant\CostCalculator;
 use App\Services\Assistant\PromptBuilder;
 use App\Services\Assistant\StoreNames;
@@ -34,7 +34,7 @@ use Throwable;
 class AskAssistantAction
 {
     public function __construct(
-        protected AiClient $aiClient,
+        protected ChatModel $aiClient,
         protected PromptBuilder $promptBuilder,
         protected AssistantQueryRegistry $registry,
     ) {}
@@ -85,7 +85,8 @@ class AskAssistantAction
         // 3. Load global settings at runtime (not cached)
         $settings = AssistantGlobalSetting::current();
         $historyWindow = (int) ($settings->history_window ?? 20);
-        $modelName = (string) ($settings->model_name ?? 'openai/gpt-4o-mini');
+        // assistant.model_override: the 1.4 comparison runs one question on several models.
+        $modelName = (string) (config('assistant.model_override') ?: ($settings->model_name ?? 'openai/gpt-4o-mini'));
         $maxTokens = (int) ($settings->max_tokens ?? 800);
 
         // 4. Build prompt & message history

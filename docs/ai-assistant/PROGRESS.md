@@ -31,7 +31,7 @@ Source prompt: pasted at session start (2026-11-06). In a new session, re-paste 
 | Phase | What | Covered by main's assistant | Status |
 |---|---|---|---|
 | 0 | Recon (redone against `origin/main`, read-only) | — | **awaiting review** |
-| 1 | **Harden the existing assistant**: 1.1 security → 1.2 correctness → 1.3 visibility/cost → 1.4 provider | foundations exist | 1.1 done; 1.2 part one done; 1.3 done (committed); 1.1 to 1.3 done; 1.2 own sales built (awaiting merge); **1.4 next** |
+| 1 | **Harden the existing assistant**: 1.1 security → 1.2 correctness → 1.3 visibility/cost → 1.4 provider | foundations exist | 1.1 done; 1.2 part one done; 1.3 done (committed); 1.1 to 1.3 done; 1.2 complete; 1.4 built (stays on gpt-4o-mini by decision); store-name fix, own sales and 1.4 awaiting merge |
 | 2 | Sales, products, prices, stock tools | **partly**: sales_summary, sales_by_day, top/slow products, revenue_vs_previous, low/out-of-stock, stock_value. **Missing:** find_product (fuzzy), product_price, per-store/combined stock_levels, search_records; reuse of SalesReportService | done, on main `077fdd4` (find_products; low/out of stock rewritten) |
 | 3 | Margins + product movement | **partly**: profit (store-level), dead_stock, slow_products. **Missing:** per-product listed vs realized margin, below-cost list, velocity/days of cover (ProductVelocityService) | not started |
 | 4 | "Who did what" + logging gaps | **missing** | not started |
@@ -290,6 +290,37 @@ The 5 cap-wording assertions in CostControlsAndGuardrailsTest now expect the res
 **Decision (owner, 2026-11-10): failed questions count.** A question that reached the model counts toward the business's and the user's daily allowance even if it then failed (provider error, tool error, reply failed), so repeated failures cannot run up credit unchecked. That is how main's per-user counter already works. Briefly reversed the same day and put back before anything was committed. Refusals at the cap, and short-circuits that never call the model (new store, store not picked), do not count.
 
 **Deploy:** `php artisan migrate --force`. No seeder or permission change.
+
+### Phase 1.4: provider (built 2026-11-10 on `feat/assistant-provider`; **stays on gpt-4o-mini by owner decision**)
+
+**Owner decision (2026-11-10): no paid comparison runs for now; keep `openai/gpt-4o-mini` and upgrade later.** Everything needed to upgrade is in place, so switching is a setting, not a code change.
+
+- **The model call is behind one interface:** `App\Services\Assistant\ChatModel`, implemented by `AiClient` (OpenRouter) and bound in `AppServiceProvider`. `AskAssistantAction` depends on the interface.
+- **Prompt caching for Claude through OpenRouter.** `PromptBuilder` now puts the per-question context (active store, the asker's stores, today's Lagos date) last, after `CONTEXT_MARKER` ("Context for this question:"). `AiClient::withCaching()` sends a Claude model's system message as two parts: the rules marked `cache_control: ephemeral`, then the context unmarked. The cached prefix (tools + rules) is identical for every user, business and day; this is tested. OpenAI models are sent unchanged, because they cache a repeated prefix on their own: a live gpt-4o-mini follow-up read 1,280 tokens from cache. Moving the context to the end also lengthens the stable prefix that OpenAI caches.
+- **OpenRouter prices on 2026-11-10** (per million tokens, input / output / cache read):
+
+  | Model | Input | Output | Cache read |
+  |---|---|---|---|
+  | gpt-4o-mini | $0.15 | $0.60 | $0.075 |
+  | **claude-haiku-5.5** | **$0.10** | **$0.50** | $0.01 |
+  | claude-sonnet-5.5 | $2 | $10 | $0.10 |
+
+  Haiku 5.5 is cheaper per token than the current model, and is the first candidate to test. Their rates are in `config/assistant.php` (the fallback; OpenRouter's billed cost is used when it is reported).
+- **To upgrade later:** Admin → Assistant → Global settings → model name, for example `anthropic/claude-haiku-5.5`. Raise `max_tokens` if answers get cut off.
+- **Comparison, ready but not run:** `php artisan assistant:compare --user=… --vendor=… --store=… [--models=…] [--variants=with_tool_lines,without_tool_lines] [--only=1,2] [--dry-run]`.
+  - It runs `docs/ai-assistant/compare-questions.json` (24 questions on local TechHaven data, including today's live failures) through the real `SendMessageAction`, once per model and prompt variant.
+  - It scores automatically: expected tools, period, stores, the answer quoting the tool's figure, and no false "I can't check that yet".
+  - The report (Markdown + JSON) goes to `storage/app/assistant-compare/` and covers tokens, cache read/write, cost and latency.
+  - `--dry-run` estimate for the full run (3 models × 2 variants × 24): **$0.74 upper bound, uncached**. Questions count toward the caps, so lift them on the test business first.
+- **The two "You now have tools…" lines stay** until the comparison has shown tool choice doesn't change without them. `PromptBuilder::TOOL_LINES` and `assistant.prompt_variant = without_tool_lines` give the test switch.
+- Prompt plus tools is 2,208 tokens (ceiling 2,300).
+- **Tests:** `tests/Feature/Assistant/Provider/ChatModelAndCachingTest.php` (6):
+  - the interface binding;
+  - the stable rules prefix and context after the marker;
+  - Claude gets the cache-marked part, and the marking reaches OpenRouter's request body;
+  - OpenAI messages are untouched;
+  - the model override and prompt-variant switches.
+- **Gate (2026-11-10, 16:03 to 16:55 UTC):** 3,349 tests (3,327 passed, 3 skipped). **19 failures, the baseline list by name.**
 
 ### Fix after Phase 2 went live: stores by name, not number (2026-11-10)
 
