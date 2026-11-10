@@ -7,6 +7,7 @@ namespace App\Actions\Assistant;
 use App\Enums\Assistant\AnswerStatus;
 use App\Exceptions\Assistant\AiProviderException;
 use App\Exceptions\Assistant\AiRateLimitException;
+use App\Exceptions\Assistant\InvalidPeriod;
 use App\Exceptions\Assistant\UnauthorizedStoreAccess;
 use App\Models\AssistantDailyUsage;
 use App\Models\AssistantGlobalSetting;
@@ -17,11 +18,12 @@ use App\Models\AssistantVendorDailyUsage;
 use App\Models\Store;
 use App\Services\Assistant\AiClient;
 use App\Services\Assistant\AssistantAccess;
+use App\Services\Assistant\AssistantPeriod;
 use App\Services\Assistant\AssistantQueryRegistry;
 use App\Services\Assistant\AssistantScope;
 use App\Services\Assistant\CostCalculator;
 use App\Services\Assistant\PromptBuilder;
-use Carbon\Carbon;
+use App\Support\Pos\BusinessDate;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -216,28 +218,35 @@ class AskAssistantAction
                             $atLeastOneQuerySuccess = true;
                         }
                     } else {
-                        // Build scope
+                        // The stores this call asks about. Its own name: $scope
+                        // is the asker's access, which a later switch_store in
+                        // the same reply still needs.
                         if (isset($args['store_ids']) && is_array($args['store_ids'])) {
-                            $scope = ['store_ids' => $args['store_ids']];
+                            $queryScope = ['store_ids' => $args['store_ids']];
                         } elseif (isset($args['store_id'])) {
-                            $scope = ['store_id' => (int) $args['store_id']];
+                            $queryScope = ['store_id' => (int) $args['store_id']];
                         } elseif ($activeStore !== null) {
-                            $scope = ['store_id' => $activeStore->id];
+                            $queryScope = ['store_id' => $activeStore->id];
                         } else {
-                            $scope = [];
+                            $queryScope = [];
                         }
 
-                        // Build dates (defaults to last 7 days)
-                        $from = isset($args['date_from'])
-                            ? Carbon::parse((string) $args['date_from'])->startOfDay()
-                            : now()->subDays(7)->startOfDay();
+                        // Dates are worked out in code on the Lagos day
+                        // (AssistantPeriod): a named period or plain dates, and
+                        // without either, the tool's own default, never a
+                        // silent "last 7 days". Tools that take no dates get none.
+                        $defaultPeriod = $this->registry->defaultPeriod($queryKey);
+                        $period = null;
+                        $periodError = null;
 
-                        if (isset($args['date_to'])) {
-                            $parsedTo = Carbon::parse((string) $args['date_to']);
-                            $to = $parsedTo->isToday() ? now() : $parsedTo->endOfDay();
-                        } else {
-                            $to = now();
+                        try {
+                            $period = $defaultPeriod === null ? null : AssistantPeriod::resolve($args, $defaultPeriod);
+                        } catch (InvalidPeriod $e) {
+                            $periodError = $e->getMessage();
                         }
+
+                        $from = $period?->from() ?? BusinessDate::boundsFor(BusinessDate::today())[0];
+                        $to = $period?->to() ?? now();
                         $options = isset($args['options']) && is_array($args['options']) ? $args['options'] : [];
                         if (isset($args['customer_name']) && ! isset($options['customer_name'])) {
                             $options['customer_name'] = $args['customer_name'];
@@ -256,8 +265,19 @@ class AskAssistantAction
                         $querySuccess = false;
 
                         try {
+                            if ($periodError !== null) {
+                                throw new InvalidPeriod($periodError);
+                            }
+
                             $queryAction = $this->registry->get($queryKey);
-                            $queryResult = $queryAction->execute($scope, $from, $to, $options);
+                            $queryResult = $queryAction->execute($queryScope, $from, $to, $options);
+
+                            // The answer states which dates it covered. A refusal
+                            // stays bare: nothing about it but that it was refused.
+                            if ($period !== null && ($queryResult['reason'] ?? null) !== 'no_access') {
+                                $queryResult['period'] = $period->toArray();
+                            }
+
                             $querySuccess = true;
                             $atLeastOneQuerySuccess = true;
                         } catch (Throwable $e) {
@@ -269,9 +289,10 @@ class AskAssistantAction
 
                         $queryRunsData[] = [
                             'query_key' => $queryKey,
-                            'scope_json' => $scope,
-                            'date_from' => $from->toDateString(),
-                            'date_to' => $to->toDateString(),
+                            'scope_json' => $queryScope,
+                            // Lagos calendar dates the tool covered.
+                            'date_from' => $period?->fromDate->toDateString() ?? BusinessDate::today(),
+                            'date_to' => $period?->toDate->toDateString() ?? BusinessDate::today(),
                             'result_json' => $queryResult,
                             'success' => $querySuccess,
                             'has_data' => $querySuccess ? ($queryResult['has_data'] ?? true) : true,
@@ -289,7 +310,8 @@ class AskAssistantAction
                         'role' => 'tool',
                         'tool_call_id' => $toolCallId,
                         'name' => $queryKey,
-                        'content' => (string) json_encode($toolPayload),
+                        // The real ₦ sign, not its JSON escape: the model copied the escape into a reply once.
+                        'content' => (string) json_encode($toolPayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
                     ];
                 }
 

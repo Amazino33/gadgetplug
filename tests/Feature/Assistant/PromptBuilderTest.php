@@ -24,7 +24,8 @@ test('system prompt contains today date and active store name', function () {
     $prompt = $builder->systemPrompt(now(), $store, ['Flagship Store', 'Online Store']);
 
     expect($prompt)
-        ->toContain(now()->format('Y-m-d'))
+        // Today as the Lagos date and weekday (Phase 1.2).
+        ->toContain('Today is '.now('Africa/Lagos')->format('l j F Y').' (Lagos).')
         ->toContain('Flagship Store')
         ->toContain('"Flagship Store", "Online Store"')
         ->toContain('GadgetPlug')
@@ -47,7 +48,12 @@ test('tool schema has 20 entries with valid JSON schema and slimmed descriptions
             ->and(in_array($tool['function']['name'], $registryKeys, true))->toBeTrue()
             ->and(strlen($tool['function']['description']))->toBeLessThanOrEqual(80)
             ->and($tool['function']['parameters']['type'])->toBe('object')
-            ->and($tool['function']['parameters']['properties'])->toHaveKeys(['store_id', 'store_ids', 'date_from', 'date_to']);
+            ->and($tool['function']['parameters']['properties'])->toHaveKeys(['store_id', 'store_ids']);
+
+        // Date fields only where the tool takes dates (Phase 1.2).
+        $takesDates = $registry->defaultPeriod($tool['function']['name']) !== null;
+        expect(array_key_exists('period', $tool['function']['parameters']['properties']))->toBe($takesDates)
+            ->and(array_key_exists('date_from', $tool['function']['parameters']['properties']))->toBe($takesDates);
     }
 
     $customerHistoryTool = collect($tools)->firstWhere('function.name', 'customer_history');
@@ -126,7 +132,7 @@ test('systemPrompt contains each of the reason translations and stays in sync wi
         ->and($prompt)->toContain('If the data is empty, answer honestly. You may briefly offer alternatives, but do not repeat the same list of categories every time. Vary your phrasing.')
         ->and($prompt)->toContain("Never use filler phrases like 'Certainly!', 'I can help with that', or 'Great question'. Answer directly and concisely.")
         ->and($prompt)->toContain('If the CustomerDebtsQuery returns a debtors array, you may list their names and amounts if asked.')
-        ->and($prompt)->toContain('If the user asks for multiple days, use the sales_by_day tool with a date range covering all requested days.')
+        ->and($prompt)->toContain('For several days, use sales_by_day over the whole range.')
         ->and($prompt)->toContain('Money in tool results is naira: quote each *_display value exactly. Never calculate money yourself.')
         ->and($prompt)->not->toContain("If the user asks for 'profit' or 'margin', you must reply: 'I can only track revenue right now, not profit margins.' Never substitute revenue for profit.")
         ->and($prompt)->not->toContain('but I can tell you about')
@@ -137,7 +143,7 @@ test('systemPrompt contains each of the reason translations and stays in sync wi
         ->and($prompt)->toContain('When using the customer_history tool, inform the user which store the purchase was made in, since customers can shop across multiple branches.')
         ->and($prompt)->toContain('For cashier_shortages, summarize which cashier had a variance and the amount.')
         ->and($prompt)->toContain('For expenses, explain the total spent on till expenses.')
-        ->and($prompt)->toContain("If the user asks a follow-up question about a previous tool result (e.g., 'what is the name?', 'how much exactly?'), you MUST call the exact same tool with the exact same date range you just used.");
+        ->and($prompt)->toContain('For a follow-up about an earlier result, call the same tool with the same period.');
 
     $expectedTranslations = [
         'no_cash_ups_yet' => 'you haven\'t done a cash-up yet',

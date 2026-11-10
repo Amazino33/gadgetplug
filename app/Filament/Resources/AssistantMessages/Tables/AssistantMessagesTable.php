@@ -7,6 +7,7 @@ namespace App\Filament\Resources\AssistantMessages\Tables;
 use App\Actions\Assistant\FlagMessageAction;
 use App\Actions\Assistant\UnflagMessageAction;
 use App\Models\AssistantMessage;
+use App\Support\Pos\BusinessDate;
 use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
@@ -130,11 +131,12 @@ class AssistantMessagesTable
                         return $query
                             ->when(
                                 $data['created_from'] ?? null,
-                                fn (Builder $q, $date) => $q->whereDate('created_at', '>=', $date),
+                                // Lagos days: created_at is UTC, so the day's bounds come from BusinessDate.
+                                fn (Builder $q, $date) => $q->where('created_at', '>=', BusinessDate::boundsFor((string) $date)[0]),
                             )
                             ->when(
                                 $data['created_until'] ?? null,
-                                fn (Builder $q, $date) => $q->whereDate('created_at', '<=', $date),
+                                fn (Builder $q, $date) => $q->where('created_at', '<=', BusinessDate::boundsFor((string) $date)[1]),
                             );
                     }),
             ])

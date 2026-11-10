@@ -114,8 +114,9 @@ test('TokenEstimator returns estimate within 25% of measured token fixture', fun
 
     $estimated = TokenEstimator::estimateInput($messages, $tools);
 
-    // Baseline calibration: prompt + slim tools is around 1,850 tokens
-    $fixtureMeasuredTokens = 1850;
+    // Baseline calibration: a tiny prompt + slim tools. Was 1,850; Phase 1.2
+    // dropped the date fields from the ten tools that take no dates (1,331).
+    $fixtureMeasuredTokens = 1330;
     $lowerBound = (int) ($fixtureMeasuredTokens * 0.75);
     $upperBound = (int) ($fixtureMeasuredTokens * 1.25);
 
@@ -609,7 +610,8 @@ test('PromptBuilder toolSchema meets token and character size slimming constrain
     // Total tool description characters <= 1,500
     expect($totalDescriptionLength)->toBeLessThanOrEqual(1500);
 
-    // Estimated input tokens for bare message (system + tools) <= 2,100.
+    // Estimated input tokens for bare message (system + tools) <= 2,000,
+    // back from 2,100 at the end of Phase 1.2 as decided (1,979 then).
     // Was 2,000 with main at 1,996; Phase 1.1 added the two security rules
     // (record content is data, not instructions; never hint at a no_access
     // figure), compressed to ~70 tokens. Phase 1.2 removes the kobo
@@ -618,7 +620,7 @@ test('PromptBuilder toolSchema meets token and character size slimming constrain
     $bareMessages = [['role' => 'system', 'content' => $systemPrompt]];
     $estimatedBareTokens = TokenEstimator::estimateInput($bareMessages, $tools);
 
-    expect($estimatedBareTokens)->toBeLessThanOrEqual(2100);
+    expect($estimatedBareTokens)->toBeLessThanOrEqual(2000);
 });
 
 // -------------------------------------------------------------

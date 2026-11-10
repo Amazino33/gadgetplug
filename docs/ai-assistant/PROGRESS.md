@@ -31,7 +31,7 @@ Source prompt: pasted at session start (2026-11-06). In a new session, re-paste 
 | Phase | What | Covered by main's assistant | Status |
 |---|---|---|---|
 | 0 | Recon (redone against `origin/main`, read-only) | — | **awaiting review** |
-| 1 | **Harden the existing assistant**: 1.1 security → 1.2 correctness → 1.3 visibility/cost → 1.4 provider | foundations exist | 1.1 done; 1.2 part one done (approved 2026-11-08); **1.3 built, awaiting review**; Lagos day + own sales wait for the merge |
+| 1 | **Harden the existing assistant**: 1.1 security → 1.2 correctness → 1.3 visibility/cost → 1.4 provider | foundations exist | 1.1 done; 1.2 part one done; 1.3 done (committed); **1.2 part two (Lagos day) awaiting review**; own sales next |
 | 2 | Sales, products, prices, stock tools | **partly**: sales_summary, sales_by_day, top/slow products, revenue_vs_previous, low/out-of-stock, stock_value. **Missing:** find_product (fuzzy), product_price, per-store/combined stock_levels, search_records; reuse of SalesReportService | not started |
 | 3 | Margins + product movement | **partly**: profit (store-level), dead_stock, slow_products. **Missing:** per-product listed vs realized margin, below-cost list, velocity/days of cover (ProductVelocityService) | not started |
 | 4 | "Who did what" + logging gaps | **missing** | not started |
@@ -168,7 +168,58 @@ Four gates, each with its own review stop:
 
 **Token ceiling:** prompt plus tools estimate is now **2,013** (it was 2,067 after 1.1). The test cap stays at 2,100 until the end of 1.2, when the Lagos-day and own-sales prompt changes are in, then comes back to 2,000 or lower, as decided.
 
-**Still to do in 1.2, once `fix/lagos-day-boundary` is merged to `main`:** the Lagos day throughout the assistant (prompt "today", `date_from`/`date_to` parsing, the 7-day default, the guard's "until assistant Phase 1" entries), then own sales for till-only staff (decided 2026-11-08).
+**Still to do in 1.2:** see part two below (the Lagos day, done 2026-11-10); own sales for till-only staff remains.
+
+### Phase 1.2, part two: the Lagos day in the assistant (built 2026-11-10, awaiting review)
+
+**Why, from live data.** On 2026-11-10 at 08:20 a Zeelink Tech user asked the live assistant "how much is today revenue?" for Oraimo Store and was told ₦8,358,295 from 161 orders. The tool log showed `sales_summary` run for 3 to 10 Nov: the model had sent no dates, and the old code fell back to the last 7 days. The dashboard's figures were ₦0 from 0 orders for today, and ₦8,358,295 from 161 orders for the last 7 days. In the same conversation, "list all the orders we got today" got a failed tool result, and the model repeated the earlier figure. The owner was advised to switch the live assistant off until this branch replaces it.
+
+**Merged `origin/main` (`e99f19d`) into this branch** (`c46b2f3`, a merge with no rebase). The one conflict was AssistantQueriesTest: my naira assertions plus main's renamed helpers. BusinessDayGuard's seven assistant allowlist entries are gone, five fixed in 1.3 and two here; the `UNTIL_ASSISTANT_PHASE_1` label is removed.
+
+**Dates are worked out in code** (`App\Services\Assistant\AssistantPeriod`):
+- The model sends a named `period` (today, yesterday, this_week, last_week, last_7_days, this_month, last_month, last_30_days, this_year) or `date_from`/`date_to` as YYYY-MM-DD. Days are Lagos days, the week starts Monday as on the dashboard, and "today" ends now.
+- **With no dates, the tool's own default applies, never a silent 7 days.** Defaults are in the registry (`default_period`):
+  - today: sales_summary, profit, expenses, revenue_vs_previous;
+  - this_week: sales_by_day;
+  - last_30_days: top/slow products, cash variance, cashier shortages, affiliate commissions.
+- Dates it cannot read ("next tuesday", 2026-02-30, 10/11/2026) are a tool error, not a guess. One-sided ranges run to today, inverted ranges are swapped, and future dates are clamped to today.
+- `last_month` never overflows: it is "the day before this month began", with no `subMonth()`. Tested on 29 and 31 March, 31 May and 15 January.
+- Every dated result carries `period: {from, to, label}`, for example "Today (Tue 10 Nov 2026)", and the prompt says to state it. Refusals (`no_access`) stay bare. `assistant_query_runs.date_from/date_to` are now the Lagos dates covered.
+- **The ten tools that take no dates** (stock, debts owed now, payouts, glossary and so on) are offered no date fields. That made the tool list smaller.
+- The prompt says "Today is Tuesday 10 November 2026 (Lagos).", lists the periods, and adds "If a tool returns an error, say you couldn't fetch it; never reuse an earlier figure."
+- The admin All Messages date filter uses Lagos days.
+
+**Found and fixed on the way:**
+- **The ₦ sign reached the model as the `₦` escape**, and a live reply printed "₦0" instead of ₦0. Tool results are now JSON-encoded without escaping (`JSON_UNESCAPED_UNICODE`). This also saves tokens.
+- **A store switch after a query in the same reply would crash.** The loop reused `$scope`, the asker's access, for each call's store list, so a later `switch_store` received an array. This was latent since 1.1. The per-call value is now `$queryScope`, and it is tested.
+- **The test suite could reach the live AI provider and spend its credit** once a key is in `.env`; AssistantTest "send with all on…" makes a real call. phpunit.xml and phpunit.mysql.xml now force `OPENROUTER_API_KEY` empty.
+- **BusinessDayGuard flagged `BusinessDate::now()->startOfDay()`**, which is the Lagos clock itself. The rule now skips `BusinessDate::now()`, and its self-test has the case.
+
+**Token ceiling is back to 2,000, as decided:** the prompt plus tools is estimated at 1,979 (2,013 before). The TokenEstimator calibration fixture moved from 1,850 to 1,330 because the tool list is smaller.
+
+**Live check (local data, real key, gpt-4o-mini):**
+- "how much is today revenue?" gave "Revenue for today (Tue 10 Nov 2026) is ₦0." That is correct.
+- "this week" gave 9 to 10 Nov, ₦0. That is correct.
+- "1st to 4th November" gave ₦22,000 from 1 order. That equals SalesReportService for the same range.
+
+**Tests:** `tests/Feature/Assistant/Correctness/AssistantPeriodTest.php` (28). It covers:
+- every named period;
+- month overflow;
+- 00:30 and 23:30 around Lagos midnight;
+- plain, one-sided, inverted, future and keyword dates;
+- unreadable dates refused;
+- the live case end to end (₦0 today, not the week's takings);
+- last_7_days;
+- tools with no dates;
+- the prompt's Lagos date before 01:00;
+- the ₦ sign;
+- the store switch after a query.
+
+Updated tests: the PromptBuilderTest wording and schema, the registry `default_period`, the token calibration and ceiling, and the 1.1 refusal shape.
+
+**Gate (2026-11-10, 08:56 to 09:45 UTC, the plain suite in one run now that main's helper fix is merged):** 3,321 tests (3,299 passed, 3 skipped). **19 failures, the baseline list by name**: nothing new, nothing gone.
+
+**Still to do in 1.2:** own sales for till-only staff (decided 2026-11-08).
 
 ### Phase 1.3: visibility and cost (built, awaiting review)
 
