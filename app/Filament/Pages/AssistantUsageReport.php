@@ -43,7 +43,7 @@ class AssistantUsageReport extends Page implements HasTable
     public function getTodayTotalCostUsd(): string
     {
         $micros = (int) AssistantDailyUsage::query()
-            ->where('date', today())
+            ->where('date', AssistantDailyUsage::day())
             ->sum('cost_micros');
 
         return '$'.number_format($micros / 1000000, 4);
@@ -52,7 +52,7 @@ class AssistantUsageReport extends Page implements HasTable
     public function getTodayTotalMessages(): int
     {
         return (int) AssistantDailyUsage::query()
-            ->where('date', today())
+            ->where('date', AssistantDailyUsage::day())
             ->sum('message_count');
     }
 

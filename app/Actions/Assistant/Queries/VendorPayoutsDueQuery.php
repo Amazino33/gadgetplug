@@ -18,6 +18,12 @@ use Carbon\CarbonInterface;
  */
 class VendorPayoutsDueQuery extends BaseAssistantQuery
 {
+    /** Same gate as the Payouts screen. */
+    public function requiredPermission(): ?string
+    {
+        return 'view_payouts';
+    }
+
     public function supportsAggregate(): bool
     {
         return false;
@@ -53,8 +59,8 @@ class VendorPayoutsDueQuery extends BaseAssistantQuery
         $paidNaira = (float) $payouts->where('status', 'paid')->sum('amount');
 
         return QueryResult::withData([
-            'pending_total' => (int) round($pendingNaira * 100),
-            'paid_total' => (int) round($paidNaira * 100),
+            ...self::naira('pending_total', $pendingNaira),
+            ...self::naira('paid_total', $paidNaira),
         ]);
     }
 }

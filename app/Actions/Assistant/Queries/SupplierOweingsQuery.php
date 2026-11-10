@@ -9,6 +9,12 @@ use Carbon\CarbonInterface;
 
 class SupplierOweingsQuery extends BaseAssistantQuery
 {
+    /** Same gate as the Supplier Payables (owner-only page) screen. */
+    public function ownerOnly(): bool
+    {
+        return true;
+    }
+
     public function supportsAggregate(): bool
     {
         return true;
@@ -46,7 +52,7 @@ class SupplierOweingsQuery extends BaseAssistantQuery
         }
 
         return QueryResult::withData([
-            'total_unpaid' => (int) round($totalUnpaidNaira * 100),
+            ...self::naira('total_unpaid', $totalUnpaidNaira),
             'invoices_count' => $unpaidProcurements->count(),
             'due_dates' => array_values(array_unique($dueDates)),
         ]);

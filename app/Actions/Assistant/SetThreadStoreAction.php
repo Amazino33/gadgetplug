@@ -8,24 +8,43 @@ use App\Exceptions\Assistant\UnauthorizedStoreAccess;
 use App\Models\AssistantMessage;
 use App\Models\AssistantThread;
 use App\Models\Store;
+use App\Services\Assistant\AssistantScope;
 use Illuminate\Support\Facades\DB;
 
 class SetThreadStoreAction
 {
     /**
+     * The scope the question in flight was authorised for, if this runs inside
+     * one (the switch_store tool); otherwise the thread's own user and business.
+     */
+    private function scopeFor(AssistantThread $thread): AssistantScope
+    {
+        $current = AssistantScope::current();
+
+        if ($current && (int) $current->user->id === (int) $thread->user_id) {
+            return $current;
+        }
+
+        return AssistantScope::for($thread->user, $thread->vendor);
+    }
+
+    /**
      * Resolves a store by exact match first, then by case-insensitive partial match across the user's owned stores.
      *
      * @return array{store: ?Store, error: ?string}
      */
-    public function resolveStoreByName(int $userId, string $name): array
+    public function resolveStoreByName(int $userId, string $name, ?AssistantScope $scope = null): array
     {
         $target = trim($name);
         if ($target === '') {
             return ['store' => null, 'error' => 'No store with that exact name, or multiple matches.'];
         }
 
-        $baseQuery = Store::query()
-            ->whereHas('vendor', fn ($v) => $v->where('user_id', $userId));
+        // Only stores this question may see: the business's stores this user
+        // can access, or (no scope) the stores the user owns, as before.
+        $baseQuery = $scope
+            ? Store::query()->whereIn('id', $scope->storeIds())
+            : Store::query()->whereHas('vendor', fn ($v) => $v->where('user_id', $userId));
 
         // 1. Exact match first
         $exactMatches = (clone $baseQuery)
@@ -58,7 +77,7 @@ class SetThreadStoreAction
      */
     public function switchByName(AssistantThread $thread, string $storeName, string $source = 'manual'): ?Store
     {
-        $resolved = $this->resolveStoreByName((int) $thread->user_id, $storeName);
+        $resolved = $this->resolveStoreByName((int) $thread->user_id, $storeName, $this->scopeFor($thread));
         if ($resolved['store'] === null) {
             return null;
         }
@@ -73,16 +92,14 @@ class SetThreadStoreAction
      */
     public function execute(AssistantThread $thread, Store $store, string $source = 'manual'): void
     {
-        $isOwner = Store::query()
-            ->where('id', $store->id)
-            ->whereHas('vendor', fn ($v) => $v->where('user_id', $thread->user_id))
-            ->exists();
-
-        if (! $isOwner) {
-            throw new UnauthorizedStoreAccess("Store [{$store->id}] is not owned by the thread owner.");
+        if (! $this->scopeFor($thread)->allows((int) $store->id)) {
+            throw new UnauthorizedStoreAccess("Store [{$store->id}] is not accessible to the thread owner in this business.");
         }
 
         DB::transaction(function () use ($thread, $store, $source) {
+            // A thread started without a business takes the store's — the
+            // store was just checked against what this user may see.
+            $thread->vendor_id ??= $store->vendor_id;
             $thread->store_id = $store->id;
             $thread->store_removed_at = null;
             $thread->store_removed_name = null;

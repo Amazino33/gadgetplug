@@ -56,5 +56,12 @@ test('registry describe returns structured metadata array', function () {
         ->and($descriptions)->toHaveCount(20);
 
     $first = $descriptions[0];
-    expect($first)->toHaveKeys(['key', 'description', 'supports_aggregate', 'default_window_days']);
+    expect($first)->toHaveKeys(['key', 'description', 'supports_aggregate', 'default_period']);
+
+    // A period for tools that take dates; none for those that don't.
+    $periods = collect($descriptions)->pluck('default_period', 'key');
+    expect($periods['sales_summary'])->toBe('today')
+        ->and($periods['top_products'])->toBe('last_30_days')
+        ->and($periods['stock_value'])->toBeNull()
+        ->and($periods['customer_debts'])->toBeNull();
 });

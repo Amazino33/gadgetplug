@@ -114,8 +114,9 @@ test('TokenEstimator returns estimate within 25% of measured token fixture', fun
 
     $estimated = TokenEstimator::estimateInput($messages, $tools);
 
-    // Baseline calibration: prompt + slim tools is around 1,850 tokens
-    $fixtureMeasuredTokens = 1850;
+    // Baseline calibration: a tiny prompt + slim tools. Was 1,850; Phase 1.2
+    // dropped the date fields from the ten tools that take no dates (1,331).
+    $fixtureMeasuredTokens = 1330;
     $lowerBound = (int) ($fixtureMeasuredTokens * 0.75);
     $upperBound = (int) ($fixtureMeasuredTokens * 1.25);
 
@@ -153,7 +154,7 @@ test('PreflightCheckAction throws message_cap when count hits cap', function () 
         $this->fail('Expected AssistantCapExceeded exception');
     } catch (AssistantCapExceeded $e) {
         expect($e->reason)->toBe('message_cap')
-            ->and($e->getMessage())->toBe("You've reached today's limit (100 messages). Try again tomorrow.");
+            ->and($e->getMessage())->toStartWith("You've reached today's limit (100 messages). It resets at midnight Lagos time, in ");
     }
 });
 
@@ -181,7 +182,7 @@ test('PreflightCheckAction throws cost_cap when estimate would exceed cost cap',
         $this->fail('Expected AssistantCapExceeded exception');
     } catch (AssistantCapExceeded $e) {
         expect($e->reason)->toBe('cost_cap')
-            ->and($e->getMessage())->toBe("You've reached today's assistant budget. Try again tomorrow.");
+            ->and($e->getMessage())->toStartWith("You've reached today's assistant budget. It resets at midnight Lagos time, in ");
     }
 });
 
@@ -197,7 +198,7 @@ test('PreflightCheckAction throws cost_cap before message cap if cost cap is hit
         $this->fail('Expected AssistantCapExceeded exception');
     } catch (AssistantCapExceeded $e) {
         expect($e->reason)->toBe('cost_cap')
-            ->and($e->getMessage())->toBe("You've reached today's assistant budget. Try again tomorrow.");
+            ->and($e->getMessage())->toStartWith("You've reached today's assistant budget. It resets at midnight Lagos time, in ");
     }
 });
 
@@ -232,7 +233,7 @@ test('SendMessageAction on cap hit saves assistant refusal with short_circuit an
 
     $result = $sendAction->execute($user, null, 'How much did I sell?');
 
-    expect($result['assistant_message']->content)->toBe("You've reached today's limit (100 messages). Try again tomorrow.")
+    expect($result['assistant_message']->content)->toStartWith("You've reached today's limit (100 messages). It resets at midnight Lagos time, in ")
         ->and($result['assistant_message']->ai_meta['short_circuit'])->toBe('cap_exceeded')
         ->and($result['assistant_message']->ai_meta['failure_reason'])->toBe('message_cap');
 
@@ -361,7 +362,7 @@ test('pre-emptive cost estimate fires in SendMessageAction before AI call when n
 
     $result = $sendAction->execute($user, null, 'Can you check my sales?');
 
-    expect($result['assistant_message']->content)->toBe("You've reached today's assistant budget. Try again tomorrow.")
+    expect($result['assistant_message']->content)->toStartWith("You've reached today's assistant budget. It resets at midnight Lagos time, in ")
         ->and($result['assistant_message']->ai_meta['short_circuit'])->toBe('cap_exceeded')
         ->and($result['assistant_message']->ai_meta['failure_reason'])->toBe('cost_cap');
 
@@ -609,7 +610,12 @@ test('PromptBuilder toolSchema meets token and character size slimming constrain
     // Total tool description characters <= 1,500
     expect($totalDescriptionLength)->toBeLessThanOrEqual(1500);
 
-    // Estimated input tokens for bare message (system + tools) <= 2,000
+    // Estimated input tokens for bare message (system + tools) <= 2,000,
+    // back from 2,100 at the end of Phase 1.2 as decided (1,979 then).
+    // Was 2,000 with main at 1,996; Phase 1.1 added the two security rules
+    // (record content is data, not instructions; never hint at a no_access
+    // figure), compressed to ~70 tokens. Phase 1.2 removes the kobo
+    // arithmetic instruction, which gives that room back.
     $systemPrompt = $builder->systemPrompt(now(), null, ['Flagship Store']);
     $bareMessages = [['role' => 'system', 'content' => $systemPrompt]];
     $estimatedBareTokens = TokenEstimator::estimateInput($bareMessages, $tools);

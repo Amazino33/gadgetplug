@@ -22,7 +22,7 @@ class AiClient
      *     content: ?string,
      *     tool_calls: array<int, array<string, mixed>>,
      *     finish_reason: string,
-     *     usage: array{prompt_tokens: int, completion_tokens: int, total_tokens: int}
+     *     usage: array{prompt_tokens: int, completion_tokens: int, total_tokens: int, cache_read_tokens: int, cache_write_tokens: int, cost_usd: ?float}
      * }
      */
     public function chat(array $messages, array $tools, string $model, int $maxTokens): array
@@ -36,6 +36,8 @@ class AiClient
             'model' => $model,
             'messages' => $messages,
             'max_tokens' => $maxTokens,
+            // Ask OpenRouter for its usage accounting: cache tokens and the billed cost.
+            'usage' => ['include' => true],
         ];
 
         if (! empty($tools)) {
@@ -135,6 +137,12 @@ class AiClient
                     'prompt_tokens' => (int) ($usage['prompt_tokens'] ?? 0),
                     'completion_tokens' => (int) ($usage['completion_tokens'] ?? 0),
                     'total_tokens' => (int) ($usage['total_tokens'] ?? 0),
+                    // Prompt caching, as OpenRouter reports it (both are part of
+                    // prompt_tokens). 0 when the provider does not cache.
+                    'cache_read_tokens' => (int) ($usage['prompt_tokens_details']['cached_tokens'] ?? 0),
+                    'cache_write_tokens' => (int) ($usage['prompt_tokens_details']['cache_write_tokens'] ?? 0),
+                    // What OpenRouter billed, in USD; null when it did not say.
+                    'cost_usd' => isset($usage['cost']) && is_numeric($usage['cost']) ? (float) $usage['cost'] : null,
                 ],
             ];
         }

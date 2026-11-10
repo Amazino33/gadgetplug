@@ -6,13 +6,29 @@ namespace App\Actions\Assistant\Queries;
 
 use App\Models\OrderItemStoreAllocation;
 use App\Models\PosSale;
-use App\Models\PosSaleItem;
 use App\Models\Store;
+use App\Services\Assistant\ReportedSales;
 use Carbon\CarbonInterface;
-use Illuminate\Support\Facades\DB;
 
+/**
+ * Revenue, cost of goods sold, profit and margin — the dashboard's figures
+ * (SalesReportService::summary): revenue net of discounts and refunds, cost
+ * as booked at the time of sale.
+ */
 class ProfitQuery extends BaseAssistantQuery
 {
+    /** Same gate as the Sales Report, and cost visibility screen. */
+    public function requiredPermission(): ?string
+    {
+        return 'view_inventory_reports';
+    }
+
+    /** The answer is cost or profit: refused without view_cost_price. */
+    public function costSensitive(): bool
+    {
+        return true;
+    }
+
     public function supportsAggregate(): bool
     {
         return true;
@@ -32,62 +48,16 @@ class ProfitQuery extends BaseAssistantQuery
             }
         }
 
-        // 1. POS sales revenue: subtotal minus discounts for non-voided sales
-        $posRevenueRow = PosSale::query()
-            ->whereIn('pos_sales.store_id', $storeIds)
-            ->where('pos_sales.status', '!=', 'voided')
-            ->where(DB::raw('COALESCE(pos_sales.completed_at, pos_sales.created_at)'), '>=', $from)
-            ->where(DB::raw('COALESCE(pos_sales.completed_at, pos_sales.created_at)'), '<=', $to)
-            ->selectRaw('COALESCE(SUM(pos_sales.subtotal - pos_sales.discount_amount), 0) as revenue')
-            ->first();
-
-        // 2. POS sales cost: use cost_total when available, fallback to quantity * (unit_cost ?? products.cost_price ?? 0)
-        $posCostRow = PosSaleItem::query()
-            ->join('pos_sales', 'pos_sales.id', '=', 'pos_sale_items.pos_sale_id')
-            ->leftJoin('products', 'products.id', '=', 'pos_sale_items.product_id')
-            ->whereIn('pos_sales.store_id', $storeIds)
-            ->where('pos_sales.status', '!=', 'voided')
-            ->where(DB::raw('COALESCE(pos_sales.completed_at, pos_sales.created_at)'), '>=', $from)
-            ->where(DB::raw('COALESCE(pos_sales.completed_at, pos_sales.created_at)'), '<=', $to)
-            ->selectRaw('COALESCE(SUM(COALESCE(pos_sale_items.cost_total, pos_sale_items.quantity * COALESCE(pos_sale_items.unit_cost, products.cost_price, 0))), 0) as cost')
-            ->first();
-
-        // 3. Online orders revenue allocated to these stores
-        $onlineRevenueRow = OrderItemStoreAllocation::query()
-            ->join('order_items', 'order_items.id', '=', 'order_item_store_allocations.order_item_id')
-            ->join('orders', 'orders.id', '=', 'order_items.order_id')
-            ->whereIn('order_item_store_allocations.store_id', $storeIds)
-            ->whereNotNull('orders.revenue_recognized_at')
-            ->where('orders.revenue_recognized_at', '>=', $from)
-            ->where('orders.revenue_recognized_at', '<=', $to)
-            ->where('orders.status', '!=', 'cancelled')
-            ->selectRaw('COALESCE(SUM(order_item_store_allocations.quantity * order_items.unit_price), 0) as revenue')
-            ->first();
-
-        // 4. Online orders cost: cost_total with fallback to quantity * (unit_cost ?? products.cost_price ?? 0)
-        $onlineCostRow = OrderItemStoreAllocation::query()
-            ->join('order_items', 'order_items.id', '=', 'order_item_store_allocations.order_item_id')
-            ->join('orders', 'orders.id', '=', 'order_items.order_id')
-            ->leftJoin('products', 'products.id', '=', 'order_items.product_id')
-            ->whereIn('order_item_store_allocations.store_id', $storeIds)
-            ->whereNotNull('orders.revenue_recognized_at')
-            ->where('orders.revenue_recognized_at', '>=', $from)
-            ->where('orders.revenue_recognized_at', '<=', $to)
-            ->where('orders.status', '!=', 'cancelled')
-            ->selectRaw('COALESCE(SUM(COALESCE(order_items.cost_total, order_item_store_allocations.quantity * COALESCE(order_items.unit_cost, products.cost_price, 0))), 0) as cost')
-            ->first();
-
-        $totalRevenueNaira = (float) ($posRevenueRow->revenue ?? 0) + (float) ($onlineRevenueRow->revenue ?? 0);
-        $totalCostNaira = (float) ($posCostRow->cost ?? 0) + (float) ($onlineCostRow->cost ?? 0);
-
-        $totalRevenueKobo = (int) round($totalRevenueNaira * 100);
-        $totalCostKobo = (int) round($totalCostNaira * 100);
-        $profitKobo = $totalRevenueKobo - $totalCostKobo;
+        $s = app(ReportedSales::class)->summary($storeIds, $from, $to);
 
         return QueryResult::withData([
-            'total_revenue' => $totalRevenueKobo,
-            'total_cost' => $totalCostKobo,
-            'profit' => $profitKobo,
+            ...self::naira('total_revenue', $s['revenue']),
+            ...self::naira('total_cost', $s['cost']),
+            ...self::naira('profit', $s['profit']),
+            ...self::percent('margin_percent', $s['margin']),
+            // Some sold lines had no cost recorded at the time of sale, so their
+            // cost is today's cost price: the profit is an estimate.
+            'cost_is_estimated' => $s['cost_is_estimated'],
         ]);
     }
 }

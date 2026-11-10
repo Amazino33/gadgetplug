@@ -6,6 +6,7 @@ namespace App\Livewire\Assistant;
 
 use App\Actions\Assistant\CreateThreadAction;
 use App\Actions\Assistant\DeleteThreadAction;
+use App\Actions\Assistant\PreflightCheckAction;
 use App\Actions\Assistant\RenameThreadAction;
 use App\Actions\Assistant\SendMessageAction;
 use App\Actions\Assistant\SetThreadStoreAction;
@@ -13,10 +14,15 @@ use App\Models\AssistantDailyUsage;
 use App\Models\AssistantGlobalSetting;
 use App\Models\AssistantMessage;
 use App\Models\AssistantThread;
+use App\Models\AssistantVendorDailyUsage;
 use App\Models\Store;
+use App\Models\Vendor;
 use App\Services\Assistant\AssistantAccess;
+use App\Services\Assistant\AssistantScope;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Throwable;
 
@@ -38,14 +44,24 @@ class ChatBubble extends Component
 
     public bool $thinking = false;
 
+    /**
+     * The business this bubble is open in: the panel tenant at mount. Locked,
+     * so a Livewire request cannot point the bubble at another business; every
+     * use is re-checked against the user's access (AssistantScope).
+     */
+    #[Locked]
+    public ?int $vendorId = null;
+
     public function mount(): void
     {
-        if (! auth()->check() || ! AssistantAccess::isEnabledFor(auth()->user())) {
+        $tenant = filament()->getTenant();
+        $this->vendorId = $tenant instanceof Vendor ? (int) $tenant->id : null;
+
+        if (! auth()->check() || ! AssistantAccess::isEnabledFor(auth()->user(), $this->vendor())) {
             return;
         }
 
-        $latestThread = AssistantThread::query()
-            ->where('user_id', auth()->id())
+        $latestThread = $this->ownThreads()
             ->orderByDesc('last_message_at')
             ->first();
 
@@ -56,18 +72,61 @@ class ChatBubble extends Component
 
     public function getIsEnabledProperty(): bool
     {
-        return auth()->check() && AssistantAccess::isEnabledFor(auth()->user());
+        return auth()->check() && AssistantAccess::isEnabledFor(auth()->user(), $this->vendor());
     }
 
+    private function vendor(): ?Vendor
+    {
+        return $this->vendorId ? Vendor::find($this->vendorId) : null;
+    }
+
+    private function scope(): AssistantScope
+    {
+        return AssistantScope::for(auth()->user(), $this->vendor());
+    }
+
+    /**
+     * This user's threads in this business. Threads with no business yet are
+     * listed only where there is no business to filter by.
+     */
+    private function ownThreads(): Builder
+    {
+        return AssistantThread::query()
+            ->where('user_id', auth()->id())
+            ->when($this->vendorId, fn (Builder $q) => $q->where('vendor_id', $this->vendorId));
+    }
+
+    /** A thread this user may touch from this bubble, or a 403. */
+    private function ownThreadOrAbort(int $threadId): AssistantThread
+    {
+        $thread = $this->ownThreads()->whereKey($threadId)->first();
+
+        if (! $thread) {
+            abort(403, 'Unauthorized thread access.');
+        }
+
+        return $thread;
+    }
+
+    /** In a business: its daily question cap (the one users hit first). Else the per-user cap. */
     public function getDailyMessageCapProperty(): int
     {
+        if ($vendor = $this->vendor()) {
+            return PreflightCheckAction::vendorCap($vendor);
+        }
+
         return (int) (AssistantGlobalSetting::current()->daily_message_cap ?? 0);
     }
 
+    /** In a business: questions everyone in it has asked today (Lagos day). Else this user's. */
     public function getTodayMessageCountProperty(): int
     {
         if (! auth()->check()) {
             return 0;
+        }
+
+        if ($vendor = $this->vendor()) {
+            return AssistantVendorDailyUsage::questionsToday((int) $vendor->id);
         }
 
         return (int) (AssistantDailyUsage::forToday(auth()->user())->message_count ?? 0);
@@ -94,9 +153,8 @@ class ChatBubble extends Component
             return collect();
         }
 
-        return AssistantThread::query()
+        return $this->ownThreads()
             ->with('store')
-            ->where('user_id', auth()->id())
             ->orderByDesc('last_message_at')
             ->limit(20)
             ->get();
@@ -108,10 +166,9 @@ class ChatBubble extends Component
             return null;
         }
 
-        return AssistantThread::query()
+        return $this->ownThreads()
             ->with('store')
-            ->where('id', $this->activeThreadId)
-            ->where('user_id', auth()->id())
+            ->whereKey($this->activeThreadId)
             ->first();
     }
 
@@ -124,9 +181,7 @@ class ChatBubble extends Component
             return collect();
         }
 
-        return Store::query()
-            ->whereHas('vendor', fn ($v) => $v->where('user_id', auth()->id()))
-            ->get();
+        return $this->scope()->stores();
     }
 
     /**
@@ -134,7 +189,7 @@ class ChatBubble extends Component
      */
     public function loadMessages(): Collection
     {
-        if (! auth()->check() || ! $this->activeThreadId) {
+        if (! auth()->check() || ! $this->activeThreadId || ! $this->activeThread) {
             return collect();
         }
 
@@ -160,10 +215,7 @@ class ChatBubble extends Component
 
     public function selectThread(int $threadId): void
     {
-        $thread = AssistantThread::find($threadId);
-        if (! $thread || (int) $thread->user_id !== (int) auth()->id()) {
-            abort(403, 'Unauthorized thread access.');
-        }
+        $thread = $this->ownThreadOrAbort($threadId);
 
         $this->activeThreadId = $thread->id;
         $this->sidebarOpen = false;
@@ -177,7 +229,7 @@ class ChatBubble extends Component
         }
 
         $user = auth()->user();
-        $thread = $createThreadAction->execute($user);
+        $thread = $createThreadAction->execute($user, $this->vendor());
 
         $this->activeThreadId = $thread->id;
         $this->sidebarOpen = false;
@@ -205,10 +257,7 @@ class ChatBubble extends Component
 
     public function saveThreadTitle(int $threadId, RenameThreadAction $renameThreadAction): void
     {
-        $thread = AssistantThread::find($threadId);
-        if (! $thread || (int) $thread->user_id !== (int) auth()->id()) {
-            abort(403, 'Unauthorized thread access.');
-        }
+        $thread = $this->ownThreadOrAbort($threadId);
 
         $renameThreadAction->execute($thread, $this->editingTitle);
         $this->editingThreadId = null;
@@ -217,16 +266,12 @@ class ChatBubble extends Component
 
     public function deleteThread(int $threadId, ?DeleteThreadAction $deleteThreadAction = null): void
     {
-        $thread = AssistantThread::find($threadId);
-        if (! $thread || (int) $thread->user_id !== (int) auth()->id()) {
-            abort(403, 'Unauthorized thread access.');
-        }
+        $thread = $this->ownThreadOrAbort($threadId);
 
         ($deleteThreadAction ?? app(DeleteThreadAction::class))->execute($thread);
 
         if ($this->activeThreadId === $threadId) {
-            $this->activeThreadId = AssistantThread::query()
-                ->where('user_id', auth()->id())
+            $this->activeThreadId = $this->ownThreads()
                 ->orderByDesc('last_message_at')
                 ->value('id');
         }
@@ -236,10 +281,7 @@ class ChatBubble extends Component
 
     public function switchStore(int $threadId, int $storeId, ?SetThreadStoreAction $setThreadStoreAction = null): void
     {
-        $thread = AssistantThread::find($threadId);
-        if (! $thread || (int) $thread->user_id !== (int) auth()->id()) {
-            abort(403, 'Unauthorized thread access.');
-        }
+        $thread = $this->ownThreadOrAbort($threadId);
 
         $this->activeThreadId = $thread->id;
         $this->selectStore($storeId, $setThreadStoreAction ?? app(SetThreadStoreAction::class), app(CreateThreadAction::class));
@@ -253,10 +295,7 @@ class ChatBubble extends Component
 
         $user = auth()->user();
 
-        $store = Store::query()
-            ->where('id', $storeId)
-            ->whereHas('vendor', fn ($v) => $v->where('user_id', $user->id))
-            ->first();
+        $store = $this->scope()->allows($storeId) ? Store::query()->find($storeId) : null;
 
         if (! $store) {
             abort(403, 'Unauthorized store access.');
@@ -268,7 +307,7 @@ class ChatBubble extends Component
         }
 
         if (! $thread) {
-            $thread = $createThreadAction->execute($user);
+            $thread = $createThreadAction->execute($user, $this->vendor());
             $this->activeThreadId = $thread->id;
         }
 
@@ -303,7 +342,7 @@ class ChatBubble extends Component
             $user = auth()->user();
             $thread = $this->activeThread;
 
-            $result = $sendMessageAction->execute($user, $thread, $content);
+            $result = $sendMessageAction->execute($user, $thread, $content, null, $this->vendor());
 
             if (isset($result['thread']) && $result['thread']) {
                 $this->activeThreadId = $result['thread']->id;

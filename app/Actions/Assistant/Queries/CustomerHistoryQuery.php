@@ -12,6 +12,12 @@ use Illuminate\Support\Facades\DB;
 
 class CustomerHistoryQuery extends BaseAssistantQuery
 {
+    /** Same gate as the Customer Debts (customer records) screen. */
+    public function requiredPermission(): ?string
+    {
+        return 'view_customer_debts';
+    }
+
     public function supportsAggregate(): bool
     {
         return true;
@@ -71,7 +77,7 @@ class CustomerHistoryQuery extends BaseAssistantQuery
                 'date' => $date,
                 'product_name' => (string) $row->product_name,
                 'quantity' => fmod($qty, 1.0) === 0.0 ? (int) $qty : $qty,
-                'total_amount' => (int) round(((float) $row->total) * 100),
+                ...self::naira('total_amount', ((float) $row->total)),
             ];
         })->all();
 

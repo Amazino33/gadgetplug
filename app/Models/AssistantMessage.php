@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\Assistant\AnswerStatus;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -23,6 +24,8 @@ class AssistantMessage extends Model
         'content',
         'is_prompt',
         'ai_meta',
+        'status',
+        'latency_ms',
         'flagged_at',
         'flagged_by',
         'flag_note',
@@ -31,6 +34,8 @@ class AssistantMessage extends Model
     protected $casts = [
         'is_prompt' => 'boolean',
         'ai_meta' => 'array',
+        'status' => AnswerStatus::class,
+        'latency_ms' => 'integer',
         'flagged_at' => 'datetime',
     ];
 

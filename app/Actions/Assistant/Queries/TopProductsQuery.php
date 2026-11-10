@@ -12,6 +12,12 @@ use Illuminate\Support\Facades\DB;
 
 class TopProductsQuery extends BaseAssistantQuery
 {
+    /** Same gate as the Top Sellers report screen. */
+    public function requiredPermission(): ?string
+    {
+        return 'view_inventory_reports';
+    }
+
     public function supportsAggregate(): bool
     {
         return true;
@@ -88,7 +94,7 @@ class TopProductsQuery extends BaseAssistantQuery
             $combined[] = [
                 'product_id' => (int) $pId,
                 'name' => (string) ($productNames->get($pId) ?? 'Unknown Product'),
-                'revenue' => (int) round($revNaira * 100),
+                ...self::naira('revenue', $revNaira),
                 'units' => $units,
             ];
         }

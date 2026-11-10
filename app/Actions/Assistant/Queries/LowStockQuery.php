@@ -9,6 +9,12 @@ use Carbon\CarbonInterface;
 
 class LowStockQuery extends BaseAssistantQuery
 {
+    /** Same gate as the Products screen. */
+    public function requiredPermission(): ?string
+    {
+        return 'view_any_products';
+    }
+
     public function supportsAggregate(): bool
     {
         return false;

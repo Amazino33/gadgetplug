@@ -115,32 +115,32 @@ test('SalesSummaryQuery handles empty data and returns exact sum on aggregate st
 
     // 1. Empty data
     $empty = $query->execute(['store_id' => $store1->id], $from, $to);
-    expect($empty['revenue'])->toBe(0)
+    expect($empty['revenue'])->toBe(0.0)
         ->and($empty['orders'])->toBe(0)
         ->and($empty['has_data'])->toBeTrue()
         ->and($empty['reason'])->toBeNull()
-        ->and(is_int($empty['revenue']))->toBeTrue()
+        ->and(is_string($empty['revenue_display']))->toBeTrue()
         ->and(is_int($empty['orders']))->toBeTrue();
 
-    // 2. Sales in store 1 (₦150.00 = 15000 kobo)
+    // 2. Sales in store 1 (₦150.00)
     assistantQueriesPosSale($vendor, $store1, $user, 150.00, now()->subDays(2));
 
-    // 3. Sales in store 2 (₦250.00 = 25000 kobo)
+    // 3. Sales in store 2 (₦250.00)
     assistantQueriesPosSale($vendor, $store2, $user, 250.00, now()->subDays(3));
 
     // Single store query
     $res1 = $query->execute(['store_id' => $store1->id], $from, $to);
-    expect($res1['revenue'])->toBe(15000)
+    expect($res1['revenue'])->toBe(150.0)
         ->and($res1['orders'])->toBe(1);
 
     // Multi-store aggregate math
     $agg = $query->execute(['store_ids' => [$store1->id, $store2->id]], $from, $to);
-    expect($agg['revenue'])->toBe(40000)
+    expect($agg['revenue'])->toBe(400.0)
         ->and($agg['orders'])->toBe(2)
-        ->and(is_int($agg['revenue']))->toBeTrue();
+        ->and(is_string($agg['revenue_display']))->toBeTrue();
 });
 
-test('SalesByDayQuery returns structured daily breakdown with integer kobo', function () {
+test('SalesByDayQuery returns structured daily breakdown in naira with display strings', function () {
     [$user, $vendor, $store] = assistantQueriesVendor();
     $query = new SalesByDayQuery;
     $from = now()->subDays(5);
@@ -156,8 +156,8 @@ test('SalesByDayQuery returns structured daily breakdown with integer kobo', fun
     $res = $query->execute(['store_id' => $store->id], $from, $to);
     expect($res['days'])->toHaveCount(1)
         ->and($res['days'][0])->toHaveKeys(['date', 'revenue', 'orders'])
-        ->and($res['days'][0]['revenue'])->toBe(50000)
-        ->and(is_int($res['days'][0]['revenue']))->toBeTrue();
+        ->and($res['days'][0]['revenue'])->toBe(500.0)
+        ->and(is_string($res['days'][0]['revenue_display']))->toBeTrue();
 });
 
 test('TopProductsQuery returns top 5 products sorted by revenue desc', function () {
@@ -197,8 +197,8 @@ test('TopProductsQuery returns top 5 products sorted by revenue desc', function 
     $res = $query->execute(['store_id' => $store->id], $from, $to);
     expect($res['products'])->toHaveCount(2)
         ->and($res['products'][0]['product_id'])->toBe($p1->id)
-        ->and($res['products'][0]['revenue'])->toBe(20000)
-        ->and(is_int($res['products'][0]['revenue']))->toBeTrue()
+        ->and($res['products'][0]['revenue'])->toBe(200.0)
+        ->and(is_string($res['products'][0]['revenue_display']))->toBeTrue()
         ->and($res['products'][1]['product_id'])->toBe($p2->id);
 });
 
@@ -251,11 +251,11 @@ test('RevenueVsPreviousQuery calculates period revenue and percentage change', f
 
     $res = $query->execute(['store_id' => $store->id], $from, $to);
 
-    expect($res['current_revenue'])->toBe(20000)
-        ->and($res['previous_revenue'])->toBe(10000)
+    expect($res['current_revenue'])->toBe(200.0)
+        ->and($res['previous_revenue'])->toBe(100.0)
         ->and($res['percentage_change'])->toBe(100.0)
-        ->and(is_int($res['current_revenue']))->toBeTrue()
-        ->and(is_int($res['previous_revenue']))->toBeTrue();
+        ->and(is_string($res['current_revenue_display']))->toBeTrue()
+        ->and(is_string($res['previous_revenue_display']))->toBeTrue();
 });
 
 test('LowStockQuery and OutOfStockQuery return correct items and respect threshold', function () {
@@ -318,17 +318,17 @@ test('DeadStockQuery returns store_too_new for stores < 30 days old and flags de
         ->and($resOld['items'][0]['product_id'])->toBe($pDead->id);
 });
 
-test('StockValueQuery computes total inventory cost in integer kobo', function () {
+test('StockValueQuery computes total inventory cost in naira with display strings', function () {
     [$user, $vendor, $store] = assistantQueriesVendor();
     $query = new StockValueQuery;
 
     // Empty
     $empty = $query->execute(['store_id' => $store->id], now()->subDays(1), now());
-    expect($empty['total_cost_value'])->toBe(0)
+    expect($empty['total_cost_value'])->toBe(0.0)
         ->and($empty['total_units'])->toBe(0)
         ->and($empty['has_data'])->toBeTrue()
         ->and($empty['reason'])->toBeNull()
-        ->and(is_int($empty['total_cost_value']))->toBeTrue();
+        ->and(is_string($empty['total_cost_value_display']))->toBeTrue();
 
     $p = makeProduct($vendor, 'Valuable Item', 100.00);
     ProductStoreStock::create(['store_id' => $store->id, 'product_id' => $p->id, 'quantity' => 10, 'reserved' => 0]);
@@ -344,12 +344,12 @@ test('StockValueQuery computes total inventory cost in integer kobo', function (
 
     $res = $query->execute(['store_id' => $store->id], now()->subDays(1), now());
     // 10 units * ₦100.00 = ₦1,000.00 = 100,000 kobo
-    expect($res['total_cost_value'])->toBe(100000)
+    expect($res['total_cost_value'])->toBe(1000.0)
         ->and($res['total_units'])->toBe(10)
-        ->and(is_int($res['total_cost_value']))->toBeTrue();
+        ->and(is_string($res['total_cost_value_display']))->toBeTrue();
 });
 
-test('CashVarianceQuery returns expected and counted variance in integer kobo', function () {
+test('CashVarianceQuery returns expected and counted variance in naira with display strings', function () {
     [$user, $vendor, $store] = assistantQueriesVendor();
     $session = PosSession::create([
         'vendor_id' => $vendor->id,
@@ -377,10 +377,10 @@ test('CashVarianceQuery returns expected and counted variance in integer kobo', 
     $res = $query->execute(['store_id' => $store->id], now()->subDays(5), now());
 
     expect($res['cash_ups'])->toHaveCount(1)
-        ->and($res['total_expected'])->toBe(150000)
-        ->and($res['total_counted'])->toBe(148000)
-        ->and($res['total_variance'])->toBe(-2000)
-        ->and(is_int($res['total_variance']))->toBeTrue();
+        ->and($res['total_expected'])->toBe(1500.0)
+        ->and($res['total_counted'])->toBe(1480.0)
+        ->and($res['total_variance'])->toBe(-20.0)
+        ->and(is_string($res['total_variance_display']))->toBeTrue();
 });
 
 test('CustomerDebtsQuery calculates outstanding balances and oldest debt date', function () {
@@ -399,13 +399,13 @@ test('CustomerDebtsQuery calculates outstanding balances and oldest debt date', 
     $query = new CustomerDebtsQuery;
     $res = $query->execute(['store_id' => $store->id], now()->subDays(30), now());
 
-    expect($res['total_owed'])->toBe(50000)
+    expect($res['total_owed'])->toBe(500.0)
         ->and($res['debtor_count'])->toBe(1)
         ->and($res['oldest_debt_date'])->toBe('2026-10-01')
-        ->and(is_int($res['total_owed']))->toBeTrue()
+        ->and(is_string($res['total_owed_display']))->toBeTrue()
         ->and($res['debtors'])->toBeArray()
         ->and($res['debtors'][0]['name'])->toBe('Debtor John')
-        ->and($res['debtors'][0]['amount'])->toBe(50000);
+        ->and($res['debtors'][0]['amount'])->toBe(500.0);
 });
 
 test('CustomerDebtsQuery seeds debt for Emeka Eze and asserts debtor name', function () {
@@ -426,10 +426,10 @@ test('CustomerDebtsQuery seeds debt for Emeka Eze and asserts debtor name', func
 
     expect($res['debtors'])->toBeArray()
         ->and($res['debtors'][0]['name'])->toBe('Emeka Eze')
-        ->and($res['debtors'][0]['amount'])->toBe(4500000);
+        ->and($res['debtors'][0]['amount'])->toBe(45000.0);
 });
 
-test('SupplierOweingsQuery returns unpaid procurements and schedule dates in integer kobo', function () {
+test('SupplierOweingsQuery returns unpaid procurements and schedule dates in naira with display strings', function () {
     [$user, $vendor, $store] = assistantQueriesVendor();
     $supplier = Supplier::create(['vendor_id' => $vendor->id, 'name' => 'Supplier Co']);
 
@@ -451,10 +451,10 @@ test('SupplierOweingsQuery returns unpaid procurements and schedule dates in int
     $query = new SupplierOweingsQuery;
     $res = $query->execute(['store_id' => $store->id], now()->subDays(10), now());
 
-    expect($res['total_unpaid'])->toBe(60000)
+    expect($res['total_unpaid'])->toBe(600.0)
         ->and($res['invoices_count'])->toBe(1)
         ->and($res['due_dates'])->toHaveCount(1)
-        ->and(is_int($res['total_unpaid']))->toBeTrue();
+        ->and(is_string($res['total_unpaid_display']))->toBeTrue();
 });
 
 test('VendorPayoutsDueQuery returns vendor-scoped payout numbers', function () {
@@ -485,13 +485,13 @@ test('VendorPayoutsDueQuery returns vendor-scoped payout numbers', function () {
     $query = new VendorPayoutsDueQuery;
     $res = $query->execute(['store_id' => $store->id], now()->subDays(10), now());
 
-    expect($res['pending_total'])->toBe(20000)
-        ->and($res['paid_total'])->toBe(30000)
-        ->and(is_int($res['pending_total']))->toBeTrue()
-        ->and(is_int($res['paid_total']))->toBeTrue();
+    expect($res['pending_total'])->toBe(200.0)
+        ->and($res['paid_total'])->toBe(300.0)
+        ->and(is_string($res['pending_total_display']))->toBeTrue()
+        ->and(is_string($res['paid_total_display']))->toBeTrue();
 });
 
-test('AffiliateCommissionsQuery aggregates commission amounts in kobo', function () {
+test('AffiliateCommissionsQuery aggregates commission amounts in naira', function () {
     [$user, $vendor, $store] = assistantQueriesVendor();
     $affiliate = Affiliate::create(['user_id' => $user->id, 'code' => 'AFF'.uniqid()]);
     $order = Order::create([
@@ -534,10 +534,10 @@ test('AffiliateCommissionsQuery aggregates commission amounts in kobo', function
     $query = new AffiliateCommissionsQuery;
     $res = $query->execute(['store_id' => $store->id], now()->subDays(5), now());
 
-    expect($res['earned_total'])->toBe(5000)
-        ->and($res['pending_total'])->toBe(5000)
-        ->and($res['paid_total'])->toBe(0)
-        ->and(is_int($res['earned_total']))->toBeTrue();
+    expect($res['earned_total'])->toBe(50.0)
+        ->and($res['pending_total'])->toBe(50.0)
+        ->and($res['paid_total'])->toBe(0.0)
+        ->and(is_string($res['earned_total_display']))->toBeTrue();
 });
 
 test('PickerItemsOutQuery returns products out with pickers', function () {
@@ -645,7 +645,7 @@ test('CustomerDebtsQuery includes debt dated 60 days ago even when date range is
     $res = $query->execute(['store_id' => $store->id], now()->startOfWeek(), now());
 
     expect($res['has_data'])->toBeTrue()
-        ->and($res['total_owed'])->toBe(45000)
+        ->and($res['total_owed'])->toBe(450.0)
         ->and($res['debtor_count'])->toBe(1);
 });
 
@@ -685,7 +685,7 @@ test('SupplierOweingsQuery includes unpaid procurement from 90 days ago when que
     $res = $query->execute(['store_id' => $store->id], now()->startOfMonth(), now());
 
     expect($res['has_data'])->toBeTrue()
-        ->and($res['total_unpaid'])->toBe(300000)
+        ->and($res['total_unpaid'])->toBe(3000.0)
         ->and($res['invoices_count'])->toBe(1);
 });
 
@@ -707,10 +707,10 @@ test('VendorPayoutsDueQuery returns pending total including payouts dated 90 day
     $res = $query->execute(['store_id' => $store->id], now()->startOfWeek(), now());
 
     expect($res['has_data'])->toBeTrue()
-        ->and($res['pending_total'])->toBe(75000);
+        ->and($res['pending_total'])->toBe(750.0);
 });
 
-test('ProfitQuery returns total_revenue, total_cost, and profit in kobo', function () {
+test('ProfitQuery returns total_revenue, total_cost, and profit in naira', function () {
     [$user, $vendor, $store] = assistantQueriesVendor();
 
     $category = Category::create(['name' => 'General', 'slug' => 'general-'.uniqid()]);
@@ -754,12 +754,12 @@ test('ProfitQuery returns total_revenue, total_cost, and profit in kobo', functi
     $res = $query->execute(['store_id' => $store->id], now()->startOfDay(), now());
 
     expect($res['has_data'])->toBeTrue()
-        ->and($res['total_revenue'])->toBe(900000) // 9,000 Naira in kobo
-        ->and($res['total_cost'])->toBe(400000)   // 4,000 Naira in kobo
-        ->and($res['profit'])->toBe(500000);      // 5,000 Naira in kobo
+        ->and($res['total_revenue'])->toBe(9000.0) // 9,000 Naira
+        ->and($res['total_cost'])->toBe(4000.0)   // 4,000 Naira
+        ->and($res['profit'])->toBe(5000.0);      // 5,000 Naira
 });
 
-test('CustomerHistoryQuery finds customer by fuzzy name and returns last purchases in kobo', function () {
+test('CustomerHistoryQuery finds customer by fuzzy name and returns last purchases in naira', function () {
     [$user, $vendor, $store] = assistantQueriesVendor();
 
     $customer = PosCustomer::create([
@@ -817,7 +817,7 @@ test('CustomerHistoryQuery finds customer by fuzzy name and returns last purchas
         ->and($res['purchases'][0]['store_name'])->toBe($store->name)
         ->and($res['purchases'][0]['product_name'])->toBe('iPhone Charger')
         ->and($res['purchases'][0]['quantity'])->toBe(2)
-        ->and($res['purchases'][0]['total_amount'])->toBe(700000);
+        ->and($res['purchases'][0]['total_amount'])->toBe(7000.0);
 });
 
 test('CustomerHistoryQuery searches across all stores of the vendor and returns store_name', function () {
@@ -884,7 +884,7 @@ test('CustomerHistoryQuery searches across all stores of the vendor and returns 
         ->and($res['purchases'])->toHaveCount(1)
         ->and($res['purchases'][0]['store_name'])->toBe($storeA->name)
         ->and($res['purchases'][0]['product_name'])->toBe('Wireless Mouse')
-        ->and($res['purchases'][0]['total_amount'])->toBe(400000);
+        ->and($res['purchases'][0]['total_amount'])->toBe(4000.0);
 });
 
 test('CustomerHistoryQuery returns not_configured when customer_name is missing or empty', function () {
@@ -902,7 +902,7 @@ test('CustomerHistoryQuery returns not_configured when customer_name is missing 
         ->and($resEmpty['reason'])->toBe('not_configured');
 });
 
-test('ExpenseSummaryQuery returns total expenses in kobo and count for store', function () {
+test('ExpenseSummaryQuery returns total expenses in naira and count for store', function () {
     [$user, $vendor, $store] = assistantQueriesVendor();
 
     TillExpense::create([
@@ -927,11 +927,11 @@ test('ExpenseSummaryQuery returns total expenses in kobo and count for store', f
     $res = $query->execute(['store_id' => $store->id], now()->startOfDay(), now());
 
     expect($res['has_data'])->toBeTrue()
-        ->and($res['total_expenses'])->toBe(200000)
+        ->and($res['total_expenses'])->toBe(2000.0)
         ->and($res['count'])->toBe(2);
 });
 
-test('CashierShortageQuery returns cash variance shortages with cashier name and kobo', function () {
+test('CashierShortageQuery returns cash variance shortages with cashier name and naira', function () {
     [$user, $vendor, $store] = assistantQueriesVendor();
     $cashier = User::factory()->create(['name' => 'Adaeze Cashier']);
 
@@ -970,6 +970,6 @@ test('CashierShortageQuery returns cash variance shortages with cashier name and
     expect($res['has_data'])->toBeTrue()
         ->and($res['shortages'])->toHaveCount(1)
         ->and($res['shortages'][0]['cashier_name'])->toBe('Adaeze Cashier')
-        ->and($res['shortages'][0]['variance'])->toBe(-50000)
+        ->and($res['shortages'][0]['variance'])->toBe(-500.0)
         ->and($res['shortages'][0]['date'])->toBe(now()->format('Y-m-d'));
 });

@@ -8,7 +8,9 @@ use App\Exceptions\Assistant\AggregateNotSupported;
 use App\Exceptions\Assistant\DateRangeTooLarge;
 use App\Exceptions\Assistant\InvalidScope;
 use App\Exceptions\Assistant\UnauthorizedStoreAccess;
-use App\Models\Store;
+use App\Services\Assistant\AssistantScope;
+use App\Services\Assistant\CostFieldStripper;
+use App\Support\Naira;
 use Carbon\CarbonInterface;
 
 abstract class BaseAssistantQuery
@@ -36,13 +38,118 @@ abstract class BaseAssistantQuery
     }
 
     /**
+     * The vendor permission a user needs for this query — the same one that
+     * gates the panel screen showing the same data. Null: anyone allowed to
+     * use the assistant may ask it.
+     */
+    public function requiredPermission(): ?string
+    {
+        return null;
+    }
+
+    /**
+     * Data whose panel screen is owner-only (supplier payables, affiliate
+     * commissions): no role can be granted it.
+     */
+    public function ownerOnly(): bool
+    {
+        return false;
+    }
+
+    /**
+     * Whether the answer IS cost, profit or margin (profit, stock at cost):
+     * refused outright without view_cost_price, rather than returned with
+     * the figure stripped and nothing left.
+     */
+    public function costSensitive(): bool
+    {
+        return false;
+    }
+
+    /**
+     * A money figure as the model must quote it: naira, rounded to kobo, and
+     * the display string worked out here. The model is told to repeat the
+     * _display value and never to calculate money itself — so every total,
+     * difference and percentage it states comes from code.
+     *
+     * @return array<string, float|string>
+     */
+    protected static function naira(string $key, float|int|string|null $amount): array
+    {
+        $value = round((float) $amount, 2);
+
+        return [
+            $key => $value,
+            "{$key}_display" => Naira::format($value, '₦0'),
+        ];
+    }
+
+    /**
+     * A percentage worked out in code, with its display string (e.g. "+12.5%").
+     *
+     * @return array<string, float|string>
+     */
+    protected static function percent(string $key, float $value): array
+    {
+        $value = round($value, 1);
+
+        return [
+            $key => $value,
+            "{$key}_display" => ($value > 0 ? '+' : '').number_format($value, 1).'%',
+        ];
+    }
+
+    /**
      * Template method performing strict security, scope, and date validations.
+     *
+     * Order, unchanged for shape and stores: the scope shape, then store
+     * access (the isolation guard), then — new — whether this user's role
+     * covers this data at all, then dates. Who is asking is the scope of the
+     * current question, or the authenticated user with no vendor. Results lose
+     * cost/profit/margin fields for anyone without view_cost_price.
      *
      * @param  array{store_id?: int, store_ids?: array<int>}  $scope
      * @param  array<string, mixed>  $options
      * @return array<string, mixed>
      */
     public function execute(array $scope, CarbonInterface $from, CarbonInterface $to, array $options = []): array
+    {
+        $access = $this->accessScope();
+
+        $result = $this->scopedRun($access, $scope, $from, $to, $options);
+
+        return $access?->canSeeCost() ? $result : CostFieldStripper::stripCost($result);
+    }
+
+    /**
+     * Whether this user's role covers this query. Null access (nobody signed
+     * in) passes only a query that needs nothing — the glossary.
+     */
+    public function mayBeAskedBy(?AssistantScope $access): bool
+    {
+        if (! $access) {
+            return $this->requiredPermission() === null && ! $this->ownerOnly() && ! $this->costSensitive();
+        }
+
+        if ($this->ownerOnly() && ! $access->isOwner()) {
+            return false;
+        }
+
+        if ($this->costSensitive() && ! $access->canSeeCost()) {
+            return false;
+        }
+
+        $permission = $this->requiredPermission();
+
+        return $permission === null || $access->can($permission);
+    }
+
+    /**
+     * @param  array{store_id?: int, store_ids?: array<int>}  $scope
+     * @param  array<string, mixed>  $options
+     * @return array<string, mixed>
+     */
+    private function scopedRun(?AssistantScope $access, array $scope, CarbonInterface $from, CarbonInterface $to, array $options): array
     {
         if (! $this->requiresScopeAndDates()) {
             $hasSingle = array_key_exists('store_id', $scope) && $scope['store_id'] !== null;
@@ -53,7 +160,11 @@ abstract class BaseAssistantQuery
                     ? [(int) $scope['store_id']]
                     : array_values(array_map('intval', (array) $scope['store_ids']));
 
-                $this->assertStoreOwnership($targetIds);
+                $this->assertStoreAccess($access, $targetIds);
+            }
+
+            if (! $this->mayBeAskedBy($access)) {
+                return QueryResult::empty('no_access');
             }
 
             return $this->run($scope, $from, $to, $options);
@@ -77,24 +188,14 @@ abstract class BaseAssistantQuery
             $targetStoreIds = array_values(array_map('intval', $scope['store_ids']));
         }
 
-        // 2. Store Ownership Check (isolation guard before feature checks)
-        $user = auth()->user();
-        if (! $user) {
-            throw new UnauthorizedStoreAccess('Authentication required for store queries.');
-        }
+        // 2. Store access (isolation guard before feature checks)
+        $this->assertStoreAccess($access, $targetStoreIds);
 
-        if (! $user->isSuperAdmin()) {
-            // Vendor-owner relationship: stores belonging to vendors owned by the authenticated user
-            $allowedStoreIds = Store::query()
-                ->whereHas('vendor', fn ($v) => $v->where('user_id', $user->id))
-                ->pluck('id')
-                ->all();
-
-            foreach ($targetStoreIds as $storeId) {
-                if (! in_array($storeId, $allowedStoreIds, true)) {
-                    throw new UnauthorizedStoreAccess("Unauthorized access to store [{$storeId}].");
-                }
-            }
+        // 2b. Whether this user's role covers this data at all. Structured,
+        // like every other "no" a query gives: the model is told there is no
+        // access and nothing about the figure itself.
+        if (! $this->mayBeAskedBy($access)) {
+            return QueryResult::empty('no_access');
         }
 
         // 3. Validate Multi-store aggregate capability
@@ -123,28 +224,37 @@ abstract class BaseAssistantQuery
     }
 
     /**
+     * The scope of the question being answered (set by AskAssistantAction),
+     * or — for a direct call — the authenticated user with no vendor, which
+     * limits stores to the ones they own exactly as before. Null when nobody
+     * is signed in: only a query needing neither stores nor a permission
+     * (the glossary) can then run.
+     */
+    protected function accessScope(): ?AssistantScope
+    {
+        if ($scope = AssistantScope::current()) {
+            return $scope;
+        }
+
+        $user = auth()->user();
+
+        return $user ? AssistantScope::for($user) : null;
+    }
+
+    /**
      * @param  array<int>  $targetStoreIds
      *
      * @throws UnauthorizedStoreAccess
      */
-    protected function assertStoreOwnership(array $targetStoreIds): void
+    protected function assertStoreAccess(?AssistantScope $access, array $targetStoreIds): void
     {
-        $user = auth()->user();
-        if (! $user) {
+        if (! $access) {
             throw new UnauthorizedStoreAccess('Authentication required for store queries.');
         }
 
-        if (! $user->isSuperAdmin()) {
-            // Vendor-owner relationship: stores belonging to vendors owned by the authenticated user
-            $allowedStoreIds = Store::query()
-                ->whereHas('vendor', fn ($v) => $v->where('user_id', $user->id))
-                ->pluck('id')
-                ->all();
-
-            foreach ($targetStoreIds as $storeId) {
-                if (! in_array($storeId, $allowedStoreIds, true)) {
-                    throw new UnauthorizedStoreAccess("Unauthorized access to store [{$storeId}].");
-                }
+        foreach ($targetStoreIds as $storeId) {
+            if (! $access->allows($storeId)) {
+                throw new UnauthorizedStoreAccess("Unauthorized access to store [{$storeId}].");
             }
         }
     }

@@ -18,9 +18,11 @@ class AssistantGlobalSetting extends Model
         'max_tokens',
         'daily_message_cap',
         'daily_cost_cap_micros',
+        'daily_vendor_cap',
     ];
 
     protected $casts = [
+        'daily_vendor_cap' => 'integer',
         'is_enabled' => 'boolean',
         'history_window' => 'integer',
         'model_name' => 'string',
@@ -38,6 +40,7 @@ class AssistantGlobalSetting extends Model
             'max_tokens' => 800,
             'daily_message_cap' => 100,
             'daily_cost_cap_micros' => 200000,
+            'daily_vendor_cap' => 100,
         ]);
     }
 }

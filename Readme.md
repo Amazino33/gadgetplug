@@ -10,6 +10,7 @@ A high-performance, multi-tenant gadget marketplace built on the TALL stack.
 * **Payments:** Paystack / Flutterwave
 
 ## Git Strategy (GitHub Flow)
+0. **Fetch first, every session.** Run `git fetch origin` and compare against `origin/main` (not your local `main`) before any recon, baseline test run or branch work, and branch from `origin/main`. Several sessions and machines push to `main`; local refs go stale, and work built on a stale `main` has already had to be redone once.
 1. Branch off `main` for all new features (`feat/...`, `fix/...`, `chore/...`).
 2. Commit using Conventional Commits.
 3. Merge to `main` only when tested and stable.

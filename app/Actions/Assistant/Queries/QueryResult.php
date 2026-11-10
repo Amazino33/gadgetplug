@@ -24,6 +24,9 @@ class QueryResult
         'not_configured',
         'internal_error',
         'no_sales_yet',
+        // The user's role does not include this data (BaseAssistantQuery::
+        // mayBeAskedBy). Says nothing about whether the data exists.
+        'no_access',
     ];
 
     /**

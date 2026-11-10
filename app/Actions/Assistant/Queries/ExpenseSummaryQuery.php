@@ -10,6 +10,12 @@ use Illuminate\Support\Facades\DB;
 
 class ExpenseSummaryQuery extends BaseAssistantQuery
 {
+    /** Same gate as the Expenses screen. */
+    public function requiredPermission(): ?string
+    {
+        return 'manage_expenses';
+    }
+
     public function supportsAggregate(): bool
     {
         return false;
@@ -27,7 +33,7 @@ class ExpenseSummaryQuery extends BaseAssistantQuery
             ->first();
 
         return QueryResult::withData([
-            'total_expenses' => (int) round(((float) ($row->total_expenses ?? 0)) * 100),
+            ...self::naira('total_expenses', ((float) ($row->total_expenses ?? 0))),
             'count' => (int) ($row->count ?? 0),
         ]);
     }

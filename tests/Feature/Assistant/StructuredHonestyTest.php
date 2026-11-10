@@ -122,7 +122,7 @@ test('SalesSummaryQuery on empty established store returns withData and revenue 
 
     expect($result['has_data'])->toBeTrue()
         ->and($result['reason'])->toBeNull()
-        ->and($result['revenue'])->toBe(0)
+        ->and($result['revenue'])->toBe(0.0)
         ->and($result['orders'])->toBe(0);
 });
 
