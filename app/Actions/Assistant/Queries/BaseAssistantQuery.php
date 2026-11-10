@@ -74,7 +74,7 @@ abstract class BaseAssistantQuery
      *
      * @return array<string, float|string>
      */
-    protected static function naira(string $key, float|int|string|null $amount): array
+    public static function naira(string $key, float|int|string|null $amount): array
     {
         $value = round((float) $amount, 2);
 

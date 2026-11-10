@@ -264,9 +264,14 @@ test('LowStockQuery and OutOfStockQuery return correct items and respect thresho
     $pOut = makeProduct($vendor, 'Out Cable');
     $pHigh = makeProduct($vendor, 'Plenty Cable');
 
-    ProductStoreStock::create(['store_id' => $store->id, 'product_id' => $pLow->id, 'quantity' => 3, 'reserved' => 0]);
-    ProductStoreStock::create(['store_id' => $store->id, 'product_id' => $pOut->id, 'quantity' => 0, 'reserved' => 0]);
-    ProductStoreStock::create(['store_id' => $store->id, 'product_id' => $pHigh->id, 'quantity' => 25, 'reserved' => 0]);
+    // One home store per product, as the Products screen and the till read them.
+    foreach ([$pLow, $pOut, $pHigh] as $p) {
+        $p->update(['store_id' => $store->id]);
+    }
+
+    ProductStoreStock::updateOrCreate(['store_id' => $store->id, 'product_id' => $pLow->id], ['quantity' => 3, 'reserved' => 0]);
+    ProductStoreStock::updateOrCreate(['store_id' => $store->id, 'product_id' => $pOut->id], ['quantity' => 0, 'reserved' => 0]);
+    ProductStoreStock::updateOrCreate(['store_id' => $store->id, 'product_id' => $pHigh->id], ['quantity' => 25, 'reserved' => 0]);
 
     // Low stock test (default threshold 5)
     $lowQuery = new LowStockQuery;
@@ -274,16 +279,16 @@ test('LowStockQuery and OutOfStockQuery return correct items and respect thresho
 
     expect($lowRes['threshold'])->toBe(5)
         ->and($lowRes['items'])->toHaveCount(1)
-        ->and($lowRes['items'][0]['product_id'])->toBe($pLow->id)
-        ->and($lowRes['items'][0]['quantity'])->toBe(3);
+        ->and($lowRes['items'][0]['name'])->toBe('Low Cable')
+        ->and($lowRes['items'][0]['available'])->toBe(3);
 
     // Out of stock test
     $outQuery = new OutOfStockQuery;
     $outRes = $outQuery->execute(['store_id' => $store->id], now()->subDays(1), now());
 
     expect($outRes['items'])->toHaveCount(1)
-        ->and($outRes['items'][0]['product_id'])->toBe($pOut->id)
-        ->and($outRes['items'][0]['quantity'])->toBe(0);
+        ->and($outRes['items'][0]['name'])->toBe('Out Cable')
+        ->and($outRes['items'][0]['available'])->toBe(0);
 });
 
 test('DeadStockQuery returns store_too_new for stores < 30 days old and flags dead inventory', function () {
@@ -587,12 +592,12 @@ test('GlossaryQuery returns definition for known terms and found=false for unkno
         ->and($resUnknown['definition'])->toBe('');
 });
 
-test('every query returns complete structured keys on empty data (table-driven loop across all 20)', function () {
+test('every query returns complete structured keys on empty data (table-driven loop across all 21)', function () {
     [$user, $vendor, $store] = assistantQueriesVendor();
 
     $registry = new AssistantQueryRegistry;
 
-    expect(count($registry->keys()))->toBe(20);
+    expect(count($registry->keys()))->toBe(21);
 
     foreach ($registry->keys() as $key) {
         $queryInstance = $registry->get($key);

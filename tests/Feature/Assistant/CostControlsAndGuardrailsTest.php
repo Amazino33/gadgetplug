@@ -592,7 +592,7 @@ test('PromptBuilder toolSchema meets token and character size slimming constrain
 
     $tools = $builder->toolSchema($registry);
 
-    expect($tools)->toHaveCount(20);
+    expect($tools)->toHaveCount(21);
 
     $registryKeys = $registry->keys();
     $totalDescriptionLength = 0;

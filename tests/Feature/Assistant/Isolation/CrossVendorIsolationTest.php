@@ -54,7 +54,7 @@ function createVendorWithStore(string $vendorName, string $storeName): array
     return [$user, $vendor, $store];
 }
 
-test('query layer: Vendor A calling any of the 20 queries with Vendor B store throws UnauthorizedStoreAccess', function () {
+test('query layer: Vendor A calling any of the 21 queries with Vendor B store throws UnauthorizedStoreAccess', function () {
     [$userA, $vendorA, $storeA] = createVendorWithStore('Vendor A', 'Store A');
     [$userB, $vendorB, $storeB] = createVendorWithStore('Vendor B', 'Store B');
 
@@ -63,7 +63,7 @@ test('query layer: Vendor A calling any of the 20 queries with Vendor B store th
     $registry = new AssistantQueryRegistry;
     $keys = $registry->keys();
 
-    expect($keys)->toHaveCount(20);
+    expect($keys)->toHaveCount(21);
 
     $from = now()->subDays(7);
     $to = now();
@@ -401,11 +401,11 @@ test('AI refusal behavior: when no matching tool exists for user query AI refuse
     ]);
 
     $mockAiClient = Mockery::mock(AiClient::class);
-    // AI has no weather tool in its 21 tools schema, so it returns stop without any tool calls
+    // AI has no weather tool in its 22 tools schema, so it returns stop without any tool calls
     $mockAiClient->shouldReceive('chat')
         ->once()
         ->withArgs(function ($messages, $tools) {
-            return count($tools) === 21;
+            return count($tools) === 22;
         })
         ->andReturn([
             'content' => "I can't check that yet. I don't have weather forecast data for your stores.",
