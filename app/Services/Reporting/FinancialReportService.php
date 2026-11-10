@@ -17,6 +17,7 @@ use App\Models\ProcurementLogisticsLeg;
 use App\Models\Product;
 use App\Models\Vendor;
 use App\Services\Inventory\StockValuation;
+use App\Support\Pos\BusinessDate;
 use App\Support\Quantity;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -225,8 +226,10 @@ class FinancialReportService
             ->where('direction', 'out')
             ->pluck('occurred_at', 'source_id');
 
-        $fromDate = $from->toDateString();
-        $toDate = $to->toDateString();
+        // Reversal dates are business dates; compare against the Lagos dates
+        // of the range, not the UTC dates of its stored-time bounds.
+        $fromDate = BusinessDate::of($from);
+        $toDate = BusinessDate::of($to);
 
         $inRange = $orders->filter(function (Order $order) use ($originals, $reversedOn, $from, $to, $fromDate, $toDate) {
             $reversal = $reversedOn->get($originals->get($order->id));
@@ -408,7 +411,7 @@ class FinancialReportService
         // ledger itself is built on.
         $customerDebt = (float) PosCustomerLedgerEntry::query()
             ->forVendor($vendorId)
-            ->where('occurred_at', '<=', $asOf->toDateString())
+            ->whereDate('occurred_at', '<=', BusinessDate::of($asOf))
             ->sum('amount');
 
         $initialCapital = (float) (Vendor::find($vendorId)?->initial_capital ?? 0);

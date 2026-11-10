@@ -7,11 +7,13 @@ use App\Filament\Vendor\Pages\SalesReport;
 use App\Filament\Vendor\Resources\CustomerDebts\CustomerDebtResource;
 use App\Filament\Vendor\Resources\Orders\OrderResource;
 use App\Filament\Vendor\Resources\Products\ProductResource;
+use App\Filament\Vendor\Resources\Products\Schemas\ProductForm;
 use App\Models\Order;
 use App\Models\Product;
 use App\Services\ActiveStore;
 use App\Services\Pos\CustomerDebtService;
 use App\Services\Reporting\SalesReportService;
+use App\Support\Pos\BusinessDate;
 use App\Support\Quantity;
 use Carbon\Carbon;
 use Livewire\Component;
@@ -46,8 +48,10 @@ class HomeDashboard extends Component
 
         // Stat strip figures
         $reports = app(SalesReportService::class);
-        $todayStart = Carbon::now('Africa/Lagos')->startOfDay();
-        $todayEnd = Carbon::now('Africa/Lagos')->endOfDay();
+        // The Lagos trading day, converted to stored (UTC) time. Lagos-zoned
+        // bounds passed straight to the query were compared as if UTC, so the
+        // tile ran 01:00–01:00 and missed every sale rung before 01:00.
+        [$todayStart, $todayEnd] = BusinessDate::boundsFor(BusinessDate::today());
 
         $summary = $reports->summary($vendor->id, $todayStart, $todayEnd, $storeId);
 
@@ -99,6 +103,11 @@ class HomeDashboard extends Component
 
         $isOwner = $user->isSuperAdmin() || $vendor->isOwner($user);
 
+        // Profit is revenue minus cost, so showing it beside revenue hands over
+        // the cost too. It follows view_cost_price, the same single rule the
+        // product screens use — not the tile's own view_inventory_reports gate.
+        $canSeeCost = ProductForm::canSeeCostPrice();
+
         // Build Tile Registry
         $tiles = collect([
             [
@@ -117,7 +126,7 @@ class HomeDashboard extends Component
                 'icon' => 'heroicon-o-banknotes',
                 'route' => null,
                 'value' => '₦'.number_format($summary['revenue']),
-                'subtext' => 'Profit: ₦'.number_format($summary['profit']),
+                'subtext' => $canSeeCost ? 'Profit: ₦'.number_format($summary['profit']) : null,
                 'permission' => 'view_inventory_reports',
                 'owner_prominence' => 'hidden',
                 'staff_prominence' => 'secondary',

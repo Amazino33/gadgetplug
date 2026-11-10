@@ -78,6 +78,23 @@ class FreeShopApplicationResource extends Resource
         return FreeShopApplicationsTable::configure($table);
     }
 
+    /**
+     * Every link to a shop's page carries its id, matching $recordRouteKeyName.
+     *
+     * Filament reads that setting only when it opens the page, not when it
+     * builds a link: a link built from the record (the table's Review button,
+     * a row click) used the vendor's own route key, its link name, and the
+     * page then looked that up as an id and answered 404.
+     */
+    public static function getUrl(?string $name = null, array $parameters = [], bool $isAbsolute = true, ?string $panel = null, ?Model $tenant = null, bool $shouldGuessMissingParameters = false, ?string $configuration = null): string
+    {
+        if (($parameters['record'] ?? null) instanceof Model) {
+            $parameters['record'] = $parameters['record']->getKey();
+        }
+
+        return parent::getUrl($name, $parameters, $isAbsolute, $panel, $tenant, $shouldGuessMissingParameters, $configuration);
+    }
+
     public static function getPages(): array
     {
         return [

@@ -196,3 +196,20 @@ it('saves the free plan settings', function () {
         ->and(FreePlanSetting::photosPerProduct())->toBe(5)
         ->and(FreePlanSetting::adminEmail())->toBe('reviews@gadgetplug.com.ng');
 });
+
+it('opens the review page from the Review link, which carries the id and not the link name', function () {
+    actingAsPlatformAdmin();
+
+    $vendor = freeShop(attributes: ['slug' => 'thrift-urban'])['vendor'];
+
+    $url = FreeShopApplicationResource::getUrl('view', ['record' => $vendor]);
+
+    expect($url)->toEndWith('/free-shop-applications/'.$vendor->id)
+        ->and($url)->not->toContain('thrift-urban');
+
+    // The table's Review button, as the admin clicks it.
+    Livewire::test(ListFreeShopApplications::class)
+        ->assertTableActionHasUrl('view', $url, $vendor);
+
+    $this->get($url)->assertOk()->assertSee($vendor->name);
+});

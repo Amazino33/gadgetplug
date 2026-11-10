@@ -7,6 +7,7 @@ namespace App\Actions\Pos;
 use App\Models\PosCustomerLedgerEntry;
 use App\Models\PosSale;
 use App\Models\PosSalePayment;
+use App\Support\Pos\BusinessDate;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -70,7 +71,7 @@ class ChargeCustomerDebtAction
             'created_by' => $sale->cashier_id,
             // The business date, which for an offline sale is when it was rung
             // up rather than when it happened to reach the server.
-            'occurred_at' => ($sale->completed_at ?? $sale->created_at)->toDateString(),
+            'occurred_at' => BusinessDate::of($sale->completed_at ?? $sale->created_at),
             'description' => "Credit sale — {$sale->reference}",
         ]);
     }

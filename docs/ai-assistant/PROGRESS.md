@@ -236,7 +236,7 @@ The 5 cap-wording assertions in CostControlsAndGuardrailsTest now expect the res
 
 **Fix after the first local run (2026-11-10):** `--store` was ignored for a business with several branches, which got "Pick a store to start." every time; the tests had used only single-branch businesses. `--store` now sets the conversation's branch, as picking one in the chat bubble does, and a branch the user cannot see is refused before anything is created. Two tests were added (8 command tests). Gate: 3,243 tests plus 27; the 19 baseline failures plus OnlineNameTest "the feed posts the online name", which passes when its file runs alone (19/19). That one is order-dependent: it looks for the product in the first 50 feed posts. It is unrelated to this change and is noted as a flake.
 
-**Open question for the owner:** a question that fails at the provider (no key, out of credit, timeout) still counts toward the daily cap. That matches main's per-user counter and its tests.
+**Decision (owner, 2026-11-10): failed questions count.** A question that reached the model counts toward the business's and the user's daily allowance even if it then failed (provider error, tool error, reply failed), so repeated failures cannot run up credit unchecked. That is how main's per-user counter already works. Briefly reversed the same day and put back before anything was committed. Refusals at the cap, and short-circuits that never call the model (new store, store not picked), do not count.
 
 **Deploy:** `php artisan migrate --force`. No seeder or permission change.
 

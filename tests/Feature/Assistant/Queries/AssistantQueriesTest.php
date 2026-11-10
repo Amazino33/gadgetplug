@@ -56,7 +56,7 @@ use Illuminate\Support\Str;
 
 uses(RefreshDatabase::class);
 
-function createVendorWithStore(): array
+function assistantQueriesVendor(): array
 {
     $user = User::factory()->create();
     $vendor = Vendor::create(['user_id' => $user->id, 'name' => 'Test Vendor '.uniqid()]);
@@ -71,7 +71,7 @@ function createVendorWithStore(): array
     return [$user, $vendor, $store];
 }
 
-function makePosSale(Vendor $vendor, Store $store, User $cashier, float $amount, ?CarbonInterface $completedAt = null): PosSale
+function assistantQueriesPosSale(Vendor $vendor, Store $store, User $cashier, float $amount, ?CarbonInterface $completedAt = null): PosSale
 {
     return PosSale::create([
         'reference' => 'POS-'.Str::random(10),
@@ -102,7 +102,7 @@ function makeProduct(Vendor $vendor, string $name, float $cost = 0.0): Product
 }
 
 test('SalesSummaryQuery handles empty data and returns exact sum on aggregate stores', function () {
-    [$user, $vendor, $store1] = createVendorWithStore();
+    [$user, $vendor, $store1] = assistantQueriesVendor();
     $store2 = Store::create([
         'vendor_id' => $vendor->id,
         'name' => 'Second Branch',
@@ -123,10 +123,10 @@ test('SalesSummaryQuery handles empty data and returns exact sum on aggregate st
         ->and(is_int($empty['orders']))->toBeTrue();
 
     // 2. Sales in store 1 (₦150.00)
-    makePosSale($vendor, $store1, $user, 150.00, now()->subDays(2));
+    assistantQueriesPosSale($vendor, $store1, $user, 150.00, now()->subDays(2));
 
     // 3. Sales in store 2 (₦250.00)
-    makePosSale($vendor, $store2, $user, 250.00, now()->subDays(3));
+    assistantQueriesPosSale($vendor, $store2, $user, 250.00, now()->subDays(3));
 
     // Single store query
     $res1 = $query->execute(['store_id' => $store1->id], $from, $to);
@@ -141,7 +141,7 @@ test('SalesSummaryQuery handles empty data and returns exact sum on aggregate st
 });
 
 test('SalesByDayQuery returns structured daily breakdown in naira with display strings', function () {
-    [$user, $vendor, $store] = createVendorWithStore();
+    [$user, $vendor, $store] = assistantQueriesVendor();
     $query = new SalesByDayQuery;
     $from = now()->subDays(5);
     $to = now();
@@ -151,7 +151,7 @@ test('SalesByDayQuery returns structured daily breakdown in naira with display s
     expect($empty['days'])->toBeArray()->and($empty['days'])->toBeEmpty();
 
     // Add sale
-    makePosSale($vendor, $store, $user, 500.00, now()->subDays(1));
+    assistantQueriesPosSale($vendor, $store, $user, 500.00, now()->subDays(1));
 
     $res = $query->execute(['store_id' => $store->id], $from, $to);
     expect($res['days'])->toHaveCount(1)
@@ -161,7 +161,7 @@ test('SalesByDayQuery returns structured daily breakdown in naira with display s
 });
 
 test('TopProductsQuery returns top 5 products sorted by revenue desc', function () {
-    [$user, $vendor, $store] = createVendorWithStore();
+    [$user, $vendor, $store] = assistantQueriesVendor();
     $query = new TopProductsQuery;
     $from = now()->subDays(30);
     $to = now();
@@ -174,7 +174,7 @@ test('TopProductsQuery returns top 5 products sorted by revenue desc', function 
     $p1 = makeProduct($vendor, 'Gadget A');
     $p2 = makeProduct($vendor, 'Gadget B');
 
-    $sale = makePosSale($vendor, $store, $user, 300.00, now()->subDays(2));
+    $sale = assistantQueriesPosSale($vendor, $store, $user, 300.00, now()->subDays(2));
 
     PosSaleItem::create([
         'pos_sale_id' => $sale->id,
@@ -237,17 +237,17 @@ test('SlowProductsQuery returns store_too_new for new stores and bottom products
 });
 
 test('RevenueVsPreviousQuery calculates period revenue and percentage change', function () {
-    [$user, $vendor, $store] = createVendorWithStore();
+    [$user, $vendor, $store] = assistantQueriesVendor();
     $query = new RevenueVsPreviousQuery;
 
     $to = now();
     $from = now()->subDays(10); // 10 day window
 
     // Current period sale: ₦200 = 20000 kobo
-    makePosSale($vendor, $store, $user, 200.00, now()->subDays(2));
+    assistantQueriesPosSale($vendor, $store, $user, 200.00, now()->subDays(2));
 
     // Previous period sale: ₦100 = 10000 kobo
-    makePosSale($vendor, $store, $user, 100.00, now()->subDays(15));
+    assistantQueriesPosSale($vendor, $store, $user, 100.00, now()->subDays(15));
 
     $res = $query->execute(['store_id' => $store->id], $from, $to);
 
@@ -259,7 +259,7 @@ test('RevenueVsPreviousQuery calculates period revenue and percentage change', f
 });
 
 test('LowStockQuery and OutOfStockQuery return correct items and respect threshold', function () {
-    [$user, $vendor, $store] = createVendorWithStore();
+    [$user, $vendor, $store] = assistantQueriesVendor();
     $pLow = makeProduct($vendor, 'Low Cable');
     $pOut = makeProduct($vendor, 'Out Cable');
     $pHigh = makeProduct($vendor, 'Plenty Cable');
@@ -319,7 +319,7 @@ test('DeadStockQuery returns store_too_new for stores < 30 days old and flags de
 });
 
 test('StockValueQuery computes total inventory cost in naira with display strings', function () {
-    [$user, $vendor, $store] = createVendorWithStore();
+    [$user, $vendor, $store] = assistantQueriesVendor();
     $query = new StockValueQuery;
 
     // Empty
@@ -350,7 +350,7 @@ test('StockValueQuery computes total inventory cost in naira with display string
 });
 
 test('CashVarianceQuery returns expected and counted variance in naira with display strings', function () {
-    [$user, $vendor, $store] = createVendorWithStore();
+    [$user, $vendor, $store] = assistantQueriesVendor();
     $session = PosSession::create([
         'vendor_id' => $vendor->id,
         'store_id' => $store->id,
@@ -384,7 +384,7 @@ test('CashVarianceQuery returns expected and counted variance in naira with disp
 });
 
 test('CustomerDebtsQuery calculates outstanding balances and oldest debt date', function () {
-    [$user, $vendor, $store] = createVendorWithStore();
+    [$user, $vendor, $store] = assistantQueriesVendor();
     $customer = PosCustomer::create(['vendor_id' => $vendor->id, 'name' => 'Debtor John']);
 
     PosCustomerLedgerEntry::create([
@@ -409,7 +409,7 @@ test('CustomerDebtsQuery calculates outstanding balances and oldest debt date', 
 });
 
 test('CustomerDebtsQuery seeds debt for Emeka Eze and asserts debtor name', function () {
-    [$user, $vendor, $store] = createVendorWithStore();
+    [$user, $vendor, $store] = assistantQueriesVendor();
     $customer = PosCustomer::create(['vendor_id' => $vendor->id, 'name' => 'Emeka Eze']);
 
     PosCustomerLedgerEntry::create([
@@ -430,7 +430,7 @@ test('CustomerDebtsQuery seeds debt for Emeka Eze and asserts debtor name', func
 });
 
 test('SupplierOweingsQuery returns unpaid procurements and schedule dates in naira with display strings', function () {
-    [$user, $vendor, $store] = createVendorWithStore();
+    [$user, $vendor, $store] = assistantQueriesVendor();
     $supplier = Supplier::create(['vendor_id' => $vendor->id, 'name' => 'Supplier Co']);
 
     $proc = Procurement::create([
@@ -458,7 +458,7 @@ test('SupplierOweingsQuery returns unpaid procurements and schedule dates in nai
 });
 
 test('VendorPayoutsDueQuery returns vendor-scoped payout numbers', function () {
-    [$user, $vendor, $store] = createVendorWithStore();
+    [$user, $vendor, $store] = assistantQueriesVendor();
 
     $p1 = VendorPayout::create([
         'vendor_id' => $vendor->id,
@@ -492,7 +492,7 @@ test('VendorPayoutsDueQuery returns vendor-scoped payout numbers', function () {
 });
 
 test('AffiliateCommissionsQuery aggregates commission amounts in naira', function () {
-    [$user, $vendor, $store] = createVendorWithStore();
+    [$user, $vendor, $store] = assistantQueriesVendor();
     $affiliate = Affiliate::create(['user_id' => $user->id, 'code' => 'AFF'.uniqid()]);
     $order = Order::create([
         'reference' => 'GP-ORD-'.uniqid(),
@@ -541,7 +541,7 @@ test('AffiliateCommissionsQuery aggregates commission amounts in naira', functio
 });
 
 test('PickerItemsOutQuery returns products out with pickers', function () {
-    [$user, $vendor, $store] = createVendorWithStore();
+    [$user, $vendor, $store] = assistantQueriesVendor();
     $picker = Picker::create(['vendor_id' => $vendor->id, 'name' => 'Rider Mike']);
     $product = makeProduct($vendor, 'Dispatched Phone');
 
@@ -588,7 +588,7 @@ test('GlossaryQuery returns definition for known terms and found=false for unkno
 });
 
 test('every query returns complete structured keys on empty data (table-driven loop across all 20)', function () {
-    [$user, $vendor, $store] = createVendorWithStore();
+    [$user, $vendor, $store] = assistantQueriesVendor();
 
     $registry = new AssistantQueryRegistry;
 
@@ -629,7 +629,7 @@ test('AssistantDemoSeeder aligns store IDs, names, and slugs correctly', functio
 });
 
 test('CustomerDebtsQuery includes debt dated 60 days ago even when date range is this week', function () {
-    [$user, $vendor, $store] = createVendorWithStore();
+    [$user, $vendor, $store] = assistantQueriesVendor();
     $customer = PosCustomer::create(['vendor_id' => $vendor->id, 'name' => 'Old Debtor']);
 
     PosCustomerLedgerEntry::create([
@@ -650,7 +650,7 @@ test('CustomerDebtsQuery includes debt dated 60 days ago even when date range is
 });
 
 test('SupplierOweingsQuery includes unpaid procurement from 90 days ago when querying this month and excludes full procurements', function () {
-    [$user, $vendor, $store] = createVendorWithStore();
+    [$user, $vendor, $store] = assistantQueriesVendor();
     $supplier = Supplier::create(['vendor_id' => $vendor->id, 'name' => 'Supplier Co']);
 
     $unpaid = Procurement::create([
@@ -690,7 +690,7 @@ test('SupplierOweingsQuery includes unpaid procurement from 90 days ago when que
 });
 
 test('VendorPayoutsDueQuery returns pending total including payouts dated 90 days ago', function () {
-    [$user, $vendor, $store] = createVendorWithStore();
+    [$user, $vendor, $store] = assistantQueriesVendor();
 
     $payout = VendorPayout::create([
         'vendor_id' => $vendor->id,
@@ -711,7 +711,7 @@ test('VendorPayoutsDueQuery returns pending total including payouts dated 90 day
 });
 
 test('ProfitQuery returns total_revenue, total_cost, and profit in naira', function () {
-    [$user, $vendor, $store] = createVendorWithStore();
+    [$user, $vendor, $store] = assistantQueriesVendor();
 
     $category = Category::create(['name' => 'General', 'slug' => 'general-'.uniqid()]);
     $product = Product::create([
@@ -760,7 +760,7 @@ test('ProfitQuery returns total_revenue, total_cost, and profit in naira', funct
 });
 
 test('CustomerHistoryQuery finds customer by fuzzy name and returns last purchases in naira', function () {
-    [$user, $vendor, $store] = createVendorWithStore();
+    [$user, $vendor, $store] = assistantQueriesVendor();
 
     $customer = PosCustomer::create([
         'vendor_id' => $vendor->id,
@@ -821,7 +821,7 @@ test('CustomerHistoryQuery finds customer by fuzzy name and returns last purchas
 });
 
 test('CustomerHistoryQuery searches across all stores of the vendor and returns store_name', function () {
-    [$user, $vendor, $storeA] = createVendorWithStore();
+    [$user, $vendor, $storeA] = assistantQueriesVendor();
     $storeB = Store::create([
         'vendor_id' => $vendor->id,
         'name' => 'Branch Store B',
@@ -888,7 +888,7 @@ test('CustomerHistoryQuery searches across all stores of the vendor and returns 
 });
 
 test('CustomerHistoryQuery returns not_configured when customer_name is missing or empty', function () {
-    [$user, $vendor, $store] = createVendorWithStore();
+    [$user, $vendor, $store] = assistantQueriesVendor();
 
     $query = new CustomerHistoryQuery;
     $res = $query->execute(['store_id' => $store->id], now()->startOfMonth(), now(), []);
@@ -903,7 +903,7 @@ test('CustomerHistoryQuery returns not_configured when customer_name is missing 
 });
 
 test('ExpenseSummaryQuery returns total expenses in naira and count for store', function () {
-    [$user, $vendor, $store] = createVendorWithStore();
+    [$user, $vendor, $store] = assistantQueriesVendor();
 
     TillExpense::create([
         'vendor_id' => $vendor->id,
@@ -932,7 +932,7 @@ test('ExpenseSummaryQuery returns total expenses in naira and count for store', 
 });
 
 test('CashierShortageQuery returns cash variance shortages with cashier name and naira', function () {
-    [$user, $vendor, $store] = createVendorWithStore();
+    [$user, $vendor, $store] = assistantQueriesVendor();
     $cashier = User::factory()->create(['name' => 'Adaeze Cashier']);
 
     $session = PosSession::create([
