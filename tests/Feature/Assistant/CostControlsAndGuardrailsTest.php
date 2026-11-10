@@ -153,7 +153,7 @@ test('PreflightCheckAction throws message_cap when count hits cap', function () 
         $this->fail('Expected AssistantCapExceeded exception');
     } catch (AssistantCapExceeded $e) {
         expect($e->reason)->toBe('message_cap')
-            ->and($e->getMessage())->toBe("You've reached today's limit (100 messages). Try again tomorrow.");
+            ->and($e->getMessage())->toStartWith("You've reached today's limit (100 messages). It resets at midnight Lagos time, in ");
     }
 });
 
@@ -181,7 +181,7 @@ test('PreflightCheckAction throws cost_cap when estimate would exceed cost cap',
         $this->fail('Expected AssistantCapExceeded exception');
     } catch (AssistantCapExceeded $e) {
         expect($e->reason)->toBe('cost_cap')
-            ->and($e->getMessage())->toBe("You've reached today's assistant budget. Try again tomorrow.");
+            ->and($e->getMessage())->toStartWith("You've reached today's assistant budget. It resets at midnight Lagos time, in ");
     }
 });
 
@@ -197,7 +197,7 @@ test('PreflightCheckAction throws cost_cap before message cap if cost cap is hit
         $this->fail('Expected AssistantCapExceeded exception');
     } catch (AssistantCapExceeded $e) {
         expect($e->reason)->toBe('cost_cap')
-            ->and($e->getMessage())->toBe("You've reached today's assistant budget. Try again tomorrow.");
+            ->and($e->getMessage())->toStartWith("You've reached today's assistant budget. It resets at midnight Lagos time, in ");
     }
 });
 
@@ -232,7 +232,7 @@ test('SendMessageAction on cap hit saves assistant refusal with short_circuit an
 
     $result = $sendAction->execute($user, null, 'How much did I sell?');
 
-    expect($result['assistant_message']->content)->toBe("You've reached today's limit (100 messages). Try again tomorrow.")
+    expect($result['assistant_message']->content)->toStartWith("You've reached today's limit (100 messages). It resets at midnight Lagos time, in ")
         ->and($result['assistant_message']->ai_meta['short_circuit'])->toBe('cap_exceeded')
         ->and($result['assistant_message']->ai_meta['failure_reason'])->toBe('message_cap');
 
@@ -361,7 +361,7 @@ test('pre-emptive cost estimate fires in SendMessageAction before AI call when n
 
     $result = $sendAction->execute($user, null, 'Can you check my sales?');
 
-    expect($result['assistant_message']->content)->toBe("You've reached today's assistant budget. Try again tomorrow.")
+    expect($result['assistant_message']->content)->toStartWith("You've reached today's assistant budget. It resets at midnight Lagos time, in ")
         ->and($result['assistant_message']->ai_meta['short_circuit'])->toBe('cap_exceeded')
         ->and($result['assistant_message']->ai_meta['failure_reason'])->toBe('cost_cap');
 

@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Actions\Assistant;
 
+use App\Enums\Assistant\AnswerStatus;
 use App\Exceptions\Assistant\AiProviderException;
 use App\Exceptions\Assistant\AssistantCapExceeded;
 use App\Exceptions\Assistant\UnauthorizedStoreAccess;
 use App\Models\AssistantMessage;
 use App\Models\AssistantThread;
+use App\Models\AssistantUnansweredQuestion;
 use App\Models\Store;
 use App\Models\User;
 use App\Models\Vendor;
@@ -36,9 +38,12 @@ class SendMessageAction
      * @param  Vendor|null  $vendor  The business the question is asked in — the
      *                               panel tenant. Null: no business context, and data is limited to
      *                               stores the user owns (AssistantScope).
+     * @param  string  $channel  where the question came from: 'panel', or 'cli' (assistant:ask)
      */
-    public function execute(User $user, ?AssistantThread $thread, string $content, ?int $storeId = null, ?Vendor $vendor = null): array
+    public function execute(User $user, ?AssistantThread $thread, string $content, ?int $storeId = null, ?Vendor $vendor = null, string $channel = 'panel'): array
     {
+        $started = hrtime(true);
+
         // A thread belongs to one business. Continuing it from another
         // business's panel is refused, not quietly answered with either's data.
         if ($vendor && $thread && $thread->vendor_id !== null && (int) $thread->vendor_id !== (int) $vendor->id) {
@@ -122,14 +127,11 @@ class SendMessageAction
                     'store_id' => null,
                     'role' => 'assistant',
                     'content' => 'You have no stores assigned yet.',
+                    'status' => AnswerStatus::NoStores,
                 ]);
                 $currentThread->update(['last_message_at' => now()]);
 
-                return [
-                    'user_message' => $userMessage,
-                    'assistant_message' => $assistantMessage,
-                    'thread' => $currentThread,
-                ];
+                return $this->finish($userMessage, $assistantMessage, $currentThread, $vendor, $started, $channel);
             } else {
                 $assistantMessage = AssistantMessage::create([
                     'thread_id' => $currentThread->id,
@@ -138,14 +140,11 @@ class SendMessageAction
                     'role' => 'assistant',
                     'content' => 'Pick a store to start.',
                     'is_prompt' => true,
+                    'status' => AnswerStatus::NeedsStore,
                 ]);
                 $currentThread->update(['last_message_at' => now()]);
 
-                return [
-                    'user_message' => $userMessage,
-                    'assistant_message' => $assistantMessage,
-                    'thread' => $currentThread,
-                ];
+                return $this->finish($userMessage, $assistantMessage, $currentThread, $vendor, $started, $channel);
             }
         } else {
             $activeStore = Store::query()->find($currentThread->store_id) ?? $currentThread->store ?? $activeStore;
@@ -153,7 +152,7 @@ class SendMessageAction
 
         // Pre-flight cap check (runs before brand-new store short-circuit and before AI calls)
         try {
-            app(PreflightCheckAction::class)->execute($user);
+            app(PreflightCheckAction::class)->execute($user, vendor: $vendor);
         } catch (AssistantCapExceeded $e) {
             $assistantMessage = DB::transaction(function () use ($currentThread, $user, $effectiveStoreId, $activeStore, $e) {
                 $msg = AssistantMessage::create([
@@ -167,6 +166,7 @@ class SendMessageAction
                         'short_circuit' => 'cap_exceeded',
                         'failure_reason' => $e->reason,
                     ],
+                    'status' => AnswerStatus::CapReached,
                 ]);
 
                 $currentThread->update([
@@ -176,11 +176,7 @@ class SendMessageAction
                 return $msg;
             });
 
-            return [
-                'user_message' => $userMessage,
-                'assistant_message' => $assistantMessage,
-                'thread' => $currentThread,
-            ];
+            return $this->finish($userMessage, $assistantMessage, $currentThread, $vendor, $started, $channel);
         }
 
         // Pre-flight short-circuit for brand-new stores (< 24h old, zero orders, zero stock, zero cash-ups)
@@ -201,6 +197,7 @@ class SendMessageAction
                     'ai_meta' => [
                         'short_circuit' => true,
                     ],
+                    'status' => AnswerStatus::NewStore,
                 ]);
 
                 $currentThread->update([
@@ -210,11 +207,7 @@ class SendMessageAction
                 return $msg;
             });
 
-            return [
-                'user_message' => $userMessage,
-                'assistant_message' => $assistantMessage,
-                'thread' => $currentThread,
-            ];
+            return $this->finish($userMessage, $assistantMessage, $currentThread, $vendor, $started, $channel);
         }
 
         // Step 3: AI pipeline executes OUTSIDE DB transaction (no row locks held during network I/O)
@@ -270,6 +263,7 @@ class SendMessageAction
                         'error' => $e->getMessage(),
                         'failure_category' => $failureCategory,
                     ],
+                    'status' => $e instanceof AiProviderException ? AnswerStatus::ProviderError : AnswerStatus::InternalError,
                 ]);
 
                 $currentThread->update([
@@ -280,10 +274,53 @@ class SendMessageAction
             });
         }
 
+        return $this->finish($userMessage, $assistantMessage, $currentThread, $vendor, $started, $channel);
+    }
+
+    /**
+     * The last step on every path: how long the whole question took, where it
+     * came from, and, when it went unanswered, a copy for the admin to review.
+     * Logging never stops the answer reaching the user.
+     *
+     * @return array{user_message: AssistantMessage, assistant_message: AssistantMessage, thread: AssistantThread}
+     */
+    private function finish(AssistantMessage $userMessage, AssistantMessage $assistantMessage, AssistantThread $thread, ?Vendor $vendor, int $started, string $channel): array
+    {
+        try {
+            $assistantMessage->forceFill([
+                'latency_ms' => (int) round((hrtime(true) - $started) / 1e6),
+                'ai_meta' => [...($assistantMessage->ai_meta ?? []), 'channel' => $channel],
+            ])->save();
+
+            $status = $assistantMessage->status;
+
+            if ($status instanceof AnswerStatus && $status->isUnanswered()) {
+                $meta = $assistantMessage->ai_meta ?? [];
+                $failedTools = $assistantMessage->queryRuns()->where('success', false)->pluck('query_key')->all();
+
+                AssistantUnansweredQuestion::create([
+                    'vendor_id' => $vendor?->id ?? $thread->vendor_id,
+                    'user_id' => $userMessage->user_id,
+                    'thread_id' => $thread->id,
+                    'answer_message_id' => $assistantMessage->id,
+                    'question' => (string) $userMessage->content,
+                    'answer' => (string) $assistantMessage->content,
+                    'reason' => $status,
+                    'detail' => collect([
+                        isset($meta['failure_category']) ? 'category: '.$meta['failure_category'] : null,
+                        $failedTools !== [] ? 'failed tools: '.implode(', ', $failedTools) : null,
+                        isset($meta['error']) ? 'error: '.mb_substr((string) $meta['error'], 0, 500) : null,
+                    ])->filter()->implode("\n") ?: null,
+                ]);
+            }
+        } catch (Throwable $e) {
+            Log::warning('Assistant answer logging failed: '.$e->getMessage(), ['message_id' => $assistantMessage->id]);
+        }
+
         return [
             'user_message' => $userMessage,
             'assistant_message' => $assistantMessage,
-            'thread' => $currentThread,
+            'thread' => $thread,
         ];
     }
 }

@@ -49,6 +49,7 @@ class AssistantGlobalSettingsPage extends Page
             'is_enabled' => $setting->is_enabled,
             'daily_message_cap' => $setting->daily_message_cap ?? 100,
             'daily_cost_cap_micros' => $setting->daily_cost_cap_micros ?? 200000,
+            'daily_vendor_cap' => $setting->daily_vendor_cap ?? 100,
         ]);
     }
 
@@ -68,12 +69,19 @@ class AssistantGlobalSettingsPage extends Page
                 Section::make('Usage & Cost Backstops')
                     ->description('Control maximum daily vendor activity and prevent unexpected AI provider spend.')
                     ->schema([
+                        TextInput::make('daily_vendor_cap')
+                            ->label('Daily Questions per Business')
+                            ->numeric()
+                            ->minValue(0)
+                            ->default(100)
+                            ->helperText('Set to 0 for unlimited. Questions one business (all its staff together) can ask per day; resets at midnight Lagos time. A business can be given its own number on its Vendor page.'),
+
                         TextInput::make('daily_message_cap')
                             ->label('Daily Message Cap')
                             ->numeric()
                             ->minValue(0)
                             ->default(100)
-                            ->helperText('Set to 0 for unlimited. Maximum assistant messages a vendor can send per day.'),
+                            ->helperText('Set to 0 for unlimited. Maximum assistant messages one user can send per day (a backstop under the business cap); resets at midnight Lagos time.'),
 
                         TextInput::make('daily_cost_cap_micros')
                             ->label('Daily Cost Cap (Micro-Dollars)')
@@ -95,6 +103,7 @@ class AssistantGlobalSettingsPage extends Page
             'is_enabled' => (bool) ($state['is_enabled'] ?? false),
             'daily_message_cap' => isset($state['daily_message_cap']) ? (int) $state['daily_message_cap'] : 100,
             'daily_cost_cap_micros' => isset($state['daily_cost_cap_micros']) ? (int) $state['daily_cost_cap_micros'] : 200000,
+            'daily_vendor_cap' => isset($state['daily_vendor_cap']) ? (int) $state['daily_vendor_cap'] : 100,
         ]);
 
         Notification::make()

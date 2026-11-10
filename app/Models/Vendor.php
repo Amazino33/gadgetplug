@@ -28,6 +28,8 @@ class Vendor extends Model
         // Free plan (self-signup). See FreeShopApplications for who writes these.
         'plan', 'status', 'category', 'verification_photo', 'social_link',
         'review_note', 'info_requested', 'applied_at', 'approved_at', 'approved_by',
+        // Ask GadgetPlug: questions per Lagos day; null = the platform default.
+        'assistant_daily_cap',
     ];
 
     public const PLAN_FREE = 'free';
@@ -53,6 +55,7 @@ class Vendor extends Model
 
     protected $casts = [
         'pos_min_margin_percent' => 'decimal:2',
+        'assistant_daily_cap' => 'integer',
         'allow_negative_stock' => 'boolean',
         'enable_gadget_fields' => 'boolean',
         'pos_ask_quantity' => 'boolean',

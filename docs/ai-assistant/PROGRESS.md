@@ -31,7 +31,7 @@ Source prompt: pasted at session start (2026-11-06). In a new session, re-paste 
 | Phase | What | Covered by main's assistant | Status |
 |---|---|---|---|
 | 0 | Recon (redone against `origin/main`, read-only) | — | **awaiting review** |
-| 1 | **Harden the existing assistant**: 1.1 security → 1.2 correctness → 1.3 visibility/cost → 1.4 provider | foundations exist | 1.1 done; 1.2 part one done (approved 2026-11-08); **1.3 in progress**; Lagos day + own sales wait for the merge |
+| 1 | **Harden the existing assistant**: 1.1 security → 1.2 correctness → 1.3 visibility/cost → 1.4 provider | foundations exist | 1.1 done; 1.2 part one done (approved 2026-11-08); **1.3 built, awaiting review**; Lagos day + own sales wait for the merge |
 | 2 | Sales, products, prices, stock tools | **partly**: sales_summary, sales_by_day, top/slow products, revenue_vs_previous, low/out-of-stock, stock_value. **Missing:** find_product (fuzzy), product_price, per-store/combined stock_levels, search_records; reuse of SalesReportService | not started |
 | 3 | Margins + product movement | **partly**: profit (store-level), dead_stock, slow_products. **Missing:** per-product listed vs realized margin, below-cost list, velocity/days of cover (ProductVelocityService) | not started |
 | 4 | "Who did what" + logging gaps | **missing** | not started |
@@ -168,7 +168,73 @@ Four gates, each with its own review stop:
 
 **Token ceiling:** prompt plus tools estimate is now **2,013** (it was 2,067 after 1.1). The test cap stays at 2,100 until the end of 1.2, when the Lagos-day and own-sales prompt changes are in, then comes back to 2,000 or lower, as decided.
 
-**Still to do in 1.2, once `fix/lagos-day-boundary` is merged to `main`:** the Lagos day throughout the assistant (prompt "today", `date_from`/`date_to` parsing, the 7-day default, the daily-usage date, the guard's "until assistant Phase 1" entries), then own sales for till-only staff (decided 2026-11-08).
+**Still to do in 1.2, once `fix/lagos-day-boundary` is merged to `main`:** the Lagos day throughout the assistant (prompt "today", `date_from`/`date_to` parsing, the 7-day default, the guard's "until assistant Phase 1" entries), then own sales for till-only staff (decided 2026-11-08).
+
+### Phase 1.3: visibility and cost (built, awaiting review)
+
+**Every question is logged, including the ones that never reach the model.**
+- `assistant_messages.status` records how each question ended, using `App\Enums\Assistant\AnswerStatus`:
+  - `answered`, `no_data`, `no_access`;
+  - `cannot_answer`, `tool_error`, `phrasing_failed`, `provider_error`, `internal_error`;
+  - `cap_reached`, `new_store`, `needs_store`, `no_stores`.
+- The status is worked out from what happened, not from the wording of the reply. The one exception is `cannot_answer`, which is the exact phrase the prompt requires ("I can't check that yet").
+- `assistant_messages.latency_ms` is the time for the whole question, from send to the reply being saved.
+- `ai_meta` now also holds:
+  - `cache_read_tokens` and `cache_write_tokens` (both included in `tokens_in`);
+  - `cost_micros` and `cost_source`;
+  - `model_ms` (time spent waiting on the model);
+  - `rounds` (how many model calls);
+  - `channel` (`panel` or `cli`).
+- The per-tool log (`assistant_query_runs`) is unchanged: tool, scope, dates, result, success, has_data, reason, duration.
+- **Cache and cost come from OpenRouter.** The request now asks for OpenRouter's usage accounting (`usage: {include: true}`). The response gives `prompt_tokens_details.cached_tokens` / `cache_write_tokens` and `usage.cost`. When OpenRouter reports a billed cost, that figure counts, because it prices cache reads and writes correctly. Otherwise the cost comes from our rate table. Whether Sonnet-through-OpenRouter actually caches is a 1.4 question; the logging for it is now in place.
+
+**Unanswered questions are kept for review.** The four "should have answered" statuses (`cannot_answer`, `tool_error`, `phrasing_failed`, `provider_error`), plus `internal_error`, are each copied to `assistant_unanswered_questions` with:
+- the question text, the reply, the business and the user;
+- the failure detail (category, failing tools, error).
+
+The question is copied, so the record survives the user deleting the conversation. `no_data`, `no_access` and `cap_reached` are deliberate outcomes and are not logged as unanswered. The admin screen is Admin → Assistant → Unanswered: open questions by default, with a badge count. The admin can mark one reviewed with a note, or reopen it. Logging never stops the reply reaching the user.
+
+**Daily cap: the locked decision is now built.**
+- **100 questions per business per day**, counting all staff together, held in `assistant_vendor_daily_usage` (one row per business per Lagos day, with tokens, cache and cost).
+- The platform default is `assistant_global_settings.daily_vendor_cap`, on the Assistant settings page. The per-business override is `vendors.assistant_daily_cap`, on the admin Vendor page: empty means the default, 0 means unlimited.
+- At the limit the model is not called, the refusal does not count, and the user sees: "Your business has used all 100 of today's questions. They reset at midnight Lagos time, in about 5 hours."
+- Only questions that reached the model count, as with the existing per-user counter.
+- The existing per-user message and cost caps stay as a backstop. Their messages now give the reset time too.
+- **The days are Lagos days.** All three caps count the Lagos trading day (`BusinessDate::today()`, already on `main`) and reset at Lagos midnight. That moves the per-user usage date out of the blocked Lagos-day list in 1.2, because a business cap and a user cap resetting at different midnights would give wrong reset times. `BusinessDate` itself is not touched, so there is no conflict with `fix/lagos-day-boundary`.
+- In a business, the chat bubble's "N / cap today" now shows the business's questions against its cap.
+- Usage per business is on Admin → Assistant → Usage by Business: questions against the cap, tokens, cache and cost per Lagos day.
+- The cap race accepted on 2026-11-07 still applies (check, then count, with no lock between).
+
+**Terminal command** (same path as the chat bubble, `SendMessageAction`: the same access checks, scope, caps and logging; channel `cli`; it counts toward the business's cap):
+
+```
+php artisan assistant:ask "how much did we sell today?" --user=<id or email> [--vendor=<id or slug>] [--thread=<id>] [--store=<id>]
+```
+
+It prints the answer, the tools called (scope, dates, result, ms), status, model, tokens in/out, cache read/write, model calls, cost and its source, latency (whole question / model), the business's questions today against its cap, and the conversation id for follow-ups. `--vendor` is needed only if the user belongs to more than one business. It refuses businesses the user isn't part of and other people's conversations.
+
+**Admin screens are platform-staff only** (`isSuperAdmin()` with `canAccess` + `shouldRegisterNavigation`, like the other Assistant screens). A business owner is turned away by the panel (redirect) and by the page guard (tested). `CatalogueEditorTest`, which walks every admin resource and page, covers the two new ones.
+
+**Migrations** (additive):
+- `2026_11_08_100000`: `assistant_messages.status`, `latency_ms`;
+- `2026_11_08_100001`: `daily_vendor_cap`, `vendors.assistant_daily_cap`, `assistant_vendor_daily_usage`;
+- `2026_11_08_100002`: `assistant_unanswered_questions`.
+
+**Tests** (`tests/Feature/Assistant/Visibility/`, 37):
+- AnswerLoggingTest (11): statuses, latency, cache, billed vs rate-table cost, the unanswered log, the AI client's usage parsing;
+- VendorDailyCapTest (12): 100 per business across staff, the override, 0 = unlimited, refusals not counted, the Lagos midnight reset at 23:30/00:30, reset-time wording, the usage row, the bubble;
+- AdminVisibilityScreensTest (5): review list, mark reviewed, the owner refused, usage page, both cap settings;
+- AssistantAskCommandTest (6): answer and printout, `--thread`, wrong business, someone else's conversation, cap, unknown user.
+
+The 5 cap-wording assertions in CostControlsAndGuardrailsTest now expect the reset-time wording.
+
+**Also found while building 1.3:** Filament fills closure arguments by name. A query closure written as `fn (Builder $q)` gets an empty Builder with no model from the container and crashes the table. The new screens use `$query` / `$record`. On `main`, `QueryClosureParameterNamesTest` already flags one such closure (InventoryTableWidget.php:196). It's a baseline failure, not touched here.
+
+**For the merge with `fix/lagos-day-boundary`:** its BusinessDayGuard allowlists five `today()` hits in AssistantDailyUsage, AskAssistantAction and AssistantUsageReport "until assistant Phase 1". Those hits are gone now, and the guard fails on stale entries, so the merge that brings the guard onto this branch removes those five entries.
+
+**Gate (2026-11-09, 14:51 to 15:58 UTC, two parts):** 3,241 tests (3,219 passed, 3 skipped) plus 27 in AssistantQueriesTest alone. **19 failures, the baseline list by name**: nothing new, nothing gone.
+
+**Deploy:** `php artisan migrate --force`. No seeder or permission change.
 
 ## Phase 0 (redo) — gap analysis of main's assistant (origin/main `6f7d01c`, read-only, 2026-11-07)
 

@@ -6,6 +6,7 @@ namespace App\Livewire\Assistant;
 
 use App\Actions\Assistant\CreateThreadAction;
 use App\Actions\Assistant\DeleteThreadAction;
+use App\Actions\Assistant\PreflightCheckAction;
 use App\Actions\Assistant\RenameThreadAction;
 use App\Actions\Assistant\SendMessageAction;
 use App\Actions\Assistant\SetThreadStoreAction;
@@ -13,6 +14,7 @@ use App\Models\AssistantDailyUsage;
 use App\Models\AssistantGlobalSetting;
 use App\Models\AssistantMessage;
 use App\Models\AssistantThread;
+use App\Models\AssistantVendorDailyUsage;
 use App\Models\Store;
 use App\Models\Vendor;
 use App\Services\Assistant\AssistantAccess;
@@ -106,15 +108,25 @@ class ChatBubble extends Component
         return $thread;
     }
 
+    /** In a business: its daily question cap (the one users hit first). Else the per-user cap. */
     public function getDailyMessageCapProperty(): int
     {
+        if ($vendor = $this->vendor()) {
+            return PreflightCheckAction::vendorCap($vendor);
+        }
+
         return (int) (AssistantGlobalSetting::current()->daily_message_cap ?? 0);
     }
 
+    /** In a business: questions everyone in it has asked today (Lagos day). Else this user's. */
     public function getTodayMessageCountProperty(): int
     {
         if (! auth()->check()) {
             return 0;
+        }
+
+        if ($vendor = $this->vendor()) {
+            return AssistantVendorDailyUsage::questionsToday((int) $vendor->id);
         }
 
         return (int) (AssistantDailyUsage::forToday(auth()->user())->message_count ?? 0);

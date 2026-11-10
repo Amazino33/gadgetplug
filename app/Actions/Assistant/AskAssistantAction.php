@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Assistant;
 
+use App\Enums\Assistant\AnswerStatus;
 use App\Exceptions\Assistant\AiProviderException;
 use App\Exceptions\Assistant\AiRateLimitException;
 use App\Exceptions\Assistant\UnauthorizedStoreAccess;
@@ -12,6 +13,7 @@ use App\Models\AssistantGlobalSetting;
 use App\Models\AssistantMessage;
 use App\Models\AssistantQueryRun;
 use App\Models\AssistantThread;
+use App\Models\AssistantVendorDailyUsage;
 use App\Models\Store;
 use App\Services\Assistant\AiClient;
 use App\Services\Assistant\AssistantAccess;
@@ -114,14 +116,40 @@ class AskAssistantAction
         $extraToolCalls = [];
         $switchedToStoreId = null;
         $finalContent = null;
+        $phrasingFailed = false;
+        $costMicros = null;
+
+        // Usage across every model call this question makes (Phase 1.3).
+        $cacheRead = 0;
+        $cacheWrite = 0;
+        $providerCostUsd = null;
+        $modelMs = 0;
+        $rounds = 0;
+        $absorb = function (array $usage) use (&$cacheRead, &$cacheWrite, &$providerCostUsd): void {
+            $cacheRead += (int) ($usage['cache_read_tokens'] ?? 0);
+            $cacheWrite += (int) ($usage['cache_write_tokens'] ?? 0);
+
+            if (isset($usage['cost_usd']) && is_numeric($usage['cost_usd'])) {
+                $providerCostUsd = ($providerCostUsd ?? 0.0) + (float) $usage['cost_usd'];
+            }
+        };
 
         try {
             $aiCallStarted = true;
 
             try {
-                $response = $this->aiClient->chat($messages, $tools, $modelName, $maxTokens);
+                $rounds++;
+                $callStarted = hrtime(true);
+
+                try {
+                    $response = $this->aiClient->chat($messages, $tools, $modelName, $maxTokens);
+                } finally {
+                    $modelMs += (int) round((hrtime(true) - $callStarted) / 1e6);
+                }
+
                 $tokensIn = (int) ($response['usage']['prompt_tokens'] ?? 0);
                 $tokensOut = (int) ($response['usage']['completion_tokens'] ?? 0);
+                $absorb($response['usage'] ?? []);
                 $finishReason = (string) ($response['finish_reason'] ?? 'stop');
                 $finalContent = $response['content'] ?? null;
             } catch (AiProviderException|AiRateLimitException $e) {
@@ -268,14 +296,25 @@ class AskAssistantAction
                 $secondMessages = array_merge($messages, [$assistantTurn], $toolTurns);
 
                 try {
-                    $secondResponse = $this->aiClient->chat($secondMessages, [], $modelName, $maxTokens);
+                    $rounds++;
+                    $callStarted = hrtime(true);
+
+                    try {
+                        $secondResponse = $this->aiClient->chat($secondMessages, [], $modelName, $maxTokens);
+                    } finally {
+                        $modelMs += (int) round((hrtime(true) - $callStarted) / 1e6);
+                    }
+
                     $tokensIn += (int) ($secondResponse['usage']['prompt_tokens'] ?? 0);
                     $tokensOut += (int) ($secondResponse['usage']['completion_tokens'] ?? 0);
+                    $absorb($secondResponse['usage'] ?? []);
                     $finalContent = $secondResponse['content'] ?? null;
                 } catch (Throwable $e) {
                     Log::error('Second AI call failed: '.$e->getMessage(), [
                         'exception' => $e,
                     ]);
+                    $phrasingFailed = true;
+                    $errorMessage ??= $e->getMessage();
                     $finalContent = $atLeastOneQuerySuccess
                         ? 'I fetched your data but had trouble phrasing it — try again.'
                         : "I couldn't fetch that right now.";
@@ -291,11 +330,21 @@ class AskAssistantAction
 
                 if ($finalContent === '' || strlen($finalContent) > 4000) {
                     $finalContent = 'Sorry, I had trouble answering that.';
+                    $phrasingFailed = true;
                 } elseif (str_starts_with($finalContent, '{') && str_ends_with($finalContent, '}') && json_decode($finalContent) !== null) {
                     // Reject raw JSON leaks
                     $finalContent = 'Sorry, I had trouble answering that.';
+                    $phrasingFailed = true;
                 }
             }
+
+            $status = self::statusFor($failureCategory, $phrasingFailed, $toolUsed, $queryRunsData, is_string($finalContent) ? $finalContent : '');
+
+            // What the question cost: OpenRouter's billed figure when it gave
+            // one (it prices cache reads and writes properly), else our rate table.
+            $costMicros = $providerCostUsd !== null
+                ? (int) round($providerCostUsd * 1_000_000)
+                : CostCalculator::costMicros($modelName, $tokensIn, $tokensOut);
 
             // 9. Persist inside short DB transaction
             return DB::transaction(function () use (
@@ -314,7 +363,14 @@ class AskAssistantAction
                 $extraToolCalls,
                 $failureCategory,
                 $errorMessage,
-                $queryRunsData
+                $queryRunsData,
+                $status,
+                $cacheRead,
+                $cacheWrite,
+                $costMicros,
+                $providerCostUsd,
+                $modelMs,
+                $rounds
             ) {
                 $aiMeta = [
                     'model' => $modelName,
@@ -326,6 +382,13 @@ class AskAssistantAction
                     'switched_to_store_id' => $switchedToStoreId,
                     'no_tool_used' => $noToolUsed,
                     'extra_tool_calls' => $extraToolCalls,
+                    // Phase 1.3. Cache tokens are part of tokens_in.
+                    'cache_read_tokens' => $cacheRead,
+                    'cache_write_tokens' => $cacheWrite,
+                    'cost_micros' => $costMicros,
+                    'cost_source' => $providerCostUsd !== null ? 'provider' : 'rate_table',
+                    'model_ms' => $modelMs,
+                    'rounds' => $rounds,
                 ];
 
                 if ($failureCategory !== null) {
@@ -344,6 +407,7 @@ class AskAssistantAction
                     'role' => 'assistant',
                     'content' => $finalContent,
                     'ai_meta' => $aiMeta,
+                    'status' => $status,
                 ]);
 
                 foreach ($queryRunsData as $runData) {
@@ -357,11 +421,14 @@ class AskAssistantAction
             });
         } finally {
             if ($aiCallStarted) {
-                $costMicros = CostCalculator::costMicros($modelName, $tokensIn, $tokensOut);
+                $costMicros ??= CostCalculator::costMicros($modelName, $tokensIn, $tokensOut);
+
+                // Counted on the Lagos trading day, so every cap resets at Lagos midnight.
                 DB::transaction(function () use ($user, $tokensIn, $tokensOut, $costMicros) {
+                    $today = AssistantDailyUsage::day();
                     $usage = AssistantDailyUsage::query()
                         ->where('user_id', $user->id)
-                        ->where('date', today())
+                        ->where('date', $today)
                         ->lockForUpdate()
                         ->first();
 
@@ -369,7 +436,7 @@ class AskAssistantAction
                         try {
                             $usage = AssistantDailyUsage::create([
                                 'user_id' => $user->id,
-                                'date' => today(),
+                                'date' => $today,
                                 'message_count' => 0,
                                 'input_tokens' => 0,
                                 'output_tokens' => 0,
@@ -378,7 +445,7 @@ class AskAssistantAction
                         } catch (Throwable) {
                             $usage = AssistantDailyUsage::query()
                                 ->where('user_id', $user->id)
-                                ->where('date', today())
+                                ->where('date', $today)
                                 ->lockForUpdate()
                                 ->first();
                         }
@@ -389,7 +456,60 @@ class AskAssistantAction
                     $usage->increment('output_tokens', $tokensOut);
                     $usage->increment('cost_micros', $costMicros);
                 });
+
+                // And against the business's daily question cap.
+                if ($thread->vendor_id !== null) {
+                    AssistantVendorDailyUsage::record((int) $thread->vendor_id, [
+                        'input_tokens' => $tokensIn,
+                        'output_tokens' => $tokensOut,
+                        'cache_read_tokens' => $cacheRead,
+                        'cache_write_tokens' => $cacheWrite,
+                        'cost_micros' => $costMicros,
+                    ]);
+                }
             }
         }
+    }
+
+    /**
+     * How the question went, from what happened rather than what the reply
+     * says, except "I can't check that yet": the exact phrase the prompt
+     * makes the model use when no tool covers the question.
+     *
+     * @param  array<int, array<string, mixed>>  $runs  the query runs (switch_store is not one)
+     */
+    public static function statusFor(?string $failureCategory, bool $phrasingFailed, bool $toolUsed, array $runs, string $reply): AnswerStatus
+    {
+        if ($failureCategory !== null) {
+            return AnswerStatus::ProviderError;
+        }
+
+        if ($runs !== [] && collect($runs)->every(fn (array $r) => ! $r['success'])) {
+            return AnswerStatus::ToolError;
+        }
+
+        if ($phrasingFailed) {
+            return AnswerStatus::PhrasingFailed;
+        }
+
+        if ($runs !== []) {
+            $succeeded = collect($runs)->where('success', true);
+
+            if ($succeeded->contains(fn (array $r) => ($r['failure_reason'] ?? null) === 'no_access')) {
+                return AnswerStatus::NoAccess;
+            }
+
+            if ($succeeded->every(fn (array $r) => ! ($r['has_data'] ?? true))) {
+                return AnswerStatus::NoData;
+            }
+
+            return AnswerStatus::Answered;
+        }
+
+        if (! $toolUsed && str_contains(mb_strtolower(str_replace(["\u{2019}", "\u{2018}"], "'", $reply)), "i can't check that yet")) {
+            return AnswerStatus::CannotAnswer;
+        }
+
+        return AnswerStatus::Answered;
     }
 }

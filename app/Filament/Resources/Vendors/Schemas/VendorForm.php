@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Vendors\Schemas;
 
+use App\Models\AssistantGlobalSetting;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -48,6 +49,13 @@ class VendorForm
                 Toggle::make('owner_can_manage_roles')
                     ->label('Allow owner to manage roles')
                     ->helperText('Grants the vendor owner access to create and assign roles for their team.'),
+                TextInput::make('assistant_daily_cap')
+                    ->label('Ask GadgetPlug: questions per day')
+                    ->numeric()
+                    ->integer()
+                    ->minValue(0)
+                    ->placeholder(fn () => (string) (AssistantGlobalSetting::current()->daily_vendor_cap ?? 100))
+                    ->helperText('Leave empty for the platform default (Assistant settings). 0 = unlimited. All staff together; resets at midnight Lagos time.'),
             ]);
     }
 }
