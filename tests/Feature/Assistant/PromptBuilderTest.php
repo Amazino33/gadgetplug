@@ -39,7 +39,7 @@ test('tool schema has 20 entries with valid JSON schema and slimmed descriptions
 
     $tools = $builder->toolSchema($registry);
 
-    expect($tools)->toHaveCount(21);
+    expect($tools)->toHaveCount(22);
 
     $registryKeys = $registry->keys();
 
@@ -48,7 +48,7 @@ test('tool schema has 20 entries with valid JSON schema and slimmed descriptions
             ->and(in_array($tool['function']['name'], $registryKeys, true))->toBeTrue()
             ->and(strlen($tool['function']['description']))->toBeLessThanOrEqual(80)
             ->and($tool['function']['parameters']['type'])->toBe('object')
-            ->and($tool['function']['parameters']['properties'])->toHaveKeys(['store_id', 'store_ids']);
+            ->and($tool['function']['parameters']['properties'])->toHaveKeys(['store', 'stores']);
 
         // Date fields only where the tool takes dates (Phase 1.2).
         $takesDates = $registry->defaultPeriod($tool['function']['name']) !== null;

@@ -5,11 +5,11 @@ declare(strict_types=1);
 use App\Actions\Assistant\Queries\SalesSummaryQuery;
 use App\Services\Assistant\AssistantQueryRegistry;
 
-test('registry keys returns exactly 21 queries', function () {
+test('registry keys returns exactly 22 queries', function () {
     $registry = new AssistantQueryRegistry;
     $keys = $registry->keys();
 
-    expect($keys)->toHaveCount(21)
+    expect($keys)->toHaveCount(22)
         ->and($keys)->toContain(
             'sales_summary',
             'sales_by_day',
@@ -32,6 +32,7 @@ test('registry keys returns exactly 21 queries', function () {
             'expenses',
             'cashier_shortages',
             'find_products',
+            'my_sales',
         );
 });
 
@@ -54,7 +55,7 @@ test('registry describe returns structured metadata array', function () {
     $descriptions = $registry->describe();
 
     expect($descriptions)->toBeArray()
-        ->and($descriptions)->toHaveCount(21);
+        ->and($descriptions)->toHaveCount(22);
 
     $first = $descriptions[0];
     expect($first)->toHaveKeys(['key', 'description', 'supports_aggregate', 'default_period']);

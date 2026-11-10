@@ -8,6 +8,7 @@ use App\Enums\Assistant\AnswerStatus;
 use App\Exceptions\Assistant\AiProviderException;
 use App\Exceptions\Assistant\AiRateLimitException;
 use App\Exceptions\Assistant\InvalidPeriod;
+use App\Exceptions\Assistant\InvalidScope;
 use App\Exceptions\Assistant\UnauthorizedStoreAccess;
 use App\Models\AssistantDailyUsage;
 use App\Models\AssistantGlobalSetting;
@@ -23,6 +24,7 @@ use App\Services\Assistant\AssistantQueryRegistry;
 use App\Services\Assistant\AssistantScope;
 use App\Services\Assistant\CostCalculator;
 use App\Services\Assistant\PromptBuilder;
+use App\Services\Assistant\StoreNames;
 use App\Support\Pos\BusinessDate;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
@@ -218,17 +220,17 @@ class AskAssistantAction
                             $atLeastOneQuerySuccess = true;
                         }
                     } else {
-                        // The stores this call asks about. Its own name: $scope
-                        // is the asker's access, which a later switch_store in
-                        // the same reply still needs.
-                        if (isset($args['store_ids']) && is_array($args['store_ids'])) {
-                            $queryScope = ['store_ids' => $args['store_ids']];
-                        } elseif (isset($args['store_id'])) {
-                            $queryScope = ['store_id' => (int) $args['store_id']];
-                        } elseif ($activeStore !== null) {
-                            $queryScope = ['store_id' => $activeStore->id];
-                        } else {
+                        // The stores this call asks about, by name (StoreNames),
+                        // never a number the model had to guess. Its own name:
+                        // $scope is the asker's access, which a later
+                        // switch_store in the same reply still needs.
+                        $scopeError = null;
+
+                        try {
+                            $queryScope = StoreNames::scopeFor($args, $activeStore, $scope);
+                        } catch (InvalidScope $e) {
                             $queryScope = [];
+                            $scopeError = $e->getMessage();
                         }
 
                         // Dates are worked out in code on the Lagos day
@@ -270,6 +272,10 @@ class AskAssistantAction
                         $querySuccess = false;
 
                         try {
+                            if ($scopeError !== null) {
+                                throw new InvalidScope($scopeError);
+                            }
+
                             if ($periodError !== null) {
                                 throw new InvalidPeriod($periodError);
                             }
@@ -366,6 +372,17 @@ class AskAssistantAction
             }
 
             $status = self::statusFor($failureCategory, $phrasingFailed, $toolUsed, $queryRunsData, is_string($finalContent) ? $finalContent : '');
+
+            // Every tool call failed: the reply is ours, not the model's. Live
+            // on 2026-11-10 the model answered a failed tool with "I can't
+            // check that yet", which says the assistant cannot do something
+            // it can. A store it could not find is named, with the right ones.
+            if ($status === AnswerStatus::ToolError) {
+                $storeProblem = collect($queryRunsData)->pluck('error_message')
+                    ->first(fn ($m) => is_string($m) && (str_starts_with($m, 'No store named') || str_contains($m, 'matches more than one store')));
+
+                $finalContent = $storeProblem ?? "I couldn't fetch that right now.";
+            }
 
             // What the question cost: OpenRouter's billed figure when it gave
             // one (it prices cache reads and writes properly), else our rate table.
