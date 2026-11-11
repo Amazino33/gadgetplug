@@ -1,5 +1,8 @@
 @import '../../../../vendor/filament/filament/resources/css/theme.css';
 
+/* In-app tips, Learn page and tip reports: brand tokens and components. */
+@import '../../engagement.css';
+
 /* Every place admin markup can carry Tailwind classes. Filament's own CSS only
    holds the utilities Filament itself uses, so a class written in one of our
    views exists only if Tailwind scans that file here. Leaving these out is

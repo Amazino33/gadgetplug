@@ -126,6 +126,11 @@ class VendorPermissionsSeeder extends Seeder
             'use_ai_assistant',
             'view_ai_alerts',
             'view_staff_activity',
+
+            // Learn GadgetPlug (in-app tips). On every default role; a vendor
+            // can take it away on the Roles screen. Also created, and granted
+            // to existing roles, by migration 2026_11_12_100000.
+            'view_learn_page',
         ];
 
         foreach ($permissions as $permission) {

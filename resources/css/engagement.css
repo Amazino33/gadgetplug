@@ -1,0 +1,523 @@
+/*
+ * In-app tips, the Learn page and the tip reports (vendor and admin panels).
+ *
+ * Brand tokens live here and are used ONLY by these components: the panels
+ * themselves stay on Filament's primary colour. Plain classes rather than
+ * utilities because the markup is injected through render hooks and lazy
+ * Livewire components. Headings are Inter semibold (Filament's own font);
+ * Montserrat is deliberately not loaded, to save data.
+ */
+
+:root {
+    --gp-brand-green: #068b03;
+    --gp-brand-green-hover: #057502;
+    --gp-brand-green-soft: #e8f5e7;
+    --gp-brand-on-green: #ffffff;
+    --gp-brand-orange: #f97316;
+    --gp-brand-orange-soft: #fff1e6;
+    --gp-tip-surface: #ffffff;
+    --gp-tip-text: #111827;
+    --gp-tip-muted: #4b5563;
+    --gp-tip-border: #e5e7eb;
+    --gp-tip-shadow: 0 20px 40px -12px rgb(0 0 0 / 0.25), 0 0 0 1px rgb(0 0 0 / 0.04);
+}
+
+/* Dark mode: lighter green and orange keep their contrast on a dark surface;
+   text on the green button turns dark for the same reason. */
+:root.dark,
+.dark {
+    --gp-brand-green: #3fbf3b;
+    --gp-brand-green-hover: #57cc53;
+    --gp-brand-green-soft: rgb(63 191 59 / 0.14);
+    --gp-brand-on-green: #052e04;
+    --gp-brand-orange: #fb923c;
+    --gp-brand-orange-soft: rgb(251 146 60 / 0.16);
+    --gp-tip-surface: #18181b;
+    --gp-tip-text: #f4f4f5;
+    --gp-tip-muted: #a1a1aa;
+    --gp-tip-border: #3f3f46;
+    --gp-tip-shadow: 0 20px 40px -12px rgb(0 0 0 / 0.6), 0 0 0 1px rgb(255 255 255 / 0.06);
+}
+
+[x-cloak] { display: none !important; }
+
+/* ── Layer: where the card sits ───────────────────────────────────────────── */
+
+.gp-tip-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 45; /* over the page and the chat bubble, under Filament modals */
+    display: flex;
+    pointer-events: none;
+}
+
+.gp-tip-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgb(17 24 39 / 0.45);
+    pointer-events: auto;
+}
+
+/* Phone: bottom sheet, full width, over a light backdrop. */
+.gp-tip-layer--sheet { align-items: flex-end; justify-content: center; }
+.gp-tip-layer--sheet .gp-tip-backdrop { background: rgb(17 24 39 / 0.25); }
+
+/* Desktop: the same tip becomes a corner card with no backdrop, sitting
+   above the chat bubble so neither hides the other. */
+@media (min-width: 640px) {
+    .gp-tip-layer--sheet { align-items: flex-end; justify-content: flex-end; padding: 0 1.5rem 6rem 0; }
+    .gp-tip-layer--sheet .gp-tip-backdrop { display: none; }
+}
+
+.gp-tip-layer--modal { align-items: center; justify-content: center; padding: 1rem; }
+
+/* ── The card ─────────────────────────────────────────────────────────────── */
+
+.gp-tip-card {
+    position: relative;
+    pointer-events: auto;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    background: var(--gp-tip-surface);
+    color: var(--gp-tip-text);
+    box-shadow: var(--gp-tip-shadow);
+    padding: 1.25rem 1.25rem 1rem;
+    font-size: 0.9375rem;
+    line-height: 1.5;
+    transition: transform 150ms ease-out;
+}
+
+.gp-tip-card--sheet {
+    border-radius: 1.25rem 1.25rem 0 0;
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 640px) {
+    .gp-tip-card--sheet { width: 22rem; border-radius: 1rem; padding-bottom: 1rem; }
+}
+
+.gp-tip-card--modal { max-width: 26rem; border-radius: 1.25rem; padding-top: 1.5rem; }
+
+.gp-tip-handle-zone {
+    display: flex;
+    justify-content: center;
+    margin: -0.5rem -1.25rem 0.5rem;
+    padding: 0.25rem 0 0.5rem;
+    touch-action: none;
+}
+
+.gp-tip-handle {
+    width: 2.5rem;
+    height: 0.3rem;
+    border-radius: 9999px;
+    background: var(--gp-tip-border);
+}
+
+@media (min-width: 640px) {
+    .gp-tip-card--sheet .gp-tip-handle-zone { display: none; }
+}
+
+.gp-tip-close {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    display: grid;
+    place-items: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 9999px;
+    color: var(--gp-tip-muted);
+    background: transparent;
+    cursor: pointer;
+}
+
+.gp-tip-close:hover { background: var(--gp-tip-border); }
+.gp-tip-close svg { width: 1.25rem; height: 1.25rem; }
+
+.gp-tip-new {
+    display: inline-block;
+    margin-bottom: 0.5rem;
+    padding: 0.125rem 0.625rem;
+    border-radius: 9999px;
+    background: var(--gp-brand-orange);
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.gp-tip-title {
+    margin: 0 2rem 0.375rem 0;
+    font-size: 1.125rem;
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+.gp-tip-message { color: var(--gp-tip-muted); }
+.gp-tip-message p { margin: 0 0 0.5rem; }
+.gp-tip-message p:last-child { margin-bottom: 0; }
+.gp-tip-message strong { color: var(--gp-tip-text); font-weight: 600; }
+.gp-tip-message a { color: var(--gp-brand-green); font-weight: 500; text-decoration: underline; }
+
+/* ── Media: poster first, scales to the card's width ──────────────────────── */
+
+.gp-tip-image,
+.gp-tip-media {
+    display: block;
+    width: calc(100% + 2.5rem);
+    margin: -1.25rem -1.25rem 1rem;
+    max-height: 40vh;
+    object-fit: cover;
+    background: var(--gp-brand-green-soft);
+}
+
+/* Under the sheet's drag handle the picture sits inside the padding. */
+.gp-tip-card--sheet .gp-tip-image,
+.gp-tip-card--sheet .gp-tip-media { width: 100%; margin: 0 0 1rem; border-radius: 0.75rem; overflow: hidden; }
+
+.gp-tip-card--modal .gp-tip-image,
+.gp-tip-card--modal .gp-tip-media { margin-top: -1.5rem; border-radius: 1.25rem 1.25rem 0 0; }
+
+.gp-tip-media { position: relative; }
+
+.gp-tip-clip {
+    display: block;
+    width: 100%;
+    max-height: 40vh;
+    object-fit: cover;
+}
+
+.gp-tip-play {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    display: grid;
+    place-items: center;
+    width: 3.5rem;
+    height: 3.5rem;
+    border-radius: 9999px;
+    background: rgb(0 0 0 / 0.55);
+    color: #fff;
+    cursor: pointer;
+}
+
+.gp-tip-play svg { width: 1.5rem; height: 1.5rem; margin-left: 0.2rem; }
+
+/* ── Buttons: big tap targets ─────────────────────────────────────────────── */
+
+.gp-tip-actions { margin-top: 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
+
+.gp-tip-primary {
+    width: 100%;
+    min-height: 3rem;
+    padding: 0.75rem 1rem;
+    border-radius: 0.75rem;
+    background: var(--gp-brand-green);
+    color: var(--gp-brand-on-green);
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background-color 150ms;
+}
+
+.gp-tip-primary:hover { background: var(--gp-brand-green-hover); }
+.gp-tip-primary:disabled { opacity: 0.6; cursor: wait; }
+.gp-tip-primary:focus-visible,
+.gp-tip-link:focus-visible,
+.gp-tip-thumb:focus-visible,
+.gp-tip-close:focus-visible { outline: 2px solid var(--gp-brand-green); outline-offset: 2px; }
+
+.gp-tip-secondary { display: flex; justify-content: center; gap: 0.25rem; flex-wrap: wrap; }
+
+.gp-tip-link {
+    min-height: 2.75rem;
+    padding: 0 0.875rem;
+    border-radius: 0.5rem;
+    color: var(--gp-tip-muted);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.gp-tip-link:hover { color: var(--gp-tip-text); background: var(--gp-tip-border); }
+
+/* ── "Was this helpful?": small and quiet ─────────────────────────────────── */
+
+.gp-tip-feedback {
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--gp-tip-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.25rem;
+    color: var(--gp-tip-muted);
+    font-size: 0.8125rem;
+}
+
+.gp-tip-thumb {
+    display: inline-grid;
+    place-items: center;
+    min-width: 2.5rem;
+    min-height: 2.5rem;
+    border-radius: 9999px;
+    font-size: 1.05rem;
+    cursor: pointer;
+    filter: grayscale(0.6);
+}
+
+.gp-tip-thumb[aria-pressed="true"] { background: var(--gp-brand-green-soft); filter: none; }
+
+.gp-tip-preview-badge {
+    position: absolute;
+    top: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    background: var(--gp-brand-orange);
+    color: #fff;
+    font-size: 0.75rem;
+    font-weight: 600;
+    pointer-events: none;
+}
+
+/* ── Admin: phone-sized preview ───────────────────────────────────────────── */
+
+.gp-tip-phone { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
+
+.gp-tip-phone-screen {
+    position: relative;
+    width: 100%;
+    max-width: 20rem;
+    min-height: 34rem;
+    border: 0.5rem solid #111827;
+    border-radius: 2rem;
+    overflow: hidden;
+    background: var(--gp-tip-border);
+    display: flex;
+}
+
+.gp-tip-phone-page { position: absolute; inset: 1rem; display: flex; flex-direction: column; gap: 0.75rem; }
+.gp-tip-phone-page span { height: 3rem; border-radius: 0.5rem; background: var(--gp-tip-surface); opacity: 0.7; }
+
+.gp-tip-phone-layer { position: relative; width: 100%; display: flex; background: rgb(17 24 39 / 0.25); }
+.gp-tip-phone-layer--sheet { align-items: flex-end; }
+.gp-tip-phone-layer--modal { align-items: center; padding: 0.75rem; background: rgb(17 24 39 / 0.45); }
+
+/* In the preview frame the sheet stays a sheet even on a wide screen. */
+.gp-tip-phone .gp-tip-card--sheet { width: 100%; border-radius: 1.25rem 1.25rem 0 0; }
+.gp-tip-phone .gp-tip-card--sheet .gp-tip-handle-zone { display: flex; }
+
+.gp-tip-phone-note { font-size: 0.75rem; color: var(--gp-tip-muted); text-align: center; }
+
+/* ── Learn GadgetPlug page ────────────────────────────────────────────────── */
+
+.gp-learn { display: flex; flex-direction: column; gap: 1.5rem; color: var(--gp-tip-text); }
+
+.gp-learn-progress,
+.gp-learn-item,
+.gp-learn-card,
+.gp-learn-card-mini {
+    position: relative;
+    background: var(--gp-tip-surface);
+    border: 1px solid var(--gp-tip-border);
+    border-radius: 1rem;
+}
+
+.gp-learn-progress { padding: 1rem 1.25rem; }
+.gp-learn-progress-text { margin: 0 0 0.625rem; font-size: 1.0625rem; font-weight: 600; }
+.gp-learn-progress-text strong { color: var(--gp-brand-green); }
+
+/* Progress bar: green on a soft green track. */
+.gp-progress {
+    height: 0.625rem;
+    border-radius: 9999px;
+    background: var(--gp-brand-green-soft);
+    overflow: hidden;
+}
+
+.gp-progress > span {
+    display: block;
+    height: 100%;
+    min-width: 0.625rem;
+    border-radius: inherit;
+    background: var(--gp-brand-green);
+    transition: width 400ms ease;
+}
+
+.gp-learn-note { margin: 0.625rem 0 0; color: var(--gp-tip-muted); font-size: 0.875rem; }
+
+.gp-learn-heading {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0 0 0.75rem;
+    font-size: 1.125rem;
+    font-weight: 600;
+}
+
+/* Orange is for small highlights only: the unread dot and the "new" count. */
+.gp-learn-new-count {
+    padding: 0.0625rem 0.5rem;
+    border-radius: 9999px;
+    background: var(--gp-brand-orange-soft);
+    color: var(--gp-brand-orange);
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.gp-unread-dot {
+    position: absolute;
+    top: 0.875rem;
+    right: 0.875rem;
+    z-index: 1;
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 9999px;
+    background: var(--gp-brand-orange);
+    box-shadow: 0 0 0 3px var(--gp-tip-surface);
+}
+
+.gp-learn-list { display: flex; flex-direction: column; gap: 0.75rem; }
+
+/* One column on phones, two from tablets, three on wide screens. */
+.gp-learn-grid { display: grid; grid-template-columns: 1fr; gap: 0.75rem; }
+
+@media (min-width: 640px) {
+    .gp-learn-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (min-width: 1280px) {
+    .gp-learn-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+.gp-learn-item,
+.gp-learn-card { display: flex; flex-direction: column; overflow: hidden; }
+
+.gp-learn-card.is-used { border-color: color-mix(in srgb, var(--gp-brand-green) 35%, var(--gp-tip-border)); }
+
+.gp-learn-item .gp-tip-media,
+.gp-learn-item .gp-tip-image,
+.gp-learn-card .gp-tip-media,
+.gp-learn-card .gp-tip-image { width: 100%; margin: 0; max-height: 14rem; border-radius: 0; }
+
+.gp-learn-item .gp-tip-clip,
+.gp-learn-card .gp-tip-clip { max-height: 14rem; }
+
+.gp-learn-item-body { display: flex; flex-direction: column; flex: 1; padding: 1rem 1.25rem; }
+
+.gp-learn-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0 1.5rem 0.25rem 0;
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+.gp-tick {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 9999px;
+    background: var(--gp-brand-green);
+    color: var(--gp-brand-on-green);
+}
+
+.gp-tick svg { width: 1rem; height: 1rem; }
+
+.gp-learn-chip {
+    align-self: flex-start;
+    margin-bottom: 0.375rem;
+    padding: 0.0625rem 0.5rem;
+    border-radius: 9999px;
+    background: var(--gp-tip-border);
+    color: var(--gp-tip-muted);
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+.gp-learn-desc { margin: 0; color: var(--gp-tip-muted); font-size: 0.9375rem; }
+.gp-learn-date { color: var(--gp-tip-muted); font-size: 0.8125rem; }
+
+.gp-learn-status { margin: 0.5rem 0 0; color: var(--gp-tip-muted); font-size: 0.8125rem; }
+.gp-learn-status.is-used { color: var(--gp-brand-green); font-weight: 500; }
+
+/* Actions sit at the bottom so cards in a row line up. */
+.gp-learn-actions { margin-top: auto; padding-top: 0.875rem; display: flex; flex-direction: column; gap: 0.25rem; }
+.gp-learn-actions .gp-tip-link { display: inline-flex; align-items: center; justify-content: center; }
+.gp-learn-feedback { margin-top: 0.75rem; }
+
+/* ── The dashboard's progress card ────────────────────────────────────────── */
+
+.gp-learn-card-mini { margin-bottom: 1.5rem; padding: 1rem 3.25rem 1rem 1.25rem; }
+.gp-learn-card-mini-title { display: flex; align-items: center; gap: 0.5rem; margin: 0 0 0.25rem; font-weight: 600; }
+.gp-learn-card-mini-text { margin: 0 0 0.625rem; color: var(--gp-tip-muted); font-size: 0.9375rem; }
+.gp-learn-card-mini-text strong { color: var(--gp-brand-green); }
+.gp-learn-card-mini-link { display: inline-flex; align-items: center; margin: 0.5rem 0 0 -0.875rem; color: var(--gp-brand-green); }
+
+/* ── Admin reports: the tip funnel and Feature Adoption ───────────────────── */
+
+.gp-report { display: flex; flex-direction: column; gap: 1.25rem; color: var(--gp-tip-text); }
+
+.gp-report-panel,
+.gp-report-tile {
+    background: var(--gp-tip-surface);
+    border: 1px solid var(--gp-tip-border);
+    border-radius: 0.75rem;
+    padding: 1rem 1.25rem;
+}
+
+.gp-report-heading { margin: 0 0 0.875rem; font-size: 1rem; font-weight: 600; }
+.gp-report-note { margin: 0; color: var(--gp-tip-muted); font-size: 0.875rem; }
+.gp-report-note strong { color: var(--gp-tip-text); }
+.gp-report-panel .gp-report-note { margin-top: 0.875rem; }
+.gp-report-link { margin-left: 0.25rem; color: var(--gp-brand-green); font-weight: 500; text-decoration: underline; }
+
+/* Funnel: one hue (it is one series), each bar labelled with its own count
+   and share of "Saw", so no value is read from colour. */
+.gp-funnel { display: flex; flex-direction: column; gap: 0.625rem; margin: 0; }
+
+.gp-funnel-row { display: grid; grid-template-columns: 1fr; gap: 0.25rem; }
+
+@media (min-width: 640px) {
+    .gp-funnel-row { grid-template-columns: 11rem 1fr; align-items: center; gap: 1rem; }
+}
+
+.gp-funnel-label { font-size: 0.875rem; color: var(--gp-tip-muted); }
+.gp-funnel-bar-cell { display: flex; align-items: center; gap: 0.75rem; margin: 0; }
+
+.gp-funnel-track { flex: 1; height: 0.75rem; border-radius: 4px; background: var(--gp-brand-green-soft); overflow: hidden; }
+.gp-funnel-bar { display: block; height: 100%; border-radius: 0 4px 4px 0; background: var(--gp-brand-green); }
+
+.gp-funnel-value {
+    min-width: 6.5rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.gp-funnel-share { margin-left: 0.25rem; color: var(--gp-tip-muted); font-weight: 400; font-size: 0.8125rem; }
+
+.gp-report-tiles { display: grid; grid-template-columns: 1fr; gap: 0.75rem; }
+
+@media (min-width: 640px) {
+    .gp-report-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.gp-report-tile-label { margin: 0; color: var(--gp-tip-muted); font-size: 0.8125rem; }
+.gp-report-tile-value { margin: 0.125rem 0; font-size: 1.75rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.gp-report-tile-sub { margin: 0; color: var(--gp-tip-muted); font-size: 0.8125rem; }
+
+.gp-adoption-cell { display: flex; align-items: center; gap: 0.75rem; min-width: 14rem; }
+.gp-adoption-track { max-width: 10rem; }
+
+@media (prefers-reduced-motion: reduce) {
+    .gp-tip-card, .gp-tip-primary, .gp-progress > span { transition: none; }
+}

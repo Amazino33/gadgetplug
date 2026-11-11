@@ -9,6 +9,7 @@
 @endphp
 <div
     class="gp-chat"
+    x-on:gp-open-assistant.window="open = true"
     x-data="{
         open: false,
         historyOpen: false,

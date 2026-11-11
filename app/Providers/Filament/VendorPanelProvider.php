@@ -172,6 +172,20 @@ class VendorPanelProvider extends PanelProvider
                 PanelsRenderHook::BODY_END,
                 fn () => Blade::render('@livewire(\App\Livewire\Assistant\ChatBubble::class)'),
             )
+            // In-app tips: skipped when none is live, otherwise loaded lazily
+            // after the page so choosing one never slows it down.
+            ->renderHook(
+                PanelsRenderHook::BODY_END,
+                fn () => view('engagement.tip-hook'),
+            )
+            // Learn GadgetPlug's progress card, at the top of the dashboard
+            // only. Lazy and self-hiding (dismissed, all used, no access, or
+            // the free plan's own home).
+            ->renderHook(
+                PanelsRenderHook::PAGE_HEADER_WIDGETS_BEFORE,
+                fn (): string => Blade::render('@livewire(\App\Livewire\Engagement\LearnProgressCard::class)'),
+                scopes: \App\Filament\Vendor\Pages\Dashboard::class,
+            )
             // Replaces the global search removed above: filters the sidebar itself
             // so staff can jump to a page without scrolling the whole menu.
             ->renderHook(
