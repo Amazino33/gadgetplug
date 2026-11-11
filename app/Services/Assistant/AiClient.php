@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Sleep;
 use Throwable;
 
-class AiClient
+class AiClient implements ChatModel
 {
     /**
      * Sends a chat completion request to OpenRouter with automatic retries for 429 and network timeouts.
@@ -34,7 +34,7 @@ class AiClient
 
         $payload = [
             'model' => $model,
-            'messages' => $messages,
+            'messages' => self::withCaching($messages, $model),
             'max_tokens' => $maxTokens,
             // Ask OpenRouter for its usage accounting: cache tokens and the billed cost.
             'usage' => ['include' => true],
@@ -148,6 +148,45 @@ class AiClient
         }
 
         throw new AiProviderException('OpenRouter call ended unexpectedly.', 'provider_error');
+    }
+
+    /**
+     * Prompt caching for Claude models through OpenRouter (Phase 1.4).
+     *
+     * OpenAI models cache a repeated prefix on their own. Claude caches only
+     * what a request marks, so the system message is sent as two parts: the
+     * fixed rules, marked cacheable, and the per-question context after
+     * PromptBuilder::CONTEXT_MARKER (date, active store, the asker's stores),
+     * not. The cached prefix is then tools + rules: the same for every user
+     * and every business, so one cache entry serves the whole platform.
+     *
+     * @param  array<int, array<string, mixed>>  $messages
+     * @return array<int, array<string, mixed>>
+     */
+    public static function withCaching(array $messages, string $model): array
+    {
+        if (! str_starts_with($model, 'anthropic/')) {
+            return $messages;
+        }
+
+        foreach ($messages as $i => $message) {
+            if (($message['role'] ?? null) !== 'system' || ! is_string($message['content'] ?? null)) {
+                continue;
+            }
+
+            $at = strpos($message['content'], PromptBuilder::CONTEXT_MARKER);
+            $rules = $at === false ? $message['content'] : rtrim(substr($message['content'], 0, $at));
+            $context = $at === false ? '' : substr($message['content'], $at);
+
+            $messages[$i]['content'] = array_values(array_filter([
+                ['type' => 'text', 'text' => $rules, 'cache_control' => ['type' => 'ephemeral']],
+                $context !== '' ? ['type' => 'text', 'text' => $context] : null,
+            ]));
+
+            break;
+        }
+
+        return $messages;
     }
 
     protected function delay(int $seconds): void

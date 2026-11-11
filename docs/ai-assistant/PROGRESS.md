@@ -31,8 +31,8 @@ Source prompt: pasted at session start (2026-11-06). In a new session, re-paste 
 | Phase | What | Covered by main's assistant | Status |
 |---|---|---|---|
 | 0 | Recon (redone against `origin/main`, read-only) | — | **awaiting review** |
-| 1 | **Harden the existing assistant**: 1.1 security → 1.2 correctness → 1.3 visibility/cost → 1.4 provider | foundations exist | 1.1 done; 1.2 part one done; 1.3 done (committed); 1.2 part two done and on main (`f28581a`, 2026-11-10); own sales and 1.4 still to do |
-| 2 | Sales, products, prices, stock tools | **partly**: sales_summary, sales_by_day, top/slow products, revenue_vs_previous, low/out-of-stock, stock_value. **Missing:** find_product (fuzzy), product_price, per-store/combined stock_levels, search_records; reuse of SalesReportService | **built on feat/assistant-phase2, awaiting review** (find_products; low/out of stock rewritten) |
+| 1 | **Harden the existing assistant**: 1.1 security → 1.2 correctness → 1.3 visibility/cost → 1.4 provider | foundations exist | 1.1 done; 1.2 part one done; 1.3 done (committed); 1.1 to 1.3 done; 1.2 complete; 1.4 built (stays on gpt-4o-mini by decision); store-name fix, own sales and 1.4 awaiting merge |
+| 2 | Sales, products, prices, stock tools | **partly**: sales_summary, sales_by_day, top/slow products, revenue_vs_previous, low/out-of-stock, stock_value. **Missing:** find_product (fuzzy), product_price, per-store/combined stock_levels, search_records; reuse of SalesReportService | done, on main `077fdd4` (find_products; low/out of stock rewritten) |
 | 3 | Margins + product movement | **partly**: profit (store-level), dead_stock, slow_products. **Missing:** per-product listed vs realized margin, below-cost list, velocity/days of cover (ProductVelocityService) | not started |
 | 4 | "Who did what" + logging gaps | **missing** | not started |
 | 5 | Purchase suggestions | **missing** | not started |
@@ -291,7 +291,85 @@ The 5 cap-wording assertions in CostControlsAndGuardrailsTest now expect the res
 
 **Deploy:** `php artisan migrate --force`. No seeder or permission change.
 
-## Phase 2: products, prices and stock (built 2026-11-10 on `feat/assistant-phase2`, awaiting review)
+### Phase 1.4: provider (built 2026-11-10 on `feat/assistant-provider`; **stays on gpt-4o-mini by owner decision**)
+
+**Owner decision (2026-11-10): no paid comparison runs for now; keep `openai/gpt-4o-mini` and upgrade later.** Everything needed to upgrade is in place, so switching is a setting, not a code change.
+
+- **The model call is behind one interface:** `App\Services\Assistant\ChatModel`, implemented by `AiClient` (OpenRouter) and bound in `AppServiceProvider`. `AskAssistantAction` depends on the interface.
+- **Prompt caching for Claude through OpenRouter.** `PromptBuilder` now puts the per-question context (active store, the asker's stores, today's Lagos date) last, after `CONTEXT_MARKER` ("Context for this question:"). `AiClient::withCaching()` sends a Claude model's system message as two parts: the rules marked `cache_control: ephemeral`, then the context unmarked. The cached prefix (tools + rules) is identical for every user, business and day; this is tested. OpenAI models are sent unchanged, because they cache a repeated prefix on their own: a live gpt-4o-mini follow-up read 1,280 tokens from cache. Moving the context to the end also lengthens the stable prefix that OpenAI caches.
+- **OpenRouter prices on 2026-11-10** (per million tokens, input / output / cache read):
+
+  | Model | Input | Output | Cache read |
+  |---|---|---|---|
+  | gpt-4o-mini | $0.15 | $0.60 | $0.075 |
+  | **claude-haiku-5.5** | **$0.10** | **$0.50** | $0.01 |
+  | claude-sonnet-5.5 | $2 | $10 | $0.10 |
+
+  Haiku 5.5 is cheaper per token than the current model, and is the first candidate to test. Their rates are in `config/assistant.php` (the fallback; OpenRouter's billed cost is used when it is reported).
+- **To upgrade later:** Admin → Assistant → Global settings → model name, for example `anthropic/claude-haiku-5.5`. Raise `max_tokens` if answers get cut off.
+- **Comparison, ready but not run:** `php artisan assistant:compare --user=… --vendor=… --store=… [--models=…] [--variants=with_tool_lines,without_tool_lines] [--only=1,2] [--dry-run]`.
+  - It runs `docs/ai-assistant/compare-questions.json` (24 questions on local TechHaven data, including today's live failures) through the real `SendMessageAction`, once per model and prompt variant.
+  - It scores automatically: expected tools, period, stores, the answer quoting the tool's figure, and no false "I can't check that yet".
+  - The report (Markdown + JSON) goes to `storage/app/assistant-compare/` and covers tokens, cache read/write, cost and latency.
+  - `--dry-run` estimate for the full run (3 models × 2 variants × 24): **$0.74 upper bound, uncached**. Questions count toward the caps, so lift them on the test business first.
+- **The two "You now have tools…" lines stay** until the comparison has shown tool choice doesn't change without them. `PromptBuilder::TOOL_LINES` and `assistant.prompt_variant = without_tool_lines` give the test switch.
+- Prompt plus tools is 2,208 tokens (ceiling 2,300).
+- **Tests:** `tests/Feature/Assistant/Provider/ChatModelAndCachingTest.php` (6):
+  - the interface binding;
+  - the stable rules prefix and context after the marker;
+  - Claude gets the cache-marked part, and the marking reaches OpenRouter's request body;
+  - OpenAI messages are untouched;
+  - the model override and prompt-variant switches.
+- **Gate (2026-11-10, 16:03 to 16:55 UTC):** 3,349 tests (3,327 passed, 3 skipped). **19 failures, the baseline list by name.**
+
+### Fix after Phase 2 went live: stores by name, not number (2026-11-10)
+
+**Found live.** At Zeelink Tech, "give me breakdown of sales we had this week?" and "how much is 20000mah power bank" (asked in Itel Home, which is store 6) both came back "I can't check that yet". The tool log showed `sales_by_day` and `find_products` were called with `{"store_id":3}` and refused with "Unauthorized access to store [3]". **There is no store 3.** The prompt lists the asker's stores by name, and the active store by name plus ID, but the tools took store IDs, so for any store the model had to produce a number, and gpt-4o-mini invented one. The model then covered the failed tool with "I can't check that yet". This design flaw was inherited from main's assistant.
+
+**Fixed:**
+- **Tools take store names** (`store`, `stores`, or `["all"]`), and `App\Services\Assistant\StoreNames` looks them up among the asker's own stores only. It ignores case and spacing, and a short name that fits exactly one store is taken ("oraimo" for "Oraimo Store"). An unknown name gets "No store named "Ikeja". Stores: …, or "all"", and an ambiguous one says it matches more than one. Staff can name only their own stores, so another branch is simply "no store named". With no store named, the active store is used. `store_id`/`store_ids` are still read from callers that send them, but the model is no longer offered them, and the prompt no longer shows "(ID: n)".
+- **When every tool call fails, the reply is set in code**, not by the model: "I couldn't fetch that right now." (the existing wording), or the store-name message when a name was the problem. It is never "I can't check that yet", which says the assistant cannot do something it can.
+- Prompt plus tools is 2,201 tokens, inside the 2,300 ceiling.
+
+**Live check (local, real key, asked at Akpaden Branch):**
+- "breakdown of sales this week" ran sales_by_day for store 10, 9 to 10 Nov.
+- "all our stores … 1st to 4th november" ran stores 1, 10 and 11: ₦22,000.
+- "main store … 1st to 4th" ran store 1: ₦22,000.
+
+**Tests:** `tests/Feature/Assistant/Correctness/StoreNamesTest.php` (7):
+- the live case, with Itel Home named and the active store as default;
+- a made-up number can no longer turn into "I can't check that yet";
+- case, spacing and short names;
+- "all" and several names;
+- unknown and ambiguous names answered with the right names;
+- staff limited to their own stores;
+- the model is offered names, never numbers.
+PromptBuilderTest now expects `store`/`stores` in every tool's schema.
+
+**Gate (2026-11-10, 15:01 to 15:30 UTC, own sales and the store-name fix together):** 3,343 tests (3,321 passed, 3 skipped). **19 failures, the baseline list by name**: nothing new, nothing gone.
+
+### Phase 1.2, part three: own sales for till-only staff (built 2026-11-10 on `feat/assistant-phase2`, after Phase 2 merged)
+
+- **`my_sales`** (new tool): the asker's own till sales, from `CashierSalesHistory::summary()`, the calculation behind the till's My Sales screen, over the same Lagos day bounds. Like that screen, it covers every branch of the business. It returns:
+  - number of sales and revenue (net of discount, no VAT, refunds netted);
+  - collected, split into cash, card and transfer;
+  - sold on credit;
+  - refunds and the voided count.
+  It is labelled "your own sales", and the period defaults to today.
+- **Always the person asking.** The cashier is the signed-in user from the access scope, never anything the model sends, so nobody can ask about a colleague's sales. No permission is needed beyond using the assistant, because everyone may see what they rang (decided 2026-11-08). Shop totals stay behind `view_inventory_reports`, and the refusal stays bare.
+- Prompt: "On no_access, never hint at the hidden figure; for shop sales, offer my_sales (the asker's own)."
+- **Token ceiling raised to 2,300 (owner decision, 2026-11-10).** `my_sales` took the estimate to 2,071, against 1,982 before it. Each tool costs about 55 tokens, cents per thousand questions; 1.4 measures real cost per question.
+- **Live check (local):** "how much have I personally sold this month at the till?" gave ₦22,000 for 1 to 10 Nov, equal to CashierSalesHistory for the same user and period. Collected was ₦23,650 including VAT.
+- **Tests:** `tests/Feature/Assistant/Correctness/MySalesTest.php` (4):
+  - the same figures as My Sales, with cash, card, credit, voided, refunded, a colleague's sale and yesterday in the data;
+  - the same cashier is refused shop totals with no hint;
+  - an owner asking gets only what the owner rang;
+  - "yesterday" is the Lagos day.
+  Tool counts in the tests are now 22 queries, 23 with switch_store.
+
+**1.2 is now complete.**
+
+## Phase 2: products, prices and stock (merged to main `077fdd4`, 2026-11-10)
 
 **Why.** Live on 2026-11-10, "list all the power banks we have in store" and "how much is 20000mah power bank?" both got "I can't check that yet": there was no tool that could look up a product.
 

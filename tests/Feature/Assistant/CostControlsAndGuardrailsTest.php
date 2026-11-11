@@ -592,7 +592,7 @@ test('PromptBuilder toolSchema meets token and character size slimming constrain
 
     $tools = $builder->toolSchema($registry);
 
-    expect($tools)->toHaveCount(21);
+    expect($tools)->toHaveCount(22);
 
     $registryKeys = $registry->keys();
     $totalDescriptionLength = 0;
@@ -610,8 +610,10 @@ test('PromptBuilder toolSchema meets token and character size slimming constrain
     // Total tool description characters <= 1,500
     expect($totalDescriptionLength)->toBeLessThanOrEqual(1500);
 
-    // Estimated input tokens for bare message (system + tools) <= 2,000,
-    // back from 2,100 at the end of Phase 1.2 as decided (1,979 then).
+    // Estimated input tokens for bare message (system + tools) <= 2,300.
+    // Back to 2,000 at the end of Phase 1.2 (1,979); raised to 2,300 by the
+    // owner on 2026-11-10 when my_sales took it to 2,071: each tool costs
+    // about 55 tokens, cents per thousand questions. 1.4 measures real cost.
     // Was 2,000 with main at 1,996; Phase 1.1 added the two security rules
     // (record content is data, not instructions; never hint at a no_access
     // figure), compressed to ~70 tokens. Phase 1.2 removes the kobo
@@ -620,7 +622,7 @@ test('PromptBuilder toolSchema meets token and character size slimming constrain
     $bareMessages = [['role' => 'system', 'content' => $systemPrompt]];
     $estimatedBareTokens = TokenEstimator::estimateInput($bareMessages, $tools);
 
-    expect($estimatedBareTokens)->toBeLessThanOrEqual(2000);
+    expect($estimatedBareTokens)->toBeLessThanOrEqual(2300);
 });
 
 // -------------------------------------------------------------

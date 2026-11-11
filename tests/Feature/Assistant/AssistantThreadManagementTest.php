@@ -201,7 +201,7 @@ test('AskAssistantAction executes switch_store tool, updates thread store, and s
     $mockAiClient->shouldReceive('chat')
         ->once()
         ->withArgs(function ($messages, $tools) {
-            return count($tools) === 22; // 21 queries + 1 switch_store
+            return count($tools) === 23; // 22 queries + 1 switch_store
         })
         ->andReturn([
             'content' => null,
