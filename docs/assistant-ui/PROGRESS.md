@@ -5,7 +5,7 @@ The chat UI/UX rework. The assistant's backend (queries, permissions, prompt, pr
 | Phase | What | Status |
 |---|---|---|
 | 0 | Recon and design plan | approved 2026-11-10 |
-| 1 | Fix what's broken | **built on `feat/assistant-ui`, awaiting review** |
+| 1 | Fix what's broken | **merged to main 2026-11-11** |
 | 2 | Conversation flow (+ auto-titles, permission-aware suggestions) | not started |
 | 3 | Answer cards (needs product IDs from the backend; the answer-style prompt change ships with it) | not started |
 | 4 | Polish and accessibility pass | not started |
@@ -90,6 +90,8 @@ In the order the review set:
 Full suite, 2026-11-11, 06:08 to 06:42 UTC, results in `storage/gate/feat-assistant-ui-full-20261111-0608.*`: 3,349 tests (3,327 passed, 3 skipped). **19 failures, the baseline list by name**: nothing new, nothing gone.
 
 An earlier run (04:12 to 05:12 UTC) had 20: the extra was AccountAffiliateDashboardTest "the dashboard shows the affiliate's pending and available wallet balances". That run overlapped a stalled earlier run and another session's parallel run. The test passes alone (10/10), but its first test takes 60 to 90 s. It has nothing to do with the chat, and it is noted as load-sensitive.
+
+**Merge gate:** after merging main (`7f368e7`: stores by name, own sales, model interface) into the branch, the full suite ran again, 2026-11-11, 10:11 to 11:10 UTC (`storage/gate/feat-assistant-ui-merge-20261111-1011.*`): 3,366 tests, **19 failures, the baseline list by name**. Main's commits touched no CSS, JS or views, so `public/build` merged cleanly and needed no rebuild.
 
 ### Retry counting (as decided)
 
