@@ -34,7 +34,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Ask GadgetPlug's model call, behind one interface (Phase 1.4). Resolved
+        // through AiClient so a test (or another provider) can swap it there.
+        $this->app->bind(\App\Services\Assistant\ChatModel::class, fn ($app) => $app->make(\App\Services\Assistant\AiClient::class));
     }
 
     /**

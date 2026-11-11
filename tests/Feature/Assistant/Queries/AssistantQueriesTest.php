@@ -592,12 +592,12 @@ test('GlossaryQuery returns definition for known terms and found=false for unkno
         ->and($resUnknown['definition'])->toBe('');
 });
 
-test('every query returns complete structured keys on empty data (table-driven loop across all 21)', function () {
+test('every query returns complete structured keys on empty data (table-driven loop across all 22)', function () {
     [$user, $vendor, $store] = assistantQueriesVendor();
 
     $registry = new AssistantQueryRegistry;
 
-    expect(count($registry->keys()))->toBe(21);
+    expect(count($registry->keys()))->toBe(22);
 
     foreach ($registry->keys() as $key) {
         $queryInstance = $registry->get($key);
