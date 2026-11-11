@@ -147,8 +147,8 @@ test('the chat bubble is hidden in the panel for staff without use_ai_assistant,
     Filament::setCurrentPanel(Filament::getPanel('vendor'));
     Filament::setTenant($ctx['vendor']);
 
-    Livewire::actingAs($staff)->test(ChatBubble::class)->assertDontSee('How can I help you today?');
-    Livewire::actingAs($ctx['owner'])->test(ChatBubble::class)->assertSee('How can I help you today?');
+    Livewire::actingAs($staff)->test(ChatBubble::class)->assertDontSee('Ask about sales, stock, prices or debts');
+    Livewire::actingAs($ctx['owner'])->test(ChatBubble::class)->assertSee('Ask about sales, stock, prices or debts');
 });
 
 test('the three new permissions exist and no default role holds them', function () {

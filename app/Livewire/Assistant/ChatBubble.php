@@ -19,9 +19,16 @@ use App\Models\Store;
 use App\Models\Vendor;
 use App\Services\Assistant\AssistantAccess;
 use App\Services\Assistant\AssistantScope;
+use App\Support\Assistant\AnswerMarkdown;
+use App\Support\Pos\BusinessDate;
+use Carbon\CarbonInterface;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\HtmlString;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
 use Throwable;
@@ -43,6 +50,12 @@ class ChatBubble extends Component
     public ?string $errorMessage = null;
 
     public bool $thinking = false;
+
+    /** The question that last failed before an answer was saved, for Retry. */
+    public ?string $failedQuestion = null;
+
+    /** Shown in the header only from this many questions left today. */
+    public const QUESTIONS_LEFT_WARNING = 10;
 
     /**
      * The business this bubble is open in: the panel tenant at mount. Locked,
@@ -132,16 +145,49 @@ class ChatBubble extends Component
         return (int) (AssistantDailyUsage::forToday(auth()->user())->message_count ?? 0);
     }
 
-    public function getShowCapWarningProperty(): bool
+    /** Questions left today, or null when there is no limit. */
+    public function getQuestionsLeftProperty(): ?int
     {
         $cap = $this->dailyMessageCap;
-        if ($cap <= 0) {
-            return false;
-        }
 
-        $count = $this->todayMessageCount;
+        return $cap > 0 ? max(0, $cap - $this->todayMessageCount) : null;
+    }
 
-        return $count >= (int) ceil($cap * 0.8);
+    /** The header shows the count only when it is getting low. */
+    public function getShowQuestionsLeftProperty(): bool
+    {
+        return $this->questionsLeft !== null && $this->questionsLeft <= self::QUESTIONS_LEFT_WARNING;
+    }
+
+    /** A stored time on the trading-day clock (BusinessDate's timezone), not UTC. */
+    public function localTime(?CarbonInterface $at): ?CarbonInterface
+    {
+        return $at?->copy()->setTimezone(BusinessDate::timezone());
+    }
+
+    /** A time divider's label: "Today, 14:12", "Yesterday, 09:05", "Mon 9 Nov, 14:12". */
+    public function dividerLabel(CarbonInterface $at): string
+    {
+        $local = $this->localTime($at);
+        $today = BusinessDate::today();
+
+        return match ($local->toDateString()) {
+            $today => 'Today, '.$local->format('H:i'),
+            BusinessDate::now()->subDay()->toDateString() => 'Yesterday, '.$local->format('H:i'),
+            default => $local->format('D j M, H:i'),
+        };
+    }
+
+    /** An answer as safe HTML (sanitized Markdown). */
+    public function answerHtml(AssistantMessage $message): HtmlString
+    {
+        return AnswerMarkdown::toHtml($message->content);
+    }
+
+    /** The store a "[Store context: X]" note names, or null for any other system note. */
+    public static function storeContextName(?string $content): ?string
+    {
+        return preg_match('/^\[Store context: (.+)\]$/u', trim((string) $content), $m) ? $m[1] : null;
     }
 
     /**
@@ -328,6 +374,7 @@ class ChatBubble extends Component
         }
 
         $this->errorMessage = null;
+        $this->failedQuestion = null;
 
         $content = $message !== null && trim($message) !== '' ? trim($message) : trim($this->messageInput);
         if ($content === '') {
@@ -356,10 +403,36 @@ class ChatBubble extends Component
             // Re-run message loader to refresh component message collection
             $this->loadMessages();
         } catch (Throwable $e) {
-            $this->errorMessage = $e->getMessage();
+            // Never the exception's own text: it can carry SQL, paths or other
+            // internals. The full exception goes to the log, with the question.
+            Log::error('Assistant chat: the question could not be answered', [
+                'exception' => $e,
+                'user_id' => auth()->id(),
+                'vendor_id' => $this->vendorId,
+                'thread_id' => $this->activeThreadId,
+                'question_message_id' => $this->activeThreadId ? AssistantMessage::query()
+                    ->where('thread_id', $this->activeThreadId)
+                    ->where('user_id', auth()->id())
+                    ->where('role', 'user')
+                    ->latest('id')
+                    ->value('id') : null,
+            ]);
+
+            $this->errorMessage = self::friendlyError($e);
+            $this->failedQuestion = $content;
         } finally {
             $this->thinking = false;
         }
+    }
+
+    /** What the person is told when sending fails: plain words and a next step. */
+    public static function friendlyError(Throwable $e): string
+    {
+        return match (true) {
+            $e instanceof ValidationException => 'That question is too long. Keep it under 2,000 characters.',
+            $e instanceof AuthorizationException => "The assistant isn't available to you here. Ask the shop owner if you need it.",
+            default => "Couldn't get an answer. Check your connection and try again.",
+        };
     }
 
     public function send(SendMessageAction $sendMessageAction, ?string $message = null): void
