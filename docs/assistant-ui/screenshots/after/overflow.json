@@ -1,0 +1,122 @@
+[
+  {
+    "theme": "light",
+    "width": 320,
+    "viewport": 320,
+    "sheetWidth": 320,
+    "sheetScroll": 320,
+    "docScroll": 320,
+    "sendRight": 308,
+    "sendFullyVisible": true,
+    "overflowing": 0,
+    "examples": []
+  },
+  {
+    "theme": "light",
+    "width": 360,
+    "viewport": 360,
+    "sheetWidth": 360,
+    "sheetScroll": 360,
+    "docScroll": 360,
+    "sendRight": 348,
+    "sendFullyVisible": true,
+    "overflowing": 0,
+    "examples": []
+  },
+  {
+    "theme": "light",
+    "width": 390,
+    "viewport": 390,
+    "sheetWidth": 390,
+    "sheetScroll": 390,
+    "docScroll": 390,
+    "sendRight": 378,
+    "sendFullyVisible": true,
+    "overflowing": 0,
+    "examples": []
+  },
+  {
+    "theme": "light",
+    "width": 768,
+    "viewport": 768,
+    "sheetWidth": 420,
+    "sheetScroll": 419,
+    "docScroll": 768,
+    "sendRight": 756,
+    "sendFullyVisible": true,
+    "overflowing": 0,
+    "examples": []
+  },
+  {
+    "theme": "light",
+    "width": 1280,
+    "viewport": 1280,
+    "sheetWidth": 420,
+    "sheetScroll": 419,
+    "docScroll": 1280,
+    "sendRight": 1268,
+    "sendFullyVisible": true,
+    "overflowing": 0,
+    "examples": []
+  },
+  {
+    "theme": "dark",
+    "width": 320,
+    "viewport": 320,
+    "sheetWidth": 320,
+    "sheetScroll": 320,
+    "docScroll": 320,
+    "sendRight": 308,
+    "sendFullyVisible": true,
+    "overflowing": 0,
+    "examples": []
+  },
+  {
+    "theme": "dark",
+    "width": 360,
+    "viewport": 360,
+    "sheetWidth": 360,
+    "sheetScroll": 360,
+    "docScroll": 360,
+    "sendRight": 348,
+    "sendFullyVisible": true,
+    "overflowing": 0,
+    "examples": []
+  },
+  {
+    "theme": "dark",
+    "width": 390,
+    "viewport": 390,
+    "sheetWidth": 390,
+    "sheetScroll": 390,
+    "docScroll": 390,
+    "sendRight": 378,
+    "sendFullyVisible": true,
+    "overflowing": 0,
+    "examples": []
+  },
+  {
+    "theme": "dark",
+    "width": 768,
+    "viewport": 768,
+    "sheetWidth": 420,
+    "sheetScroll": 419,
+    "docScroll": 768,
+    "sendRight": 756,
+    "sendFullyVisible": true,
+    "overflowing": 0,
+    "examples": []
+  },
+  {
+    "theme": "dark",
+    "width": 1280,
+    "viewport": 1280,
+    "sheetWidth": 420,
+    "sheetScroll": 419,
+    "docScroll": 1280,
+    "sendRight": 1268,
+    "sendFullyVisible": true,
+    "overflowing": 0,
+    "examples": []
+  }
+]
