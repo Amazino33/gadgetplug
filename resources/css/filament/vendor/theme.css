@@ -194,3 +194,132 @@
 /* The first-visit offer is a centred modal with nothing highlighted behind it,
    so it needs a little more room than a step pointing at one button. */
 .gp-tour-offer { max-width: 26rem; }
+
+/* ── Ask GadgetPlug chat (resources/views/livewire/assistant/chat-bubble.blade.php) ──
+   Tokens on the panel's own Filament colours, so it follows the theme and dark
+   mode. Orange is an accent only (send, the store chip, focus), always with
+   dark text on it: white on primary-500 is 2.15:1, gray-950 on it is 9.4:1. */
+.gp-chat {
+    --chat-surface: #fff;
+    --chat-canvas: var(--gray-50);
+    --chat-line: var(--gray-200);
+    --chat-ink: var(--gray-950);
+    --chat-muted: var(--gray-500);
+    --chat-mine: var(--primary-50);
+    --chat-mine-ink: var(--gray-950);
+    --chat-accent: var(--primary-500);
+    --chat-accent-ink: var(--primary-700);
+    font-variant-numeric: tabular-nums;
+}
+:where(.dark) .gp-chat {
+    --chat-surface: var(--gray-900);
+    --chat-canvas: var(--gray-950);
+    --chat-line: var(--gray-800);
+    --chat-ink: var(--gray-100);
+    --chat-muted: var(--gray-400);
+    --chat-mine: color-mix(in oklab, var(--primary-500) 16%, var(--gray-900));
+    --chat-mine-ink: var(--gray-100);
+    --chat-accent: var(--primary-400);
+    --chat-accent-ink: var(--primary-300);
+}
+.gp-chat-sheet { background: var(--chat-surface); color: var(--chat-ink); border-color: var(--chat-line); }
+@media (min-width: 768px) { .gp-chat-sheet { top: 0 !important; height: 100dvh !important; } }
+.gp-chat-header, .gp-chat-hairline-b { border-bottom: 1px solid var(--chat-line); background: var(--chat-surface); }
+.gp-chat-footer { border-top: 1px solid var(--chat-line); background: var(--chat-surface); }
+.gp-chat-canvas { background: var(--chat-canvas); }
+.gp-chat-drawer { background: var(--chat-surface); border-right: 1px solid var(--chat-line); }
+.gp-chat-muted { color: var(--chat-muted); }
+
+/* 44px targets for every icon control. */
+.gp-chat-icon-btn {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 2.75rem; height: 2.75rem; flex-shrink: 0; border-radius: 0.75rem; color: var(--chat-muted);
+}
+.gp-chat-icon-btn:hover { background: var(--chat-canvas); color: var(--chat-ink); }
+.gp-chat :focus-visible { outline: 2px solid var(--chat-accent); outline-offset: 2px; }
+
+.gp-chat-store-chip {
+    display: inline-flex; align-items: center; gap: 0.25rem; min-width: 0; max-width: 45%;
+    min-height: 2.25rem; padding: 0 0.75rem; border-radius: 9999px;
+    background: var(--chat-accent); color: var(--gray-950); font-size: 13px; font-weight: 600;
+}
+.gp-chat-left {
+    font-size: 12px; font-weight: 600; padding: 0.125rem 0.5rem; border-radius: 9999px;
+    color: var(--warning-800); background: var(--warning-100);
+}
+:where(.dark) .gp-chat-left { color: var(--warning-200); background: color-mix(in oklab, var(--warning-500) 20%, var(--gray-900)); }
+
+.gp-chat-popover { background: var(--chat-surface); border: 1px solid var(--chat-line); border-radius: 0.75rem; box-shadow: 0 10px 30px rgb(0 0 0 / 0.15); }
+.gp-chat-option { display: flex; width: 100%; min-height: 2.75rem; align-items: center; padding: 0 0.875rem; font-size: 14px; text-align: left; }
+.gp-chat-option:hover { background: var(--chat-canvas); }
+.gp-chat-option.is-active { font-weight: 600; color: var(--chat-accent-ink); }
+
+.gp-chat-thread { border-radius: 0.75rem; padding: 0.125rem 0.25rem 0.125rem 0.5rem; }
+.gp-chat-thread:hover { background: var(--chat-canvas); }
+.gp-chat-thread.is-active { background: var(--chat-mine); }
+.gp-chat-new {
+    min-height: 2.75rem; border-radius: 0.75rem; font-size: 14px; font-weight: 600;
+    border: 1px dashed var(--chat-line); color: var(--chat-accent-ink);
+}
+
+.gp-chat-chip {
+    min-height: 2.25rem; padding: 0 0.875rem; border-radius: 9999px; font-size: 13px; font-weight: 500;
+    background: var(--chat-surface); border: 1px solid var(--chat-line); color: var(--chat-ink);
+}
+.gp-chat-chip:hover { border-color: var(--chat-accent); }
+
+.gp-chat-field {
+    background: var(--chat-canvas); color: var(--chat-ink); border: 1px solid var(--chat-line); border-radius: 0.875rem;
+}
+.gp-chat-field::placeholder { color: var(--chat-muted); }
+.gp-chat-field:focus { outline: none; border-color: var(--chat-accent); box-shadow: 0 0 0 1px var(--chat-accent); }
+.gp-chat-send {
+    display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem;
+    border-radius: 0.875rem; background: var(--chat-accent); color: var(--gray-950);
+}
+.gp-chat-send:disabled { opacity: 0.45; }
+
+/* Your question: a tinted bubble. The answer: no bubble, full width. */
+.gp-chat-mine { background: var(--chat-mine); color: var(--chat-mine-ink); font-size: 15px; line-height: 22px; }
+.gp-chat-answer { font-size: 15px; line-height: 22px; overflow-wrap: anywhere; }
+@media (min-width: 768px) { .gp-chat-answer, .gp-chat-mine { font-size: 14px; line-height: 20px; } }
+.gp-chat-answer > * + * { margin-top: 0.5rem; }
+.gp-chat-answer > p:first-child { font-size: 16px; line-height: 24px; font-weight: 600; }
+.gp-chat-answer ul { list-style: disc; padding-inline-start: 1.25rem; }
+.gp-chat-answer ol { list-style: decimal; padding-inline-start: 1.25rem; }
+.gp-chat-answer li + li { margin-top: 0.25rem; }
+.gp-chat-answer strong { font-weight: 600; }
+.gp-chat-answer code { font-size: 0.9em; padding: 0.05rem 0.3rem; border-radius: 0.3rem; background: var(--chat-line); }
+.gp-chat-answer a[href] { color: var(--chat-accent-ink); text-decoration: underline; text-underline-offset: 2px; }
+.gp-chat-answer a:not([href]) { color: inherit; text-decoration: none; cursor: text; }
+/* A wide table scrolls sideways inside the answer, never the whole chat. */
+.gp-chat-answer table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; font-size: 13px; }
+.gp-chat-answer th, .gp-chat-answer td { padding: 0.375rem 0.625rem; border-bottom: 1px solid var(--chat-line); text-align: left; white-space: nowrap; }
+.gp-chat-answer th { font-weight: 600; color: var(--chat-muted); }
+
+.gp-chat-divider { display: flex; justify-content: center; margin: 0.75rem 0; }
+.gp-chat-divider > span { font-size: 12px; font-weight: 500; color: var(--chat-muted); padding: 0.125rem 0.625rem; border-radius: 9999px; background: var(--chat-surface); border: 1px solid var(--chat-line); max-width: 100%; overflow-wrap: anywhere; text-align: center; }
+.gp-chat-time { font-size: 11px; color: var(--chat-muted); margin-top: 0.25rem; padding: 0 0.25rem; }
+
+.gp-chat-notice { font-size: 13px; line-height: 20px; padding: 0.75rem 0.875rem; border-radius: 0.875rem; background: var(--chat-surface); border: 1px solid var(--chat-line); }
+.gp-chat-error {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem;
+    font-size: 14px; line-height: 20px; padding: 0.625rem 0.625rem 0.625rem 0.875rem; border-radius: 0.875rem;
+    color: var(--danger-800); background: var(--danger-50); border: 1px solid var(--danger-200);
+}
+:where(.dark) .gp-chat-error { color: var(--danger-200); background: color-mix(in oklab, var(--danger-500) 14%, var(--gray-900)); border-color: color-mix(in oklab, var(--danger-500) 35%, var(--gray-900)); }
+.gp-chat-error > p { flex: 1 1 12rem; min-width: 0; }
+.gp-chat-retry { min-height: 2.75rem; padding: 0 1rem; border-radius: 0.75rem; font-size: 14px; font-weight: 600; background: var(--chat-surface); border: 1px solid currentColor; }
+
+.gp-chat-pill { min-height: 2.25rem; padding: 0 0.875rem; border-radius: 9999px; font-size: 13px; font-weight: 600; background: var(--gray-950); color: #fff; box-shadow: 0 6px 18px rgb(0 0 0 / 0.2); }
+:where(.dark) .gp-chat-pill { background: var(--gray-100); color: var(--gray-950); }
+
+.gp-chat-thinking { display: flex; align-items: center; min-height: 1.5rem; }
+.gp-chat-dot { width: 0.4rem; height: 0.4rem; margin-right: 0.25rem; border-radius: 9999px; background: var(--chat-muted); opacity: 0.5; }
+@media (prefers-reduced-motion: no-preference) {
+    .gp-chat-dot { animation: gp-chat-dot 1.2s ease-in-out infinite; }
+    .gp-chat-dot:nth-child(2) { animation-delay: 0.15s; }
+    .gp-chat-dot:nth-child(3) { animation-delay: 0.3s; }
+}
+@keyframes gp-chat-dot { 0%, 80%, 100% { opacity: 0.25; } 40% { opacity: 1; } }
+[x-cloak] { display: none !important; }

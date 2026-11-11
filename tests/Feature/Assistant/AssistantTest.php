@@ -35,15 +35,15 @@ test('bubble is hidden when any of the three switches is off', function () {
     expect(AssistantAccess::isEnabledFor($user))->toBeTrue();
     Livewire::actingAs($user)
         ->test(ChatBubble::class)
-        ->assertSee('AI Assistant')
-        ->assertSee('How can I help you today?');
+        ->assertSee('Ask GadgetPlug')
+        ->assertSee('Ask about sales, stock, prices or debts');
 
     // 2. Global switch off -> hidden
     AssistantGlobalSetting::current()->update(['is_enabled' => false]);
     expect(AssistantAccess::isEnabledFor($user))->toBeFalse();
     Livewire::actingAs($user)
         ->test(ChatBubble::class)
-        ->assertDontSee('How can I help you today?');
+        ->assertDontSee('Ask about sales, stock, prices or debts');
 
     // Reset global on
     AssistantGlobalSetting::current()->update(['is_enabled' => true]);
@@ -53,14 +53,14 @@ test('bubble is hidden when any of the three switches is off', function () {
     expect(AssistantAccess::isEnabledFor($user->fresh()))->toBeFalse();
     Livewire::actingAs($user)
         ->test(ChatBubble::class)
-        ->assertDontSee('How can I help you today?');
+        ->assertDontSee('Ask about sales, stock, prices or debts');
 
     // 4. Vendor disabled -> hidden
     $setting->update(['admin_disabled' => false, 'vendor_disabled' => true]);
     expect(AssistantAccess::isEnabledFor($user->fresh()))->toBeFalse();
     Livewire::actingAs($user)
         ->test(ChatBubble::class)
-        ->assertDontSee('How can I help you today?');
+        ->assertDontSee('Ask about sales, stock, prices or debts');
 });
 
 test('send with all on saves 2 messages with correct role and store_id snapshot', function () {

@@ -199,7 +199,7 @@ test('each question\'s tokens, cache and cost add up on the business\'s row', fu
         ->and($row->cost_micros)->toBeGreaterThan(0);
 });
 
-test('in a business, the chat bubble counts the business\'s questions against its cap', function () {
+test('in a business, the chat shows the business\'s questions left, only once 10 or fewer remain', function () {
     $ctx = vcapVendor();
     $ctx['vendor']->update(['assistant_daily_cap' => 40]);
     vcapFill($ctx['vendor'], 37);
@@ -209,5 +209,13 @@ test('in a business, the chat bubble counts the business\'s questions against it
 
     Livewire::test(ChatBubble::class)
         ->assertSet('vendorId', $ctx['vendor']->id)
-        ->assertSee('37 / 40 today');
+        ->assertSet('questionsLeft', 3)
+        ->assertSee('3 left today');
+
+    // Plenty left: no count in the header.
+    $ctx['vendor']->update(['assistant_daily_cap' => 100]);
+
+    Livewire::test(ChatBubble::class)
+        ->assertSet('questionsLeft', 63)
+        ->assertDontSee('left today');
 });
