@@ -35,25 +35,7 @@
         <span class="gp-tip-new">New</span>
     @endif
 
-    @if ($card['video'])
-        <div class="gp-tip-media" x-data="gpTipMedia(@js($card['video']))">
-            @if ($card['video']['kind'] === 'mp4')
-                <video
-                    x-ref="clip"
-                    class="gp-tip-clip"
-                    muted loop playsinline preload="none"
-                    @if ($card['video']['poster']) poster="{{ $card['video']['poster'] }}" @endif
-                ></video>
-            @else
-                <img x-ref="clip" class="gp-tip-clip" alt="" src="{{ $card['video']['poster'] ?? 'data:image/gif;base64,R0lGODlhAQABAAAAACw=' }}">
-            @endif
-            <button type="button" class="gp-tip-play" x-show="!playing" x-on:click="play()" aria-label="Play">
-                <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M6.3 2.84A1.5 1.5 0 0 0 4 4.11v11.78a1.5 1.5 0 0 0 2.3 1.27l9.34-5.89a1.5 1.5 0 0 0 0-2.54L6.3 2.84Z"/></svg>
-            </button>
-        </div>
-    @elseif ($card['imageUrl'])
-        <img class="gp-tip-image" src="{{ $card['imageUrl'] }}" alt="" loading="lazy">
-    @endif
+    @include('engagement.media', ['video' => $card['video'], 'imageUrl' => $card['imageUrl']])
 
     <h2 class="gp-tip-title" id="gp-tip-title">{{ $card['title'] }}</h2>
 

@@ -19,6 +19,7 @@ class EditTip extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            TipsTable::reportAction(),
             TipsTable::previewAction(),
             TipsTable::toggleStatusAction(),
             DeleteAction::make(),

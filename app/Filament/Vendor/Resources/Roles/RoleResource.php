@@ -52,7 +52,19 @@ class RoleResource extends ShieldRoleResource
         'manage_expenses',
         'manage_financial_reports',
         'view_reports_hub',
+        // Learn GadgetPlug. Ticked by default on a new role (see
+        // DEFAULT_ON_PERMISSIONS), so a vendor takes it away rather than
+        // having to know to add it.
+        'view_learn_page',
     ];
+
+    /**
+     * Ticked already when a vendor creates a new role. Only harmless,
+     * everyone-should-have-it pages belong here.
+     *
+     * @var array<int, string>
+     */
+    public const DEFAULT_ON_PERMISSIONS = ['view_learn_page'];
 
     protected static ?int $navigationSort = 7;
 
@@ -128,6 +140,12 @@ class RoleResource extends ShieldRoleResource
                 ->getOptionLabelFromRecordUsing(fn ($record) => Str::headline(
                     preg_replace('/(^|_)pos(?=_|$)/', '$1sales_point', $record->name)
                 ))
+                // Applies to the create form only; editing shows what the role holds.
+                ->default(fn (): array => Permission::query()
+                    ->whereIn('name', self::DEFAULT_ON_PERMISSIONS)
+                    ->where('guard_name', 'web')
+                    ->pluck('id')
+                    ->all())
                 ->bulkToggleable()
                 ->columns(3),
         ]);

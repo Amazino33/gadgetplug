@@ -254,11 +254,13 @@ class User extends Authenticatable implements FilamentUser, HasTenants
             // Dispatch staff come in for Orders (the dispatch board) and
             // Logistics companies only.
             // Tip writers come in for Help Centre → In-App Tips, App Features
-            // and Tip Settings only (each gated by TipPolicy).
+            // and Tip Settings only (each gated by TipPolicy); adoption
+            // viewers for Help Centre → Feature Adoption only.
             return $this->isSuperAdmin() || $this->isCatalogueEditor()
                 || $this->hasGlobalPermission('manage_delivery_settings')
                 || $this->hasGlobalPermission('manage_dispatch')
-                || $this->hasGlobalPermission('manage_in_app_tips');
+                || $this->hasGlobalPermission('manage_in_app_tips')
+                || $this->hasGlobalPermission('view_feature_adoption');
         }
 
         if ($panel->getId() === 'vendor') {

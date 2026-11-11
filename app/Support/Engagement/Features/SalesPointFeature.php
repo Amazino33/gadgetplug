@@ -39,7 +39,12 @@ class SalesPointFeature extends Feature
 
     public function canAccess(User $user, Vendor $vendor): bool
     {
-        return $user->isSuperAdmin() || $user->hasVendorPermission($vendor->id, 'access_pos');
+        if ($user->isSuperAdmin()) {
+            return true;
+        }
+
+        // The till is not part of the free plan (PosAuthController refuses it).
+        return ! $vendor->isFreePlan() && $user->hasVendorPermission($vendor->id, 'access_pos');
     }
 
     protected function usageSources(): array

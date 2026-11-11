@@ -22,7 +22,10 @@ adoption report. Don't add a second way of detecting usage.
 | Cached usage per person | `FeatureUsage` (see "The usage cache" below) |
 | Moments | `Moments/*`, fired by `MomentRecorder`, held in the cache by `PendingMoments` |
 | Conditions | `Conditions/ConditionRegistry` |
-| Button URLs and access | `DestinationResolver` (Filament's own `canAccess()`) |
+| Button URLs and access | `DestinationResolver` (Filament's own `canAccess()`, plus the free plan's allowed routes) |
+| The Learn page and its dashboard card | `LearnCatalogue`, `LearnGadgetPlug`, `LearnProgressCard` |
+| The per-tip report | `TipReport` (names on top of `TipAdoption`), `ReportTip` page |
+| Platform adoption | `FeatureAdoption`, `FeatureAdoptionPage` |
 
 ## Who counts as "used it"
 
@@ -164,7 +167,14 @@ button opens the chat bubble.
 - a custom https:// or /path link (the last resort: it cannot be
   access-checked).
 
-Anyone who can't open the destination never sees the tip.
+Anyone who can't open the destination never sees the tip. A free-plan shop
+can open only what `EnforceFreePlan::ALLOWED_ROUTES` lists (the dashboard,
+Products, Shop Profile), so `DestinationResolver::canAccess()` refuses every
+other destination for it, and `SalesPointFeature` refuses the till, as the
+POS login does. There is one list: `planAllows()` reads
+`EnforceFreePlan::ALLOWED_ROUTES` itself, and `LearnPageTest` requests every
+destination a tip can use, as a free shop, through the real middleware, and
+fails if the tips and the plan ever disagree.
 
 ## The pop-up
 
@@ -188,6 +198,87 @@ Anyone who can't open the destination never sees the tip.
   used only by these components. Headings are Inter semibold; Montserrat is
   not loaded.
 
+## Learn GadgetPlug (vendor panel)
+
+`App\Filament\Vendor\Pages\LearnGadgetPlug` at `/plug/{shop}/learn`, beside
+Help & Guides in the menu. Everything it shows comes from `LearnCatalogue`:
+
+- **Features:** every visible, registered `app_features` row (in the admin's
+  order) whose feature passes its own `canAccess()` for this person. Each card
+  has the admin's copy and video, **Show me** (the feature's page, or its
+  browser event: Ask GadgetPlug opens the chat bubble), a "Read the guide"
+  link when the row names a published help article, and thumbs.
+- **Ticks and progress:** `FeatureUsage::map()`, the same cached registry
+  answer the tips use. "You've used X of Y features" counts the ticked cards.
+- **Honest labels:** owners (and platform admins) are told ticks count the
+  whole business. Staff are told ticks are their own, and cards whose tables
+  don't record who did it carry a "Whole business" chip.
+- **What's new:** every announcement sent to this person (active, started;
+  ones past their end date stay as history), newest first, filtered by
+  `TipEligibility::targets()` (panel, role, feature access, destination). An
+  orange dot marks each one without a `shown` event. Reading it here (a
+  quarter of it on screen for 1.5 seconds) records `shown` on the Learn route,
+  which clears the dot and retires its pop-up. `shownToday()` ignores events
+  on the Learn route, so reading here never uses up the day's pop-up, and no
+  pop-up ever shows on the Learn page itself.
+- **Recorded as `tip_events`** (route = the Learn route): Show me taps
+  (`clicked` + `feature_key`), thumbs, video plays (once per visit).
+
+**Who can open it:** its own vendor permission, `view_learn_page`, on every
+default role (and granted to every existing role by migration). It is on the
+Roles screen's list (`RoleResource::GRANTABLE_PERMISSIONS`), ticked by
+default when a vendor creates a new role (`DEFAULT_ON_PERMISSIONS`), so a
+vendor takes it away rather than having to know to add it. Owners and super
+admins always can. Not part of the free plan.
+
+**Dashboard card:** `App\Livewire\Engagement\LearnProgressCard`, lazy, at the
+top of the vendor dashboard (render hook). It shows the progress and the
+number of unread announcements, and links to the page. Closing it records a
+`dismissed` event with `feature_key = learn_progress_card` (not a registry
+key), and it stays closed for that person at that business. It also hides
+once every feature is ticked.
+
+## Reports (admin, Help Centre)
+
+### Per-tip report
+
+In-App Tips → a tip → **Report** (`/admin/tips/{id}/report`), same access as
+the other tip screens. `TipReport` adds names to `TipAdoption::rows()` and
+never recomputes a status:
+
+- the funnel: Saw → Tapped → Used it, each bar with its count and share of
+  Saw; Already using is counted separately underneath;
+- found it helpful (% and 👍/👎, latest answer per person) and video plays;
+- one row per person per business: business, branch (where they first saw
+  it), person, role, status (*Saw only* / *Tapped, not used* / *Used it* /
+  *Already using*), first saw, tapped, first used, and whether "used" counted
+  the person or the business. Filter by status, search by name, and
+  **Download CSV** of what's on screen.
+
+### Feature Adoption
+
+Help Centre → **Feature Adoption** (`/admin/feature-adoption`). Per feature:
+the share of businesses that have used it, how many people have used it
+themselves ("Whole business" where the tables don't record who), thumbs from
+the Learn page, and Show me taps. **Not using yet** lists the businesses that
+haven't, newest first, with the owner's name and number (the shop's WhatsApp
+when the owner has none). Filters: plan (paid by default: a free shop can't
+reach most features, so counting it would make them all look unused) and
+date joined. CSV of what's on screen.
+
+- **Live, cached for 10 minutes** (`FeatureAdoption::CACHE_SECONDS`), with a
+  Refresh now button. Each feature is one or two indexed GROUP BY queries, so
+  a nightly rollup (a new table, plus a cron entry on a crontab shared with
+  another app) wasn't worth figures a day old. Filters work on the cached
+  answers, so changing one never re-runs the queries.
+- **Who can open it:** super admins and the global `view_feature_adoption`
+  permission, its own because the list holds every owner's phone number.
+  Writing tips (`manage_in_app_tips`) doesn't open it.
+
+CSV cells that start with `=`, `+`, `-`, `@` or a tab get a leading
+apostrophe (`Csv::cell()`), because business and owner names are typed by
+vendors and a spreadsheet would otherwise run them as formulas.
+
 ## Trying it locally
 
 1. `php artisan migrate` and `php artisan db:seed --class=EngagementTipsSeeder`
@@ -198,9 +289,11 @@ Anyone who can't open the destination never sees the tip.
    phone-sized window. Open the dashboard; after about 4 seconds the bottom
    sheet appears.
 4. Tap "See who owes you": it opens the business's Customer Debts list.
-5. Record a credit sale in Sales Point. The tip's Saw → Tapped → Used
-   column then shows the sale as "Used". The per-person list with
-   statuses arrives with the Phase 3 report.
+5. Record a credit sale in Sales Point. The tip's **Report** then shows you
+   as "Used it" (and the list's Saw → Tapped → Used column counts it).
+6. Open **Learn GadgetPlug** from the menu: Customer debts now has its tick,
+   and the progress bar has moved. Activate the seeded "What's new"
+   announcement to see the unread dot; it clears once you've read it.
 
 Each person gets one pop-up per Lagos day. To see it again the same day,
 raise the daily cap in Tip Settings, or use Preview as me.

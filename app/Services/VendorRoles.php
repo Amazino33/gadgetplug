@@ -29,17 +29,20 @@ class VendorRoles
             'submit_cash', 'receive_cash',
             'count_stock', 'approve_stock_count',
             'view_store_settlement',
+            'view_learn_page',
         ],
         'product_manager' => [
             'view_products', 'view_any_products', 'create_products', 'edit_products', 'delete_products',
             'import_products', 'export_products',
             'view_order_items', 'view_any_order_items',
             'manage_inventory',
+            'view_learn_page',
         ],
         'order_manager' => [
             'view_products', 'view_any_products',
             'view_order_items', 'view_any_order_items', 'edit_order_items',
             'access_pos', 'void_sale', 'process_return', 'close_pos_session', 'view_sales_history',
+            'view_learn_page',
         ],
         'inventory_manager' => [
             'view_products', 'view_any_products', 'create_products', 'edit_products', 'delete_products',
@@ -55,6 +58,7 @@ class VendorRoles
             'submit_cash', 'receive_cash',
             'count_stock', 'approve_stock_count',
             'view_store_settlement',
+            'view_learn_page',
         ],
         'storekeeper' => [
             'view_products', 'view_any_products',
@@ -79,9 +83,11 @@ class VendorRoles
             // withheld for the same reason receive_cash is — a shortage on a
             // shelf you count is one you must not also sign off.
             'count_stock',
+            'view_learn_page',
         ],
         'member' => [
             'view_products', 'view_any_products',
+            'view_learn_page',
         ],
     ];
 

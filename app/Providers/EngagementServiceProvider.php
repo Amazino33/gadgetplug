@@ -10,6 +10,7 @@ use App\Support\Engagement\Conditions\ConditionRegistry;
 use App\Support\Engagement\DestinationResolver;
 use App\Support\Engagement\FeatureRegistry;
 use App\Support\Engagement\FeatureUsage;
+use App\Support\Engagement\LearnCatalogue;
 use App\Support\Engagement\Moments\MomentRecorder;
 use App\Support\Engagement\Moments\PendingMoments;
 use Illuminate\Database\Eloquent\Model;
@@ -37,6 +38,9 @@ class EngagementServiceProvider extends ServiceProvider
         // Per request (or queued job): both hold memos that must not outlive it.
         $this->app->scoped(FeatureUsage::class);
         $this->app->scoped(MomentRecorder::class);
+        // Remembers each person's feature list for the request (the Learn
+        // page's actions ask for it more than once).
+        $this->app->scoped(LearnCatalogue::class);
     }
 
     public function boot(): void

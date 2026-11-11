@@ -32,7 +32,7 @@ class TipPolicy
      * setPermissionsTeamId(null), so hasGlobalPermission() cannot see a global
      * grant there. See docs/known-issues.md; once that is fixed, use it here.
      */
-    private static function holdsGlobally(User $user, string $permission): bool
+    public static function holdsGlobally(User $user, string $permission): bool
     {
         $direct = DB::table('model_has_permissions')
             ->join('permissions', 'permissions.id', '=', 'model_has_permissions.permission_id')

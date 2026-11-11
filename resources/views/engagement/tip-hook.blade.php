@@ -7,7 +7,10 @@
 --}}
 @php
     $gpTipPreviewId = request()->integer('gp_tip_preview') ?: null;
-    $gpTipsLive = auth()->check() && ($gpTipPreviewId || \App\Models\Tip::query()->live()->exists());
+    // Never on the Learn page itself (TipEligibility::pick() agrees).
+    $gpTipsLive = auth()->check()
+        && request()->route()?->getName() !== \App\Support\Engagement\LearnCatalogue::ROUTE
+        && ($gpTipPreviewId || \App\Models\Tip::query()->live()->exists());
 @endphp
 
 @if ($gpTipsLive)

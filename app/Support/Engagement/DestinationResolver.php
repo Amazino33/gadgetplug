@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Engagement;
 
+use App\Http\Middleware\EnforceFreePlan;
 use App\Models\User;
 use App\Models\Vendor;
 use Filament\Pages\BasePage;
@@ -13,6 +14,7 @@ use Filament\Resources\Pages\Page as ResourcePage;
 use Illuminate\Routing\Exceptions\UrlGenerationException;
 use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\Route as Router;
+use Illuminate\Support\Str;
 use Throwable;
 
 /**
@@ -80,6 +82,10 @@ class DestinationResolver
             return false;
         }
 
+        if (! $this->planAllows($routeName, $user, $vendor)) {
+            return false;
+        }
+
         $class = $this->pageClass($routeName);
 
         try {
@@ -102,6 +108,26 @@ class DestinationResolver
     }
 
     /** The Filament page class behind a route, or null if it is not one. */
+    /**
+     * A free-plan shop may open only what EnforceFreePlan allows, so a tip
+     * must never send it anywhere else (it would land on "Not part of the
+     * free plan"). Super admins pass, as they do there.
+     */
+    public function planAllows(string $routeName, User $user, ?Vendor $vendor): bool
+    {
+        if (! $vendor?->isFreePlan() || $user->isSuperAdmin()) {
+            return true;
+        }
+
+        foreach (EnforceFreePlan::ALLOWED_ROUTES as $pattern) {
+            if (Str::is($pattern, $routeName)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public function pageClass(?string $routeName): ?string
     {
         $route = $routeName ? $this->route($routeName) : null;

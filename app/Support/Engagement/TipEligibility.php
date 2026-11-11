@@ -52,6 +52,12 @@ class TipEligibility
 
     public function pick(TipContext $context): ?TipDecision
     {
+        // The Learn page teaches every feature already; a pop-up on it would
+        // only interrupt.
+        if ($context->routeName === LearnCatalogue::ROUTE) {
+            return null;
+        }
+
         if ($this->dailyCapReached($context->user)) {
             return null;
         }
@@ -132,10 +138,13 @@ class TipEligibility
     {
         [$start] = BusinessDate::boundsFor(BusinessDate::today());
 
+        // Pop-ups only: an announcement read on the Learn page is logged as
+        // shown there, and reading isn't being interrupted.
         $tips = TipEvent::query()
             ->where('user_id', $user->id)
             ->where('event', TipEvent::SHOWN)
             ->where('created_at', '>=', $start)
+            ->where(fn ($q) => $q->whereNull('route')->orWhere('route', '!=', LearnCatalogue::ROUTE))
             ->count();
 
         // A tour's first-visit offer is a pop-up too. Its row is created at
@@ -236,6 +245,29 @@ class TipEligibility
         }
 
         return null;
+    }
+
+    /**
+     * Was this tip aimed at this person at all? Panel, role, the linked
+     * feature's access and the button's destination: the targeting half of
+     * reject(), without status, timing, caps or history. The Learn page uses
+     * it to list the announcements someone was sent.
+     */
+    public function targets(Tip $tip, TipContext $context): bool
+    {
+        if (! in_array($context->panelId, (array) $tip->panels, true) || ! $this->matchesRoles($tip, $context)) {
+            return false;
+        }
+
+        if ($tip->feature_key) {
+            $feature = $this->features->find($tip->feature_key);
+
+            if (! $feature || ! $context->vendor || ! $feature->canAccess($context->user, $context->vendor)) {
+                return false;
+            }
+        }
+
+        return $this->button($tip, $context)['ok'];
     }
 
     private function isLive(Tip $tip): bool

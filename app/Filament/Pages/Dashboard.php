@@ -48,6 +48,10 @@ class Dashboard extends BaseDashboard
             return TipResource::getUrl('index', panel: 'admin');
         }
 
+        if (FeatureAdoptionPage::canView($user)) {
+            return FeatureAdoptionPage::getUrl(panel: 'admin');
+        }
+
         return null;
     }
 

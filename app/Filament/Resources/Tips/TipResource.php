@@ -7,6 +7,7 @@ namespace App\Filament\Resources\Tips;
 use App\Filament\Resources\Tips\Pages\CreateTip;
 use App\Filament\Resources\Tips\Pages\EditTip;
 use App\Filament\Resources\Tips\Pages\ListTips;
+use App\Filament\Resources\Tips\Pages\ReportTip;
 use App\Filament\Resources\Tips\Schemas\TipForm;
 use App\Filament\Resources\Tips\Tables\TipsTable;
 use App\Models\Tip;
@@ -74,6 +75,7 @@ class TipResource extends Resource
             'index' => ListTips::route('/'),
             'create' => CreateTip::route('/create'),
             'edit' => EditTip::route('/{record}/edit'),
+            'report' => ReportTip::route('/{record}/report'),
         ];
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\Tips\Tables;
 
+use App\Filament\Resources\Tips\TipResource;
 use App\Models\Tip;
 use App\Models\Vendor;
 use App\Support\Engagement\TipAdoption;
@@ -93,6 +94,7 @@ class TipsTable
             ])
             ->recordActions([
                 EditAction::make(),
+                self::reportAction(),
                 self::previewAction(),
                 self::toggleStatusAction(),
                 ReplicateAction::make()
@@ -117,6 +119,16 @@ class TipsTable
                     DeleteBulkAction::make(),
                 ]),
             ]);
+    }
+
+    /** The per-tip report: funnel, thumbs, plays and the people behind them. */
+    public static function reportAction(): Action
+    {
+        return Action::make('report')
+            ->label('Report')
+            ->icon('heroicon-o-chart-bar')
+            ->color('gray')
+            ->url(fn (Tip $record): string => TipResource::getUrl('report', ['record' => $record]));
     }
 
     /**
