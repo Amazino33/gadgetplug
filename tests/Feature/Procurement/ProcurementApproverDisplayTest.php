@@ -30,7 +30,7 @@ test('the record screen shows who approved it once agreed', function () {
     $html = Livewire::test(ViewProcurement::class, ['record' => $delivery->getRouteKey()])->html();
 
     expect($html)->toContain('Approved By')
-        ->and($html)->toContain($ctx['checker']->name);
+        ->and($html)->toContain(e($ctx['checker']->name)); // escaped as the page prints it (O'Reilly → O&#039;Reilly)
 });
 
 test('a pending delivery shows no approver, because there is none yet', function () {
@@ -62,5 +62,5 @@ test('the approver name also shows on the list, next to the items', function () 
     $html = Livewire::test(ListProcurements::class)->html();
 
     expect($html)->toContain('Approved by')
-        ->and($html)->toContain($ctx['checker']->name);
+        ->and($html)->toContain(e($ctx['checker']->name)); // escaped as the page prints it (O'Reilly → O&#039;Reilly)
 });
