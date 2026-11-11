@@ -59,17 +59,28 @@ abstract class Feature
     }
 
     /**
+     * For a feature that lives on every page rather than at a URL (the
+     * assistant's chat bubble): the browser event "Show me" fires to open it.
+     */
+    public function clientEvent(): ?string
+    {
+        return null;
+    }
+
+    /**
      * Whether the signed-in user can use this feature at this vendor.
      *
      * Defaults to the destination page's own canAccess(), so a tip or a Learn
-     * card can never be more generous than the page itself. Features without a
-     * Filament page override this.
+     * card can never be more generous than the page itself. Features whose
+     * destination is not a Filament page must override this: DestinationResolver
+     * asks the feature in that case, so it cannot answer for them.
      */
     public function canAccess(User $user, Vendor $vendor): bool
     {
         $route = $this->destinationRoute();
+        $resolver = app(DestinationResolver::class);
 
-        return $route !== null && app(DestinationResolver::class)->canAccess($route, $user, $vendor);
+        return $route !== null && $resolver->pageClass($route) !== null && $resolver->canAccess($route, $user, $vendor);
     }
 
     /** @return array<int, class-string<Moment>> */

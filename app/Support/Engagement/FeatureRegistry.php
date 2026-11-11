@@ -68,6 +68,18 @@ class FeatureRegistry
         return $key === null ? null : ($this->all()[$key] ?? null);
     }
 
+    /** The feature whose "Show me" goes to $routeName, if any. */
+    public function forRoute(string $routeName): ?Feature
+    {
+        foreach ($this->all() as $feature) {
+            if ($feature->destinationRoute() === $routeName) {
+                return $feature;
+            }
+        }
+
+        return null;
+    }
+
     /** @return array<int, string> */
     public function keys(): array
     {

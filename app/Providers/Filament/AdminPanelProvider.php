@@ -3,8 +3,12 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Pages\DeliverySettings;
+use App\Filament\Resources\AppFeatures\Pages\EditAppFeature;
 use App\Filament\Resources\Orders\Pages\ViewOrder;
 use App\Filament\Resources\Products\Pages\ListProducts;
+use App\Filament\Resources\Tips\Pages\CreateTip;
+use App\Filament\Resources\Tips\Pages\EditTip;
+use App\Filament\Resources\Tips\Pages\ListTips;
 use App\Services\Messaging\MessagingService;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
 use Filament\Http\Middleware\Authenticate;
@@ -101,6 +105,17 @@ class AdminPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
                 fn () => Blade::render("@include('partials.meta-pixel')"),
+            )
+            // In-app tips can target the admin panel too, for testing.
+            ->renderHook(
+                PanelsRenderHook::BODY_END,
+                fn () => view('engagement.tip-hook'),
+            )
+            // The tip editor's phone preview plays media with the same script.
+            ->renderHook(
+                PanelsRenderHook::BODY_END,
+                fn () => view('engagement.tip-scripts'),
+                scopes: [ListTips::class, CreateTip::class, EditTip::class, EditAppFeature::class],
             );
     }
 

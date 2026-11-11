@@ -1,5 +1,8 @@
 @import '../../../../vendor/filament/filament/resources/css/theme.css';
 
+/* In-app tips, Learn page and tip reports: brand tokens and components. */
+@import '../../engagement.css';
+
 @source '../../../../app/Filament/Vendor/**/*';
 @source '../../../../resources/views/filament/vendor/**/*';
 @source '../../../../resources/views/livewire/assistant/**/*';

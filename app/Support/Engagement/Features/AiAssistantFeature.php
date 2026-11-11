@@ -10,9 +10,9 @@ use App\Services\Assistant\AssistantAccess;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Ask GadgetPlug. It is a chat bubble on every page, not a page, and the
- * assistant itself is out of scope for this work, so there is no "Show me"
- * destination: the Learn card explains where the bubble is instead.
+ * Ask GadgetPlug. It is a chat bubble on every page, not a page, so "Show me"
+ * fires a browser event instead of navigating, and the bubble opens. That one
+ * listener is the only change to the assistant.
  */
 class AiAssistantFeature extends Feature
 {
@@ -29,6 +29,12 @@ class AiAssistantFeature extends Feature
     public function defaultDescription(): string
     {
         return 'Tap the chat bubble at the bottom of any page and ask about your sales, stock or debts in plain English.';
+    }
+
+    /** Heard by the chat bubble (one x-on line in its markup), which opens. */
+    public function clientEvent(): ?string
+    {
+        return 'gp-open-assistant';
     }
 
     public function canAccess(User $user, Vendor $vendor): bool

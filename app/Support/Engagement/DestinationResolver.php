@@ -21,8 +21,9 @@ use Throwable;
  *
  * Access is Filament's own check, the same one the page runs on mount: a
  * resource page needs its resource's canAccess() and its own; a plain page
- * needs its canAccess(). Anything that is not a Filament page is refused —
- * features outside the panel (the POS) carry their own rule instead.
+ * needs its canAccess(). A route outside the panel is allowed only when a
+ * registered feature owns it (Sales Point's pos.vendor), and then that
+ * feature's own access rule decides. Anything else is refused.
  */
 class DestinationResolver
 {
@@ -40,6 +41,15 @@ class DestinationResolver
             }
 
             $params = ['tenant' => $vendor->slug] + $params;
+        }
+
+        // Routes outside the panel bind the business as {vendor:slug}.
+        if (in_array('vendor', $route->parameterNames(), true)) {
+            if (! $vendor) {
+                return null;
+            }
+
+            $params = ['vendor' => $vendor->slug] + $params;
         }
 
         try {
@@ -72,11 +82,13 @@ class DestinationResolver
 
         $class = $this->pageClass($routeName);
 
-        if ($class === null) {
-            return false;
-        }
-
         try {
+            if ($class === null) {
+                $owner = app(FeatureRegistry::class)->forRoute($routeName);
+
+                return $owner !== null && $vendor !== null && $owner->canAccess($user, $vendor);
+            }
+
             if (is_subclass_of($class, ResourcePage::class)) {
                 return $class::getResource()::canAccess() && $class::canAccess();
             }

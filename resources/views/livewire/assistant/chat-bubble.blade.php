@@ -1,6 +1,7 @@
 <div>
 @if($this->isEnabled)
 <div
+    x-on:gp-open-assistant.window="open = true"
     x-data="{
         open: false,
         sidebarOpen: @entangle('sidebarOpen'),

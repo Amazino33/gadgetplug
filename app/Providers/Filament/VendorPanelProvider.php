@@ -172,6 +172,12 @@ class VendorPanelProvider extends PanelProvider
                 PanelsRenderHook::BODY_END,
                 fn () => Blade::render('@livewire(\App\Livewire\Assistant\ChatBubble::class)'),
             )
+            // In-app tips: skipped when none is live, otherwise loaded lazily
+            // after the page so choosing one never slows it down.
+            ->renderHook(
+                PanelsRenderHook::BODY_END,
+                fn () => view('engagement.tip-hook'),
+            )
             // Replaces the global search removed above: filters the sidebar itself
             // so staff can jump to a page without scrolling the whole menu.
             ->renderHook(

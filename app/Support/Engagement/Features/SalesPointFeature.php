@@ -12,7 +12,8 @@ use App\Support\Engagement\Moments\CashSalesTodayReached;
 /**
  * The till. Not a Filament page (it is the POS app at /sales-point/{slug}), so
  * the access rule is the same one the panel's "Sales Point Terminal" menu item
- * uses rather than a page's canAccess().
+ * uses rather than a page's canAccess(). Because this feature owns the route,
+ * any tip may also send its button to Sales Point under this same rule.
  */
 class SalesPointFeature extends Feature
 {
@@ -31,9 +32,9 @@ class SalesPointFeature extends Feature
         return 'Ring up sales on your phone or computer. It keeps working when the internet drops.';
     }
 
-    public function destinationUrl(Vendor $vendor): ?string
+    public function destinationRoute(): ?string
     {
-        return route('pos.vendor', ['vendor' => $vendor->slug]);
+        return 'pos.vendor';
     }
 
     public function canAccess(User $user, Vendor $vendor): bool

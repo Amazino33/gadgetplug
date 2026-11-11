@@ -253,9 +253,12 @@ class User extends Authenticatable implements FilamentUser, HasTenants
             // admin page keeps its own gate (see AdminPanelAccessTest).
             // Dispatch staff come in for Orders (the dispatch board) and
             // Logistics companies only.
+            // Tip writers come in for Help Centre → In-App Tips, App Features
+            // and Tip Settings only (each gated by TipPolicy).
             return $this->isSuperAdmin() || $this->isCatalogueEditor()
                 || $this->hasGlobalPermission('manage_delivery_settings')
-                || $this->hasGlobalPermission('manage_dispatch');
+                || $this->hasGlobalPermission('manage_dispatch')
+                || $this->hasGlobalPermission('manage_in_app_tips');
         }
 
         if ($panel->getId() === 'vendor') {

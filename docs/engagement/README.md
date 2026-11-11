@@ -114,3 +114,93 @@ then by whichever this person saw least recently.
 
 The daily cap is per person per Lagos day, and it also counts the guided
 tours' own first-visit offer (`user_tour_progress` rows created today).
+
+## Admin screens (Help Centre)
+
+Platform staff with the global `manage_in_app_tips` permission see these
+screens, and so do super admins. `TipPolicy` gates them all; vendor roles never
+pass. Someone holding only `manage_in_app_tips` reaches these three screens and
+nothing else in the admin panel; `TipAdminTest` sweeps every admin resource
+and page to prove it. The permission check reads the pivots directly; see
+`docs/known-issues.md` for why.
+
+- **In-App Tips:** list with Saw → Tapped → Used and 👍%. Create and edit
+  with a live phone preview. Row actions: Duplicate (as a draft),
+  Pause/Activate, and **Preview as me**, which opens the real pop-up on a
+  chosen business's dashboard via `?gp_tip_preview={id}`. A preview ignores
+  status and caps, and records nothing.
+- **App Features:** the copy, video and order of each feature (drag to
+  reorder). Rows are created only by `features:sync`.
+- **Tip Settings:** daily cap (default 1), days between repeats (3),
+  adoption window (7).
+
+### Writing a tip
+
+1. Help Centre → In-App Tips → New tip. Type: **Tip**.
+2. Link a feature. Its page becomes the button's destination, people already
+   using it never see the tip, and "Used it" is counted from it.
+3. Title as a question, a one-sentence message, and a button label that says
+   where it goes.
+4. Pick who sees it (panels, roles, condition), then set Status to **Active**.
+
+### A moment tip
+
+The same steps, plus **Show right after** (for example "After N cash sales
+by this person today", with N = 5). It only shows while that moment is
+pending, and it takes the day's slot ahead of ordinary tips.
+
+### A "What's new" announcement
+
+Type: **What's new announcement**. It is shown once to everyone targeted, in
+the centre with an orange "New" badge, even to people already using the
+feature. Link the feature so the button goes to it. For Ask GadgetPlug, the
+button opens the chat bubble.
+
+### Button destinations
+
+- the linked feature's page, or
+- any panel list/page (never create/edit or single-record pages), or
+- Sales Point (owned by `SalesPointFeature`, checked with `access_pos`), or
+- a custom https:// or /path link (the last resort: it cannot be
+  access-checked).
+
+Anyone who can't open the destination never sees the tip.
+
+## The pop-up
+
+`App\Livewire\Engagement\TipPopup`, added to the end of every vendor-panel
+(and admin-panel) page by `resources/views/engagement/tip-hook.blade.php`.
+
+- **When no tip is live**, the hook adds nothing (one indexed query).
+- **Otherwise** the component loads lazily after the page.
+- **`shown` is logged only when the browser displays the tip**: after the
+  tip's delay, and never on a page load where the SystemAnnouncement modal or
+  a guided tour is showing or being offered. It also waits while a Filament
+  modal is open. These are read-only DOM checks in `engagement/tip-scripts`;
+  `TipPopupTest` fails if the announcement modal's markup stops matching
+  them.
+- **Layout:** a bottom sheet with a drag handle on phones (swipe down = Not
+  now), a corner card above the chat bubble on desktop, or a centre modal.
+- **Media:** poster first, then muted, looped, inline video once on screen.
+  With Save-Data or reduced motion, it shows a play button instead.
+- **Styling:** `resources/css/engagement.css` (imported by both panel themes)
+  defines `--gp-brand-green` / `--gp-brand-orange` with dark-mode variants,
+  used only by these components. Headings are Inter semibold; Montserrat is
+  not loaded.
+
+## Trying it locally
+
+1. `php artisan migrate` and `php artisan db:seed --class=EngagementTipsSeeder`
+   (this seeds five draft tips).
+2. As a super admin: Help Centre → In-App Tips → "Debts: buy on credit" →
+   Activate.
+3. Sign in as a vendor owner whose business has no debts yet, in a
+   phone-sized window. Open the dashboard; after about 4 seconds the bottom
+   sheet appears.
+4. Tap "See who owes you": it opens the business's Customer Debts list.
+5. Record a credit sale in Sales Point. The tip's Saw → Tapped → Used
+   column then shows the sale as "Used". The per-person list with
+   statuses arrives with the Phase 3 report.
+
+Each person gets one pop-up per Lagos day. To see it again the same day,
+raise the daily cap in Tip Settings, or use Preview as me.

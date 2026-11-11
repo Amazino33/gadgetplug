@@ -4,6 +4,8 @@ namespace App\Filament\Pages;
 
 use App\Filament\Resources\Orders\OrderResource;
 use App\Filament\Resources\Products\ProductResource;
+use App\Filament\Resources\Tips\TipResource;
+use App\Policies\TipPolicy;
 use Filament\Pages\Dashboard as BaseDashboard;
 
 // The admin panel's home, kept for super-admins only.
@@ -40,6 +42,10 @@ class Dashboard extends BaseDashboard
 
         if ($user->hasGlobalPermission('manage_delivery_settings')) {
             return DeliverySettings::getUrl(panel: 'admin');
+        }
+
+        if (TipPolicy::canManage($user)) {
+            return TipResource::getUrl('index', panel: 'admin');
         }
 
         return null;

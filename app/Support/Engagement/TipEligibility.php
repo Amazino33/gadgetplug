@@ -67,10 +67,10 @@ class TipEligibility
         $decisions = [];
 
         foreach ($tips as $tip) {
-            $buttonUrl = null;
+            $button = null;
 
-            if ($this->reject($tip, $context, $state[$tip->id] ?? [], $moments, $buttonUrl) === null) {
-                $decisions[] = new TipDecision($tip, $buttonUrl, $this->slot($tip));
+            if ($this->reject($tip, $context, $state[$tip->id] ?? [], $moments, $button) === null) {
+                $decisions[] = new TipDecision($tip, $button['url'], $this->slot($tip), $button['event']);
             }
         }
 
@@ -90,9 +90,41 @@ class TipEligibility
     public function explain(Tip $tip, TipContext $context): ?string
     {
         $state = $this->stateFor($context, collect([$tip]));
-        $buttonUrl = null;
+        $button = null;
 
-        return $this->reject($tip, $context, $state[$tip->id] ?? [], $this->moments($context), $buttonUrl);
+        return $this->reject($tip, $context, $state[$tip->id] ?? [], $this->moments($context), $button);
+    }
+
+    /**
+     * What the tip's button does for this person here.
+     *
+     * In order: a chosen panel page (or a feature-owned page such as Sales
+     * Point), a custom link, else the linked feature's own page or page event.
+     * 'ok' is false when a chosen page does not resolve or this person cannot
+     * open it; such a tip is never shown (a preview still draws it).
+     *
+     * @return array{url: string|null, event: string|null, ok: bool}
+     */
+    public function button(Tip $tip, TipContext $context): array
+    {
+        if ($tip->button_route) {
+            $url = $this->destinations->url($tip->button_route, (array) $tip->button_params, $context->vendor);
+            $ok = $url !== null && $this->destinations->canAccess($tip->button_route, $context->user, $context->vendor);
+
+            return ['url' => $url, 'event' => null, 'ok' => $ok];
+        }
+
+        if ($tip->button_url) {
+            return ['url' => $tip->button_url, 'event' => null, 'ok' => true];
+        }
+
+        $feature = $this->features->find($tip->feature_key);
+
+        if ($feature && $context->vendor) {
+            return ['url' => $feature->destinationUrl($context->vendor), 'event' => $feature->clientEvent(), 'ok' => true];
+        }
+
+        return ['url' => null, 'event' => null, 'ok' => true];
     }
 
     /** Pop-ups this person has already had today (Lagos day), tips and tour offers together. */
@@ -125,7 +157,7 @@ class TipEligibility
      * @param  array<string, array{count: int, last: CarbonImmutable}>  $state  this tip's events for this person
      * @param  array<string, int>  $moments  pending moment key => value
      */
-    private function reject(Tip $tip, TipContext $context, array $state, array $moments, ?string &$buttonUrl): ?string
+    private function reject(Tip $tip, TipContext $context, array $state, array $moments, ?array &$button): ?string
     {
         if (! $this->isLive($tip)) {
             return 'not_live';
@@ -172,16 +204,10 @@ class TipEligibility
             return 'condition';
         }
 
-        if ($tip->button_route) {
-            $buttonUrl = $this->destinations->url($tip->button_route, (array) $tip->button_params, $context->vendor);
+        $button = $this->button($tip, $context);
 
-            if ($buttonUrl === null || ! $this->destinations->canAccess($tip->button_route, $context->user, $context->vendor)) {
-                return 'no_destination_access';
-            }
-        } elseif ($tip->button_url) {
-            $buttonUrl = $tip->button_url;
-        } elseif ($feature && $context->vendor) {
-            $buttonUrl = $feature->destinationUrl($context->vendor);
+        if (! $button['ok']) {
+            return 'no_destination_access';
         }
 
         $shown = $state[TipEvent::SHOWN]['count'] ?? 0;
