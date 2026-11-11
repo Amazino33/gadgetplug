@@ -10,8 +10,7 @@ use App\Support\Engagement\Conditions\ConditionRegistry;
 use App\Support\Engagement\DestinationResolver;
 use App\Support\Engagement\FeatureRegistry;
 use App\Support\Engagement\FeatureUsage;
-use App\Support\Engagement\Moments\CashSalesTodayReached;
-use App\Support\Engagement\Moments\FirstProductAdded;
+use App\Support\Engagement\Moments\MomentRecorder;
 use App\Support\Engagement\Moments\PendingMoments;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -19,11 +18,13 @@ use Illuminate\Support\ServiceProvider;
 use Throwable;
 
 /**
- * Wiring for in-app tips: the registries, the usage-cache refresh, and the
+ * Wiring for in-app tips: the registries, the usage-cache recheck, and the
  * moment listeners.
  *
- * Every listener here runs after the surrounding transaction commits and
- * swallows its own errors. A tip is never worth a failed sale.
+ * Every listener here goes through guarded(): whatever it decides during the
+ * save is wrapped so an exception is reported and swallowed, and anything it
+ * writes happens after the surrounding transaction commits, wrapped the same
+ * way. A tip is never worth a failed sale or a failed sync.
  */
 class EngagementServiceProvider extends ServiceProvider
 {
@@ -33,36 +34,61 @@ class EngagementServiceProvider extends ServiceProvider
         $this->app->singleton(ConditionRegistry::class);
         $this->app->singleton(DestinationResolver::class);
         $this->app->singleton(PendingMoments::class);
+        // Per request (or queued job): both hold memos that must not outlive it.
         $this->app->scoped(FeatureUsage::class);
+        $this->app->scoped(MomentRecorder::class);
     }
 
     public function boot(): void
     {
-        $this->refreshUsageWhenSourcesChange();
+        $this->recheckUsageWhenSourcesChange();
         $this->listenForMoments();
     }
 
     /**
-     * Saving a row that counts as use refreshes that vendor's cached usage,
-     * so a tip about debts disappears the moment the first debt is recorded.
+     * A saved row that counts as use may turn a cached "not used yet" into a
+     * date. Only that answer is cleared; a cached date is never touched,
+     * because first use cannot change. Once this request has seen the keys
+     * holding dates, further saves do no cache work at all.
      */
-    private function refreshUsageWhenSourcesChange(): void
+    private function recheckUsageWhenSourcesChange(): void
     {
-        $models = [];
+        $byModel = [];
 
         foreach ($this->app->make(FeatureRegistry::class)->all() as $feature) {
-            foreach ($feature->sourceModels() as $model) {
-                $models[$model] = true;
+            foreach ($feature->sources() as $source) {
+                if ($source->model) {
+                    $byModel[$source->model][] = [$feature, $source];
+                }
             }
         }
 
-        foreach (array_keys($models) as $model) {
-            $model::saved(function (Model $record): void {
-                $vendorId = $record->getAttribute('vendor_id');
+        foreach ($byModel as $model => $pairs) {
+            $model::saved(function (Model $record) use ($pairs): void {
+                self::guarded(function () use ($record, $pairs): ?callable {
+                    $vendorId = (int) $record->getAttribute('vendor_id');
 
-                if ($vendorId) {
-                    self::safely(fn () => FeatureUsage::bump((int) $vendorId));
-                }
+                    if (! $vendorId) {
+                        return null;
+                    }
+
+                    $usage = app(FeatureUsage::class);
+                    $keys = [];
+
+                    foreach ($pairs as [$feature, $source]) {
+                        $userIds = [];
+
+                        foreach (array_keys($source->userColumns) as $column) {
+                            if ($id = (int) $record->getAttribute($column)) {
+                                $userIds[] = $id;
+                            }
+                        }
+
+                        array_push($keys, ...$usage->keysToRecheck($feature, $vendorId, $userIds));
+                    }
+
+                    return $keys === [] ? null : fn () => $usage->recheck($keys);
+                });
             });
         }
     }
@@ -70,19 +96,37 @@ class EngagementServiceProvider extends ServiceProvider
     private function listenForMoments(): void
     {
         PosSale::created(function (PosSale $sale): void {
-            self::safely(fn () => app(CashSalesTodayReached::class)->handleSale($sale, app(PendingMoments::class)));
+            self::guarded(fn () => app(MomentRecorder::class)->saleSaved($sale));
         });
 
         Product::created(function (Product $product): void {
-            self::safely(fn () => app(FirstProductAdded::class)->handleProduct($product, app(PendingMoments::class)));
+            self::guarded(fn () => app(MomentRecorder::class)->productCreated($product));
         });
     }
 
-    private static function safely(callable $callback): void
+    /**
+     * Run $decide now; if it hands back work, run that after commit. Neither
+     * step can throw out of here.
+     *
+     * @param  callable(): (callable|null)  $decide
+     */
+    public static function guarded(callable $decide): void
     {
-        DB::afterCommit(function () use ($callback): void {
+        try {
+            $after = $decide();
+        } catch (Throwable $e) {
+            report($e);
+
+            return;
+        }
+
+        if ($after === null) {
+            return;
+        }
+
+        DB::afterCommit(function () use ($after): void {
             try {
-                $callback();
+                $after();
             } catch (Throwable $e) {
                 report($e);
             }

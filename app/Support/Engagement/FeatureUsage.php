@@ -11,21 +11,48 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
 
 /**
- * "Has this person used this feature, and since when?" — cached.
+ * "Has this person used this feature, and since when?", cached.
  *
- * The answer for every feature is computed together and cached per person per
- * vendor, so a page render costs one cache read. The cache key carries a
- * per-vendor version that any save of a usage source bumps (see
- * EngagementServiceProvider), so recording a debt clears the debt tip at once
- * rather than ten minutes later. The TTL is the backstop for sources with no
- * model to listen to (photos, staff, branches).
+ * One cache entry per feature, per vendor, per scope (the business, or one
+ * person). A first-use date never changes once set, so a cached date is kept
+ * for a long time and nothing ever clears it. Only "not used yet" can go
+ * stale, so only that answer is short-lived, and only that answer is cleared
+ * when a row that counts as use is saved (see sourceSaved()).
+ *
+ * A page render reads every entry it needs in one Cache::many() call.
  */
 class FeatureUsage
 {
-    public const TTL_SECONDS = 600;
+    /** Cached value meaning "checked, and not used yet". */
+    public const NEVER = 'never';
+
+    /** How long "not used yet" is trusted when nothing clears it. */
+    public const NEVER_TTL_SECONDS = 600;
+
+    /** A first-use date never changes; this TTL is only housekeeping. */
+    public const USED_TTL_SECONDS = 60 * 60 * 24 * 30;
 
     /** @var array<string, bool> */
     private array $ownerOrAdmin = [];
+
+    /**
+     * Cache keys this request knows need no clearing: they hold a date
+     * (which never changes) or hold nothing at all. A save that only touches
+     * these keys does no cache work, which is what keeps a 500-sale offline
+     * sync from reading the cache 500 times. map() takes a key back out when
+     * it writes "not used yet" into it.
+     *
+     * @var array<string, true>
+     */
+    private array $settled = [];
+
+    /**
+     * Keys with a recheck already waiting for a commit, so saves inside one
+     * transaction queue one recheck between them.
+     *
+     * @var array<string, true>
+     */
+    private array $queued = [];
 
     public function __construct(private readonly FeatureRegistry $registry) {}
 
@@ -47,25 +74,95 @@ class FeatureUsage
         return $feature->isBusinessWideFor($this->isOwnerOrAdmin($user, $vendor));
     }
 
-    /** @return array<string, string|null> feature key => ISO first use */
+    /** @return array<string, string|null> feature key => ISO first use, null if not used */
     public function map(User $user, Vendor $vendor): array
     {
-        $key = sprintf('engagement:usage:%d:%d:%s', $vendor->id, $user->id, static::version($vendor->id));
+        $ownerOrAdmin = $this->isOwnerOrAdmin($user, $vendor);
+        $keys = [];
 
-        return Cache::remember($key, self::TTL_SECONDS, function () use ($user, $vendor): array {
-            $ownerOrAdmin = $this->isOwnerOrAdmin($user, $vendor);
-            $map = [];
+        foreach ($this->registry->all() as $featureKey => $feature) {
+            $userId = $feature->isBusinessWideFor($ownerOrAdmin) ? null : $user->id;
+            $keys[$featureKey] = static::cacheKey($featureKey, $vendor->id, $userId);
+        }
 
-            foreach ($this->registry->all() as $featureKey => $feature) {
-                $at = $feature->isBusinessWideFor($ownerOrAdmin)
-                    ? $feature->firstUsedAt($vendor->id)
-                    : $feature->firstUsedAt($vendor->id, $user->id);
+        $cached = Cache::many(array_values($keys));
+        $map = [];
 
-                $map[$featureKey] = $at?->toIso8601String();
+        foreach ($keys as $featureKey => $cacheKey) {
+            $value = $cached[$cacheKey] ?? null;
+
+            if ($value === null) {
+                $feature = $this->registry->find($featureKey);
+                $userId = $feature->isBusinessWideFor($ownerOrAdmin) ? null : $user->id;
+                $at = $feature->firstUsedAt($vendor->id, $userId);
+                $value = $at?->toIso8601String() ?? self::NEVER;
+
+                Cache::put($cacheKey, $value, $value === self::NEVER ? self::NEVER_TTL_SECONDS : self::USED_TTL_SECONDS);
             }
 
-            return $map;
-        });
+            if ($value === self::NEVER) {
+                unset($this->settled[$cacheKey]);
+            } else {
+                $this->settled[$cacheKey] = true;
+            }
+
+            $map[$featureKey] = $value === self::NEVER ? null : $value;
+        }
+
+        return $map;
+    }
+
+    /**
+     * Cache keys a saved row could make stale: the business's, and each
+     * person the row names. Empty when this request already knows none of
+     * them holds "not used yet", which is the common case once a business is
+     * up and running, and for every save after the first in a bulk sync.
+     *
+     * @param  array<int, int>  $userIds
+     * @return array<int, string>
+     */
+    public function keysToRecheck(Feature $feature, int $vendorId, array $userIds): array
+    {
+        $keys = [static::cacheKey($feature->key(), $vendorId, null)];
+
+        if ($feature->supportsUserLevel()) {
+            foreach (array_unique($userIds) as $userId) {
+                $keys[] = static::cacheKey($feature->key(), $vendorId, $userId);
+            }
+        }
+
+        $keys = array_values(array_filter(
+            $keys,
+            fn (string $key) => ! isset($this->settled[$key]) && ! isset($this->queued[$key]),
+        ));
+
+        foreach ($keys as $key) {
+            $this->queued[$key] = true;
+        }
+
+        return $keys;
+    }
+
+    /**
+     * A row that counts as use was saved. Clears any cached "not used yet"
+     * among $keys; leaves dates alone (they cannot change). Run after commit.
+     *
+     * @param  array<int, string>  $keys  from keysToRecheck()
+     */
+    public function recheck(array $keys): void
+    {
+        foreach ($keys as $key) {
+            unset($this->queued[$key]);
+        }
+
+        foreach (Cache::many($keys) as $key => $value) {
+            if ($value === self::NEVER) {
+                Cache::forget($key);
+            }
+
+            // Now a date or nothing: either way, nothing more to clear here.
+            $this->settled[$key] = true;
+        }
     }
 
     public function isOwnerOrAdmin(User $user, Vendor $vendor): bool
@@ -74,19 +171,8 @@ class FeatureUsage
             ??= $vendor->isOwner($user) || $user->isSuperAdmin();
     }
 
-    /** Invalidate every cached usage answer for a vendor. */
-    public static function bump(int $vendorId): void
+    public static function cacheKey(string $featureKey, int $vendorId, ?int $userId): string
     {
-        Cache::forever(static::versionKey($vendorId), (string) hrtime(true));
-    }
-
-    private static function version(int $vendorId): string
-    {
-        return (string) Cache::get(static::versionKey($vendorId), '0');
-    }
-
-    private static function versionKey(int $vendorId): string
-    {
-        return 'engagement:usage-version:'.$vendorId;
+        return sprintf('engagement:first-use:%s:%d:%s', $featureKey, $vendorId, $userId ?? 'business');
     }
 }

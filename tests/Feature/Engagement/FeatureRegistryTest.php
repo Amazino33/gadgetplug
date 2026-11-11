@@ -1,9 +1,6 @@
 <?php
 
 use App\Models\AppFeature;
-use App\Models\Category;
-use App\Models\PosSale;
-use App\Models\Product;
 use App\Models\Store;
 use App\Models\Tip;
 use App\Models\TipEvent;
@@ -11,12 +8,7 @@ use App\Models\User;
 use App\Models\Vendor;
 use App\Support\Engagement\FeatureRegistry;
 use App\Support\Engagement\FeatureUsage;
-use App\Support\Engagement\Moments\CashSalesTodayReached;
-use App\Support\Engagement\Moments\FirstProductAdded;
-use App\Support\Engagement\Moments\PendingMoments;
-use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Route;
-use Laravel\Sanctum\Sanctum;
 
 // ── The registry ─────────────────────────────────────────────────────────────
 
@@ -95,58 +87,6 @@ it('creates a row per feature, keeps admin edits and retires removed features', 
     expect(AppFeature::where('key', 'customer_debts')->first())
         ->title->toBe('Edited by admin')
         ->is_visible->toBeFalse();
-});
-
-// ── Moment listeners ─────────────────────────────────────────────────────────
-
-it("records the cash sales moment from a real POS sale, counting only today's cash sales", function () {
-    $ctx = debtTenderContext();
-    Sanctum::actingAs($ctx['owner']);
-
-    foreach (range(1, 2) as $i) {
-        $this->postJson('/api/pos/sales', debtSalePayload($ctx, [
-            'customer_id' => null, 'payment_method' => 'cash', 'amount_tendered' => 10000,
-        ]))->assertCreated();
-    }
-
-    // A credit sale is not a cash sale.
-    $this->postJson('/api/pos/sales', debtSalePayload($ctx))->assertCreated();
-
-    expect(PosSale::count())->toBe(3)
-        ->and(app(PendingMoments::class)->active($ctx['owner']->id, $ctx['vendor']->id))
-        ->toBe([CashSalesTodayReached::KEY => 2]);
-});
-
-it('keeps the cash sales moment until the end of the Lagos day', function () {
-    $this->travelTo(CarbonImmutable::parse('2026-11-10 21:00:00', 'UTC')); // 22:00 Lagos
-
-    $ctx = engagementVendor();
-    app(PendingMoments::class)->record($ctx['storekeeper']->id, $ctx['vendor']->id, CashSalesTodayReached::KEY, 5, app(CashSalesTodayReached::class)->expiresAt());
-
-    $this->travelTo(CarbonImmutable::parse('2026-11-10 22:59:00', 'UTC')); // 23:59 Lagos
-    expect(app(PendingMoments::class)->active($ctx['storekeeper']->id, $ctx['vendor']->id))->toHaveKey(CashSalesTodayReached::KEY);
-
-    $this->travelTo(CarbonImmutable::parse('2026-11-10 23:01:00', 'UTC')); // 00:01 Lagos, next day
-    expect(app(PendingMoments::class)->active($ctx['storekeeper']->id, $ctx['vendor']->id))->toBe([]);
-});
-
-it('records the first product moment for the person who added it, and only for the first', function () {
-    $ctx = engagementVendor();
-    $this->actingAs($ctx['owner']);
-    $category = Category::create(['name' => 'C'.uniqid()]);
-
-    $make = fn (string $name) => Product::create([
-        'vendor_id' => $ctx['vendor']->id, 'store_id' => $ctx['store']->id, 'category_id' => $category->id,
-        'name' => $name, 'price' => 100, 'cost_price' => 50, 'stock_quantity' => 1,
-        'reserved_stock' => 0, 'status' => 'published',
-    ]);
-
-    $make('First');
-    expect(app(PendingMoments::class)->active($ctx['owner']->id, $ctx['vendor']->id))->toBe([FirstProductAdded::KEY => 1]);
-
-    app(PendingMoments::class)->forget($ctx['owner']->id, $ctx['vendor']->id);
-    $make('Second');
-    expect(app(PendingMoments::class)->active($ctx['owner']->id, $ctx['vendor']->id))->toBe([]);
 });
 
 // ── Tip events are a log ─────────────────────────────────────────────────────

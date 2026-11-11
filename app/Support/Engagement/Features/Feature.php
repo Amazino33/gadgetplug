@@ -103,13 +103,10 @@ abstract class Feature
         return $isOwnerOrAdmin || ! $this->supportsUserLevel();
     }
 
-    /** @return array<int, class-string> Models whose saves refresh usage caches. */
-    public function sourceModels(): array
+    /** @return array<int, UsageSource> */
+    public function sources(): array
     {
-        return array_values(array_filter(array_map(
-            fn (UsageSource $s) => $s->model,
-            $this->usageSources(),
-        )));
+        return $this->usageSources();
     }
 
     /**

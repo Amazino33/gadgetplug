@@ -19,8 +19,8 @@ adoption report. Don't add a second way of detecting usage.
 | Platform defaults (daily cap 1, cooldown 3 days, adoption window 7 days) | `tip_settings`, `TipSetting::current()` |
 | Which tip to show, if any | `TipEligibility::pick()`; `explain()` says why one wouldn't show |
 | Did the tip work | `TipAdoption::rows()` / `summary()` |
-| Cached usage per person | `FeatureUsage` (10 min, refreshed whenever a usage source is saved) |
-| Moments | `Moments/*`, pending moments in the cache via `PendingMoments` |
+| Cached usage per person | `FeatureUsage` (see "The usage cache" below) |
+| Moments | `Moments/*`, fired by `MomentRecorder`, held in the cache by `PendingMoments` |
 | Conditions | `Conditions/ConditionRegistry` |
 | Button URLs and access | `DestinationResolver` (Filament's own `canAccess()`) |
 
@@ -58,18 +58,47 @@ always business-wide, and the UI must say so. The rule is
    exists and that a new vendor shows no use. Add a case if the detection is
    unusual.
 
+## The usage cache
+
+There is one entry per feature, per vendor, per scope (the business, or one
+person). A page reads all of them in one `Cache::many()` call.
+
+- A first-use **date never changes**, so it is cached for 30 days and nothing
+  ever clears it.
+- **"Not used yet"** is cached for 10 minutes. It is the only answer that can
+  go stale, so it is the only one that is cleared: when a row that counts as
+  use is saved, `FeatureUsage::recheck()` clears it after commit.
+- Each request remembers which keys need no clearing (they hold a date or
+  hold nothing). Every save after the first in a bulk operation therefore
+  does **no cache work at all**. A 40-sale offline sync does one batched read
+  of two keys, and no writes.
+
+## Listener safety
+
+Every listener goes through `EngagementServiceProvider::guarded()`.
+
+- The decision made during the save is wrapped in a try/catch.
+- The work it hands back runs after commit, wrapped the same way.
+- An exception is reported and swallowed: a tip is never worth a failed sale
+  or sync. `EngagementListenersTest` throws from both steps and checks that
+  the sync still succeeds.
+
 ## Adding a moment
 
-Extend `Moments\Moment`. If something being saved should fire it, call
-`PendingMoments::record()` from a listener in `EngagementServiceProvider`. Those
-listeners run after commit and swallow their own errors, because a tip is
-never worth a failed sale. If a page visit fires it, implement
-`detectOnRender()`. Then return the class from a feature's `moments()`.
+Extend `Moments\Moment`.
+
+- **Fired by a save:** add a method to `MomentRecorder`, called from a
+  listener in `EngagementServiceProvider`. Make it cheap for bulk saves: decide
+  once per vendor per request, and skip everything when no live tip waits for
+  the moment (`isWanted()`).
+- **Fired by a page visit:** implement `detectOnRender()`.
+
+Then return the class from a feature's `moments()`.
 
 | Moment | Fired by | Pending for |
 |---|---|---|
-| `cash_sales_today_reached` | `PosSale` created (cash, completed, today) | until the end of the Lagos day, because sales happen in the POS app where tips never show |
-| `first_product_added` | `Product` created, when it is the vendor's first, for the signed-in user | 15 min |
+| `cash_sales_today_reached` | `PosSale` created: cash, completed, and dated today by its own sale date (late offline syncs from earlier days never count). Counted once per cashier when the request ends, because the sync endpoint commits each sale separately. | until the end of the Lagos day, because sales happen in the POS app where tips never show |
+| `first_product_added` | `Product` created, checked once per vendor per request at save time. The first row of an import sees itself as the only product; the other rows cost nothing. Needs a signed-in user. | 15 min |
 | `debtors_page_empty_visit` | opening the customer debts list while the vendor has no debts | 15 min |
 
 ## Eligibility order
