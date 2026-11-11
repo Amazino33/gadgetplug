@@ -276,3 +276,106 @@ function checkoutLocation(string $lga = 'Uyo', string $state = 'Akwa Ibom'): arr
 
     return [$stateId, $lgaId];
 }
+
+/*
+|--------------------------------------------------------------------------
+| In-app tips (engagement)
+|--------------------------------------------------------------------------
+|
+| A vendor with an owner and a storekeeper on the real default roles, and
+| helpers for the panel context TipEligibility reads (Filament's canAccess()
+| looks at the signed-in user and the current tenant).
+|
+*/
+
+/** @return array{owner: User, storekeeper: User, vendor: Vendor, store: Store} */
+function engagementVendor(string $name = 'Tips Shop'): array
+{
+    (new Database\Seeders\VendorPermissionsSeeder)->run();
+
+    $owner = User::factory()->create();
+    $vendor = Vendor::create(['user_id' => $owner->id, 'name' => $name.' '.uniqid()]);
+    $store = Store::where('vendor_id', $vendor->id)->where('is_default', true)->first();
+
+    $storekeeper = User::factory()->create();
+    $vendor->users()->attach($storekeeper->id);
+    $storekeeper->stores()->syncWithoutDetaching([$store->id]);
+
+    setPermissionsTeamId($vendor->id);
+    $storekeeper->assignRole(
+        Spatie\Permission\Models\Role::where('name', 'storekeeper')->where('team_id', $vendor->id)->firstOrFail()
+    );
+    $storekeeper->unsetRelation('roles')->unsetRelation('permissions');
+    app(Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+
+    return compact('owner', 'storekeeper', 'vendor', 'store');
+}
+
+/** Sign in as $user inside $vendor's panel, the way a real panel request is. */
+function actInTipsPanel(User $user, ?Vendor $vendor, string $panel = 'vendor'): void
+{
+    test()->actingAs($user);
+    Filament\Facades\Filament::setCurrentPanel(Filament\Facades\Filament::getPanel($panel));
+    Filament\Facades\Filament::setTenant($vendor);
+    setPermissionsTeamId($vendor?->id);
+}
+
+function tipsContext(User $user, ?Vendor $vendor, ?string $route = 'filament.vendor.pages.dashboard', string $panel = 'vendor'): App\Support\Engagement\TipContext
+{
+    actInTipsPanel($user, $vendor, $panel);
+
+    return new App\Support\Engagement\TipContext($user, $vendor, $panel, $route);
+}
+
+/** An active tip with sensible defaults; override anything. */
+function makeTip(array $attributes = []): App\Models\Tip
+{
+    return App\Models\Tip::create(array_merge([
+        'name' => 'Tip '.uniqid(),
+        'type' => App\Models\Tip::TYPE_TIP,
+        'title' => 'Did you know?',
+        'message' => 'Something useful.',
+        'panels' => ['vendor'],
+        'status' => App\Models\Tip::STATUS_ACTIVE,
+        'condition' => 'always',
+        'cooldown_days' => 3,
+    ], $attributes));
+}
+
+function logTipEvent(App\Models\Tip $tip, User $user, ?Vendor $vendor, string $event, mixed $at = null): App\Models\TipEvent
+{
+    $row = new App\Models\TipEvent([
+        'tip_id' => $tip->id,
+        'user_id' => $user->id,
+        'vendor_id' => $vendor?->id,
+        'event' => $event,
+    ]);
+    $row->created_at = $at ?? now();
+    $row->save();
+
+    return $row;
+}
+
+/** A debt charge recorded by $by at $at, the row CustomerDebtsFeature counts. */
+function recordTestDebt(array $ctx, User $by, mixed $at = null): PosCustomerLedgerEntry
+{
+    $customer = PosCustomer::firstOrCreate(
+        ['vendor_id' => $ctx['vendor']->id, 'phone' => '0803'.random_int(1000000, 9999999)],
+        ['name' => 'Debtor'],
+    );
+
+    $entry = new PosCustomerLedgerEntry([
+        'pos_customer_id' => $customer->id,
+        'vendor_id' => $ctx['vendor']->id,
+        'direction' => 'charge',
+        'amount' => 5000,
+        'store_id' => $ctx['store']->id,
+        'created_by' => $by->id,
+        'occurred_at' => '2026-11-01',
+        'description' => 'Credit sale — test',
+    ]);
+    $entry->created_at = $at ?? now();
+    $entry->save();
+
+    return $entry;
+}
