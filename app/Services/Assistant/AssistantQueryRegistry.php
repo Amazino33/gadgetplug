@@ -15,6 +15,7 @@ use App\Actions\Assistant\Queries\ExpenseSummaryQuery;
 use App\Actions\Assistant\Queries\FindProductsQuery;
 use App\Actions\Assistant\Queries\GlossaryQuery;
 use App\Actions\Assistant\Queries\LowStockQuery;
+use App\Actions\Assistant\Queries\MySalesQuery;
 use App\Actions\Assistant\Queries\OutOfStockQuery;
 use App\Actions\Assistant\Queries\PickerItemsOutQuery;
 use App\Actions\Assistant\Queries\ProfitQuery;
@@ -129,6 +130,12 @@ class AssistantQueryRegistry
             'description' => 'Items released to pickers.',
             'supports_aggregate' => false,
             'default_period' => null,
+        ],
+        'my_sales' => [
+            'class' => MySalesQuery::class,
+            'description' => 'The asker\'s own till sales (the My Sales screen).',
+            'supports_aggregate' => true,
+            'default_period' => 'today',
         ],
         'find_products' => [
             'class' => FindProductsQuery::class,
