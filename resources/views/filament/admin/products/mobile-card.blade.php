@@ -25,6 +25,9 @@
     // them — same objects, same authorize()/visible() checks — and drawn as
     // full-width buttons instead of links.
     $actions = collect($getTable()->getRecordActions())
+        // The desktop row bundles its actions into one "Edit" menu; on the
+        // card they are unpacked again, since big buttons beat a dropdown here.
+        ->flatMap(fn ($action) => $action instanceof \Filament\Actions\ActionGroup ? array_values($action->getFlatActions()) : [$action])
         ->map(fn ($action) => $action->getClone()->record($record))
         ->reject(fn ($action) => $action->isHidden())
         ->map(fn ($action) => $action->button()->size('lg')->extraAttributes(['class' => 'gp-card-action'], merge: true));

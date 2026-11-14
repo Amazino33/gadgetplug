@@ -9,8 +9,10 @@ use App\Filament\Resources\Products\ProductResource;
 use App\Models\Product;
 use App\Models\Vendor;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\TextInput;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -61,9 +63,10 @@ class ProductsTable
                     ->sortable()
                     ->weight('bold')
                     ->wrap()
-                    ->description(fn (Product $record): ?string => $record->isLinked()
-                        ? 'Images managed on supplier product'
-                        : null)
+                    // Brand and category ride under the name rather than in
+                    // columns of their own, so the row fits a laptop screen
+                    // without scrolling sideways.
+                    ->description(fn (Product $record): ?string => self::nameSubtitle($record))
                     ->visibleFrom('md'),
 
                 TextColumn::make('online_name')
@@ -75,11 +78,18 @@ class ProductsTable
                     ->wrap()
                     ->visibleFrom('md'),
 
-                TextColumn::make('vendor.name')->label('Vendor')->searchable()->sortable()->visibleFrom('md'),
+                // Hidden by default: rows are already grouped under vendor
+                // headers, and brand/category show under the name. All three
+                // stay searchable and can be switched back on from the column
+                // picker (hidden-by-toggle columns are still searched).
+                TextColumn::make('vendor.name')->label('Vendor')->searchable()->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true)->visibleFrom('md'),
 
-                TextColumn::make('category.name')->label('Category')->sortable()->toggleable()->visibleFrom('md'),
+                TextColumn::make('category.name')->label('Category')->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true)->visibleFrom('md'),
 
-                TextColumn::make('brand')->placeholder('—')->searchable()->toggleable()->visibleFrom('md'),
+                TextColumn::make('brand')->placeholder('—')->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true)->visibleFrom('md'),
 
                 TextColumn::make('price')->label('Selling price')->money('NGN')->sortable()->visibleFrom('md'),
 
@@ -116,7 +126,8 @@ class ProductsTable
                     ->badge()
                     ->color(fn ($state) => $state !== null ? 'success' : 'gray')
                     ->visible($canSeeCost)
-                    ->toggleable()
+                    // Mostly "—"; one click away in the column picker.
+                    ->toggleable(isToggledHiddenByDefault: true)
                     ->visibleFrom('md'),
                 TextColumn::make('reseller_discount')
                     ->label('Discount Override')
@@ -124,7 +135,8 @@ class ProductsTable
                     ->badge()
                     ->color(fn ($state) => $state !== null ? 'success' : 'gray')
                     ->visible($canSeeCost)
-                    ->toggleable()
+                    // Mostly "—"; one click away in the column picker.
+                    ->toggleable(isToggledHiddenByDefault: true)
                     ->visibleFrom('md'),
             ])
             ->groups([
@@ -195,11 +207,38 @@ class ProductsTable
                     ))
                     ->indicateUsing(fn (array $data): ?string => filled($data['id'] ?? null) ? 'Product #'.$data['id'] : null),
             ])
+            // One "Edit" menu per row instead of three side-by-side links, which
+            // took ~300px of every row. The phone card flattens this group back
+            // into full-width buttons (mobile-card.blade.php). The group hides
+            // itself when none of its actions apply (e.g. a linked listing for
+            // the catalogue editor).
             ->recordActions([
-                ManageProductImagesAction::make(),
-                EditOnlineNameAction::make(),
-                EditAction::make()->label('Commission')->visible($canSeeCost),
+                ActionGroup::make([
+                    ManageProductImagesAction::make(),
+                    EditOnlineNameAction::make(),
+                    EditAction::make()->label('Commission')->visible($canSeeCost),
+                ])
+                    ->label('Edit')
+                    ->icon(Heroicon::OutlinedPencilSquare)
+                    ->button()
+                    ->size('sm')
+                    ->color('gray'),
             ]);
+    }
+
+    // "Brand · Category" under the product name, plus the linked-listing note.
+    public static function nameSubtitle(Product $record): ?string
+    {
+        $parts = array_filter([$record->brand, $record->category?->name], 'filled');
+        $meta = implode(' · ', $parts);
+
+        if ($record->isLinked()) {
+            return filled($meta)
+                ? $meta.' — Images managed on supplier product'
+                : 'Images managed on supplier product';
+        }
+
+        return filled($meta) ? $meta : null;
     }
 
     // Where "Images managed on supplier product" sends you: the supplier's row.
