@@ -34,14 +34,12 @@
         // The desktop row bundles its actions into one "Edit" menu; on the
         // card they are unpacked again, since big buttons beat a dropdown here.
         ->flatMap(fn ($action) => $action instanceof \Filament\Actions\ActionGroup ? array_values($action->getFlatActions()) : [$action])
-        // Detach from the original group before binding the record: the clone
-        // otherwise still points at the group, and isHidden() (called both
-        // here and again when the button renders) first recurses into that
-        // group's own, record-less actions — a typed visible()/authorize()
-        // closure then receives null and throws. A detached clone evaluates
-        // only its own visibility and authorization, which the record() call
-        // below has already prepared.
-        ->map(fn ($action) => $action->getClone()->group(null)->record($record))
+        // Detach from the group before binding the record (isHidden() otherwise
+        // recurses into the group's own, record-less actions and a typed
+        // visible()/authorize() closure receives null), but re-attach the table
+        // so the rendered button still resolves getLivewire() and wires its
+        // mountTableAction() click handler.
+        ->map(fn ($action) => $action->getClone()->group(null)->table($getTable())->record($record))
         ->reject(fn ($action) => $action->isHidden())
         ->map(fn ($action) => $action->button()->size('lg')->extraAttributes(['class' => 'gp-card-action'], merge: true));
 @endphp
