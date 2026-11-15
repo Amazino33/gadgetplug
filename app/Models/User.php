@@ -155,6 +155,136 @@ class User extends Authenticatable implements FilamentUser, HasTenants
             ->withTimestamps();
     }
 
+    /**
+     * All stores this user belongs to or operates in:
+     * - Vendor owners have access to all stores of their owned vendor(s)
+     * - Staff members are assigned via store_user
+     */
+    public function resolvedStores(): Collection
+    {
+        $stores = collect();
+
+        if ($this->relationLoaded('ownedVendors')) {
+            foreach ($this->ownedVendors as $vendor) {
+                if ($vendor->relationLoaded('stores')) {
+                    foreach ($vendor->stores as $store) {
+                        $stores->push($store);
+                    }
+                } else {
+                    $stores = $stores->merge($vendor->stores()->get());
+                }
+            }
+        } else {
+            foreach ($this->ownedVendors()->with('stores')->get() as $vendor) {
+                $stores = $stores->merge($vendor->stores);
+            }
+        }
+
+        if ($this->relationLoaded('stores')) {
+            $stores = $stores->merge($this->stores);
+        } else {
+            $stores = $stores->merge($this->stores()->with('vendor')->get());
+        }
+
+        return $stores->unique('id')->values();
+    }
+
+    /**
+     * Returns the user's roles along with their context (store/vendor name):
+     * - Global roles: Super Admin, Catalogue Editor
+     * - Store Owner: for vendor owners
+     * - Store / Vendor roles: e.g. Inventory Officer, Storekeeper, etc.
+     * - Customer: if unaffiliated
+     */
+    public function resolvedRolesWithContext(): Collection
+    {
+        $roles = collect();
+
+        if ($this->isSuperAdmin()) {
+            $roles->push([
+                'name' => 'Super Admin',
+                'context' => null,
+                'color' => 'danger',
+                'type' => 'global',
+            ]);
+        }
+
+        if ($this->isCatalogueEditor()) {
+            $roles->push([
+                'name' => 'Catalogue Editor',
+                'context' => null,
+                'color' => 'warning',
+                'type' => 'global',
+            ]);
+        }
+
+        $owned = $this->relationLoaded('ownedVendors') ? $this->ownedVendors : $this->ownedVendors()->get();
+        foreach ($owned as $vendor) {
+            $roles->push([
+                'name' => 'Store Owner',
+                'context' => $vendor->name,
+                'color' => 'success',
+                'type' => 'owner',
+            ]);
+        }
+
+        $teamRoles = DB::table('model_has_roles')
+            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+            ->leftJoin('vendors', 'vendors.id', '=', 'model_has_roles.team_id')
+            ->where('model_has_roles.model_id', $this->id)
+            ->whereNotNull('model_has_roles.team_id')
+            ->select('roles.name as role_name', 'vendors.name as vendor_name')
+            ->get();
+
+        foreach ($teamRoles as $tr) {
+            $roles->push([
+                'name' => Str::headline($tr->role_name),
+                'context' => $tr->vendor_name,
+                'color' => 'info',
+                'type' => 'store_role',
+            ]);
+        }
+
+        $otherGlobalRoles = DB::table('model_has_roles')
+            ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
+            ->where('model_has_roles.model_id', $this->id)
+            ->whereNull('model_has_roles.team_id')
+            ->whereNotIn('roles.name', ['super_admin', 'catalogue_editor'])
+            ->pluck('roles.name');
+
+        foreach ($otherGlobalRoles as $gr) {
+            $roles->push([
+                'name' => Str::headline($gr),
+                'context' => null,
+                'color' => 'gray',
+                'type' => 'global',
+            ]);
+        }
+
+        $members = $this->relationLoaded('memberVendors') ? $this->memberVendors : $this->memberVendors()->get();
+        if ($members->isNotEmpty() && $teamRoles->isEmpty() && $owned->isEmpty()) {
+            foreach ($members as $mv) {
+                $roles->push([
+                    'name' => 'Staff Member',
+                    'context' => $mv->name,
+                    'color' => 'info',
+                    'type' => 'store_role',
+                ]);
+            }
+        }
+
+        if ($roles->isEmpty()) {
+            $roles->push([
+                'name' => 'Customer',
+                'context' => null,
+                'color' => 'gray',
+                'type' => 'customer',
+            ]);
+        }
+
+        return $roles;
+    }
+
     // The user's stores within one vendor. Filtered on stores.vendor_id
     // explicitly — the same manual scoping every vendor-owned query in this
     // codebase uses, and the qualified column name matters here because the
@@ -261,6 +391,12 @@ class User extends Authenticatable implements FilamentUser, HasTenants
                 || $this->hasGlobalPermission('manage_dispatch')
                 || $this->hasGlobalPermission('manage_in_app_tips')
                 || $this->hasGlobalPermission('view_feature_adoption');
+        }
+
+        if ($panel->getId() === 'staff') {
+            // Back-office staff panel: the catalogue editor today. New staff
+            // jobs (marketing materials, etc.) extend this same list.
+            return $this->isSuperAdmin() || $this->isCatalogueEditor();
         }
 
         if ($panel->getId() === 'vendor') {

@@ -1,14 +1,18 @@
 @php
-    use App\Filament\Resources\Products\Pages\ListProducts;
-
-    // Rendered inside ListProducts' table toolbar (TOOLBAR_SEARCH_AFTER, scoped
-    // to that page in AdminPanelProvider), so this is that component.
+    // Rendered inside a ListProducts table toolbar (TOOLBAR_SEARCH_AFTER), so
+    // the current Livewire component is that page. Both the admin and staff
+    // All Products pages expose QUICK_FILTERS and toggleQuickFilter(); this
+    // duck-types on them rather than naming either class, so the one view
+    // serves both panels.
     $page = \Livewire\Livewire::current();
+    $quickFilters = is_object($page) && defined($page::class.'::QUICK_FILTERS')
+        ? constant($page::class.'::QUICK_FILTERS')
+        : [];
 @endphp
 
-@if ($page instanceof ListProducts)
+@if ($quickFilters && method_exists($page, 'toggleQuickFilter'))
     <div class="gp-quick-filters" role="group" aria-label="Quick filters">
-        @foreach (ListProducts::QUICK_FILTERS as $filter => $label)
+        @foreach ($quickFilters as $filter => $label)
             @php($isActive = (bool) ($page->tableFilters[$filter]['isActive'] ?? false))
 
             <button

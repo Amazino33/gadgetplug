@@ -35,7 +35,12 @@ class LoginResponse implements LoginResponseContract
             return Filament::getPanel('admin')->getUrl();
         }
 
-        // Single-job admin staff (catalogue editor, delivery settings).
+        // Back-office staff (catalogue editor) work in the staff panel.
+        if ($user->canAccessPanel(Filament::getPanel('staff'))) {
+            return Filament::getPanel('staff')->getUrl();
+        }
+
+        // Single-job admin staff (delivery settings, dispatch, tips).
         if ($home = Dashboard::homeFor($user)) {
             return $home;
         }

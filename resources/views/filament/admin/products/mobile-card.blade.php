@@ -21,6 +21,12 @@
     $isOnline = ProductsTable::isVisibleOnline($record);
     $vendorLink = ProductsTable::vendorLinkLabel($record);
 
+    // Built from the page's own resource, so the link stays inside whichever
+    // panel (admin or staff) the user is currently working in.
+    $supplierRowUrl = $isLinked
+        ? $getLivewire()->getResourceUrl('index', ['tableFilters' => ['product' => ['id' => $record->source_product_id]]], false)
+        : null;
+
     // The row's own actions, prepared the way Filament's actions cell prepares
     // them — same objects, same authorize()/visible() checks — and drawn as
     // full-width buttons instead of links.
@@ -28,7 +34,14 @@
         // The desktop row bundles its actions into one "Edit" menu; on the
         // card they are unpacked again, since big buttons beat a dropdown here.
         ->flatMap(fn ($action) => $action instanceof \Filament\Actions\ActionGroup ? array_values($action->getFlatActions()) : [$action])
-        ->map(fn ($action) => $action->getClone()->record($record))
+        // Detach from the original group before binding the record: the clone
+        // otherwise still points at the group, and isHidden() (called both
+        // here and again when the button renders) first recurses into that
+        // group's own, record-less actions — a typed visible()/authorize()
+        // closure then receives null and throws. A detached clone evaluates
+        // only its own visibility and authorization, which the record() call
+        // below has already prepared.
+        ->map(fn ($action) => $action->getClone()->group(null)->record($record))
         ->reject(fn ($action) => $action->isHidden())
         ->map(fn ($action) => $action->button()->size('lg')->extraAttributes(['class' => 'gp-card-action'], merge: true));
 @endphp
@@ -76,7 +89,7 @@
         <div class="gp-card-linked">
             <p><strong>Linked to supplier</strong> · {{ $vendorLink }}</p>
             <p>Photos and online name are managed on the supplier's product.</p>
-            <a href="{{ ProductsTable::supplierRowUrl($record) }}" class="gp-card-linked-link">Open supplier product</a>
+            <a href="{{ $supplierRowUrl }}" class="gp-card-linked-link">Open supplier product</a>
         </div>
     @elseif (filled($vendorLink))
         <p class="gp-card-note">{{ $vendorLink }}</p>
