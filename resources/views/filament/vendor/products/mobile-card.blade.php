@@ -38,6 +38,7 @@
 <div class="relative rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-gray-900 p-4">
     <div class="absolute top-4 right-4 flex items-center gap-1">
         <a href="{{ $editUrl }}" title="Edit" aria-label="Edit {{ $product->name }}"
+            data-quick-edit="{{ $product->id }}" data-quick-name="{{ $product->name }}"
             class="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10 hover:text-gray-700 dark:hover:text-white">
             <x-heroicon-o-pencil class="h-4 w-4"/>
         </a>

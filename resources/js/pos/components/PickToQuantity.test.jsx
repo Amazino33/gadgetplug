@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import SearchBar from './SearchBar';
 import QuantityModal from './QuantityModal';
+import { resetSearchIndex } from '../lib/searchIndex';
 
 // Reported from the counter: "the only time the quantity comes up is when we
 // use mouse to tap". Picking with the mouse asks for a quantity; picking with
@@ -13,7 +14,8 @@ import QuantityModal from './QuantityModal';
 // this drives the real SearchBar and the real QuantityModal both ways and
 // compares them, rather than reasoning about which handler runs when.
 
-const charger = { id: 1, name: 'Samsung 25W Charger', sku: 'SAM-25', barcode: '600123', price: 5300, available_stock: 4 };
+// The branch's best seller, so it heads a search for "samsung" (search ranks by sales).
+const charger = { id: 1, name: 'Samsung 25W Charger', sku: 'SAM-25', barcode: '600123', price: 5300, available_stock: 4, sold_30d: 30 };
 const cable   = { id: 2, name: 'Samsung Cable',       sku: 'SAM-CB', barcode: '600987', price: 1500, available_stock: 9 };
 
 let localCatalogue = [];
@@ -21,6 +23,9 @@ let localCatalogue = [];
 vi.mock('../lib/db', () => ({
     db: {
         products: {
+            // What the search index reads: everything once, then results by id.
+            toArray: async () => [...localCatalogue],
+            bulkGet: async (ids) => ids.map((id) => localCatalogue.find((p) => p.id === id)),
             filter: (predicate) => ({
                 limit: () => ({ toArray: async () => localCatalogue.filter(predicate) }),
             }),
@@ -39,6 +44,9 @@ vi.mock('../lib/api', () => ({
         }),
     },
 }));
+// Each test brings its own catalogue; the index is built from it afresh.
+beforeEach(() => resetSearchIndex());
+
 
 // The shape POS uses: picking from search always opens the quantity box.
 function Till({ onConfirm }) {

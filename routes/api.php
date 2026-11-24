@@ -33,6 +33,8 @@ Route::prefix('pos')->middleware(NoStoreApiResponse::class)->group(function () {
         Route::get('products/search', [PosProductController::class, 'search']);
         Route::get('products/why-not-sellable', [PosProductController::class, 'whyNotSellable']);
         Route::post('products/{productId}/default-unit', [PosProductController::class, 'setDefaultUnit'])->whereNumber('productId');
+        // A word a cashier searched with before picking this product.
+        Route::post('products/{productId}/search-shortcut', [PosProductController::class, 'learnSearch'])->whereNumber('productId');
 
         // Customers
         Route::get('customers', [PosCustomerController::class, 'index']);

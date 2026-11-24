@@ -5,6 +5,7 @@ import { useCallback, useRef, useState } from 'react';
 import SearchBar from './SearchBar';
 import QuantityModal from './QuantityModal';
 import { addToCart } from '../lib/cartAdd';
+import { resetSearchIndex } from '../lib/searchIndex';
 
 // The whole loop a cashier actually performs, driven end to end:
 //
@@ -21,7 +22,8 @@ import { addToCart } from '../lib/cartAdd';
 // quantity" setting) so the test can run without a session, a network or a
 // Dexie database behind it.
 
-const charger = { id: 1, name: 'Samsung 25W Charger', sku: 'SAM-25', barcode: '6001234567890', price: 5300, available_stock: 4 };
+// The branch's best seller, so it heads a search for "samsung" (search ranks by sales).
+const charger = { id: 1, name: 'Samsung 25W Charger', sku: 'SAM-25', barcode: '6001234567890', price: 5300, available_stock: 4, sold_30d: 30 };
 const cable   = { id: 2, name: 'Samsung Cable',       sku: 'SAM-CB', barcode: '6009876543210', price: 1500, available_stock: 9 };
 
 let localCatalogue = [];
@@ -29,6 +31,9 @@ let localCatalogue = [];
 vi.mock('../lib/db', () => ({
     db: {
         products: {
+            // What the search index reads: everything once, then results by id.
+            toArray: async () => [...localCatalogue],
+            bulkGet: async (ids) => ids.map((id) => localCatalogue.find((p) => p.id === id)),
             filter: (predicate) => ({
                 limit: () => ({ toArray: async () => localCatalogue.filter(predicate) }),
             }),
@@ -37,6 +42,9 @@ vi.mock('../lib/db', () => ({
 }));
 
 vi.mock('../lib/api', () => ({ default: { get: vi.fn() } }));
+// Each test brings its own catalogue; the index is built from it afresh.
+beforeEach(() => resetSearchIndex());
+
 
 function Till({ askQuantity = true }) {
     const [cart, setCart] = useState([]);

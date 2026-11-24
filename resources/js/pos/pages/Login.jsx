@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import api from '../lib/api';
 import { db } from '../lib/db';
+import { resetSearchIndex } from '../lib/searchIndex';
 
 const DOTS = 4;
 const CONFIG = window.POS_CONFIG ?? {};
@@ -110,6 +111,7 @@ export default function Login({ onLogin }) {
 
         if (localStorage.getItem('pos_catalogue_owner') !== owner) {
             try { await db.products.clear(); } catch { /* nothing cached to clear */ }
+            resetSearchIndex();
             localStorage.setItem('pos_catalogue_owner', owner);
         }
 

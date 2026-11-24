@@ -5,6 +5,9 @@ import { createLatestSearch } from '../lib/latestSearch';
 import { highlightIndexFor, selectionForEnter } from '../lib/searchSelection';
 import { createBurstTracker, looksLikeBarcode, scanFor } from '../lib/scanSignal';
 import { formatQty } from '../lib/halves';
+import { searchDevice, upsertSearchIndex, removeFromSearchIndex } from '../lib/searchIndex';
+import { rankProducts } from '../../shared/productSearch';
+import { createSearchLearner } from '../../shared/searchLearning';
 
 // How long after the device's answer the server is asked. Long enough that
 // someone still typing does not send a request per letter.
@@ -49,6 +52,16 @@ const SearchBar = forwardRef(function SearchBar({
     // See scanSignal.js — measures how fast characters are arriving, which is
     // what tells an alphanumeric scan from someone typing a product name.
     const burst = useRef(createBurstTracker()).current;
+
+    // See searchLearning.js — a word that found nothing, then a product
+    // found another way, teaches the shop's search that word. Reported in the
+    // background; a till offline simply teaches nothing.
+    const vendorRef = useRef(vendorId);
+    vendorRef.current = vendorId;
+    const learner = useRef(createSearchLearner((productId, term) => {
+        if (!navigator.onLine) return;
+        api.post(`/products/${productId}/search-shortcut`, { vendor_id: vendorRef.current, term }).catch(() => {});
+    })).current;
 
     useImperativeHandle(ref, () => ({
         focus: () => inputRef.current?.focus(),
@@ -109,18 +122,11 @@ const SearchBar = forwardRef(function SearchBar({
         setOpen(true);
         setActiveIndex(-1);
 
-        // IndexedDB first — instant and offline-capable, and it's re-seeded
-        // on every login, so it's usually the whole answer.
-        const local = await db.products
-            .filter((p) =>
-                p.barcode === trimmed ||
-                // A unit's own code (a crate) or a second barcode.
-                (p.barcodes ?? []).some((b) => b.barcode === trimmed) ||
-                (p.sku && p.sku.toLowerCase() === trimmed.toLowerCase()) ||
-                (p.name && p.name.toLowerCase().includes(trimmed.toLowerCase()))
-            )
-            .limit(10)
-            .toArray();
+        // The device first — instant and offline-capable, and re-seeded on
+        // every login, so it's usually the whole answer. Codes (a barcode, a
+        // unit's own code, a SKU) come first; then names, any word order,
+        // best sellers first (see shared/productSearch.js).
+        const { products: local, unprunable } = await searchDevice(trimmed, 10);
 
         // A newer search has started since this one began — its answer is
         // no longer relevant to what's on screen, so it's dropped rather
@@ -129,9 +135,10 @@ const SearchBar = forwardRef(function SearchBar({
 
         setResults(local);
         settledRef.current = trimmed;
+        learner.searched(trimmed, local.length);
 
         clearTimeout(serverTimerRef.current);
-        serverTimerRef.current = setTimeout(() => askServer(trimmed, token, local), SERVER_DELAY_MS);
+        serverTimerRef.current = setTimeout(() => askServer(trimmed, token, local, unprunable), SERVER_DELAY_MS);
 
         return local;
     }, [vendorId, latestSearch]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -149,7 +156,7 @@ const SearchBar = forwardRef(function SearchBar({
      * the same product, and the device's copy is updated so the next scan
      * and the cart's quantity cap read today's stock too.
      */
-    const askServer = async (q, token, local) => {
+    const askServer = async (q, token, local, unprunable = new Set()) => {
         if (!navigator.onLine) return;
 
         let data;
@@ -168,14 +175,20 @@ const SearchBar = forwardRef(function SearchBar({
         // the figures are just as true for the next search or scan.
         try {
             await db.products.bulkPut(data);
+            upsertSearchIndex(data);
 
             // The server caps a search at 20; under that, its answer is the
             // whole list, so anything the device matched that it left out is
             // sold out, unpublished or moved — and must stop being offered.
+            // Except a device match the server could not have made (a typo
+            // forgiven, a word joined up): its absence proves nothing.
             if (data.length < 20) {
                 const live = new Set(data.map((p) => p.id));
-                const gone = local.filter((p) => !live.has(p.id)).map((p) => p.id);
-                if (gone.length) await db.products.bulkDelete(gone);
+                const gone = local.filter((p) => !live.has(p.id) && !unprunable.has(p.id)).map((p) => p.id);
+                if (gone.length) {
+                    await db.products.bulkDelete(gone);
+                    removeFromSearchIndex(gone);
+                }
             }
         } catch { /* the device's copy stays as it was; the next reload fixes it */ }
 
@@ -187,13 +200,23 @@ const SearchBar = forwardRef(function SearchBar({
         // may order or filter differently, and Enter must still add what the
         // cashier is looking at. If that product is gone, nothing is
         // highlighted, so Enter adds nothing rather than its neighbour.
+        // The server's answer and the device's, together, in the device's
+        // order — so the list does not reshuffle under the cashier, and what
+        // only the device found (a forgiven typo) stays.
+        const live = new Map(data.map((p) => [p.id, p]));
+        const merged = [
+            ...data,
+            ...local.filter((p) => !live.has(p.id) && unprunable.has(p.id)),
+        ];
+        const ranked = rankProducts(merged, q, { preferInStock: true }).slice(0, 20);
+
         const shown = resultsRef.current;
         setActiveIndex((prev) => {
             if (prev < 0) return prev;
             const id = shown[prev]?.id;
-            return data.findIndex((p) => p.id === id);
+            return ranked.findIndex((p) => p.id === id);
         });
-        setResults(data);
+        setResults(ranked);
     };
 
     // Everything Enter does ends here: the box empty and ready for the next
@@ -214,6 +237,7 @@ const SearchBar = forwardRef(function SearchBar({
     };
 
     const pick = (product) => {
+        learner.picked(product, query, resultsRef.current.findIndex((p) => p.id === product.id));
         reset();
         onSelect(product);
 
@@ -228,6 +252,7 @@ const SearchBar = forwardRef(function SearchBar({
     // A scan is one action. Nothing opens, nothing has to be confirmed, and
     // the caret never leaves this box — so the next scan just goes.
     const takeScan = (product) => {
+        learner.reset();
         reset();
         onScan(product);
         inputRef.current?.focus();
@@ -296,7 +321,7 @@ const SearchBar = forwardRef(function SearchBar({
 
             if (!Array.isArray(data)) return null;
 
-            try { await db.products.bulkPut(data); } catch { /* the next catalogue reload brings it */ }
+            try { await db.products.bulkPut(data); upsertSearchIndex(data); } catch { /* the next catalogue reload brings it */ }
 
             return scanFor({ query: code, results: data, burst: true });
         } catch {

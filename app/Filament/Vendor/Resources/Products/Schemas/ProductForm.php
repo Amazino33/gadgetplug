@@ -943,6 +943,28 @@ class ProductForm
                 TextInput::make('brand')
                     ->placeholder('e.g. Nigerian Breweries, Golden Penny'),
 
+                // The shop's own words for it, found by the till's
+                // search. Never shown to customers.
+                TextInput::make('search_keywords')
+                    ->label('Search keywords')
+                    ->placeholder('e.g. coke, coca')
+                    ->maxLength(500)
+                    ->helperText('Other names staff use for this product, separated by commas. The till finds it by these too.'),
+
+                Placeholder::make('learned_search_words')
+                    ->label('Learned from staff searches')
+                    ->visible(fn ($record) => $record !== null)
+                    ->content(function ($record): HtmlString {
+                        $words = $record ? app(\App\Services\Products\SearchShortcuts::class)->allFor($record) : [];
+
+                        if ($words === []) {
+                            return new HtmlString('<span class="text-xs text-gray-400">None yet. When staff search a word that finds nothing and then pick this product, the word is learned.</span>');
+                        }
+
+                        return new HtmlString(collect($words)->map(fn ($w) => '<span class="mr-1 inline-block rounded bg-gray-100 px-2 py-0.5 text-xs dark:bg-white/10">'.e($w['term']).' <span class="opacity-60">×'.$w['hits'].'</span></span>')->implode('')
+                            .'<p class="mt-1 text-xs text-gray-400">Used once seen '.\App\Services\Products\SearchShortcuts::MIN_HITS.' times. Remove one from the product pop-up on the Products list.</p>');
+                    }),
+
                 // Where it comes from. Vendor-scoped, and creatable inline so a
                 // supplier arriving via import does not have to be pre-registered.
                 Select::make('supplier_id')

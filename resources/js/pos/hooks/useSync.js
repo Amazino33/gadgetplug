@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { db } from '../lib/db';
 import api from '../lib/api';
 import { fetchCatalogue } from '../lib/catalogue';
+import { replaceSearchIndex } from '../lib/searchIndex';
 import { syncHeldSales } from '../lib/heldSales';
 import { markSaleSynced } from '../lib/salesHistory';
 import { salesToSync } from '../lib/syncQueue';
@@ -303,6 +304,9 @@ export function useSync(vendorId, cashierId, onStuckSalesChange) {
                 await db.products.clear();
                 await db.products.bulkPut(data);
             });
+
+            // The search index follows the catalogue it was built from.
+            replaceSearchIndex(data);
         } catch {
             // Offline or refused — the catalogue already on the device stays
             // exactly as it is, which is what keeps the till sellable.

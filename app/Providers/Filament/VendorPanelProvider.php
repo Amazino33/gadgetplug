@@ -186,6 +186,14 @@ class VendorPanelProvider extends PanelProvider
                 fn (): string => Blade::render('@livewire(\App\Livewire\Engagement\LearnProgressCard::class)'),
                 scopes: \App\Filament\Vendor\Pages\Dashboard::class,
             )
+            // The product pop-up's script, on the Products list only. In <head>
+            // so its alpine:init listener is in place before Livewire starts
+            // Alpine.
+            ->renderHook(
+                PanelsRenderHook::HEAD_END,
+                fn() => Blade::render("@vite('resources/js/product-quick-form.js')"),
+                scopes: \App\Filament\Vendor\Resources\Products\Pages\ListProducts::class,
+            )
             // Replaces the global search removed above: filters the sidebar itself
             // so staff can jump to a page without scrolling the whole menu.
             ->renderHook(

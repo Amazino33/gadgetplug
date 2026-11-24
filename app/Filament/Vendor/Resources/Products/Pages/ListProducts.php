@@ -10,14 +10,18 @@ use App\Models\Category;
 use App\Models\Product;
 use App\Services\Export\ProductExporter;
 use Filament\Actions\Action;
-use Filament\Actions\CreateAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use App\Services\Products\QuickProductForm;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Renderless;
 use Livewire\Attributes\Url;
+use App\Support\ProductSearch;
+use App\Services\Products\SearchShortcuts;
 
 class ListProducts extends ListRecords
 {
@@ -45,6 +49,14 @@ class ListProducts extends ListRecords
 
     /** @var array<int> */
     public array $selected = [];
+
+    /**
+     * New photos from the product pop-up, uploaded the moment Save is pressed
+     * and read by saveQuickProduct() straight after.
+     *
+     * @var array<int, \Livewire\Features\SupportFileUploads\TemporaryUploadedFile>
+     */
+    public array $quickPhotos = [];
 
     public function canSeeCostPrice(): bool
     {
@@ -92,8 +104,10 @@ class ListProducts extends ListRecords
     {
         return ProductResource::getEloquentQuery()
             ->when($this->search !== '', fn (Builder $query) => $query->where(
-                fn (Builder $q) => $q->where('name', 'like', "%{$this->search}%")
-                    ->orWhere('sku', 'like', "%{$this->search}%")
+                // Every typed word, in any order: "peak 400" finds PEAK MILK
+                // TIN 400G (see App\Support\ProductSearch).
+                fn (Builder $q) => $q->where(fn (Builder $words) => ProductSearch::apply($words, $this->search, ['products.name', 'products.sku', 'products.brand', 'products.search_keywords']))
+                    ->orWhereIn('products.id', SearchShortcuts::productIdsMatching((int) filament()->getTenant()->id, $this->search))
                     // A scanned barcode finds the product too: its main code,
                     // an extra code, or a carton's own.
                     ->orWhere('products.barcode', 'like', "%{$this->search}%")
@@ -155,6 +169,88 @@ class ListProducts extends ListRecords
         $this->selected = [];
 
         Notification::make()->title("{$deleted} product(s) deleted.")->success()->send();
+    }
+
+    // ── The product pop-up ──────────────────────────────────────────────
+    // The form itself lives in the browser (products/quick-form.blade.php);
+    // these are the only times it asks the server anything.
+
+    /** What the pop-up needs to know about this shop, sent with the page. */
+    public function getQuickFormOptions(): array
+    {
+        return app(QuickProductForm::class)->options(filament()->getTenant());
+    }
+
+    /** A product to edit in the pop-up. */
+    #[Renderless]
+    public function loadQuickProduct(int $id): array
+    {
+        $product = $this->editableProduct($id);
+
+        return $product
+            ? ['ok' => true, 'product' => app(QuickProductForm::class)->load($product)]
+            : ['ok' => false, 'message' => 'This product could not be opened. It may have been deleted, or moved to another branch.'];
+    }
+
+    /**
+     * Saves the pop-up: a new product when $id is null, else that one.
+     *
+     * Refusals come back as data rather than an exception, so the pop-up can
+     * put each one beside its field.
+     */
+    public function saveQuickProduct(array $data, ?int $id = null): array
+    {
+        $vendor = filament()->getTenant();
+        $product = null;
+
+        if ($id !== null) {
+            $product = $this->editableProduct($id);
+
+            if (! $product) {
+                return ['ok' => false, 'errors' => ['form' => ['You cannot edit this product, or it no longer exists.']]];
+            }
+        } elseif (! ProductResource::canCreate()) {
+            return ['ok' => false, 'errors' => ['form' => ['You are not allowed to add products.']]];
+        }
+
+        try {
+            $saved = app(QuickProductForm::class)->save($vendor, $product, $data, array_values($this->quickPhotos));
+        } catch (ValidationException $e) {
+            return ['ok' => false, 'errors' => $e->errors()];
+        }
+
+        $this->quickPhotos = [];
+
+        Notification::make()
+            ->title($id ? "{$saved->name} saved." : "{$saved->name} added.")
+            ->body($id ? null : "SKU {$saved->sku}")
+            ->success()
+            ->send();
+
+        return ['ok' => true, 'id' => $saved->id, 'name' => $saved->name, 'sku' => $saved->sku];
+    }
+
+    /** The SKU a new product would get, shown while the form is filled in. */
+    #[Renderless]
+    public function previewQuickSku(?string $name, $categoryId = null, ?int $id = null): ?string
+    {
+        return app(QuickProductForm::class)->previewSku(filament()->getTenant(), $name, $categoryId, $id);
+    }
+
+    /** Why a barcode is already taken, checked as someone leaves the field. */
+    #[Renderless]
+    public function checkQuickBarcode(string $code, ?int $id = null): ?string
+    {
+        return app(QuickProductForm::class)->barcodeProblem(filament()->getTenant(), $code, $id);
+    }
+
+    /** This shop's product in this branch, if the user may edit it. */
+    private function editableProduct(int $id): ?Product
+    {
+        $visible = ProductResource::getEloquentQuery()->where('products.id', $id)->exists();
+        $product = $visible ? Product::find($id) : null;
+
+        return $product && ProductResource::canEdit($product) ? $product : null;
     }
 
     protected function getHeaderActions(): array
@@ -231,7 +327,14 @@ class ListProducts extends ListRecords
                 ->visible(fn (): bool => static::canBulkMove('import_products') && ! filament()->getTenant()?->isFreePlan())
                 ->url(fn (): string => ImportProducts::getUrl()),
 
-            CreateAction::make()
+            // Opens the pop-up form already on the page: no request, no wait.
+            // The full create page (ProductResource 'create') still works for
+            // anyone who goes to it directly.
+            Action::make('create')
+                ->label('New product')
+                ->color('primary')
+                ->visible(fn (): bool => ProductResource::canCreate())
+                ->alpineClickHandler("window.dispatchEvent(new CustomEvent('product-form-open'))")
                 // Tour hook: the "Add a product" tour points a vendor here.
                 ->extraAttributes(['data-tour' => 'new-product']),
 

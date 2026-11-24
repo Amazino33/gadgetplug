@@ -99,4 +99,13 @@
 
         <div>{{ $products->links() }}</div>
     </div>
+
+    {{-- This page renders its own list instead of a Filament table, so the
+         page layout (which skips modals on HasTable pages) never outputs
+         them. Without this the header actions mount but their modals have
+         nowhere to render — Export and Take a tour appear to do nothing. --}}
+    <x-filament-actions::modals />
+
+    {{-- New product and the row pencils open this, with no page load. --}}
+    @include('filament.vendor.products.quick-form')
 </x-filament-panels::page>

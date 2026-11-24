@@ -364,7 +364,23 @@ function boot() {
     }
 }
 
-window.gpTours = { start, boot, config };
+/**
+ * A screen that opens in place rather than as its own page — the product
+ * pop-up on the Products list — runs the chapter written for the page it
+ * replaced. Only an armed tour waiting for exactly that chapter starts.
+ */
+function resumeAt(path) {
+    const marker = readResume();
+    if (!marker) return;
+
+    const tour = config?.tours?.[marker.key];
+
+    if (tour && chapterIndexFor(tour, path) === marker.chapter) {
+        runChapter(tour, marker.chapter);
+    }
+}
+
+window.gpTours = { start, boot, config, resumeAt };
 
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', boot, { once: true });

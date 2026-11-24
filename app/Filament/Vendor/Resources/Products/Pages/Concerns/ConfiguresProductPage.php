@@ -2,7 +2,7 @@
 
 namespace App\Filament\Vendor\Resources\Products\Pages\Concerns;
 
-use App\Models\Product;
+use App\Services\Products\QuickProductForm;
 use Filament\Support\Enums\Width;
 
 /**
@@ -44,29 +44,7 @@ trait ConfiguresProductPage
      */
     protected function syncDefaultUnit(): void
     {
-        /** @var Product $product */
-        $product = $this->getRecord()->fresh(['units']);
-
-        $choice = $this->data['default_unit_choice'] ?? null;
-        $base = $product->units->firstWhere('is_base', true);
-
-        $unit = null;
-
-        if (is_string($choice) && str_starts_with($choice, 'unit:')) {
-            $unit = $product->units->first(
-                fn ($u) => ! $u->is_base && $u->is_active && $u->name === substr($choice, 5)
-            );
-        } elseif ($choice === null) {
-            // The form said nothing: keep what is there, if it still exists.
-            $unit = $product->units->firstWhere('id', $product->default_unit_id);
-        }
-
-        $unit ??= $base;
-
-        if ($unit && (int) $product->default_unit_id !== (int) $unit->id) {
-            // Straight to the table: bookkeeping, not an edit anyone should see
-            // in the activity log or have re-run the unit and barcode sync.
-            Product::whereKey($product->id)->update(['default_unit_id' => $unit->id]);
-        }
+        // Shared with the Products list's pop-up form, which saves the same way.
+        QuickProductForm::applyDefaultUnit($this->getRecord(), $this->data['default_unit_choice'] ?? null);
     }
 }

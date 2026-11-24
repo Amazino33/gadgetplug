@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor, cleanup, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import SearchBar from './SearchBar';
+import { resetSearchIndex } from '../lib/searchIndex';
 
 // The rules this screen has to obey, written down as tests because reasoning
 // about them was not enough — this box has broken three separate ways in
@@ -14,7 +15,8 @@ import SearchBar from './SearchBar';
 //   - NOTHING is added until they say which one, by tap or by arrow + Enter
 //   - it works with no network at all
 
-const charger = { id: 1, name: 'Samsung 25W Charger', sku: 'SAM-25', barcode: '6001234567890', price: 5300, available_stock: 4 };
+// The branch's best seller, so it heads a search for "samsung" (search ranks by sales).
+const charger = { id: 1, name: 'Samsung 25W Charger', sku: 'SAM-25', barcode: '6001234567890', price: 5300, available_stock: 4, sold_30d: 30 };
 const cable   = { id: 2, name: 'Samsung Cable',       sku: 'SAM-CB', barcode: '6009876543210', price: 1500, available_stock: 9 };
 // Real shape of this catalogue: imports have left products on single-digit SKUs.
 const battery = { id: 3, name: 'BATTERY BL-5C',       sku: '5',      barcode: null,            price: 1695, available_stock: 655 };
@@ -27,6 +29,9 @@ let localCatalogue = [];
 vi.mock('../lib/db', () => ({
     db: {
         products: {
+            // What the search index reads: everything once, then results by id.
+            toArray: async () => [...localCatalogue],
+            bulkGet: async (ids) => ids.map((id) => localCatalogue.find((p) => p.id === id)),
             filter: (predicate) => ({
                 limit: () => ({
                     toArray: async () => localCatalogue.filter(predicate),
@@ -41,6 +46,9 @@ vi.mock('../lib/db', () => ({
 vi.mock('../lib/api', () => ({
     default: { get: vi.fn() },
 }));
+// Each test brings its own catalogue; the index is built from it afresh.
+beforeEach(() => resetSearchIndex());
+
 
 // By default the server agrees with the device — same catalogue, same
 // matching. Tests that care about them diverging (a product added since

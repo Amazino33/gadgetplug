@@ -15,10 +15,23 @@ use App\Services\Pos\PosPriceFloor;
 use App\Support\Quantity;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Support\ProductSearch;
+use App\Services\Products\SalesPopularity;
+use App\Services\Products\SearchShortcuts;
 
 class PosProductController extends Controller
 {
-    public function __construct(private PosPriceFloor $priceFloor) {}
+    /** @var array<int, int> product id → sales at this branch lately, for search ranking */
+    private array $soldHere = [];
+
+    /** @var array<int, array> product id → learned search words that count */
+    private array $learned = [];
+
+    public function __construct(
+        private PosPriceFloor $priceFloor,
+        private SalesPopularity $popularity,
+        private SearchShortcuts $shortcuts,
+    ) {}
 
     // Full catalogue for IndexedDB seed (called once on login).
     //
@@ -42,6 +55,7 @@ class PosProductController extends Controller
         ]);
 
         $vendor = Vendor::findOrFail($request->vendor_id);
+        $this->soldHere = $this->popularity->forStore((int) $request->vendor_id, TillStore::resolve($request->user(), (int) $request->vendor_id));
 
         $products = $this->branchCatalogue($request)
             ->with(['media', 'units', 'barcodes'])
@@ -51,8 +65,10 @@ class PosProductController extends Controller
                 ->where('products.id', '>', (int) $request->input('after_id', 0))
                 ->orderBy('products.id')
                 ->limit((int) $request->input('limit')))
-            ->get()
-            ->map(fn ($p) => $this->format($p, $vendor));
+            ->get();
+
+        $this->learned = $this->shortcuts->learnedFor($products->modelKeys());
+        $products = $products->map(fn ($p) => $this->format($p, $vendor));
 
         return response()->json($products);
     }
@@ -139,6 +155,23 @@ class PosProductController extends Controller
         return response()->json(['default_unit_id' => $unit->id]);
     }
 
+    /**
+     * Counts a word a cashier searched with before picking this product
+     * (see SearchShortcuts). Any cashier may: it only changes what search
+     * shows first, and only once the same pair has been seen again.
+     */
+    public function learnSearch(Request $request, int $productId): JsonResponse
+    {
+        $request->validate([
+            'vendor_id' => 'required|integer',
+            'term'      => 'required|string|max:100',
+        ]);
+
+        $this->shortcuts->record((int) $request->vendor_id, $productId, $request->term);
+
+        return response()->json(['ok' => true]);
+    }
+
     // Live search by barcode, SKU, or name
     public function search(Request $request): JsonResponse
     {
@@ -158,7 +191,11 @@ class PosProductController extends Controller
             ->where(fn ($query) => $query
                 ->where('barcode', $q)
                 ->orWhere('sku', $q)
-                ->orWhere('name', 'like', "%{$q}%")
+                // The name, SKU or brand holding every typed word, in any
+                // order (see App\Support\ProductSearch).
+                ->orWhere(fn ($words) => ProductSearch::apply($words, $q, ['products.name', 'products.sku', 'products.brand', 'products.search_keywords']))
+                // A word staff taught it (see SearchShortcuts).
+                ->orWhereIn('products.id', SearchShortcuts::productIdsMatching((int) $request->vendor_id, $q))
                 // A second barcode, or a unit's own (a crate's code).
                 ->orWhereIn('products.id', ProductBarcode::select('product_id')
                     ->where('vendor_id', $request->vendor_id)
@@ -169,8 +206,27 @@ class PosProductController extends Controller
                     ->where('sku', $q))
             )
             ->with(['media', 'units', 'barcodes'])
-            ->limit(20)
-            ->get()
+            // More than are sent, so the twenty sent are the likeliest rather
+            // than the first twenty the database happened to find.
+            ->limit(60)
+            ->get();
+
+        $this->soldHere = $this->popularity->forStore((int) $request->vendor_id, TillStore::resolve($request->user(), (int) $request->vendor_id));
+        $first = ProductSearch::words($q)[0] ?? '';
+        $this->learned = $this->shortcuts->learnedFor($products->modelKeys());
+
+        $products = $products
+            ->sortBy(fn (Product $p) => [
+                // The code typed, exactly.
+                ($p->barcode === $q || $p->sku === $q) ? 0 : 1,
+                // A name that starts with what was typed.
+                ($first !== '' && str_starts_with(implode(' ', ProductSearch::words($p->name)), $first)) ? 0 : 1,
+                // What this branch sells most.
+                -($this->soldHere[$p->id] ?? 0),
+                $p->name,
+            ])
+            ->take(20)
+            ->values()
             ->map(fn ($p) => $this->format($p, $vendor));
 
         return response()->json($products);
@@ -236,6 +292,7 @@ class PosProductController extends Controller
             'products.vendor_id', 'products.store_id',
             'products.base_unit', 'products.wholesale_price', 'products.half_price',
             'products.default_unit_id', 'products.negative_stock_override',
+            'products.brand', 'products.search_keywords',
         ];
     }
 
@@ -244,12 +301,19 @@ class PosProductController extends Controller
         $minPrice = $this->priceFloor->floorFor($p, (float) ($vendor->pos_min_margin_percent ?? 0));
 
         return [
-            'id' => $p->id,
-            'name' => $p->name,
-            'sku' => $p->sku,
-            'barcode' => $p->barcode,
-            'price' => (float) $p->price,
-            'min_price' => $minPrice,
+            'id'              => $p->id,
+            'name'            => $p->name,
+            // Searched on the device too: "dark lovely" finds the cream.
+            'brand'           => $p->brand,
+            // Sales it was in at this branch over the last 30 days: the
+            // device's search puts the everyday item first.
+            'sold_30d'        => $this->soldHere[$p->id] ?? 0,
+            // The shop's own words for it: keywords, and what staff taught.
+            'search_terms'    => SearchShortcuts::terms($p->search_keywords, $this->learned[$p->id] ?? []),
+            'sku'             => $p->sku,
+            'barcode'         => $p->barcode,
+            'price'           => (float) $p->price,
+            'min_price'       => $minPrice,
             // False when the product is locked, has no recorded cost, or is
             // already priced at its floor — in every case there's nothing to
             // haggle over, so the till shouldn't offer the option.
