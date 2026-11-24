@@ -132,6 +132,27 @@ class VendorPanelProvider extends PanelProvider
                         return $user->hasPermissionTo('access_pos');
                     }),
 
+                // Purchase Terminal and Purchase History, beside the procurement
+                // pages rather than in place of them. Lives outside the panel,
+                // like the till, so it is a link rather than a page.
+                NavigationItem::make('Purchases')
+                    ->url(fn (): string => route('purchases.index', ['vendor' => filament()->getTenant()?->slug ?? '']))
+                    ->icon('heroicon-o-inbox-arrow-down')
+                    ->group('Procurement')
+                    ->sort(0)
+                    ->visible(function () {
+                        $user = auth()->user();
+                        $vendor = filament()->getTenant();
+                        if (! $user || ! $vendor) {
+                            return false;
+                        }
+                        if ($user->isSuperAdmin()) {
+                            return true;
+                        }
+
+                        return $user->hasVendorPermission($vendor->id, 'record_purchases');
+                    }),
+
             ])
             ->plugins([
                 FilamentShieldPlugin::make()

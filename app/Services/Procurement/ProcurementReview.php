@@ -55,6 +55,13 @@ class ProcurementReview
                 throw new RuntimeException('That delivery has already been answered.');
             }
 
+            // Sent from the Purchase Terminal: received there, from Purchase
+            // History, where the payment is chosen and every unit's selling
+            // price is applied. Approving it here would skip both.
+            if ($row->isAwaitingApproval()) {
+                throw new RuntimeException("{$row->reference} was submitted from the Purchase Terminal. Approve and receive it from Purchase History.");
+            }
+
             // Receives at the verified figures, which are the recorded ones
             // when nobody corrected anything.
             $this->approveAction->execute($row, $store);

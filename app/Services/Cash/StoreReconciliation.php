@@ -147,7 +147,8 @@ class StoreReconciliation
 
         $purchases = (float) Procurement::query()
             ->where('store_id', $store->id)
-            ->where('status', '!=', 'voided')
+            // Drafts are lists nobody has received; they cost nothing yet.
+            ->whereNotIn('status', ['voided', 'draft'])
             ->whereBetween('created_at', [$from, $to])
             ->sum('total_cost');
 

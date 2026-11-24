@@ -38,6 +38,7 @@ const SearchBar = forwardRef(function SearchBar({
     const scanMissTimerRef      = useRef(null);
     const serverTimerRef        = useRef(null);
     const resultsRef            = useRef([]);
+    const listRef               = useRef(null);
 
     // The text that `results` is currently the answer to. Enter needs to know
     // whether what is on screen describes what is in the box, because a
@@ -439,6 +440,13 @@ const SearchBar = forwardRef(function SearchBar({
     // the tick after the server's results replace the device's.
     const highlighted = highlightIndexFor({ results, activeIndex, autoHighlight, query });
 
+    // The arrow keys move the highlight; the list follows it, so a row below
+    // the fold is seen before Enter takes it.
+    useEffect(() => {
+        if (highlighted < 0) return;
+        listRef.current?.children[highlighted]?.scrollIntoView?.({ block: 'nearest' });
+    }, [highlighted]);
+
     return (
         <div className="relative flex-1" ref={rootRef}>
             <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 focus-within:ring-2 focus-within:ring-[#068B03] focus-within:border-[#068B03] transition-all">
@@ -479,7 +487,7 @@ const SearchBar = forwardRef(function SearchBar({
             )}
 
             {open && results.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg z-50 max-h-72 overflow-y-auto">
+                <div ref={listRef} className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg z-50 max-h-72 overflow-y-auto">
                     {results.map((p, index) => (
                         <button
                             key={p.id}

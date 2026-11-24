@@ -26,6 +26,12 @@ class Procurement extends Model
     {
         $activity->vendor_id = $this->vendor_id;
     }
+    /**
+     * Saved from the Purchase Terminal but not received. Nothing has moved:
+     * no stock, no cost layer, no ledger entry, and it counts in no money
+     * figure. It is a list waiting to be finished.
+     */
+    public const STATUS_DRAFT = 'draft';
 
     /** Recorded by the storekeeper, waiting on somebody else to receive it. */
     public const STATUS_PENDING = 'pending';
@@ -46,16 +52,18 @@ class Procurement extends Model
     public const STATUS_VOIDED = 'voided';
 
     protected $fillable = [
-        'reference', 'vendor_id', 'store_id', 'supplier_id', 'waybill_image',
+        'reference', 'invoice_number', 'purchased_on', 'vendor_id', 'store_id', 'supplier_id', 'waybill_image',
         'total_cost', 'amount_paid', 'payment_status', 'payment_method', 'status',
         'void_reason', 'notes', 'created_by', 'approved_by', 'approved_at',
-        'awaiting_user_id',
+        'awaiting_user_id', 'submitted_at',
     ];
 
     protected $casts = [
-        'total_cost' => 'decimal:2',
-        'amount_paid' => 'decimal:2',
-        'approved_at' => 'datetime',
+        'total_cost'   => 'decimal:2',
+        'amount_paid'  => 'decimal:2',
+        'approved_at'  => 'datetime',
+        'purchased_on' => 'date',
+        'submitted_at' => 'datetime',
     ];
 
     protected static function booted(): void
@@ -63,7 +71,7 @@ class Procurement extends Model
         // Generate reference after insert: GP-PROC-00001
         static::created(function (self $procurement) {
             $procurement->updateQuietly([
-                'reference' => 'GP-PROC-'.str_pad($procurement->id, 5, '0', STR_PAD_LEFT),
+                'reference' => 'GP-PROC-' . str_pad($procurement->id, 5, '0', STR_PAD_LEFT),
             ]);
         });
     }
@@ -87,6 +95,46 @@ class Procurement extends Model
     public function items(): HasMany
     {
         return $this->hasMany(ProcurementItem::class);
+    }
+
+    /** Money paid to the supplier against this purchase, oldest first. */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(PurchasePayment::class, 'purchase_id')->orderBy('paid_at')->orderBy('id');
+    }
+
+    /** Paid / Part Paid / Unpaid, as the screens say it. */
+    public const PAYMENT_LABELS = [
+        'full'         => 'Paid',
+        'part_payment' => 'Part Paid',
+        'credit'       => 'Unpaid',
+    ];
+
+    /**
+     * Restate amount_paid and payment_status from the payment rows.
+     *
+     * amount_paid is a mirror of the payments, kept because the settlement and
+     * the daily summary read it; this is the only thing that should write it
+     * once a purchase has payments.
+     */
+    public function syncPayments(): void
+    {
+        $paid  = round((float) $this->payments()->sum('amount'), 2);
+        $total = (float) $this->total_cost;
+
+        $this->forceFill([
+            'amount_paid'    => $paid,
+            'payment_status' => match (true) {
+                $paid >= $total && $total > 0 => 'full',
+                $paid > 0                     => 'part_payment',
+                default                       => 'credit',
+            },
+        ])->save();
+    }
+
+    public function balance(): float
+    {
+        return round(max(0, (float) $this->total_cost - (float) $this->amount_paid), 2);
     }
 
     public function corrections(): HasMany
@@ -125,12 +173,12 @@ class Procurement extends Model
 
     public function recalculate(): void
     {
-        $total = $this->items()->selectRaw('SUM(quantity * unit_cost) as total')->value('total') ?? 0;
-        $paid = (float) $this->amount_paid;
+        $total  = $this->items()->selectRaw('SUM(quantity * unit_cost) as total')->value('total') ?? 0;
+        $paid   = (float) $this->amount_paid;
         $status = match (true) {
             $paid >= $total && $total > 0 => 'full',
-            $paid > 0 => 'part_payment',
-            default => 'credit',
+            $paid > 0                     => 'part_payment',
+            default                       => 'credit',
         };
 
         $this->updateQuietly(['total_cost' => $total, 'payment_status' => $status]);
@@ -148,31 +196,27 @@ class Procurement extends Model
     {
         $this->loadMissing('items.corrections');
 
-        $total = $this->verifiedTotal();
-        $paid = (float) $this->amount_paid;
+        $total  = $this->verifiedTotal();
+        $paid   = (float) $this->amount_paid;
         $status = match (true) {
             $paid >= $total && $total > 0 => 'full',
-            $paid > 0 => 'part_payment',
-            default => 'credit',
+            $paid > 0                     => 'part_payment',
+            default                       => 'credit',
         };
 
         $this->updateQuietly(['total_cost' => $total, 'payment_status' => $status]);
     }
 
-    public function isPending(): bool
-    {
-        return $this->status === self::STATUS_PENDING;
-    }
+    public function isDraft(): bool    { return $this->status === self::STATUS_DRAFT; }
 
-    public function isApproved(): bool
+    /** Sent from the Purchase Terminal and waiting for an approver to receive it. */
+    public function isAwaitingApproval(): bool
     {
-        return $this->status === self::STATUS_APPROVED;
+        return $this->status === self::STATUS_PENDING && $this->submitted_at !== null;
     }
-
-    public function isVoided(): bool
-    {
-        return $this->status === self::STATUS_VOIDED;
-    }
+    public function isPending(): bool  { return $this->status === self::STATUS_PENDING; }
+    public function isApproved(): bool { return $this->status === self::STATUS_APPROVED; }
+    public function isVoided(): bool   { return $this->status === self::STATUS_VOIDED; }
 
     public function isChangesRequested(): bool
     {

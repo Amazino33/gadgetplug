@@ -402,3 +402,23 @@ describe('a scan the shop knows but cannot sell here', () => {
         expect(onScan).not.toHaveBeenCalled();
     });
 });
+
+describe('the list follows the arrow keys', () => {
+    it('scrolls the highlighted row into view', async () => {
+        const scrolled = [];
+        const original = Element.prototype.scrollIntoView;
+        Element.prototype.scrollIntoView = function () { scrolled.push(this); };
+
+        try {
+            render(<SearchBar vendorId={1} onSelect={vi.fn()} />);
+
+            await type('samsung');
+            await screen.findByText('Samsung Cable');
+            await userEvent.keyboard('{ArrowDown}{ArrowDown}');
+
+            await waitFor(() => expect(scrolled.at(-1)?.textContent).toContain('Samsung Cable'));
+        } finally {
+            Element.prototype.scrollIntoView = original;
+        }
+    });
+});

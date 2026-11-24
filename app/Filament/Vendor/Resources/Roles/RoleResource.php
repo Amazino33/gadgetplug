@@ -33,7 +33,7 @@ class RoleResource extends ShieldRoleResource
         'access_pos', 'void_sale', 'process_return', 'close_pos_session', 'view_sales_history',
         'manage_inventory', 'perform_inventory_count', 'authorize_recount', 'adjust_stock',
         'view_inventory_reports', 'view_restock_report', 'view_audit_sessions',
-        'approve_procurement', 'manage_procurement',
+        'approve_procurement', 'manage_procurement', 'record_purchases',
         // Whoever is at the counter deals with the trader who
         // walks in, so both of these are grantable to a role.
         //

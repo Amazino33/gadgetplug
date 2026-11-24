@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use App\Casts\AsQuantity;
 use App\Support\Quantity;
+use App\Casts\AsQuantity;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -15,12 +15,15 @@ class ProcurementItem extends Model
         'quantity', 'unit_cost', 'selling_price',
         // The unit it was bought in. quantity/unit_cost above stay in base units.
         'product_unit_id', 'unit_qty', 'cost_per_unit',
+        // Other units' selling prices set on the Purchase Terminal, unit id => price.
+        'unit_prices',
     ];
 
     protected $casts = [
-        'unit_cost' => 'decimal:2',
+        'unit_cost'     => 'decimal:2',
         'selling_price' => 'decimal:2',
         'cost_per_unit' => 'decimal:2',
+        'unit_prices'   => 'array',
         'quantity' => AsQuantity::class,
         'unit_qty' => AsQuantity::class,
     ];
@@ -28,6 +31,12 @@ class ProcurementItem extends Model
     public function productUnit(): BelongsTo
     {
         return $this->belongsTo(ProductUnit::class);
+    }
+
+    /** Serial / IMEI numbers received on this line, for products that track them. */
+    public function serials(): HasMany
+    {
+        return $this->hasMany(ProcurementItemSerial::class);
     }
 
     public function procurement(): BelongsTo
@@ -120,17 +129,13 @@ class ProcurementItem extends Model
     public function costVariancePct(): ?float
     {
         $historical = (float) ($this->product?->cost_price ?? 0);
-        if ($historical <= 0) {
-            return null;
-        }
-
+        if ($historical <= 0) return null;
         return (($this->unit_cost - $historical) / $historical) * 100;
     }
 
     public function hasCostVariance(): bool
     {
         $pct = $this->costVariancePct();
-
         return $pct !== null && abs($pct) > 10;
     }
 }

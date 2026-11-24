@@ -60,6 +60,9 @@ class VendorPermissionsSeeder extends Seeder
             'view_customer_debts',
             'approve_procurement',
             'manage_procurement',
+            // The Purchase Terminal and Purchase History. Receiving there puts
+            // stock on the shelf and sets cost prices in one step.
+            'record_purchases',
 
             // Vendor Pickings
             //

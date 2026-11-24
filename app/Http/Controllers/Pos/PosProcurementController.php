@@ -40,6 +40,9 @@ class PosProcurementController extends Controller
                         ->where('status', Procurement::STATUS_CHANGES_REQUESTED)
                         ->where('awaiting_user_id', $request->user()->id));
             })
+            // Purchase Terminal submissions are approved from Purchase
+            // History, not at the till.
+            ->whereNull('submitted_at')
             ->orderBy('created_at', 'desc')
             ->get()
             ->map(function ($procurement) {

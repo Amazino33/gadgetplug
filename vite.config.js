@@ -35,6 +35,7 @@ export default defineConfig({
                 'resources/css/filament/vendor/theme.css',
                 'resources/css/filament/admin/theme.css',
                 'resources/js/pos/main.jsx',
+                'resources/js/purchases/main.jsx',
                 // Vendor-panel only (see resources/views/components/vendor-tours.blade.php)
                 'resources/js/vendor-tours.js',
                 // The product pop-up on the vendor Products list.

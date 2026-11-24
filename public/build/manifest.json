@@ -1,6 +1,10 @@
 {
+  "_ModalShell-BTQadsIA.js": {
+    "file": "assets/ModalShell-BTQadsIA.js",
+    "name": "ModalShell"
+  },
   "resources/css/app.css": {
-    "file": "assets/app-C3CR0zyh.css",
+    "file": "assets/app-D5CSYnbY.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "name": "app",
@@ -28,12 +32,15 @@
     "isEntry": true
   },
   "resources/js/pos/main.jsx": {
-    "file": "assets/main-DOiJH4M0.js",
+    "file": "assets/main-DyCei24X.js",
     "name": "main",
     "src": "resources/js/pos/main.jsx",
     "isEntry": true,
+    "imports": [
+      "_ModalShell-BTQadsIA.js"
+    ],
     "css": [
-      "assets/main-W-GiC-kG.css"
+      "assets/main-Di3647SV.css"
     ]
   },
   "resources/js/product-quick-form.js": {
@@ -41,6 +48,18 @@
     "name": "product-quick-form",
     "src": "resources/js/product-quick-form.js",
     "isEntry": true
+  },
+  "resources/js/purchases/main.jsx": {
+    "file": "assets/main-CsYc_WI4.js",
+    "name": "main",
+    "src": "resources/js/purchases/main.jsx",
+    "isEntry": true,
+    "imports": [
+      "_ModalShell-BTQadsIA.js"
+    ],
+    "css": [
+      "assets/main-BHUiCHx8.css"
+    ]
   },
   "resources/js/pwa.js": {
     "file": "assets/pwa-B7jX8TpC.js",

@@ -61,6 +61,7 @@ class StoreProfile extends Page
             'allow_negative_stock' => (bool) $vendor->allow_negative_stock,
             'pos_ask_quantity' => $vendor->pos_ask_quantity ?? true,
             'pos_allow_price_change' => (bool) $vendor->pos_allow_price_change,
+            'price_rounding_step' => $vendor->price_rounding_step ?? 50,
             'allow_half_quantities' => (bool) $vendor->allow_half_quantities,
             'pos_blind_count_frequency' => $vendor->pos_blind_count_frequency ?? 'daily',
             'pos_blind_count_custom_days' => $vendor->pos_blind_count_custom_days ?? 3,
@@ -198,6 +199,18 @@ class StoreProfile extends Page
                             ->label('Allow unit price change at sales point')
                             ->helperText('When on, cashiers can click a price in the cart to change it — never below your minimum margin. When off, items always sell at their retail or wholesale price.')
                             ->default(false),
+
+                        // Used when one unit's selling price is changed and the
+                        // others follow by the same percentage, on a purchase
+                        // line. ₦50 keeps prices to ones a shop would charge.
+                        TextInput::make('price_rounding_step')
+                            ->label('Round worked-out prices to the nearest (₦)')
+                            ->helperText('When a carton price changes and the other units follow by the same %, their new prices round to this. 0 means no rounding.')
+                            ->numeric()
+                            ->integer()
+                            ->minValue(0)
+                            ->maxValue(100000)
+                            ->default(50),
 
                         // For the shops that split crates. Turning it off is
                         // refused while any product still holds a half — the
@@ -352,6 +365,9 @@ class StoreProfile extends Page
                     : null,
             ])->save();
         }
+
+        // Not in Vendor's fillable list, so written directly.
+        $vendor->forceFill(['price_rounding_step' => max(0, (int) ($data['price_rounding_step'] ?? 50))])->save();
 
         Notification::make()
             ->title('Store profile saved')

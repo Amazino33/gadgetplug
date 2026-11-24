@@ -166,6 +166,7 @@ class Product extends Model implements HasMedia
         'stock_quantity' => AsQuantity::class,
         'reserved_stock' => AsQuantity::class,
         'is_service' => 'boolean',
+        'track_serial' => 'boolean',
         'reorder_point' => 'integer',
         'preferred_quantity' => 'integer',
         'published_at' => 'datetime',

@@ -241,6 +241,30 @@ Route::get('/pos/{path?}', function (Request $request, ?string $path = null) {
     return redirect('/sales-point'.($path ? '/'.$path : '').($query ? '?'.$query : ''), 301);
 })->where('path', '.*');
 
+// Purchases — the Purchase Terminal and Purchase History, one page with two
+// tabs. Sits beside procurement: the wizard and its pages are unchanged.
+Route::middleware(['auth', App\Http\Middleware\EnsureCanRecordPurchases::class])
+    ->prefix('purchases/{vendor:slug}')
+    ->name('purchases.')
+    ->group(function () {
+        Route::get('/', [App\Http\Controllers\PurchaseController::class, 'show'])->name('index');
+        Route::get('/api/catalogue', [App\Http\Controllers\PurchaseController::class, 'catalogue'])->name('catalogue');
+        Route::get('/api/lookup', [App\Http\Controllers\PurchaseController::class, 'lookup'])->name('lookup');
+        Route::get('/api/products', [App\Http\Controllers\PurchaseController::class, 'search'])->name('search');
+        Route::post('/api/products', [App\Http\Controllers\PurchaseController::class, 'storeProduct'])->name('products.store');
+        Route::post('/api/search-shortcuts', [App\Http\Controllers\PurchaseController::class, 'learnSearch'])->name('search-shortcuts');
+        Route::get('/api/suppliers', [App\Http\Controllers\PurchaseController::class, 'suppliers'])->name('suppliers');
+        Route::post('/api/suppliers', [App\Http\Controllers\PurchaseController::class, 'storeSupplier'])->name('suppliers.store');
+        Route::get('/api/purchases', [App\Http\Controllers\PurchaseController::class, 'index'])->name('history');
+        Route::post('/api/purchases', [App\Http\Controllers\PurchaseController::class, 'store'])->name('store');
+        Route::get('/api/purchases/{purchase}', [App\Http\Controllers\PurchaseController::class, 'detail'])
+            ->whereNumber('purchase')->name('detail');
+        Route::post('/api/purchases/{purchase}/receive', [App\Http\Controllers\PurchaseController::class, 'receiveSubmitted'])
+            ->whereNumber('purchase')->name('receive');
+        Route::post('/api/purchases/{purchase}/payments', [App\Http\Controllers\PurchaseController::class, 'storePayment'])
+            ->whereNumber('purchase')->name('payments.store');
+    });
+
 // Procurement Wizard
 Route::middleware(['auth'])->prefix('procurement')->name('procurement.')->group(function () {
     Route::get('/create', [ProcurementWizardController::class, 'create'])->name('create');

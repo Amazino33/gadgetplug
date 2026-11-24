@@ -1,0 +1,26 @@
+@import 'tailwindcss';
+
+@source '../js/purchases/**/*.jsx';
+@source '../js/pos/components/ModalShell.jsx';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Quantity and money fields lose the browser's up/down arrows: in a narrow
+   table cell they covered the very digits being typed. Arrow keys and the
+   phone steppers still change a quantity. */
+input.no-spin[type='number'] { -moz-appearance: textfield; appearance: textfield; }
+input.no-spin[type='number']::-webkit-inner-spin-button,
+input.no-spin[type='number']::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* The GRN prints from its own hidden frame; nothing on this page prints. */
+@media print {
+    #grn-print-frame { display: none !important; }
+}

@@ -190,7 +190,8 @@ class VendorDailySummary
     {
         $row = Procurement::query()
             ->where('vendor_id', $vendorId)
-            ->where('status', '!=', 'voided')
+            // A draft from the Purchase Terminal commits no money either.
+            ->whereNotIn('status', ['voided', 'draft'])
             ->whereDate('created_at', $date->toDateString())
             ->selectRaw('COUNT(*) as row_count')
             ->selectRaw('COALESCE(SUM(total_cost), 0) as total_cost')
