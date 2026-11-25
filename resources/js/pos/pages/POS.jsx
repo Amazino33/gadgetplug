@@ -9,8 +9,8 @@ import { addToCart, roomFor } from '../lib/cartAdd';
 import { findUnit, lineFields, prepareLine } from '../lib/units';
 import { formatQty, halfUnitPrice, hasHalf, lineNet } from '../lib/halves';
 import {
-    cacheServerList, cachedServerList, dropLocalHold, holdLocally,
-    mergedHeldSales, newClientRef, queueRemoval, unreachable,
+    cacheServerList, cachedServerList, heldSalesVersion, holdLocally,
+    mergedHeldSales, newClientRef, queueRemoval, syncHeldSales, takeLocalHold, unreachable,
 } from '../lib/heldSales';
 import { shouldRedirectTypingToSearch } from '../lib/typeAhead';
 import { db } from '../lib/db';
@@ -246,30 +246,55 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
     }, [session, shift]);
 
     // ── Pending (suspended) sales ────────────────────────────────────
-    // No slots, no popup: any held sale just shows up in the sidebar for
-    // whichever cashier gets to it. Polled so a sale suspended on one
-    // terminal shows up here without needing a manual refresh.
+    // No slots, no popup: held sales are reached from the top bar. Polled so
+    // a sale held on another till by the same cashier shows up here too.
+    //
+    // Nothing here waits for the server. Holding, resuming and discarding
+    // happen on this till at once and are sent in the background (see
+    // lib/heldSales). On mobile data each of them used to sit on a round trip,
+    // and the list on another, while the customer waited.
 
-    // The server's list when it answers, the last one it gave when it does
-    // not — and in both cases, with anything held or taken off here while
-    // offline folded in, so the list matches what this till has done.
-    const loadPendingSales = useCallback(async () => {
-        let serverList;
-
-        try {
-            const { data } = await api.get('/suspended', { params: { vendor_id: vendorId } });
-            serverList = data;
-            cacheServerList(vendorId, user?.id, data);
-        } catch {
-            serverList = cachedServerList(vendorId, user?.id);
-        }
-
+    // The server's list, with anything held or taken off here and not yet
+    // sent folded in, so the list matches what this till has done.
+    const showPendingSales = useCallback(async (serverList) => {
         try {
             setPendingSales(await mergedHeldSales(vendorId, user?.id, serverList));
         } catch {
             setPendingSales(serverList);
         }
     }, [vendorId, user?.id]);
+
+    // From the last list the server gave: no waiting.
+    const showCachedPendingSales = useCallback(
+        () => showPendingSales(cachedServerList(vendorId, user?.id)),
+        [showPendingSales, vendorId, user?.id],
+    );
+
+    const loadPendingSales = useCallback(async () => {
+        const asked = heldSalesVersion();
+
+        try {
+            const { data } = await api.get('/suspended', { params: { vendor_id: vendorId } });
+
+            // Something was held, resumed or sent while this was on its way,
+            // so the answer may still list a sale that is gone. The list
+            // remembered here is already up to date.
+            if (heldSalesVersion() !== asked) return showCachedPendingSales();
+
+            cacheServerList(vendorId, user?.id, data);
+            await showPendingSales(data);
+        } catch {
+            await showCachedPendingSales();
+        }
+    }, [vendorId, user?.id, showPendingSales, showCachedPendingSales]);
+
+    // After a hold, resume or discard: show it now, send it, then refresh.
+    const afterHeldSaleChange = useCallback(() => {
+        showCachedPendingSales();
+        syncHeldSales(vendorId, user?.id)
+            .catch(() => { /* the regular sync tries again */ })
+            .finally(() => loadPendingSales());
+    }, [showCachedPendingSales, loadPendingSales, vendorId, user?.id]);
 
     const [pendingProcurementsCount, setPendingProcurementsCount] = useState(0);
 
@@ -281,6 +306,8 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
     }, [vendorId]);
 
     useEffect(() => {
+        // The remembered list straight away; the live one when it arrives.
+        showCachedPendingSales();
         loadPendingSales();
         loadPendingProcurementsCount();
         const interval = setInterval(() => {
@@ -288,7 +315,7 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
             loadPendingProcurementsCount();
         }, 20000);
         return () => clearInterval(interval);
-    }, [loadPendingSales, loadPendingProcurementsCount]);
+    }, [showCachedPendingSales, loadPendingSales, loadPendingProcurementsCount]);
 
     const suspendCurrentSale = async () => {
         if (cartEmpty) return;
@@ -302,18 +329,12 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
         };
 
         try {
-            await api.post('/suspended', { vendor_id: vendorId, ...payload });
-        } catch (error) {
-            // The server answered and said no: nothing was held, say so.
-            if (! unreachable(error)) {
-                setPendingError("Couldn't hold this sale — it has NOT been saved. Try again.");
-                return;
-            }
-
-            // No connection: hold it on this till. It uploads by itself when
-            // the connection returns, and other tills see it from then on.
+            await holdLocally(vendorId, user?.id, payload);
+        } catch {
+            // This till's storage refused it (a private window, or full):
+            // straight to the server instead, and wait for it.
             try {
-                await holdLocally(vendorId, user?.id, payload);
+                await api.post('/suspended', { vendor_id: vendorId, ...payload });
             } catch {
                 setPendingError("Couldn't hold this sale — it has NOT been saved. Try again.");
                 return;
@@ -321,42 +342,42 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
         }
 
         clearCart();
-        loadPendingSales();
+        afterHeldSaleChange();
     };
 
     const resumePendingSale = async (sale) => {
         if (!cartEmpty) return;
         setPendingError(null);
 
-        // Held on this till and never uploaded: it is entirely ours to resume.
-        if (sale.local) {
-            await dropLocalHold(sale.local_id);
-            setCart(sale.cart_data?.items || []);
-            setCustomer(sale.cart_data?.customer || null);
-            loadPendingSales();
-            return;
-        }
-
+        // Resumed from the copy this till already has: a held sale never
+        // changes, so it is the same cart the server would send back.
         try {
-            const { data } = await api.post(`/suspended/${sale.id}/resume`, { vendor_id: vendorId });
-            setCart(data.cart_data.items || []);
-            setCustomer(data.cart_data.customer || null);
-        } catch (error) {
-            if (! unreachable(error)) {
-                // Most likely already resumed at another till.
-                setPendingError("This sale is no longer on hold — it may have been resumed at another till.");
-                loadPendingSales();
+            if (sale.local) {
+                await takeLocalHold(vendorId, user?.id, sale);
+            } else {
+                await queueRemoval(vendorId, user?.id, sale.id);
+            }
+        } catch {
+            if (sale.local) {
+                setPendingError("Couldn't resume this held sale — try again.");
                 return;
             }
 
-            // Offline: resume from the copy this till has, and take it off the
-            // server's list once the connection returns.
-            setCart(sale.cart_data?.items || []);
-            setCustomer(sale.cart_data?.customer || null);
-            await queueRemoval(vendorId, user?.id, sale.id);
+            // Storage refused: ask the server, as before.
+            try {
+                await api.post(`/suspended/${sale.id}/resume`, { vendor_id: vendorId });
+            } catch (error) {
+                setPendingError(unreachable(error)
+                    ? "Couldn't resume this held sale — try again."
+                    : 'This sale is no longer on hold.');
+                loadPendingSales();
+                return;
+            }
         }
 
-        loadPendingSales();
+        setCart(sale.cart_data?.items || []);
+        setCustomer(sale.cart_data?.customer || null);
+        afterHeldSaleChange();
     };
 
     const clearPendingSale = async (id) => {
@@ -364,24 +385,29 @@ export default function POS({ user, vendorId, storeId, shift, onShiftClosed, onL
 
         const sale = pendingSales.find((s) => s.id === id);
 
-        if (sale?.local) {
-            await dropLocalHold(sale.local_id);
-            loadPendingSales();
-            return;
-        }
-
         try {
-            await api.delete(`/suspended/${id}`, { data: { vendor_id: vendorId } });
-        } catch (error) {
-            if (! unreachable(error)) {
+            if (sale?.local) {
+                await takeLocalHold(vendorId, user?.id, sale);
+            } else {
+                await queueRemoval(vendorId, user?.id, id);
+            }
+        } catch {
+            if (sale?.local) {
                 setPendingError("Couldn't discard this held sale — try again.");
                 return;
             }
 
-            await queueRemoval(vendorId, user?.id, id);
+            try {
+                await api.delete(`/suspended/${id}`, { data: { vendor_id: vendorId } });
+            } catch (error) {
+                if (unreachable(error) || error?.response?.status !== 404) {
+                    setPendingError("Couldn't discard this held sale — try again.");
+                    return;
+                }
+            }
         }
 
-        loadPendingSales();
+        afterHeldSaleChange();
     };
 
     // ── Cart operations ──────────────────────────────────────────────

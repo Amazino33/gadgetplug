@@ -106,7 +106,7 @@ export default function SuspendedSalesModal({ sales = [], cartEmpty, error, onRe
                                         </p>
                                         {sale.local && (
                                             <p className="mt-1 inline-block rounded-full bg-amber-100 dark:bg-amber-900/50 px-2 py-0.5 text-[10px] font-semibold text-amber-800 dark:text-amber-300">
-                                                On this till only · uploads when back online
+                                                {offline ? 'On this till only · uploads when back online' : 'On this till · saving to your account'}
                                             </p>
                                         )}
                                     </button>

@@ -77,6 +77,9 @@ Route::prefix('pos')->middleware(NoStoreApiResponse::class)->group(function () {
         Route::post('suspended', [PosSessionController::class, 'suspend']);
         Route::post('suspended/{suspendedSale}/resume', [PosSessionController::class, 'resume']);
         Route::delete('suspended/{suspendedSale}', [PosSessionController::class, 'clearSuspended']);
+        // By the till's own reference: a sale held on a till, and resumed or
+        // discarded there before the till learned the id its upload was given.
+        Route::delete('suspended/ref/{clientRef}', [PosSessionController::class, 'clearSuspendedByRef']);
 
         // Offline sync — bulk submit queued transactions
         // Vendor pickings: what is still out at this till's branch, and the

@@ -497,4 +497,27 @@ class PosSessionController extends Controller
 
         return response()->json(['message' => 'Held sale cleared.']);
     }
+
+    /**
+     * Clears a held sale by the reference the till gave it.
+     *
+     * The till holds a sale on itself first and uploads it a moment later, so a
+     * cashier can resume or discard it before the till knows the id it was
+     * saved under — or after an upload whose answer never came back. Without
+     * this, that sale would come back on the list on the next refresh.
+     * Not found (never uploaded, or already gone) is a 404, which the till
+     * treats as done.
+     */
+    public function clearSuspendedByRef(Request $request, string $clientRef): JsonResponse
+    {
+        $request->validate(['vendor_id' => 'required|integer']);
+
+        PosSuspendedSale::where('vendor_id', $request->vendor_id)
+            ->where('cashier_id', $request->user()->id)
+            ->where('client_ref', $clientRef)
+            ->firstOrFail()
+            ->delete();
+
+        return response()->json(['message' => 'Held sale cleared.']);
+    }
 }

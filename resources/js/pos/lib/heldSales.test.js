@@ -2,7 +2,8 @@ import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from './db';
 import {
-    cacheServerList, cachedServerList, holdLocally, mergedHeldSales, queueRemoval, syncHeldSales,
+    cacheServerList, cachedServerList, heldSalesVersion, holdLocally, mergedHeldSales, queueRemoval,
+    syncHeldSales, takeLocalHold,
 } from './heldSales';
 
 vi.mock('./api', () => ({ default: { post: vi.fn(), delete: vi.fn(), get: vi.fn() } }));
@@ -111,5 +112,111 @@ describe('each cashier\'s own', () => {
         await syncHeldSales(2, 40);
         expect(api.post).toHaveBeenCalledTimes(1);
         expect(await db.heldSales.count()).toBe(0);
+    });
+});
+
+describe('resuming or discarding a sale held on this till', () => {
+    const localSale = async () => (await mergedHeldSales(2, 40, [])).find((s) => s.local);
+
+    it('needs nothing from the server when it was never sent', async () => {
+        await holdLocally(2, 40, { cart_data: cart, client_ref: 'hold-a' });
+
+        await takeLocalHold(2, 40, await localSale());
+        await syncHeldSales(2, 40);
+
+        expect(await db.heldSales.count()).toBe(0);
+        expect(api.post).not.toHaveBeenCalled();
+        expect(api.delete).not.toHaveBeenCalled();
+    });
+
+    it('asks the server to drop it by reference when its upload was already under way', async () => {
+        await holdLocally(2, 40, { cart_data: cart, client_ref: 'hold-a' });
+        const sale = await localSale();
+
+        // The upload goes out, and the cashier resumes the sale before it lands.
+        let land;
+        api.post.mockReturnValueOnce(new Promise((resolve) => { land = resolve; }));
+        const syncing = syncHeldSales(2, 40);
+        await vi.waitFor(() => expect(api.post).toHaveBeenCalled());
+
+        await takeLocalHold(2, 40, sale);
+        expect(await mergedHeldSales(2, 40, [])).toHaveLength(0);
+
+        land({ data: { id: 90, client_ref: 'hold-a' } });
+        api.delete.mockResolvedValueOnce({ data: {} });
+        await syncing;
+        await syncHeldSales(2, 40);
+
+        expect(api.delete).toHaveBeenCalledWith('/suspended/ref/hold-a', { data: { vendor_id: 2 } });
+        expect(await db.heldSales.count()).toBe(0);
+        expect(cachedServerList(2, 40)).toEqual([]);
+    });
+
+    it("hides the server's copy while the drop is waiting to be sent", async () => {
+        await holdLocally(2, 40, { cart_data: cart, client_ref: 'hold-a' });
+        api.post.mockResolvedValueOnce({ data: { id: 90, client_ref: 'hold-a' } });
+        const sale = await localSale();
+        await syncHeldSales(2, 40);
+
+        // The list on screen still showed it as this till's when it was resumed.
+        await takeLocalHold(2, 40, sale);
+
+        expect(await mergedHeldSales(2, 40, [{ ...serverSale, id: 90, client_ref: 'hold-a' }])).toHaveLength(0);
+    });
+
+    it('treats a drop the server has no record of as done', async () => {
+        await holdLocally(2, 40, { cart_data: cart, client_ref: 'hold-a' });
+        const sale = await localSale();
+        await db.heldSales.update(sale.local_id, { sent: true });
+
+        await takeLocalHold(2, 40, sale);
+        api.delete.mockRejectedValueOnce(refused(404));
+        await syncHeldSales(2, 40);
+
+        expect(await db.heldSales.count()).toBe(0);
+    });
+});
+
+describe('the remembered list', () => {
+    it('gains a hold once it is uploaded, so it still shows with no signal', async () => {
+        await holdLocally(2, 40, { cart_data: cart, client_ref: 'hold-a' });
+        api.post.mockResolvedValueOnce({ data: { id: 90, client_ref: 'hold-a', cart_data: cart } });
+
+        await syncHeldSales(2, 40);
+
+        expect(cachedServerList(2, 40)).toEqual([expect.objectContaining({ id: 90 })]);
+        expect(await mergedHeldSales(2, 40, cachedServerList(2, 40))).toHaveLength(1);
+    });
+
+    it('loses a sale once its removal is sent', async () => {
+        cacheServerList(2, 40, [serverSale]);
+        await queueRemoval(2, 40, 77);
+        api.delete.mockResolvedValueOnce({ data: {} });
+
+        await syncHeldSales(2, 40);
+
+        expect(cachedServerList(2, 40)).toEqual([]);
+    });
+});
+
+describe('a list asked for before a change', () => {
+    it('can be told apart from one asked for after it', async () => {
+        const asked = heldSalesVersion();
+
+        await queueRemoval(2, 40, 77);
+
+        expect(heldSalesVersion()).not.toBe(asked);
+    });
+});
+
+describe('syncing', () => {
+    it('never uploads the same hold twice at once', async () => {
+        await holdLocally(2, 40, { cart_data: cart, client_ref: 'hold-a' });
+        api.post.mockResolvedValue({ data: { id: 90 } });
+
+        await Promise.all([syncHeldSales(2, 40), syncHeldSales(2, 40)]);
+
+        expect(api.post).toHaveBeenCalledTimes(1);
+        expect(api.delete).not.toHaveBeenCalled();
     });
 });

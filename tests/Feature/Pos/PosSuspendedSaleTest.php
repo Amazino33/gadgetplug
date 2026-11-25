@@ -215,3 +215,29 @@ test('a held sale already resumed elsewhere answers 404 to a late discard', func
 
     $this->deleteJson("/api/pos/suspended/{$id}", ['vendor_id' => $data['vendor']->id])->assertNotFound();
 });
+
+// The till holds a sale on itself and uploads it a moment later, so it can be
+// resumed before the till knows the id it was saved under.
+test("a held sale can be cleared by the till's own reference, and only by its cashier", function () {
+    $data = suspendedSaleVendor();
+    Sanctum::actingAs($data['owner']);
+
+    $this->postJson('/api/pos/suspended', [
+        'vendor_id'  => $data['vendor']->id,
+        'cart_data'  => ['items' => [], 'customer' => null],
+        'client_ref' => 'hold-xyz',
+    ])->assertCreated();
+
+    $other = User::factory()->create();
+    $data['vendor']->users()->syncWithoutDetaching([$other->id]);
+    Sanctum::actingAs($other);
+    $this->deleteJson('/api/pos/suspended/ref/hold-xyz', ['vendor_id' => $data['vendor']->id])->assertNotFound();
+    expect(PosSuspendedSale::count())->toBe(1);
+
+    Sanctum::actingAs($data['owner']);
+    $this->deleteJson('/api/pos/suspended/ref/hold-xyz', ['vendor_id' => $data['vendor']->id])->assertOk();
+    expect(PosSuspendedSale::count())->toBe(0);
+
+    // Already gone: the till treats this as done.
+    $this->deleteJson('/api/pos/suspended/ref/hold-xyz', ['vendor_id' => $data['vendor']->id])->assertNotFound();
+});
