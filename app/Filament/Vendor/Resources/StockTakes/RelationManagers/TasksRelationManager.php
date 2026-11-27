@@ -11,6 +11,7 @@ use Filament\Forms\Components\Checkbox;
 use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ViewColumn;
 use Filament\Tables\Table;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
@@ -36,30 +37,65 @@ class TasksRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         return $table
+            ->extraAttributes(['class' => 'gp-phone-cards'])
             ->modifyQueryUsing(fn (Builder $query) => $query->with(['assignee:id,name', 'aisles'])->withCount('products'))
             ->defaultSort('created_at', 'desc')
             ->emptyStateHeading('No tasks yet')
             ->emptyStateDescription('Use New count task at the top to give someone aisles to count.')
             ->columns([
-                TextColumn::make('type')->badge()
+                // Phone only: one card per row (mobile-row.blade.php), so nothing
+                // runs off the side of the screen. The columns below are md and up.
+                ViewColumn::make('mobile_card')
+                    ->label('')
+                    ->state(fn (StockTakeTask $record) => [
+                        'title' => $record->assignee?->name ?? 'Unassigned',
+                        'badge' => match ($record->status) {
+                            StockTakeTask::STATUS_ASSIGNED           => ['Not started', 'gray'],
+                            StockTakeTask::STATUS_IN_PROGRESS        => ['Counting', 'warning'],
+                            StockTakeTask::STATUS_SUBMITTED          => ['Submitted', 'info'],
+                            StockTakeTask::STATUS_APPROVED           => ['Approved', 'success'],
+                            StockTakeTask::STATUS_PARTIALLY_APPROVED => ['Partly approved', 'success'],
+                            StockTakeTask::STATUS_CANCELLED          => ['Cancelled', 'gray'],
+                            default                                  => [(string) $record->status, 'gray'],
+                        },
+                        'lines' => [
+                            match ($record->type) {
+                                StockTakeTask::TYPE_RECOUNT => 'Recount',
+                                StockTakeTask::TYPE_MAPPING => 'Mapping',
+                                default                     => 'Count',
+                            } . ' · ' . ($record->aisles->isNotEmpty()
+                                ? $record->aisles->sortBy('sort_order')->map(fn (Aisle $a) => $a->is_quick ? 'Quick count (any aisle)' : $a->label())->implode(', ')
+                                : "{$record->products_count} products"),
+                            collect([
+                                $record->due_date ? ($this->overdue($record) ? 'Overdue: due ' : 'Due ') . $record->due_date->format('D d M') : null,
+                                $record->submitted_at ? 'Submitted ' . $record->submitted_at->timezone('Africa/Lagos')->format('D d M, g:ia') : null,
+                            ])->filter()->implode(' · '),
+                            $record->device_id === null ? null : 'Phone: ' . ($record->device_label ?? 'a phone')
+                                . ((int) $record->device_pending > 0 ? " · {$record->device_pending} not uploaded" : ''),
+                        ],
+                    ])
+                    ->view('filament.vendor.stock-take.mobile-row')
+                    ->disabledClick()
+                    ->hiddenFrom('md'),
+                TextColumn::make('type')->visibleFrom('md')->badge()
                     ->formatStateUsing(fn ($state) => match ($state) {
                         StockTakeTask::TYPE_RECOUNT => 'Recount',
                         StockTakeTask::TYPE_MAPPING => 'Mapping',
                         default                     => 'Count',
                     })
                     ->color(fn ($state) => $state === StockTakeTask::TYPE_RECOUNT ? 'warning' : 'gray'),
-                TextColumn::make('assignee.name')->label('Given to')->weight('bold'),
-                TextColumn::make('covers')
+                TextColumn::make('assignee.name')->visibleFrom('md')->label('Given to')->weight('bold'),
+                TextColumn::make('covers')->visibleFrom('md')
                     ->label('Aisles')
                     ->state(fn (StockTakeTask $record) => $record->aisles->isNotEmpty()
                         ? $record->aisles->sortBy('sort_order')->map(fn (Aisle $a) => $a->label())->implode(', ')
                         : "{$record->products_count} products")
                     ->wrap(),
-                TextColumn::make('due_date')->label('Due')->date('D d M')->placeholder('—')
+                TextColumn::make('due_date')->visibleFrom('md')->label('Due')->date('D d M')->placeholder('—')
                     ->badge(fn (StockTakeTask $record) => $this->overdue($record))
                     ->color(fn (StockTakeTask $record) => $this->overdue($record) ? 'danger' : null)
                     ->description(fn (StockTakeTask $record) => $this->overdue($record) ? 'Overdue' : null),
-                TextColumn::make('status')->badge()
+                TextColumn::make('status')->visibleFrom('md')->badge()
                     ->formatStateUsing(fn ($state) => match ($state) {
                         StockTakeTask::STATUS_ASSIGNED           => 'Not started',
                         StockTakeTask::STATUS_IN_PROGRESS        => 'Counting',
@@ -77,7 +113,7 @@ class TasksRelationManager extends RelationManager
                     }),
                 // One phone per task (release 2): which phone holds it, and what it
                 // had not yet uploaded when last seen.
-                TextColumn::make('device_label')
+                TextColumn::make('device_label')->visibleFrom('md')
                     ->label('Phone')
                     ->placeholder('—')
                     ->state(fn (StockTakeTask $record) => $record->device_id === null ? null : ($record->device_label ?? 'A phone'))
@@ -85,7 +121,7 @@ class TasksRelationManager extends RelationManager
                         $record->device_seen_at ? 'Seen ' . $record->device_seen_at->diffForHumans() : null,
                         (int) $record->device_pending > 0 ? "{$record->device_pending} not uploaded" : 'All uploaded',
                     ])->filter()->implode(' · ')),
-                TextColumn::make('submitted_at')->label('Submitted')->dateTime('D d M, g:ia', 'Africa/Lagos')->placeholder('—'),
+                TextColumn::make('submitted_at')->visibleFrom('md')->label('Submitted')->dateTime('D d M, g:ia', 'Africa/Lagos')->placeholder('—'),
             ])
             ->recordActions([
                 Action::make('releasePhone')

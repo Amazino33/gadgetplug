@@ -12,6 +12,8 @@ use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
+use Illuminate\Support\Facades\Storage;
+use Filament\Tables\Columns\ViewColumn;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -44,6 +46,7 @@ class UnknownItems extends TableWidget
         $stockTake = $this->record;
 
         return $table
+            ->extraAttributes(['class' => 'gp-phone-cards'])
             ->query(fn () => StockTakeUnknownItem::query()
                 ->where('vendor_id', $stockTake->vendor_id)
                 ->where('store_id', $stockTake->store_id)
@@ -52,12 +55,31 @@ class UnknownItems extends TableWidget
             ->defaultSort('created_at', 'desc')
             ->emptyStateHeading('No unknown barcodes waiting')
             ->columns([
-                ImageColumn::make('photo_path')->label('Photo')->disk('public')->square(),
-                TextColumn::make('name_entered')->label('Written as')->weight('bold')->searchable(),
-                TextColumn::make('barcode')->placeholder('—')->searchable(),
-                TextColumn::make('aisle.name')->label('Found in')->placeholder('—'),
-                TextColumn::make('creator.name')->label('By'),
-                TextColumn::make('created_at')->label('When')->dateTime('d M, g:ia', 'Africa/Lagos'),
+                // Phone only: one card per row (mobile-row.blade.php), so nothing
+                // runs off the side of the screen. The columns below are md and up.
+                ViewColumn::make('mobile_card')
+                    ->label('')
+                    ->state(fn (StockTakeUnknownItem $record) => [
+                        'title' => $record->name_entered,
+                        'image' => $record->photo_path ? Storage::disk('public')->url($record->photo_path) : null,
+                        'lines' => [
+                            $record->barcode,
+                            collect([
+                                $record->aisle?->name ? 'Found in ' . $record->aisle->name : null,
+                                $record->creator?->name ? 'by ' . $record->creator->name : null,
+                                $record->created_at?->timezone('Africa/Lagos')->format('d M, g:ia'),
+                            ])->filter()->implode(' · '),
+                        ],
+                    ])
+                    ->view('filament.vendor.stock-take.mobile-row')
+                    ->disabledClick()
+                    ->hiddenFrom('md'),
+                ImageColumn::make('photo_path')->visibleFrom('md')->label('Photo')->disk('public')->square(),
+                TextColumn::make('name_entered')->visibleFrom('md')->label('Written as')->weight('bold')->searchable(),
+                TextColumn::make('barcode')->visibleFrom('md')->placeholder('—')->searchable(),
+                TextColumn::make('aisle.name')->visibleFrom('md')->label('Found in')->placeholder('—'),
+                TextColumn::make('creator.name')->visibleFrom('md')->label('By'),
+                TextColumn::make('created_at')->visibleFrom('md')->label('When')->dateTime('d M, g:ia', 'Africa/Lagos'),
             ])
             ->recordActions([
                 Action::make('create_product')

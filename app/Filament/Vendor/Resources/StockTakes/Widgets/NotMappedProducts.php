@@ -7,6 +7,7 @@ use App\Models\StockTake;
 use App\Services\StockTake\StockTakeScope;
 use Filament\Actions\Action;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ViewColumn;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget;
 use Illuminate\Database\Eloquent\Model;
@@ -35,14 +36,26 @@ class NotMappedProducts extends TableWidget
         $stockTake = $this->record;
 
         return $table
+            ->extraAttributes(['class' => 'gp-phone-cards'])
             ->query(fn () => StockTakeScope::notMappedQuery((int) $stockTake->vendor_id, (int) $stockTake->store_id))
             ->defaultSort('name')
             ->paginated([10, 25, 50])
             ->emptyStateHeading('Every product with stock is on an aisle')
             ->columns([
-                TextColumn::make('name')->searchable()->weight('bold'),
-                TextColumn::make('sku')->label('SKU')->placeholder('—')->searchable(),
-                TextColumn::make('barcode')->placeholder('—')->searchable(),
+                // Phone only: one card per row (mobile-row.blade.php), so nothing
+                // runs off the side of the screen. The columns below are md and up.
+                ViewColumn::make('mobile_card')
+                    ->label('')
+                    ->state(fn ($record) => [
+                        'title' => $record->name,
+                        'lines' => [collect([$record->sku, $record->barcode])->filter()->implode(' · ')],
+                    ])
+                    ->view('filament.vendor.stock-take.mobile-row')
+                    ->disabledClick()
+                    ->hiddenFrom('md'),
+                TextColumn::make('name')->visibleFrom('md')->searchable()->weight('bold'),
+                TextColumn::make('sku')->visibleFrom('md')->label('SKU')->placeholder('—')->searchable(),
+                TextColumn::make('barcode')->visibleFrom('md')->placeholder('—')->searchable(),
             ])
             ->headerActions([
                 Action::make('aisles')->label('Go to Aisles')->color('gray')->url(fn () => AisleResource::getUrl('index')),

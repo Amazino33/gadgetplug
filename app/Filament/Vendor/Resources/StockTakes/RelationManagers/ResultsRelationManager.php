@@ -19,6 +19,7 @@ use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ViewColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -65,16 +66,30 @@ class ResultsRelationManager extends RelationManager
                 'approver:id,name',
             ]))
             ->defaultSort('id', 'desc')
+            // Scopes the phone styles in the vendor theme to this table.
+            ->extraAttributes(['class' => 'gp-st-results'])
             ->emptyStateHeading('Nothing to decide yet')
             ->emptyStateDescription('Results appear here when a counter hands a task in.')
             ->columns([
+                // Phone only: one card per count with the figures large and
+                // the decisions as big buttons, so an owner can approve from
+                // a phone without scrolling sideways. Every column below is
+                // visibleFrom('md'); filters, search and actions are the same.
+                ViewColumn::make('mobile_card')
+                    ->label('')
+                    ->view('filament.vendor.stock-take.result-card')
+                    ->disabledClick()
+                    ->hiddenFrom('md'),
+
                 TextColumn::make('product.name')
+                    ->visibleFrom('md')
                     ->label('Product')
                     ->weight('bold')
                     ->searchable()
                     ->description(fn (StockTakeResult $r) => $this->aislesOf($r)),
 
                 TextColumn::make('total_counted_base')
+                    ->visibleFrom('md')
                     ->label('Counted')
                     ->alignEnd()
                     ->formatStateUsing(fn ($state) => Quantity::format($state))
@@ -82,6 +97,7 @@ class ResultsRelationManager extends RelationManager
 
                 // Found damaged or expired: on the shelf, so not missing; written off on approval.
                 TextColumn::make('damaged_qty_base')
+                    ->visibleFrom('md')
                     ->label('Damaged / expired')
                     ->state(fn (StockTakeResult $r) => (float) $r->damaged_qty_base + (float) $r->expired_qty_base)
                     ->formatStateUsing(fn ($state, StockTakeResult $r) => (float) $state > 0
@@ -93,21 +109,31 @@ class ResultsRelationManager extends RelationManager
                     ->color(fn ($state) => (float) $state > 0 ? 'danger' : 'gray')
                     ->toggleable(),
                 TextColumn::make('system_qty_at_count')
+                    ->visibleFrom('md')
                     ->label('System at count')
                     ->alignEnd()
                     ->state(fn (StockTakeResult $r) => $r->applied_system_qty ?? $r->system_qty_at_count)
                     ->formatStateUsing(fn ($state) => Quantity::format($state))
+                    // Click: how the books got there — who sold what, what came in.
+                    ->action($this->storyAction())
+                    ->tooltip('See what happened')
+                    ->extraAttributes(['class' => 'cursor-pointer underline decoration-dotted underline-offset-4'])
                     ->description(fn (StockTakeResult $r) => $r->counted_at?->timezone('Africa/Lagos')->format('D j M, g:ia')),
 
                 TextColumn::make('variance_qty')
+                    ->visibleFrom('md')
                     ->label('Variance')
                     ->alignEnd()
+                    ->action($this->storyAction())
+                    ->tooltip('See what happened')
+                    ->extraAttributes(['class' => 'cursor-pointer underline decoration-dotted underline-offset-4'])
                     ->state(fn (StockTakeResult $r) => $r->applied_adjustment_qty ?? $r->variance_qty)
                     ->formatStateUsing(fn ($state) => ($state > 0 ? '+' : '') . Quantity::format($state))
                     ->color(fn ($state) => $state < 0 ? 'danger' : ($state > 0 ? 'success' : 'gray'))
                     ->weight('bold'),
 
                 TextColumn::make('variance_value')
+                    ->visibleFrom('md')
                     ->label('Variance ₦')
                     ->alignEnd()
                     ->visible($money)
@@ -116,10 +142,12 @@ class ResultsRelationManager extends RelationManager
                     ->color(fn ($state) => $state < 0 ? 'danger' : ($state > 0 ? 'success' : 'gray')),
 
                 TextColumn::make('task.assignee.name')
+                    ->visibleFrom('md')
                     ->label('Counted by')
                     ->description(fn (StockTakeResult $r) => $this->pairLine($r, $money)),
 
                 TextColumn::make('flags')
+                    ->visibleFrom('md')
                     ->label('')
                     ->badge()
                     ->separator(',')
@@ -133,6 +161,7 @@ class ResultsRelationManager extends RelationManager
                     }),
 
                 TextColumn::make('status')
+                    ->visibleFrom('md')
                     ->badge()
                     ->formatStateUsing(fn ($state) => match ($state) {
                         StockTakeResult::STATUS_PENDING         => 'To decide',
@@ -262,6 +291,44 @@ class ResultsRelationManager extends RelationManager
                     ->action(fn (Collection $records, array $data) => $this->sendToRecount($records, $data))
                     ->deselectRecordsAfterCompletion(),
             ]);
+    }
+
+    /**
+     * The story behind a count: what the books said when it was counted and
+     * every movement that got them there (who sold what at the till, what
+     * came in), then what happened after. Opened from the numbers.
+     */
+    private function storyAction(): Action
+    {
+        return Action::make('story')
+            ->modalHeading(fn (StockTakeResult $record) => $record->product?->name ?? 'What happened')
+            ->modalDescription('What the books said when it was counted, and how they got there.')
+            ->modalContent(fn (StockTakeResult $record) => view('filament.vendor.stock-take.count-story', [
+                's' => app(\App\Services\StockTake\StockTakeStory::class)->for($record),
+            ]))
+            ->slideOver()
+            ->modalWidth('2xl')
+            ->modalSubmitAction(false)
+            ->modalCancelActionLabel('Close');
+    }
+
+    /**
+     * What the phone card shows for one count (result-card.blade.php): the
+     * same facts as the desktop columns, worked out the same way.
+     */
+    public function cardData(StockTakeResult $r): array
+    {
+        $money = ProductForm::canSeeCostPrice();
+
+        return [
+            'aisles'    => $this->aislesOf($r),
+            'breakdown' => $this->breakdownOf($r),
+            'flags'     => $this->flagsOf($r),
+            'pair'      => $this->pairLine($r, $money),
+            'books'     => $r->applied_system_qty ?? $r->system_qty_at_count,
+            'gap'       => $r->applied_adjustment_qty ?? $r->variance_qty,
+            'value'     => $money ? self::valueOf($r) : null,
+        ];
     }
 
     /** The current ₦ figure: as applied once approved, as found before. */

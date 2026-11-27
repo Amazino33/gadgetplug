@@ -349,3 +349,87 @@
 @media (prefers-reduced-motion: reduce) {
     .gp-shimmer { animation: none; }
 }
+
+/* Stock take results on a phone: one card per count (result-card.blade.php),
+   no header row and no separate actions column (the card has its own
+   buttons), so nothing is wider than the screen. */
+@media (max-width: 767px) {
+    .gp-st-results .fi-ta-table > thead {
+        display: none;
+    }
+
+    .gp-st-results .fi-ta-row > td.fi-ta-cell:has(> .fi-ta-actions) {
+        display: none;
+    }
+
+    .gp-st-results td.fi-ta-cell-mobile-card {
+        width: 100%;
+        padding: 0 0.75rem;
+        white-space: normal;
+    }
+
+    .gp-st-results td.fi-ta-cell-mobile-card > .fi-ta-col {
+        display: block;
+        width: 100%;
+    }
+
+    .gp-st-results .fi-ta-header-toolbar > :nth-child(2) {
+        flex-wrap: wrap;
+        width: 100%;
+        gap: 0.5rem;
+    }
+
+    .gp-st-results .fi-ta-search-field {
+        flex: 1 1 100%;
+    }
+
+    .gp-st-results .fi-ta-col-manager-dropdown {
+        display: none;
+    }
+}
+
+/* Stock take page on a phone: the summary tiles two to a row, compact. */
+@media (max-width: 767px) {
+    .fi-resource-stock-takes .fi-wi-stats-overview-stat {
+        padding: 0.875rem 1rem;
+    }
+
+    .fi-resource-stock-takes .fi-wi-stats-overview-stat-value {
+        font-size: 1.375rem;
+        line-height: 1.75rem;
+    }
+
+    .fi-resource-stock-takes .fi-wi-stats-overview-stat-description {
+        font-size: 0.75rem;
+    }
+}
+
+/* The other stock take lists on a phone: one card per row (mobile-row.blade.php),
+   the same way as the results. No select box on a phone: one card, one decision. */
+@media (max-width: 767px) {
+    .gp-phone-cards .fi-ta-table > thead {
+        display: none;
+    }
+
+    .gp-phone-cards .fi-ta-row > td.fi-ta-cell:has(> .fi-ta-actions),
+    .gp-phone-cards .fi-ta-row > td.fi-ta-selection-cell,
+    .gp-st-results .fi-ta-row > td.fi-ta-selection-cell,
+    .gp-st-results .fi-ta-table > thead th.fi-ta-selection-cell {
+        display: none;
+    }
+
+    .gp-phone-cards td.fi-ta-cell-mobile-card {
+        width: 100%;
+        padding: 0 0.75rem;
+        white-space: normal;
+    }
+
+    .gp-phone-cards td.fi-ta-cell-mobile-card > .fi-ta-col {
+        display: block;
+        width: 100%;
+    }
+
+    .gp-phone-cards .fi-ta-search-field {
+        flex: 1 1 100%;
+    }
+}

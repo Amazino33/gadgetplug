@@ -15,6 +15,9 @@ use Livewire\Attributes\On;
  */
 class StockTakeProgress extends StatsOverviewWidget
 {
+    // Two to a row on a phone, so the counts are reached without a long scroll.
+    protected int|array|null $columns = ['default' => 2, 'lg' => 4];
+
     protected static bool $isDiscovered = false;
 
     public ?Model $record = null;
