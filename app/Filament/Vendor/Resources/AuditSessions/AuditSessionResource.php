@@ -317,6 +317,29 @@ class AuditSessionResource extends Resource
                     ->color(fn (AuditSession $r): string => $r->loss_value > 0 ? 'danger' : 'gray'
                     ),
 
+                // Why the owner decided a count they made themselves (Stock Take).
+                TextColumn::make('note')
+                    ->label('Note')
+                    ->placeholder('—')
+                    ->wrap()
+                    ->limit(80)
+                    ->toggleable(),
+
+            ])
+            // Opened from a Stock Take row on Audit Sessions: that task's lines.
+            ->filters([
+                \Filament\Tables\Filters\SelectFilter::make('stock_take_task')
+                    ->label('Stock take task')
+                    ->options(fn () => \App\Models\StockTakeTask::query()
+                        ->where('vendor_id', filament()->getTenant()?->id)
+                        ->whereHas('auditLines')
+                        ->with(['stockTake:id,reference', 'assignee:id,name'])
+                        ->latest('submitted_at')
+                        ->limit(200)
+                        ->get()
+                        ->mapWithKeys(fn ($t) => [$t->id => "{$t->stockTake?->reference} · {$t->assignee?->name} · " . $t->submitted_at?->format('d M')])
+                        ->all())
+                    ->query(fn ($query, array $data) => blank($data['value'] ?? null) ? $query : $query->where('stock_take_task_id', $data['value'])),
             ])
             // Shared with the Count Sessions drill-in so both surfaces offer
             // exactly the same actions from a single definition.

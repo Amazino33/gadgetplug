@@ -6,6 +6,7 @@ import { replaceSearchIndex } from '../lib/searchIndex';
 import { syncHeldSales } from '../lib/heldSales';
 import { markSaleSynced } from '../lib/salesHistory';
 import { salesToSync } from '../lib/syncQueue';
+import { reportTillState } from '../lib/tillState';
 import { markPickingPaymentSynced, pendingPickingPayments, prunePickingPayments } from '../lib/pickings';
 import {
     applyServerShift, clearSyncFailure, closeMustWait, detachFromWrongDay,
@@ -86,6 +87,12 @@ export function useSync(vendorId, cashierId, onStuckSalesChange) {
         try { await syncHeldSales(vendorId, cashierId); } catch { /* next sync tries again */ }
         await syncShifts();
         await reportStuck();
+
+        // Whatever is still waiting on this till, for Stock Take's approval
+        // screen. Every unsynced sale counts, the stuck ones included: they
+        // happened, and the server has not heard of them.
+        const stillWaiting = await db.offlineSales.where('synced').equals(0).toArray();
+        await reportTillState(api, vendorId, stillWaiting);
     };
 
     /**

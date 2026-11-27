@@ -15,4 +15,12 @@ class ListCountSessions extends ListRecords
     {
         return [];
     }
+
+    /** Stock Take's approved tasks, in the same columns, below the counts. */
+    protected function getFooterWidgets(): array
+    {
+        return filament()->getTenant()?->hasStockTake()
+            ? [\App\Filament\Vendor\Resources\CountSessions\Widgets\StockTakeAudits::class]
+            : [];
+    }
 }

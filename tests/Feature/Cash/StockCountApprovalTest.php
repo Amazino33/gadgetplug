@@ -200,3 +200,46 @@ test('the counted figures can never be edited, even by an approver', function ()
     expect(fn () => $count->lines->first()->update(['counted_quantity' => 10]))
         ->toThrow(LogicException::class);
 });
+
+test('approving a count adopted from an inventory count does not move stock a second time', function () {
+    $ctx = countContext();
+
+    // The blind count already corrected the shelf from 10 to 7 when it finished.
+    ProductStoreStock::where('product_id', $ctx['product']->id)
+        ->where('store_id', $ctx['store']->id)
+        ->first()
+        ->update(['quantity' => 7]);
+
+    $session = App\Models\BlindCountSession::create([
+        'vendor_id'        => $ctx['vendor']->id,
+        'store_id'         => $ctx['store']->id,
+        'status'           => 'completed',
+        'frequency'        => 'daily',
+        'product_order'    => [$ctx['product']->id],
+        'storekeeper_a_id' => $ctx['keeper']->id,
+        'storekeeper_b_id' => $ctx['collector']->id,
+    ]);
+
+    App\Models\AuditSession::create([
+        'vendor_id'              => $ctx['vendor']->id,
+        'blind_count_session_id' => $session->id,
+        'product_id'             => $ctx['product']->id,
+        'system_quantity'        => 10,
+        'storekeeper_a_id'       => $ctx['keeper']->id,
+        'storekeeper_b_id'       => $ctx['collector']->id,
+        'count_a'                => 7,
+        'count_b'                => 7,
+        'status'                 => 'verified',
+    ]);
+
+    $count = app(App\Actions\Inventory\AdoptAuditCountAction::class)->execute($session, $ctx['keeper']);
+
+    app(ApproveStockCountAction::class)->approve(
+        $count, $ctx['collector'], PhysicalStockCount::OUTCOME_WRITTEN_OFF,
+    );
+
+    expect(ProductStoreStock::where('product_id', $ctx['product']->id)
+        ->where('store_id', $ctx['store']->id)->value('quantity'))->toBe(7)
+        ->and($count->fresh()->status)->toBe(PhysicalStockCount::STATUS_APPROVED)
+        ->and(App\Models\InventoryLedger::where('transaction_type', 'count_adjustment')->exists())->toBeFalse();
+});

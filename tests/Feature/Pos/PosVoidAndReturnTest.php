@@ -90,3 +90,35 @@ it('processes a return and records a pos_return ledger entry without erroring', 
         ->and(InventoryLedger::where('product_id', $context['product']->id)->where('transaction_type', 'pos_return')->exists())->toBeTrue()
         ->and($context['product']->fresh()->stock_quantity)->toBe(9);
 });
+
+it('puts returned goods back at the branch the sale was rung in, not the default branch', function () {
+    $context = voidReturnContext();
+    Sanctum::actingAs($context['owner']);
+
+    $sale = $this->postJson('/api/pos/sales', [
+        'vendor_id' => $context['vendor']->id,
+        'items'     => [[
+            'product_id'   => $context['product']->id,
+            'product_name' => 'Void Return Product',
+            'unit_price'   => 3000,
+            'quantity'     => 2,
+        ]],
+        'payment_method'  => 'cash',
+        'amount_tendered' => 6000,
+        'vat_rate'        => 0,
+    ])->json();
+
+    // As though the sale had been rung at a second branch.
+    $branch = \App\Models\Store::create(['vendor_id' => $context['vendor']->id, 'name' => 'Second Branch']);
+    PosSale::whereKey($sale['id'])->update(['store_id' => $branch->id]);
+
+    $this->postJson("/api/pos/sales/{$sale['id']}/return", [
+        'items'         => [['product_id' => $context['product']->id, 'quantity' => 1]],
+        'refund_method' => 'cash',
+    ])->assertSuccessful();
+
+    $ledger = InventoryLedger::where('product_id', $context['product']->id)->where('transaction_type', 'pos_return')->first();
+
+    expect($ledger->store_id)->toBe($branch->id)
+        ->and((int) \App\Models\ProductStoreStock::where('product_id', $context['product']->id)->where('store_id', $branch->id)->value('quantity'))->toBe(1);
+});

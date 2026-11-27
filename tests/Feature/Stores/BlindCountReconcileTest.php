@@ -32,6 +32,7 @@ uses(RefreshDatabase::class);
 function reconcileVendor(): Vendor
 {
     $vendor = Vendor::create([
+        'inventory_count_enabled' => true, // this shop uses the old Inventory Count
         'user_id' => User::factory()->create()->id,
         'name' => 'Reconcile Vendor '.uniqid(),
     ]);

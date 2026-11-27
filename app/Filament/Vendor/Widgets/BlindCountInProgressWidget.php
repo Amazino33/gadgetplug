@@ -15,6 +15,12 @@ class BlindCountInProgressWidget extends Widget
 
     protected string $view = 'filament.vendor.widgets.blind-count-in-progress';
 
+    /** Not shown where the old Inventory Count is switched off. */
+    public static function canView(): bool
+    {
+        return (bool) filament()->getTenant()?->hasInventoryCount();
+    }
+
     public function getSessions(): Collection
     {
         $vendor = filament()->getTenant();

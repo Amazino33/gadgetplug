@@ -30,8 +30,8 @@ class ProductExporter
     private const CHUNK = 500;
 
     /**
-     * @param  array{category_id?: int|null, status?: string|null, low_stock_only?: bool}  $filters
-     * @return string absolute path to the written file
+     * @param  array{category_id?: int|null, status?: string|null, low_stock_only?: bool, ids?: array<int, int>}  $filters
+     * @return string  absolute path to the written file
      */
     public function export(Vendor $vendor, string $format = 'csv', array $filters = [], ?string $path = null): string
     {
@@ -194,6 +194,8 @@ class ProductExporter
         return Product::query()
             ->with(['category:id,name', 'supplier:id,name', 'units', 'barcodes'])
             ->where('vendor_id', $vendor->id)
+            // Just these products (Export on the Products list's selection).
+            ->when(isset($filters['ids']), fn ($q) => $q->whereIn('id', $filters['ids']))
             ->when(filled($filters['category_id'] ?? null), fn ($q) => $q->where('category_id', $filters['category_id']))
             ->when(filled($filters['status'] ?? null), fn ($q) => $q->where('status', $filters['status']))
             ->when(

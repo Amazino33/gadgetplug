@@ -192,8 +192,11 @@ class ProductsTable
                             ->label('My Physical Count')
                             ->required(),
                     ])
-                    ->visible(fn (?Product $record): bool => $record !== null &&
-                        ! AuditSession::where('product_id', $record->id)->where('status', 'pending')->exists()
+                    ->visible(fn (?Product $record): bool =>
+                        $record !== null &&
+                        // Part of the old Inventory Count, switched per shop.
+                        (bool) filament()->getTenant()?->hasInventoryCount() &&
+                        !AuditSession::where('product_id', $record->id)->where('status', 'pending')->exists()
                     )
                     ->action(function (Product $record, array $data): void {
                         AuditSession::create([

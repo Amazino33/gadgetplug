@@ -6,6 +6,8 @@
 @source '../../../../app/Filament/Vendor/**/*';
 @source '../../../../resources/views/filament/vendor/**/*';
 @source '../../../../resources/views/livewire/assistant/**/*';
+/* The Products list builds some class names in its script (stock and status colours). */
+@source '../../../../resources/js/products-list.js';
 
 /* Sidebar menu filter (resources/views/filament/vendor/partials/nav-search.blade.php).
    Plain CSS rather than utility classes: this markup is injected through a render
@@ -326,3 +328,24 @@
 }
 @keyframes gp-chat-dot { 0%, 80%, 100% { opacity: 0.25; } 40% { opacity: 1; } }
 [x-cloak] { display: none !important; }
+/* Products list: the shimmer on rows and numbers still loading. */
+@keyframes gp-shimmer {
+    0% { background-position: -400px 0; }
+    100% { background-position: 400px 0; }
+}
+
+.gp-shimmer {
+    background: linear-gradient(90deg, rgb(229 231 235) 0px, rgb(243 244 246) 120px, rgb(229 231 235) 240px);
+    background-size: 800px 100%;
+    animation: gp-shimmer 1.3s linear infinite;
+    border-radius: 0.375rem;
+}
+
+.dark .gp-shimmer {
+    background: linear-gradient(90deg, rgb(31 41 55) 0px, rgb(55 65 81) 120px, rgb(31 41 55) 240px);
+    background-size: 800px 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .gp-shimmer { animation: none; }
+}

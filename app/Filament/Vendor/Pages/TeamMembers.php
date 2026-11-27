@@ -48,8 +48,8 @@ class TeamMembers extends Page
         setPermissionsTeamId($vendor->id);
 
         return [
-            'owner' => $vendor->user,
-            'members' => $vendor->users()->get(),
+            'owner'   => $vendor->user,
+            'members' => $vendor->users()->whereDoesntHave('counterProfile')->get(), // counters: Inventory → Counters
         ];
     }
 

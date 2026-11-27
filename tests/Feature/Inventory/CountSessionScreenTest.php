@@ -26,8 +26,9 @@ function countSessionContext(int $stock = 10): array
     $staff = User::factory()->create();
 
     $vendor = Vendor::create([
-        'user_id' => $owner->id,
-        'name' => 'Leisure Hub',
+        'inventory_count_enabled' => true, // this shop uses the old Inventory Count
+        'user_id'                      => $owner->id,
+        'name'                         => 'Leisure Hub',
         'pos_blind_count_participants' => 1,
     ]);
     $vendor->users()->attach($staff->id);

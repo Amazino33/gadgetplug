@@ -1,10 +1,37 @@
 {
-  "_ModalShell-BTQadsIA.js": {
-    "file": "assets/ModalShell-BTQadsIA.js",
-    "name": "ModalShell"
+  "_CameraScanner-DRGGuZgB.js": {
+    "file": "assets/CameraScanner-DRGGuZgB.js",
+    "name": "CameraScanner",
+    "imports": [
+      "_index-DHed1tRg.js"
+    ],
+    "dynamicImports": [
+      "node_modules/@zxing/browser/esm/index.js"
+    ]
+  },
+  "_ModalShell-CxxVTqvZ.js": {
+    "file": "assets/ModalShell-CxxVTqvZ.js",
+    "name": "ModalShell",
+    "imports": [
+      "_index-DHed1tRg.js"
+    ]
+  },
+  "_import-wrapper-prod-D8rRdVuK.js": {
+    "file": "assets/import-wrapper-prod-D8rRdVuK.js",
+    "name": "import-wrapper-prod"
+  },
+  "_index-DHed1tRg.js": {
+    "file": "assets/index-DHed1tRg.js",
+    "name": "index"
+  },
+  "node_modules/@zxing/browser/esm/index.js": {
+    "file": "assets/index-B2ZkNDM-.js",
+    "name": "index",
+    "src": "node_modules/@zxing/browser/esm/index.js",
+    "isDynamicEntry": true
   },
   "resources/css/app.css": {
-    "file": "assets/app-D5CSYnbY.css",
+    "file": "assets/app-FtWvcX-V.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "name": "app",
@@ -13,7 +40,7 @@
     ]
   },
   "resources/css/filament/admin/theme.css": {
-    "file": "assets/theme-DkJuoZRH.css",
+    "file": "assets/theme-BB1Fv5Bc.css",
     "src": "resources/css/filament/admin/theme.css",
     "isEntry": true,
     "name": "theme",
@@ -22,8 +49,20 @@
     ]
   },
   "resources/css/filament/vendor/theme.css": {
-    "file": "assets/theme-Db45abyr.css",
+    "file": "assets/theme-Cd8Qb9c5.css",
     "src": "resources/css/filament/vendor/theme.css"
+  },
+  "resources/fonts/poppins/poppins-500.woff2": {
+    "file": "assets/poppins-500-C8OXljZJ.woff2",
+    "src": "resources/fonts/poppins/poppins-500.woff2"
+  },
+  "resources/fonts/poppins/poppins-600.woff2": {
+    "file": "assets/poppins-600-zEkxB9Mr.woff2",
+    "src": "resources/fonts/poppins/poppins-600.woff2"
+  },
+  "resources/fonts/poppins/poppins-700.woff2": {
+    "file": "assets/poppins-700-Qrb0O0WB.woff2",
+    "src": "resources/fonts/poppins/poppins-700.woff2"
   },
   "resources/js/app.js": {
     "file": "assets/app-BkMfzF6k.js",
@@ -32,15 +71,22 @@
     "isEntry": true
   },
   "resources/js/pos/main.jsx": {
-    "file": "assets/main-BsVRRewU.js",
+    "file": "assets/main-BTn9nI63.js",
     "name": "main",
     "src": "resources/js/pos/main.jsx",
     "isEntry": true,
     "imports": [
-      "_ModalShell-BTQadsIA.js"
+      "_index-DHed1tRg.js",
+      "_import-wrapper-prod-D8rRdVuK.js",
+      "_ModalShell-CxxVTqvZ.js"
     ],
     "css": [
-      "assets/main-Di3647SV.css"
+      "assets/main-DTFkklUp.css"
+    ],
+    "assets": [
+      "assets/poppins-500-C8OXljZJ.woff2",
+      "assets/poppins-600-zEkxB9Mr.woff2",
+      "assets/poppins-700-Qrb0O0WB.woff2"
     ]
   },
   "resources/js/product-quick-form.js": {
@@ -49,16 +95,24 @@
     "src": "resources/js/product-quick-form.js",
     "isEntry": true
   },
+  "resources/js/products-list.js": {
+    "file": "assets/products-list-DsppIKoQ.js",
+    "name": "products-list",
+    "src": "resources/js/products-list.js",
+    "isEntry": true
+  },
   "resources/js/purchases/main.jsx": {
-    "file": "assets/main-CsYc_WI4.js",
+    "file": "assets/main-64ta1N_g.js",
     "name": "main",
     "src": "resources/js/purchases/main.jsx",
     "isEntry": true,
     "imports": [
-      "_ModalShell-BTQadsIA.js"
+      "_index-DHed1tRg.js",
+      "_ModalShell-CxxVTqvZ.js",
+      "_CameraScanner-DRGGuZgB.js"
     ],
     "css": [
-      "assets/main-BHUiCHx8.css"
+      "assets/main-CuIiobTb.css"
     ]
   },
   "resources/js/pwa.js": {
@@ -66,6 +120,23 @@
     "name": "pwa",
     "src": "resources/js/pwa.js",
     "isEntry": true
+  },
+  "resources/js/stock-take/main.jsx": {
+    "file": "assets/main-CdjJPTAo.js",
+    "name": "main",
+    "src": "resources/js/stock-take/main.jsx",
+    "isEntry": true,
+    "imports": [
+      "_index-DHed1tRg.js",
+      "_import-wrapper-prod-D8rRdVuK.js",
+      "_CameraScanner-DRGGuZgB.js"
+    ],
+    "dynamicImports": [
+      "node_modules/@zxing/browser/esm/index.js"
+    ],
+    "css": [
+      "assets/main-DzWluQs2.css"
+    ]
   },
   "resources/js/vendor-tours.js": {
     "file": "assets/vendor-tours-C_n4_Rxy.js",

@@ -36,10 +36,13 @@ export default defineConfig({
                 'resources/css/filament/admin/theme.css',
                 'resources/js/pos/main.jsx',
                 'resources/js/purchases/main.jsx',
+                'resources/js/stock-take/main.jsx',
                 // Vendor-panel only (see resources/views/components/vendor-tours.blade.php)
                 'resources/js/vendor-tours.js',
                 // The product pop-up on the vendor Products list.
                 'resources/js/product-quick-form.js',
+                // The Products list's own script: the whole branch kept in the browser.
+                'resources/js/products-list.js',
             ],
             refresh: true,
         }),

@@ -187,10 +187,14 @@ test('grid mode renders a real multi-column CSS grid, and table mode does not', 
     Filament::setCurrentPanel(Filament::getPanel('vendor'));
     Filament::setTenant($data['vendor']);
 
-    $tableHtml = Livewire::test(ListProducts::class)->html();
+    // The page the server draws first (shown until the list in the browser
+    // starts; that one carries both layouts and switches between them).
+    $firstPage = fn (string $html) => \Illuminate\Support\Str::before(\Illuminate\Support\Str::after($html, 'data-first-page>'), 'x-show="waitingForAll"');
+
+    $tableHtml = $firstPage(Livewire::test(ListProducts::class)->html());
     expect($tableHtml)->not->toContain('sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4');
 
-    $gridHtml = Livewire::test(ListProducts::class, ['displayMode' => 'grid'])->html();
+    $gridHtml = $firstPage(Livewire::test(ListProducts::class, ['displayMode' => 'grid'])->html());
     expect($gridHtml)->toContain('sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4');
 });
 

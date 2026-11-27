@@ -15,6 +15,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Receipt {{ $sale->reference }}</title>
 <style>
+    /* Poppins, served from the app's own build (the same files the till's
+       offline receipt uses), so both receipts print in the same face. */
+    @foreach ([500, 600, 700] as $weight)
+    @font-face { font-family: "Poppins"; font-style: normal; font-weight: {{ $weight }}; font-display: block; src: url("{{ \Illuminate\Support\Facades\Vite::asset("resources/fonts/poppins/poppins-{$weight}.woff2") }}") format("woff2"); }
+    @endforeach
+
     /* 80mm roll, printed edge to edge. The 4mm margin keeps text off the
        tear-off edge on the common Xprinter/Epson heads. */
     /* No top margin: thermal paper is consumed top-down and the printer
@@ -33,9 +39,11 @@
     }
 
     body {
-        /* Monospace keeps the money column aligned — the single biggest reason
-           thermal receipts look "not arranged" is a proportional font. */
-        font-family: "Courier New", "DejaVu Sans Mono", monospace;
+        /* Poppins: a clean modern sans. Columns are laid out with flex rows,
+           not padded spaces, so a proportional face keeps them in line, and
+           tabular figures keep the money column's digits the same width. */
+        font-family: "Poppins", "Segoe UI", Arial, sans-serif;
+        font-variant-numeric: tabular-nums;
         font-size: 13px;
         line-height: 1.4;
         width: 72mm;          /* 80mm paper minus the printer's own margins */
@@ -44,9 +52,9 @@
         /* Everything is bold on purpose. A thermal head burns dots: it has no
            grey, so the driver halftones anti-aliased edges and thin strokes come
            out banded and broken — which is what a light Courier at 11px does on
-           real paper. Bold gives every stroke enough width to survive that.
-           Monospace advance widths do not change when bold, so the columns hold. */
-        font-weight: bold;
+           real paper. SemiBold gives every stroke enough width to survive that
+           while staying crisp; headings and totals step up to Bold. */
+        font-weight: 600;
 
         /* Stops the browser lightening anything on its way to the driver, which
            would hand it more grey to halftone. */

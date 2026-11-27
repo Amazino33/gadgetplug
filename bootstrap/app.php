@@ -27,7 +27,14 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->redirectUsersTo(fn (Request $request) => LoginResponse::resolveDashboardUrl($request->user() ?? auth()->user()));
+        // A counter whose session has ended goes back to the shop's QR sign-in
+        // (remembered in a cookie the app itself set), not to the staff login.
+        $middleware->redirectGuestsTo(function (Request $request) {
+            $join = $request->is('stock-take/*') ? (string) $request->cookie('stock_take_join') : '';
+
+            return $join !== '' && str_starts_with($join, url('/stock-take/')) ? $join : route('login');
+        });
+        $middleware->redirectUsersTo(fn (Request $request) => \App\Http\Responses\LoginResponse::resolveDashboardUrl($request->user() ?? auth()->user()));
 
         // No statefulApi(): the only API is the till's, and it authenticates
         // by bearer token alone (see config/sanctum.php 'guard'). Starting the

@@ -265,6 +265,69 @@ Route::middleware(['auth', App\Http\Middleware\EnsureCanRecordPurchases::class])
             ->whereNumber('purchase')->name('payments.store');
     });
 
+// Stock Take as an app on the phone (release 2, A8): its service worker,
+// which controls /stock-take/ only (never the till's pages), and the
+// home-screen manifest. Before the app's routes, so "sw.js" is never taken
+// for a shop's name. No login: a browser fetches these without one.
+Route::get('/stock-take/sw.js', [App\Http\Controllers\StockTake\StockTakePwaController::class, 'worker'])->name('stock-take.sw');
+Route::get('/stock-take/{vendor:slug}/manifest.webmanifest', [App\Http\Controllers\StockTake\StockTakePwaController::class, 'manifest'])->name('stock-take.manifest');
+
+// The whole Products list for the branch, for the Products page to keep in
+// the browser and search, filter, sort and page with no waiting.
+Route::get('/vendor-api/{vendor:slug}/products-catalogue', App\Http\Controllers\Vendor\ProductCatalogueController::class)
+    ->middleware('auth')->name('vendor.products.catalogue');
+
+// Counters sign in here, from the shop's QR code (release 2): their name and a
+// 6-digit code, no account to find. Public on purpose; the QR's secret is what
+// opens it, and wrong codes are limited per counter and per address.
+Route::get('/stock-take/{vendor:slug}/join', [App\Http\Controllers\StockTake\StockTakeJoinController::class, 'show'])->name('stock-take.join');
+Route::post('/stock-take/{vendor:slug}/join', [App\Http\Controllers\StockTake\StockTakeJoinController::class, 'join'])
+    ->middleware('throttle:20,1')->name('stock-take.join.attempt');
+Route::post('/stock-take/{vendor:slug}/sign-out', [App\Http\Controllers\StockTake\StockTakeJoinController::class, 'signOut'])
+    ->middleware('auth')->name('stock-take.sign-out');
+
+// Stock Take — the phone app: My Tasks and aisle mapping (counting arrives in
+// a later step). Admin screens for it live in the vendor panel.
+Route::middleware(['auth', App\Http\Middleware\EnsureCanUseStockTake::class])
+    ->prefix('stock-take/{vendor:slug}')
+    ->name('stock-take.')
+    ->group(function () {
+        $app = App\Http\Controllers\StockTake\StockTakeAppController::class;
+
+        Route::get('/', [$app, 'show'])->name('index');
+        Route::get('/api/home', [$app, 'home'])->name('home');
+        Route::get('/api/csrf', [$app, 'csrf'])->name('csrf');
+        Route::get('/api/aisles', [$app, 'aisles'])->name('aisles');
+        Route::get('/api/aisles/{aisle}', [$app, 'aisle'])->whereNumber('aisle')->name('aisle');
+        Route::post('/api/aisles/{aisle}/scan', [$app, 'scan'])->whereNumber('aisle')->name('scan');
+        Route::post('/api/aisles/{aisle}/products', [$app, 'addProduct'])->whereNumber('aisle')->name('aisle.add');
+        Route::post('/api/aisles/{aisle}/map', [$app, 'mapMany'])->whereNumber('aisle')->name('aisle.map');
+        Route::get('/api/mapping-catalogue', [$app, 'mappingCatalogue'])->name('mapping-catalogue');
+        Route::delete('/api/aisles/{aisle}/products/{product}', [$app, 'removeProduct'])
+            ->whereNumber('aisle')->whereNumber('product')->name('aisle.remove');
+        Route::get('/api/products', [$app, 'search'])->name('search');
+        Route::post('/api/unknown-items', [$app, 'storeUnknown'])->name('unknown.store');
+        Route::post('/api/tasks/{task}/finish', [$app, 'finishTask'])->whereNumber('task')->name('tasks.finish');
+
+        // Counting a count or recount task.
+        $count = App\Http\Controllers\StockTake\StockTakeCountController::class;
+
+        Route::get('/api/tasks/{task}', [$count, 'show'])->whereNumber('task')->name('tasks.show');
+        // Counting offline (release 2): one download, then batches of what was counted.
+        Route::get('/api/tasks/{task}/pack', [$count, 'pack'])->whereNumber('task')->name('tasks.pack');
+        Route::post('/api/tasks/{task}/sync', [$count, 'sync'])->whereNumber('task')->name('tasks.sync');
+        Route::get('/api/tasks/{task}/entries', [$count, 'entries'])->whereNumber('task')->name('tasks.entries');
+        Route::post('/api/tasks/{task}/scan', [$count, 'scan'])->whereNumber('task')->name('tasks.scan');
+        Route::post('/api/tasks/{task}/pick', [$count, 'pick'])->whereNumber('task')->name('tasks.pick');
+        Route::post('/api/tasks/{task}/entries', [$count, 'save'])->whereNumber('task')->name('tasks.save');
+        Route::delete('/api/tasks/{task}/entries/{entry}', [$count, 'destroy'])
+            ->whereNumber('task')->whereNumber('entry')->name('tasks.entries.destroy');
+        Route::post('/api/tasks/{task}/unknown-items', [$count, 'storeUnknown'])->whereNumber('task')->name('tasks.unknown');
+        Route::post('/api/tasks/{task}/aisles', [$count, 'addAisle'])->whereNumber('task')->name('tasks.aisles.add');
+        Route::get('/api/tasks/{task}/missing', [$count, 'missing'])->whereNumber('task')->name('tasks.missing');
+        Route::post('/api/tasks/{task}/submit', [$count, 'submit'])->whereNumber('task')->name('tasks.submit');
+    });
+
 // Procurement Wizard
 Route::middleware(['auth'])->prefix('procurement')->name('procurement.')->group(function () {
     Route::get('/create', [ProcurementWizardController::class, 'create'])->name('create');

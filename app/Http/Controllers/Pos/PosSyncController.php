@@ -296,6 +296,13 @@ class PosSyncController extends Controller
                             description: PosSaleController::stockDescription('Offline shop sale sync', $item),
                             store: $sale->store_id,
                             allowNegative: $product ? NegativeStock::allowed($product, $vendor) : false,
+                            // The goods left at the till's time, not when it
+                            // reached signal. A stock take counting the shelf
+                            // in between depends on knowing which side of the
+                            // count this sale fell. A till clock running fast
+                            // is held to now: nothing leaves the shelf later
+                            // than the moment the sale reached the server.
+                            occurredAt: $sale->completed_at?->isFuture() ? now() : $sale->completed_at,
                         );
 
                         if ($adjustStock->lastShortfall > 0) {

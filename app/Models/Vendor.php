@@ -20,7 +20,7 @@ class Vendor extends Model
         'description', 'whatsapp', 'city', 'state', 'bank_name', 'account_number', 'account_name',
         'pos_vat_enabled', 'pos_vat_rate', 'pos_blind_count_participants',
         'pos_blind_count_frequency', 'pos_blind_count_custom_days', 'owner_can_manage_roles',
-        'pos_min_margin_percent', 'online_sales_enabled', 'initial_capital',
+        'pos_min_margin_percent', 'online_sales_enabled', 'initial_capital', 'stock_take_enabled', 'inventory_count_enabled',
         'dashboard_blocked', 'dashboard_blocked_reason', 'dashboard_blocked_at',
         'restock_window_days', 'restock_lead_time_days', 'restock_target_cover_days', 'restock_safety_buffer_days',
         'allow_negative_stock', 'pos_ask_quantity', 'pos_allow_price_change', 'enable_gadget_fields',
@@ -62,12 +62,14 @@ class Vendor extends Model
         'pos_allow_price_change' => 'boolean',
         'allow_half_quantities' => 'boolean',
         'half_quantities_disabled_at' => 'datetime',
-        'online_sales_enabled' => 'boolean',
-        'dashboard_blocked' => 'boolean',
-        'dashboard_blocked_at' => 'datetime',
-        'initial_capital' => 'decimal:2',
-        'restock_window_days' => 'integer',
-        'restock_lead_time_days' => 'integer',
+        'online_sales_enabled'      => 'boolean',
+        'stock_take_enabled'        => 'boolean',
+        'inventory_count_enabled'   => 'boolean',
+        'dashboard_blocked'         => 'boolean',
+        'dashboard_blocked_at'      => 'datetime',
+        'initial_capital'           => 'decimal:2',
+        'restock_window_days'       => 'integer',
+        'restock_lead_time_days'    => 'integer',
         'restock_target_cover_days' => 'integer',
         'restock_safety_buffer_days' => 'integer',
         'info_requested'            => 'boolean',
@@ -228,6 +230,36 @@ class Vendor extends Model
     public function stores()
     {
         return $this->hasMany(Store::class);
+    }
+
+    public function aisles()
+    {
+        return $this->hasMany(Aisle::class);
+    }
+
+    public function stockTakes()
+    {
+        return $this->hasMany(StockTake::class);
+    }
+
+    public function stockTakeTasks()
+    {
+        return $this->hasMany(StockTakeTask::class);
+    }
+
+    /** Stock Take is switched on for this shop (admin panel → Vendors). */
+    public function hasStockTake(): bool
+    {
+        return (bool) $this->stock_take_enabled;
+    }
+
+    /**
+     * The old Inventory Count (blind count) is on for this shop. Off for new
+     * shops; on for those that had it when the switch was added.
+     */
+    public function hasInventoryCount(): bool
+    {
+        return (bool) $this->inventory_count_enabled;
     }
 
     // The one store a vendor falls back to when nothing else has been chosen —

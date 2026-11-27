@@ -82,6 +82,16 @@ class Store extends Model
         return Order::query()->whereHas('items.storeAllocations', fn ($q) => $q->where('store_id', $this->id));
     }
 
+    public function aisles(): HasMany
+    {
+        return $this->hasMany(Aisle::class);
+    }
+
+    public function stockTakes(): HasMany
+    {
+        return $this->hasMany(StockTake::class);
+    }
+
     public function orderItemAllocations(): HasMany
     {
         return $this->hasMany(OrderItemStoreAllocation::class);

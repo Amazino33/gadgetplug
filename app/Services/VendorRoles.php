@@ -30,6 +30,7 @@ class VendorRoles
             'count_stock', 'approve_stock_count',
             'view_store_settlement',
             'view_learn_page',
+            'manage_stock_takes', 'map_aisles',
         ],
         'product_manager' => [
             'view_products', 'view_any_products', 'create_products', 'edit_products', 'delete_products',
@@ -59,6 +60,7 @@ class VendorRoles
             'count_stock', 'approve_stock_count',
             'view_store_settlement',
             'view_learn_page',
+            'manage_stock_takes', 'map_aisles',
         ],
         'storekeeper' => [
             'view_products', 'view_any_products',
@@ -84,10 +86,18 @@ class VendorRoles
             // shelf you count is one you must not also sign off.
             'count_stock',
             'view_learn_page',
+            // Stock Take counting, for the same reason. manage_stock_takes is
+            // withheld: the approver must not be the counter.
+            'perform_stock_takes',
         ],
         'member' => [
             'view_products', 'view_any_products',
             'view_learn_page',
+        ],
+        // Counters (people who count stock and have no use for the site) hold
+        // this and nothing else; see StockTakeCounters.
+        'counter' => [
+            'perform_stock_takes',
         ],
     ];
 
@@ -107,6 +117,18 @@ class VendorRoles
             self::ROLES,
             fn (array $permissions) => in_array($permission, $permissions, true),
         ));
+    }
+
+    /** Make sure this shop has the Counter role, without touching any other role it has changed. */
+    public static function ensureCounterRole(Vendor $vendor): void
+    {
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+
+        $role = Role::firstOrCreate(['name' => 'counter', 'guard_name' => 'web', 'team_id' => $vendor->id]);
+
+        if ($role->wasRecentlyCreated) {
+            $role->syncPermissions(Permission::whereIn('name', self::ROLES['counter'])->where('guard_name', 'web')->get());
+        }
     }
 
     public static function seedFor(Vendor $vendor): void

@@ -21,8 +21,9 @@ function setUpCadenceVendor(string $frequency = 'daily', ?int $customDays = null
 
     $owner = User::factory()->create();
     $vendor = Vendor::create([
-        'user_id' => $owner->id,
-        'name' => 'Cadence Test Store',
+        'inventory_count_enabled' => true, // this shop uses the old Inventory Count
+        'user_id'                      => $owner->id,
+        'name'                         => 'Cadence Test Store',
         'pos_blind_count_participants' => 1,
         'pos_blind_count_frequency' => $frequency,
         'pos_blind_count_custom_days' => $customDays,

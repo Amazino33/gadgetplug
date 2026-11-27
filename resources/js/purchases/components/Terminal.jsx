@@ -36,6 +36,34 @@ const label = 'mb-1 block text-[11px] font-semibold uppercase tracking-wide text
 
 const emptyFooter = () => ({ supplierId: '', invoice: '', date: today(), notes: '' });
 
+/*
+ * The purchase being typed is never lost to a reload, a closed tab or a dead
+ * battery. Every change is kept on this device at once; and once a supplier
+ * is chosen, it is also saved as a draft on the server a few seconds after
+ * the last change, so it is in Purchase History on any device.
+ */
+const WORK_KEY = `gadgetplug.purchase.${CONFIG.vendorSlug ?? ''}.${CONFIG.userId ?? ''}.${CONFIG.storeId ?? ''}`;
+const AUTOSAVE_MS = 4000;
+
+export function readWork() {
+    try {
+        const work = JSON.parse(localStorage.getItem(WORK_KEY) ?? 'null');
+        return work && Array.isArray(work.lines) ? work : null;
+    } catch {
+        return null;
+    }
+}
+
+function writeWork(work) {
+    try {
+        if (work) localStorage.setItem(WORK_KEY, JSON.stringify(work));
+        else localStorage.removeItem(WORK_KEY);
+    } catch { /* storage full or blocked: the server draft still has it */ }
+}
+
+const hasWork = (lines, footer) => lines.length > 0 || !!footer.supplierId || !!footer.invoice || !!footer.notes;
+const clock = (at) => new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
 /**
  * Clicking or tabbing into a figure selects all of it, so typing 12 over a 1
  * gives 12, not 112 or 12-something. The mouseup that ends the click would
@@ -57,9 +85,14 @@ const selectAll = {
  * a Map; the server is asked only about a code the Map does not know.
  */
 export default function Terminal({ active, resume, onResumed, onSaved, refreshKey = 0 }) {
-    const [lines, setLines]       = useState([]);
-    const [footer, setFooter]     = useState(emptyFooter);
-    const [draft, setDraft]       = useState(null); // { id, reference } when continuing one
+    // What was being typed before a reload, kept on this device.
+    const kept = useRef(undefined);
+    if (kept.current === undefined) kept.current = readWork();
+    const [lines, setLines]       = useState(() => kept.current?.lines ?? []);
+    const [footer, setFooter]     = useState(() => ({ ...emptyFooter(), ...(kept.current?.footer ?? {}) }));
+    const [draft, setDraft]       = useState(() => kept.current?.draft ?? null); // { id, reference } when continuing one
+    // The server copy: { state: 'saving' | 'saved' | 'error', at, text }.
+    const [auto, setAuto]         = useState(() => (kept.current?.draft?.id ? { state: 'saved', at: kept.current.savedAt ?? kept.current.at } : null));
     const [suppliers, setSuppliers] = useState([]);
     const [term, setTerm]         = useState('');
     const [results, setResults]   = useState([]);
@@ -89,6 +122,14 @@ export default function Terminal({ active, resume, onResumed, onSaved, refreshKe
 
     const focusScan = useCallback(() => { if (!TOUCH) setTimeout(() => scanRef.current?.focus(), 0); }, []);
     const say = useCallback((type, text) => setNotice({ type, text, at: Date.now() }), []);
+
+    // The autosave works from the latest values, not the ones of the render that scheduled it.
+    const draftRef  = useRef(draft);
+    draftRef.current = draft;
+    const inflight  = useRef(null);  // the server save in progress, so two never race
+    const autoTimer = useRef(null);
+    const lastSent  = useRef(null);  // what the server already has
+    const round     = useRef(0);     // bumped when a new purchase starts: late answers for the old one are ignored
 
     // ── Catalogue ─────────────────────────────────────────────
     // Swapped in whole once every page has arrived, so a refresh never leaves
@@ -144,6 +185,12 @@ export default function Terminal({ active, resume, onResumed, onSaved, refreshKe
         return () => clearTimeout(t);
     }, [notice]);
 
+    // ── Brought back after a reload ───────────────────────────
+    useEffect(() => {
+        const n = kept.current?.lines?.length ?? 0;
+        if (n > 0) say('ok', `Your purchase was kept: ${n} line${n === 1 ? '' : 's'}, as you left it.`);
+    }, [say]);
+
     // ── A draft opened from History ───────────────────────────
     useEffect(() => {
         if (!resume) return;
@@ -155,6 +202,9 @@ export default function Terminal({ active, resume, onResumed, onSaved, refreshKe
             notes: resume.notes ?? '',
         });
         setDraft({ id: resume.id, reference: resume.reference, awaiting: !!resume.awaiting_approval, by: resume.recorded_by });
+        round.current += 1;
+        lastSent.current = null;
+        setAuto(resume.awaiting_approval ? null : { state: 'saved', at: Date.now() });
         setErrors({});
         onResumed();
         say('ok', resume.awaiting_approval ? `Reviewing ${resume.reference} before receiving it.` : `Continuing draft ${resume.reference}.`);
@@ -169,6 +219,11 @@ export default function Terminal({ active, resume, onResumed, onSaved, refreshKe
     }, []);
 
     const reset = useCallback(() => {
+        round.current += 1;
+        clearTimeout(autoTimer.current);
+        lastSent.current = null;
+        writeWork(null);
+        setAuto(null);
         setLines([]);
         setFooter(emptyFooter());
         setDraft(null);
@@ -308,6 +363,72 @@ export default function Terminal({ active, resume, onResumed, onSaved, refreshKe
         return null;
     };
 
+    const body = () => ({
+        supplier_id: Number(footer.supplierId),
+        invoice_number: footer.invoice || null,
+        purchased_on: footer.date || null,
+        notes: footer.notes || null,
+        lines: toPayload(lines),
+    });
+
+    // ── Kept on this device, on every change ─────────────────
+    useEffect(() => {
+        writeWork(hasWork(lines, footer)
+            ? { lines, footer, draft, at: Date.now(), savedAt: auto?.state === 'saved' ? auto.at : null }
+            : null);
+    }, [lines, footer, draft, auto]);
+
+    // ── Saved as a draft on the server, a moment after the last change ──
+    // Only once it can be (a supplier, good quantities), and never for a
+    // purchase awaiting approval: saving that as a draft would pull it back.
+    const autoSave = async () => {
+        if (busy || draftRef.current?.awaiting || problems(false)) return;
+
+        const payload = body();
+        const sent = JSON.stringify(payload);
+        if (sent === lastSent.current) return;
+
+        const mine = round.current;
+        if (inflight.current) await inflight.current;
+        if (mine !== round.current) return;
+
+        setAuto((a) => ({ ...(a ?? {}), state: 'saving' }));
+        const run = api.post('/purchases', { action: 'draft', id: draftRef.current?.id ?? null, ...payload });
+        const flight = run.then(() => {}, () => {});
+        inflight.current = flight;
+        try {
+            const { data } = await run;
+            if (mine !== round.current) return;
+            lastSent.current = sent;
+            const first = !draftRef.current?.id;
+            const next = { id: data.purchase.id, reference: data.purchase.reference, awaiting: false };
+            draftRef.current = next;
+            setDraft(next);
+            setAuto({ state: 'saved', at: Date.now() });
+            if (first) onSaved?.(); // it is in Purchase History now
+        } catch (err) {
+            if (mine === round.current) setAuto({ state: 'error', text: errorMessage(err), at: Date.now() });
+        } finally {
+            if (inflight.current === flight) inflight.current = null;
+        }
+    };
+    const autoSaveRef = useRef(autoSave);
+    autoSaveRef.current = autoSave;
+
+    useEffect(() => {
+        clearTimeout(autoTimer.current);
+        if (lines.length === 0 || !footer.supplierId) return undefined;
+        autoTimer.current = setTimeout(() => autoSaveRef.current(), AUTOSAVE_MS);
+        return () => clearTimeout(autoTimer.current);
+    }, [lines, footer]);
+
+    // Leaving the page with changes not yet on the server: send them now.
+    useEffect(() => {
+        const leaving = () => { if (document.visibilityState === 'hidden') autoSaveRef.current(); };
+        document.addEventListener('visibilitychange', leaving);
+        return () => document.removeEventListener('visibilitychange', leaving);
+    }, []);
+
     const save = async (action, payment = null) => {
         const problem = problems(action === 'receive');
         if (problem) { say('error', problem); setModal(null); focusScan(); return; }
@@ -315,16 +436,15 @@ export default function Terminal({ active, resume, onResumed, onSaved, refreshKe
         setBusy(true);
         setErrors({});
         setPayError('');
+        clearTimeout(autoTimer.current);
         try {
+            // An autosave on its way may be creating this draft: use its id, never make a second one.
+            if (inflight.current) await inflight.current;
             const { data } = await api.post('/purchases', {
                 action,
-                id: draft?.id ?? null,
-                supplier_id: Number(footer.supplierId),
-                invoice_number: footer.invoice || null,
-                purchased_on: footer.date || null,
-                notes: footer.notes || null,
+                id: draftRef.current?.id ?? null,
+                ...body(),
                 payment,
-                lines: toPayload(lines),
             });
 
             onSaved?.();
@@ -332,6 +452,8 @@ export default function Terminal({ active, resume, onResumed, onSaved, refreshKe
 
             if (action === 'receive') {
                 setModal({ type: 'grn', purchase: data.purchase });
+                // Received: nothing left to keep, and a reload must not bring it back.
+                reset();
                 // Stock, cost and prices have all moved: the next delivery
                 // scans against the catalogue as it now stands.
                 loadCatalogue();
@@ -497,14 +619,21 @@ export default function Terminal({ active, resume, onResumed, onSaved, refreshKe
                     )}
                 </div>
 
-                {draft && (
+                {(draft || lines.length > 0) && (
                     <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-orange-100 dark:border-orange-900 bg-orange-50 dark:bg-orange-950/40 px-4 py-2 text-xs text-orange-800 dark:text-orange-300">
-                        {draft.awaiting ? (
+                        {draft?.awaiting ? (
                             <span>Reviewing <strong>{draft.reference}</strong>{draft.by ? `, submitted by ${draft.by}` : ''} — correct it if needed, then Receive Stock.</span>
                         ) : (
-                            <span>Continuing draft <strong>{draft.reference}</strong></span>
+                            <span aria-live="polite" data-autosave={auto?.state ?? 'local'}>
+                                {auto?.state === 'saving' && <>Saving draft{draft?.reference ? <> <strong>{draft.reference}</strong></> : ''}…</>}
+                                {auto?.state === 'saved' && <>✓ Draft <strong>{draft?.reference}</strong> saved{auto.at ? ` at ${clock(auto.at)}` : ''}. It is in Purchase History.</>}
+                                {auto?.state === 'error' && <>Kept on this device. Not saved to Purchase History yet: {auto.text}</>}
+                                {!auto && (footer.supplierId
+                                    ? 'Kept on this device. Saving it as a draft…'
+                                    : 'Kept on this device. Choose the supplier to also save it as a draft in Purchase History.')}
+                            </span>
                         )}
-                        <button type="button" onClick={reset} className="ml-auto font-semibold hover:underline">Start a new purchase instead</button>
+                        {draft && <button type="button" onClick={reset} className="ml-auto font-semibold hover:underline">Start a new purchase instead</button>}
                     </div>
                 )}
 

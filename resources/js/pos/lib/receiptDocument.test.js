@@ -42,10 +42,13 @@ const sale = {
 };
 
 describe('receiptHtml — thermal layout', () => {
-    it('prints as a monospace, bold, black document rather than the screen modal', () => {
+    it('prints in Poppins, heavy and black, rather than the screen modal', () => {
         const html = receiptHtml(sale, config);
 
-        expect(html).toContain('"Courier New"');
+        // Bundled with the app, so it prints the same offline.
+        expect(html).toContain('font-family: "Poppins"');
+        expect(html).toMatch(/@font-face \{ font-family: "Poppins";[^}]*font-weight: 600;[^}]*src: url\("[^"]*poppins-600[^"]*\.woff2"\)/);
+        expect(html).toContain('font-variant-numeric: tabular-nums');
         expect(html).toContain('font-weight: bold');
         expect(html).toContain('print-color-adjust: exact');
         // The 80mm roll, with no top margin — the printer feeds its own.
@@ -289,7 +292,7 @@ describe('zReportHtml', () => {
         const html = zReportHtml(report, session, config);
 
         expect(html).toContain('@page { size: 80mm auto; margin: 0 3mm 4mm; }');
-        expect(html).toContain('"Courier New"');
+        expect(html).toContain('font-family: "Poppins"');
         expect(html).toContain('font-weight: bold');
     });
 
@@ -348,11 +351,15 @@ describe('the port has not drifted from the server template', () => {
     // The two renderers put paper in the same customer's hand and must not
     // diverge. Tuning one for the printer and forgetting the other is exactly
     // how the offline receipt became the worse of the two in the first place.
+    // The font's @font-face lines are left out of the comparison: each side
+    // has to name the same font files its own way (Vite::asset in blade, an
+    // imported URL here), so those lines can never be textually identical.
     const strip = (css) =>
         css.replace(/\/\*[\s\S]*?\*\//g, '')
             .split('\n')
             .map((line) => line.trim())
-            .filter(Boolean);
+            .filter(Boolean)
+            .filter((line) => ! /^(@font-face|@foreach|@endforeach)/.test(line));
 
     const bladeCss = strip(
         readFileSync('resources/views/pos/receipt.blade.php', 'utf8')

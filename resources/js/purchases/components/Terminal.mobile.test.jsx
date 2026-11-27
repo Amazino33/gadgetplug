@@ -37,7 +37,7 @@ vi.mock('../lib/api', () => ({
 import Terminal from './Terminal';
 
 describe('Purchase Terminal on a phone', () => {
-    afterEach(cleanup);
+    afterEach(() => { cleanup(); localStorage.clear(); });
 
     it('leaves the keyboard down, shows lines as cards, and steps the quantity with buttons', async () => {
         const user = userEvent.setup();

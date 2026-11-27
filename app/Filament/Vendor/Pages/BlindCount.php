@@ -44,8 +44,8 @@ class BlindCount extends Page
     {
         $user = auth()->user();
         $vendor = filament()->getTenant();
-
-        return $vendor && $user->hasVendorPermission($vendor->id, 'manage_inventory');
+        // Switched off per shop (admin panel → Vendors): hidden and refused.
+        return $vendor && $vendor->hasInventoryCount() && $user->hasVendorPermission($vendor->id, 'manage_inventory');
     }
 
     // Who physically records a count, as opposed to merely viewing the page

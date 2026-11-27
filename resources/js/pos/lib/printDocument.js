@@ -37,11 +37,28 @@ export function printDocument(html) {
         frame.contentWindow.print();
     };
 
-    // Images need to be laid out or the thermal head gets a half-rendered page.
+    // Images need to be laid out or the thermal head gets a half-rendered page,
+    // and the receipt font (Poppins) needs to have loaded or the first receipt
+    // of the day prints in the fallback face. Waited on, but never for long:
+    // if the font cannot be had, printing in the fallback beats not printing.
+    let printed = false;
+    const once = () => { if (! printed) { printed = true; run(); } };
+
+    const whenReady = () => {
+        const fonts = frame.contentWindow.document.fonts;
+
+        if (fonts?.ready) {
+            fonts.ready.then(() => setTimeout(once, 50), () => setTimeout(once, 50));
+            setTimeout(once, 1500);
+        } else {
+            setTimeout(once, 50);
+        }
+    };
+
     if (frame.contentWindow.document.readyState === 'complete') {
-        setTimeout(run, 50);
+        whenReady();
     } else {
-        frame.contentWindow.addEventListener('load', () => setTimeout(run, 50), { once: true });
+        frame.contentWindow.addEventListener('load', whenReady, { once: true });
     }
 
     return frame;

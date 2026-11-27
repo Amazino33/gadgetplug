@@ -32,6 +32,7 @@ function setUpSoloVendor(): array
 
     $owner = User::factory()->create();
     $vendor = Vendor::create([
+        'inventory_count_enabled' => true, // this shop uses the old Inventory Count
         'user_id' => $owner->id,
         'name' => 'Solo Test Store',
         'pos_blind_count_participants' => 1,

@@ -267,6 +267,15 @@ class Product extends Model implements HasMedia
         return $this->hasMany(ProductBarcode::class);
     }
 
+    /** The aisles this product is recorded as sitting in (Stock Take's map). */
+    public function aisles(): BelongsToMany
+    {
+        return $this->belongsToMany(Aisle::class, 'aisle_products')
+            ->using(AisleProduct::class)
+            ->withPivot(['id', 'vendor_id', 'source', 'mapped_by', 'mapped_at'])
+            ->withTimestamps();
+    }
+
     /**
      * Extra barcodes for the base unit. The main one lives in products.barcode
      * and is mirrored automatically, so it is left out here to keep the form
@@ -877,6 +886,15 @@ class Product extends Model implements HasMedia
         $this->addMediaConversion('feed_small')
             ->format('webp')
             ->fit(Fit::Contain, 400, 400)
+            ->quality(70)
+            ->queued();
+
+        // The picture on a Stock Take product card: 96px WebP, a few KB, so a
+        // phone can hold thousands for counting with no network. Queued like
+        // the feed's; the task pack falls back to 'thumb' until it exists.
+        $this->addMediaConversion('count_thumb')
+            ->format('webp')
+            ->fit(Fit::Crop, 96, 96)
             ->quality(70)
             ->queued();
     }

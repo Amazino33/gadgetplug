@@ -303,6 +303,17 @@ class User extends Authenticatable implements FilamentUser, HasTenants
         return $this->vendors();
     }
 
+    /** Set for someone who counts stock and nothing else (see StockTakeCounters). */
+    public function counterProfile()
+    {
+        return $this->hasOne(StockTakeCounter::class);
+    }
+
+    public function isCounter(): bool
+    {
+        return $this->counterProfile()->exists();
+    }
+
     public function canAccessTenant(Model $tenant): bool
     {
         if ($this->isSuperAdmin()) {
@@ -328,6 +339,13 @@ class User extends Authenticatable implements FilamentUser, HasTenants
 
     public function hasVendorPermission(int $vendorId, string|array $permission): bool
     {
+        // The platform's super admin holds no role inside any shop, so a shop's
+        // own permissions would refuse them everywhere. They may do anything in
+        // any shop, as its owner may.
+        if ($this->isSuperAdmin()) {
+            return true;
+        }
+
         if ($this->ownedVendors()->where('id', $vendorId)->exists()) {
             return true;
         }
@@ -400,7 +418,8 @@ class User extends Authenticatable implements FilamentUser, HasTenants
         }
 
         if ($panel->getId() === 'vendor') {
-            return $this->isSuperAdmin() || $this->vendors()->isNotEmpty();
+            // A counter has the phone app and nothing else.
+            return $this->isSuperAdmin() || ($this->vendors()->isNotEmpty() && ! $this->isCounter());
         }
 
         return false;

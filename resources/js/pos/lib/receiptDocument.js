@@ -24,11 +24,29 @@
 
 import qrcode from 'qrcode-generator';
 import { formatQty, hasHalf } from './halves';
+// Poppins, shipped with the app rather than fetched from Google: a till prints
+// offline too, and a font that only loads with a connection would make the
+// offline receipt look different from the online one. Built into /build/,
+// which the service worker keeps, so it is on the device after the first load.
+import poppins500 from '../../../fonts/poppins/poppins-500.woff2?url';
+import poppins600 from '../../../fonts/poppins/poppins-600.woff2?url';
+import poppins700 from '../../../fonts/poppins/poppins-700.woff2?url';
 
 const ALIGNMENTS = { left: 'al-left', center: 'al-center', right: 'al-right' };
 
+// Outside a real build (the test runner) the Laravel plugin leaves the asset
+// base unset and the URL comes back as "undefined/resources/…"; a build gives
+// "/build/assets/…". Dropping the stray prefix keeps both well-formed.
+const fontUrl = (url) => String(url).replace(/^undefined/, '');
+
+const POPPINS_FACES = [[500, poppins500], [600, poppins600], [700, poppins700]]
+    .map(([weight, url]) => `@font-face { font-family: "Poppins"; font-style: normal; font-weight: ${weight}; font-display: block; src: url("${fontUrl(url)}") format("woff2"); }`)
+    .join('\n    ');
+
 /** 1-bit head, no grey: everything is bold black on white. See the notes inline. */
 export const THERMAL_CSS = `
+    ${POPPINS_FACES}
+
     /* 80mm roll, printed edge to edge.
        No top margin: thermal paper is consumed top-down and the printer
        already feeds a leading strip of its own, so a page margin there is
@@ -46,9 +64,11 @@ export const THERMAL_CSS = `
     }
 
     body {
-        /* Monospace keeps the money column aligned — the single biggest reason
-           thermal receipts look "not arranged" is a proportional font. */
-        font-family: "Courier New", "DejaVu Sans Mono", monospace;
+        /* Poppins: a clean modern sans. Columns are laid out with flex rows,
+           not padded spaces, so a proportional face keeps them in line, and
+           tabular figures keep the money column's digits the same width. */
+        font-family: "Poppins", "Segoe UI", Arial, sans-serif;
+        font-variant-numeric: tabular-nums;
         font-size: 13px;
         line-height: 1.4;
         width: 72mm;          /* 80mm paper minus the printer's own margins */
@@ -57,9 +77,9 @@ export const THERMAL_CSS = `
         /* Everything is bold on purpose. A thermal head burns dots: it has no
            grey, so the driver halftones anti-aliased edges and thin strokes come
            out banded and broken — which is what a light Courier at 11px does on
-           real paper. Bold gives every stroke enough width to survive that.
-           Monospace advance widths do not change when bold, so the columns hold. */
-        font-weight: bold;
+           real paper. SemiBold gives every stroke enough width to survive that
+           while staying crisp; headings and totals step up to Bold. */
+        font-weight: 600;
 
         /* Stops the browser lightening anything on its way to the driver, which
            would hand it more grey to halftone. */

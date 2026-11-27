@@ -153,6 +153,27 @@ class VendorPanelProvider extends PanelProvider
                         return $user->hasVendorPermission($vendor->id, 'record_purchases');
                     }),
 
+                // The Stock Take phone app: My Tasks, aisle mapping and
+                // counting. Outside the panel, so a link. Shown to anyone with
+                // a Stock Take permission or an open task given to them.
+                NavigationItem::make('Stock Take (phone)')
+                    ->url(fn(): string => route('stock-take.index', ['vendor' => filament()->getTenant()?->slug ?? '']))
+                    ->icon('heroicon-o-device-phone-mobile')
+                    ->group('Inventory')
+                    ->sort(5)
+                    ->visible(function () {
+                        $user = auth()->user();
+                        $vendor = filament()->getTenant();
+                        if (! $user || ! $vendor || ! $vendor->hasStockTake()) return false;
+                        if ($user->isSuperAdmin()) return true;
+                        return $user->hasVendorPermission($vendor->id, ['manage_stock_takes', 'perform_stock_takes', 'map_aisles'])
+                            || \App\Models\StockTakeTask::query()
+                                ->where('vendor_id', $vendor->id)
+                                ->where('assigned_to', $user->id)
+                                ->open()
+                                ->exists();
+                    }),
+
             ])
             ->plugins([
                 FilamentShieldPlugin::make()
@@ -207,12 +228,12 @@ class VendorPanelProvider extends PanelProvider
                 fn (): string => Blade::render('@livewire(\App\Livewire\Engagement\LearnProgressCard::class)'),
                 scopes: \App\Filament\Vendor\Pages\Dashboard::class,
             )
-            // The product pop-up's script, on the Products list only. In <head>
+            // The product pop-up's and the list's scripts, on the Products list only. In <head>
             // so its alpine:init listener is in place before Livewire starts
             // Alpine.
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
-                fn() => Blade::render("@vite('resources/js/product-quick-form.js')"),
+                fn() => Blade::render("@vite(['resources/js/product-quick-form.js', 'resources/js/products-list.js'])"),
                 scopes: \App\Filament\Vendor\Resources\Products\Pages\ListProducts::class,
             )
             // Replaces the global search removed above: filters the sidebar itself

@@ -64,9 +64,17 @@ class ApproveStockCountAction
             $row->load('lines');
             $variance = $row->variance();
 
+            // A count adopted from an inventory count has already moved stock:
+            // the blind count corrected every agreed line when it finished,
+            // and a manager's override corrected the rest. Posting the same
+            // variance again here would take it off the shelf twice. (Hidden
+            // until 2026-11 only because MySQL refused the count_adjustment
+            // ledger type, which rolled the whole approval back.)
+            $alreadyPosted = $row->blind_count_session_id !== null;
+
             // Ordered by product id for the same reason a sale is: these row
             // locks can deadlock against a concurrent till otherwise.
-            foreach ($row->lines->sortBy('product_id') as $line) {
+            foreach ($alreadyPosted ? [] : $row->lines->sortBy('product_id') as $line) {
                 $delta = Quantity::sub($line->counted_quantity, $line->system_quantity);
 
                 if ($delta === 0) {

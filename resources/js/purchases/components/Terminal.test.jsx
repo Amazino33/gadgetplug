@@ -39,7 +39,7 @@ const scan = async (user, code) => {
 
 describe('Purchase Terminal scanning', () => {
     beforeEach(() => vi.clearAllMocks());
-    afterEach(cleanup);
+    afterEach(() => { cleanup(); localStorage.clear(); });
 
     it('takes five different scans in a row without the input being clicked', async () => {
         const user = userEvent.setup();
@@ -93,7 +93,7 @@ describe('Purchase Terminal scanning', () => {
 });
 
 describe('Purchase Terminal search list', () => {
-    afterEach(cleanup);
+    afterEach(() => { cleanup(); localStorage.clear(); });
 
     it('scrolls to keep the row the arrow keys reach in view', async () => {
         const scrolled = [];

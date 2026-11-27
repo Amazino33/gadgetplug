@@ -380,7 +380,7 @@
             this.persist();
         },
         clampCount() { this.setCount(this.entries[this.currentProductId]?.count); },
-        // '7½' for a shop that sells halves; the plain number for everyone else.
+        // 7½ for a shop that sells halves; the plain number for everyone else. (No double quotes in comments here: this whole block sits inside the x-data attribute.)
         fmtQty(v) {
             const n = Number(v ?? 0);
             if (! this.halves || Number.isInteger(n)) return String(n);

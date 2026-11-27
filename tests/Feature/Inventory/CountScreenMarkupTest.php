@@ -38,8 +38,9 @@ function countScreenHtml(): string
     $staff = User::factory()->create();
 
     $vendor = Vendor::create([
-        'user_id' => $owner->id,
-        'name' => 'Markup Guard Store',
+        'inventory_count_enabled' => true, // this shop uses the old Inventory Count
+        'user_id'                      => $owner->id,
+        'name'                         => 'Markup Guard Store',
         'pos_blind_count_participants' => 1,
     ]);
     $vendor->users()->attach($staff->id);

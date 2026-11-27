@@ -559,9 +559,13 @@ class PosSaleController extends Controller
                     productId: $item['product_id'],
                     quantityChanged: $item['quantity'],
                     transactionType: 'pos_return',
-                    userId: $request->user()->id,
-                    reference: $sale->reference,
-                    description: "Return — {$saleItem->product_name} x{$item['quantity']}",
+                    userId:          $request->user()->id,
+                    reference:       $sale->reference,
+                    description:     "Return — {$saleItem->product_name} x{$item['quantity']}",
+                    // Back onto the shelf it was sold from, as a void does.
+                    // Without it the goods land in the vendor's default
+                    // branch, and a count at the selling branch reads short.
+                    store:           $sale->store_id,
                 );
             }
 

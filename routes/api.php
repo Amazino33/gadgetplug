@@ -106,5 +106,9 @@ Route::prefix('pos')->middleware(NoStoreApiResponse::class)->group(function () {
         Route::post('cash/submit', [PosCashController::class, 'submit']);
 
         Route::post('sync', [PosSyncController::class, 'sync']);
+
+        // What this till still holds unsynced, reported on every sync tick.
+        // Stock Take's approval screen warns while any is waiting.
+        Route::post('till-state', [App\Http\Controllers\Pos\PosTillStateController::class, 'store']);
     });
 });

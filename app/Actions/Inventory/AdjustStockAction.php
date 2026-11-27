@@ -11,6 +11,7 @@ use App\Services\Inventory\StockCostLayers;
 use App\Services\Inventory\StoreStock;
 use App\Support\Quantity;
 use Exception;
+use Carbon\CarbonInterface;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\DB;
 
@@ -47,11 +48,12 @@ class AdjustStockAction
         Store|int|null $store = null,
         ?float $unitCost = null,
         bool $allowNegative = false,
+        ?CarbonInterface $occurredAt = null,
     ) {
         $this->lastShortfall = 0;
         $quantityChanged = Quantity::of($quantityChanged);
 
-        return DB::transaction(function () use ($productId, $quantityChanged, $transactionType, $userId, $reference, $description, $auditSessionId, $reasonCode, $store, $unitCost, $allowNegative) {
+        return DB::transaction(function () use ($productId, $quantityChanged, $transactionType, $userId, $reference, $description, $auditSessionId, $reasonCode, $store, $unitCost, $allowNegative, $occurredAt) {
             // 1. PESSIMISTIC LOCK: Lock the product row until the transaction is done.
             // If POS tries to sell this at the exact same millisecond, it will be forced to wait.
             // Still the product row and not merely the store row: it is what
@@ -101,7 +103,10 @@ class AdjustStockAction
                 'reference' => $reference,
                 'description' => $description,
                 'audit_session_id' => $auditSessionId,
-                'reason_code' => $reasonCode,
+                'reason_code'      => $reasonCode,
+                // When the goods actually moved. Null means now; only a till
+                // sale, which may sync long after it was rung, knows earlier.
+                'occurred_at'      => $occurredAt,
             ]);
 
             // A cashier is deliberately allowed to sell into stock an online

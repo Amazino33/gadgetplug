@@ -134,6 +134,16 @@ class VendorPermissionsSeeder extends Seeder
             // can take it away on the Roles screen. Also created, and granted
             // to existing roles, by migration 2026_11_12_100000.
             'view_learn_page',
+
+            // Stock Take: counting a branch aisle by aisle while it sells.
+            // Running it (plan, assign, approve, close) is split from doing
+            // the counting for the same reason as count_stock and
+            // approve_stock_count. Mapping which products sit in which aisle
+            // is its own grant, so a trusted storekeeper can be given it
+            // without being given the count.
+            'manage_stock_takes',
+            'perform_stock_takes',
+            'map_aisles',
         ];
 
         foreach ($permissions as $permission) {

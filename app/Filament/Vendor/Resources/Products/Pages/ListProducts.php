@@ -8,13 +8,17 @@ use App\Filament\Vendor\Resources\Products\ProductResource;
 use App\Filament\Vendor\Resources\Products\Schemas\ProductForm;
 use App\Models\Category;
 use App\Models\Product;
+use App\Services\ActiveStore;
 use App\Services\Export\ProductExporter;
+use App\Services\Products\ProductCatalogue;
+use App\Support\Quantity;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 use App\Services\Products\QuickProductForm;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Validation\ValidationException;
@@ -25,6 +29,16 @@ use App\Services\Products\SearchShortcuts;
 
 class ListProducts extends ListRecords
 {
+    /**
+     * Rows rendered with the page, so the list shows at once. The whole
+     * branch then arrives in the background (ProductCatalogue) and the page
+     * searches, filters, sorts and pages it in the browser.
+     */
+    public const FIRST_PAGE = 50;
+
+    /** Fields the list can change for many products at once. */
+    private const BULK_FIELDS = ['status', 'category_id', 'low_stock_threshold'];
+
     protected static string $resource = ProductResource::class;
 
     // Custom Blade view — bypasses Filament's Table/EmbeddedTable rendering
@@ -117,8 +131,8 @@ class ListProducts extends ListRecords
             // Column-qualified: getEloquentQuery() already joins for the
             // per-store stock columns, so a bare category_id is ambiguous.
             ->when($this->categoryFilter, fn (Builder $query) => $query->where('products.category_id', $this->categoryFilter))
-            ->latest()
-            ->paginate(10, pageName: 'productsPage');
+            ->latest('products.id')
+            ->paginate(self::FIRST_PAGE, pageName: 'productsPage');
     }
 
     public function toggleSelected(int $id): void
@@ -152,6 +166,7 @@ class ListProducts extends ListRecords
         $this->selected = array_values(array_diff($this->selected, [$id]));
 
         Notification::make()->title('Product deleted.')->success()->send();
+        $this->dispatch('products-changed');
     }
 
     public function deleteSelected(): void
@@ -169,6 +184,149 @@ class ListProducts extends ListRecords
         $this->selected = [];
 
         Notification::make()->title("{$deleted} product(s) deleted.")->success()->send();
+    }
+
+    // ── The list in the browser ─────────────────────────────────────────
+
+    /** What the list needs to start: where to fetch the rest, what this person may do, the first rows. */
+    public function getListConfig(): array
+    {
+        $vendor   = filament()->getTenant();
+        $user     = auth()->user();
+        $storeId  = ActiveStore::currentId();
+        $withCost = $this->canSeeCostPrice();
+        $first    = $this->getProducts();
+
+        return [
+            'catalogueUrl' => route('vendor.products.catalogue', ['vendor' => $vendor->slug]),
+            'storageKey'   => "gadgetplug.products.{$user->id}.{$vendor->id}." . ($storeId ?? 'all'),
+            'viewUrl'      => ProductResource::getUrl('view', ['record' => '__ID__'], tenant: $vendor),
+            'editUrl'      => ProductResource::getUrl('edit', ['record' => '__ID__'], tenant: $vendor),
+            'halves'       => Quantity::allowsHalves($vendor),
+            'can'          => [
+                'cost'   => $withCost,
+                'edit'   => $user->isSuperAdmin() || $vendor->isOwner($user) || $user->hasVendorPermission($vendor->id, 'edit_products'),
+                'delete' => $user->isSuperAdmin() || $vendor->isOwner($user) || $user->hasVendorPermission($vendor->id, 'delete_products'),
+                'export' => static::canBulkMove('export_products'),
+                'create' => ProductResource::canCreate(),
+            ],
+            'columns'      => ProductCatalogue::COLUMNS,
+            'initial'      => [
+                'rows'       => app(ProductCatalogue::class)->rowsFor($first->getCollection(), $storeId, $withCost),
+                'total'      => $first->total(),
+                'categories' => $this->getCategoryOptions(),
+            ],
+            // From the address: a shared link opens on the same view.
+            'url'          => [
+                'display'  => $this->displayMode,
+                'search'   => $this->search,
+                'status'   => $this->statusFilter,
+                'category' => $this->categoryFilter,
+            ],
+        ];
+    }
+
+    /**
+     * Change one field on many products at once: status, category, or the
+     * level at which a product counts as running low.
+     *
+     * @param  array<int, int>  $ids
+     * @return array{ok: bool, changed?: int, message?: string}
+     */
+    #[Renderless]
+    public function bulkUpdate(array $ids, string $field, mixed $value): array
+    {
+        $vendor = filament()->getTenant();
+        $user   = auth()->user();
+
+        if (! ($user->isSuperAdmin() || $vendor->isOwner($user) || $user->hasVendorPermission($vendor->id, 'edit_products'))) {
+            return ['ok' => false, 'message' => 'You are not allowed to change products.'];
+        }
+
+        if (! in_array($field, self::BULK_FIELDS, true)) {
+            return ['ok' => false, 'message' => 'That cannot be changed in bulk.'];
+        }
+
+        $value = match ($field) {
+            'status'              => in_array($value, ['draft', 'published', 'archived'], true) ? $value : null,
+            'category_id'         => DB::table('categories')->where('id', (int) $value)->exists() ? (int) $value : null,
+            'low_stock_threshold' => is_numeric($value) && (int) $value >= 0 && (int) $value <= 1000000 ? (int) $value : null,
+        };
+
+        if ($value === null) {
+            return ['ok' => false, 'message' => 'That value is not allowed.'];
+        }
+
+        $changed = 0;
+        foreach ($this->ownProducts($ids) as $product) {
+            $product->update([$field => $value]);
+            $changed++;
+        }
+
+        Notification::make()->title("{$changed} product(s) updated.")->success()->send();
+        $this->dispatch('products-changed');
+
+        return ['ok' => true, 'changed' => $changed];
+    }
+
+    /**
+     * Delete many products at once (each one checked).
+     *
+     * @param  array<int, int>  $ids
+     */
+    #[Renderless]
+    public function bulkDelete(array $ids): array
+    {
+        $deleted = 0;
+        foreach ($this->ownProducts($ids) as $product) {
+            if (ProductResource::canDelete($product)) {
+                $product->delete();
+                $deleted++;
+            }
+        }
+
+        Notification::make()->title("{$deleted} product(s) deleted.")->success()->send();
+        $this->dispatch('products-changed');
+
+        return ['ok' => true, 'deleted' => $deleted];
+    }
+
+    /**
+     * Export just these products, in the same file as Export.
+     *
+     * @param  array<int, int>  $ids
+     */
+    public function exportSelected(array $ids, string $format = 'csv')
+    {
+        if (! static::canBulkMove('export_products')) {
+            Notification::make()->title('You are not allowed to export products.')->danger()->send();
+
+            return null;
+        }
+
+        $format = in_array($format, ['csv', 'xlsx'], true) ? $format : 'csv';
+        $own    = $this->ownProducts($ids)->pluck('id')->all();
+        $path   = app(ProductExporter::class)->export(filament()->getTenant(), $format, ['ids' => $own ?: [0]]);
+
+        return response()->download($path, 'products-' . now()->format('Y-m-d') . ".{$format}")->deleteFileAfterSend();
+    }
+
+    /**
+     * Of these ids, the ones this list shows: this shop's, at this branch.
+     *
+     * @param  array<int, int>  $ids
+     * @return \Illuminate\Support\Collection<int, Product>
+     */
+    private function ownProducts(array $ids)
+    {
+        $ids = array_values(array_filter(array_map('intval', $ids)));
+        if ($ids === []) {
+            return collect();
+        }
+
+        $visible = ProductResource::getEloquentQuery()->whereIn('products.id', $ids)->pluck('products.id')->all();
+
+        return Product::whereIn('id', $visible ?: [0])->get();
     }
 
     // ── The product pop-up ──────────────────────────────────────────────
@@ -220,6 +378,7 @@ class ListProducts extends ListRecords
         }
 
         $this->quickPhotos = [];
+        $this->dispatch('products-changed');
 
         Notification::make()
             ->title($id ? "{$saved->name} saved." : "{$saved->name} added.")
@@ -255,24 +414,9 @@ class ListProducts extends ListRecords
 
     protected function getHeaderActions(): array
     {
-        // Real navigation links, not Livewire property-setting actions — Filament
-        // caches the Table config during the request's boot phase, before an
-        // in-place property update would take effect, so a live click never
-        // sees the new displayMode in time. A fresh page load (URL already
-        // carrying ?display=...) hydrates it correctly from the start.
+        // Table / Grid is a switch in the list's own toolbar now: the list
+        // lives in the browser, so it changes view instantly with no reload.
         return [
-            Action::make('tableView')
-                ->label('Table')
-                ->icon('heroicon-o-table-cells')
-                ->color(fn (): string => $this->displayMode === 'table' ? 'primary' : 'gray')
-                ->url(fn (): string => static::getUrl(parameters: ['display' => 'table'])),
-
-            Action::make('gridView')
-                ->label('Grid')
-                ->icon('heroicon-o-squares-2x2')
-                ->color(fn (): string => $this->displayMode === 'grid' ? 'primary' : 'gray')
-                ->url(fn (): string => static::getUrl(parameters: ['display' => 'grid'])),
-
             // Export sits before Import in the bar: taking a copy of what you
             // have is the safe first move before any bulk change.
             Action::make('export')

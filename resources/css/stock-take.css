@@ -1,0 +1,35 @@
+/*
+ * source(none): Tailwind looks for class names only in the files listed
+ * below, not across the whole project. Left to itself it scans every screen
+ * (till, admin, storefront) and the counting app ships all their styles:
+ * 154 KB instead of what these few screens use.
+ */
+@import 'tailwindcss' source(none);
+
+@source '../js/stock-take/**/*.{js,jsx}';
+@source '../js/purchases/components/CameraScanner.jsx';
+@source '../views/stock-take/*.blade.php';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* The red line moving across the viewfinder's frame: the camera is reading. */
+@keyframes st-scan {
+    0%, 100% { top: 10%; }
+    50% { top: 88%; }
+}
+
+.st-scanline {
+    animation: st-scan 1.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .st-scanline { animation: none; top: 50%; }
+}

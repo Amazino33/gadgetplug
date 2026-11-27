@@ -11,6 +11,7 @@ function setUpForbiddenRedirectVendor(): array
 
     $owner = User::factory()->create();
     $vendor = Vendor::create([
+        'inventory_count_enabled' => true, // this shop uses the old Inventory Count
         'user_id' => $owner->id,
         'name' => 'Redirect Test Store',
     ]);

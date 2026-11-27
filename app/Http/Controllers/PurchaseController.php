@@ -43,6 +43,9 @@ class PurchaseController extends Controller
                 'vendorName' => $vendor->name,
                 'storeName'  => $store->name,
                 'userName'   => $request->user()->name,
+                // The purchase being typed is kept on this device per person and branch.
+                'userId'     => $request->user()->id,
+                'storeId'    => $store->id,
                 'panelUrl'   => url("/plug/{$vendor->slug}"),
                 'apiBase'    => url("/purchases/{$vendor->slug}/api"),
                 'statuses'   => PurchaseHistory::STATUS_LABELS,

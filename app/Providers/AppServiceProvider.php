@@ -67,7 +67,9 @@ class AppServiceProvider extends ServiceProvider
 
         // 2. Add this Super Admin bypass
         Gate::before(function ($user, $ability) {
-            return $user->hasRole('super_admin') ? true : null;
+            // isSuperAdmin(), not hasRole(): inside a shop's panel hasRole() looks
+            // for the role in that shop's team, where the super admin has none.
+            return $user->isSuperAdmin() ? true : null;
         });
 
         Role::deleting(function (Role $role): void {

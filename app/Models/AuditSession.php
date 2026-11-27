@@ -18,6 +18,8 @@ class AuditSession extends Model
     protected $fillable = [
         'vendor_id',
         'blind_count_session_id',
+        'stock_take_task_id',
+        'stock_take_result_id',
         'product_id',
         'system_quantity',
         'storekeeper_a_id',
@@ -29,6 +31,7 @@ class AuditSession extends Model
         'status',
         'reason_code',
         'loss_value',
+        'note',
     ];
 
     protected $casts = [
@@ -49,7 +52,13 @@ class AuditSession extends Model
         return $this->belongsTo(BlindCountSession::class, 'blind_count_session_id');
     }
 
-    public function shortageCase(): HasOne
+    /** The stock take task an approved Stock Take result came from. */
+    public function stockTakeTask(): BelongsTo
+    {
+        return $this->belongsTo(StockTakeTask::class, 'stock_take_task_id');
+    }
+
+    public function shortageCase(): \Illuminate\Database\Eloquent\Relations\HasOne
     {
         return $this->hasOne(InventoryShortageCase::class, 'count_line_id');
     }
