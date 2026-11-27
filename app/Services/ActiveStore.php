@@ -36,11 +36,12 @@ class ActiveStore
      */
     public static function accessibleFor(Vendor $vendor, User $user): Collection
     {
-        $stores = Store::query()
+        // Read many times per page (menu, guards, widgets): once per request.
+        $stores = \App\Support\RequestMemo::get()->remember("stores:{$vendor->id}", fn () => Store::query()
             ->where('vendor_id', $vendor->id)
             ->orderByDesc('is_default')
             ->orderBy('name')
-            ->get();
+            ->get());
 
         // Super admins are not members of anything, so the membership branch
         // would lock them out of a panel they can otherwise fully administer.

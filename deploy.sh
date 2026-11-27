@@ -3,32 +3,56 @@
 #   ./deploy.sh
 set -e
 
-echo "==> Pulling latest changes from origin/main..."
-git pull origin main
+# The shared host stops ("Killed") a command that uses too much at once, most
+# often straight after composer. A killed step is tried again after a pause
+# instead of ending the deploy half way.
+retry() {
+    for attempt in 1 2 3; do
+        if "$@"; then
+            return 0
+        fi
+        echo "    '$*' did not finish (attempt $attempt). Trying again in 15 seconds..."
+        sleep 15
+    done
+    echo "    '$*' failed 3 times. Run it again by hand."
+    return 1
+}
 
-echo "==> Installing PHP dependencies..."
-composer install --no-dev --optimize-autoloader
+echo "==> Pulling latest changes from origin/main..."
+LOCK_BEFORE=$(git rev-parse HEAD:composer.lock 2>/dev/null || echo none)
+git pull origin main
+LOCK_AFTER=$(git rev-parse HEAD:composer.lock 2>/dev/null || echo none)
+
+# composer install is the heaviest step, and the one the host kills. Only when
+# the PHP packages actually changed (or were never installed).
+if [ "$LOCK_BEFORE" != "$LOCK_AFTER" ] || [ ! -f vendor/autoload.php ]; then
+    echo "==> PHP packages changed: installing..."
+    retry composer install --no-dev --optimize-autoloader
+    sleep 5
+else
+    echo "==> PHP packages unchanged: skipping composer install."
+fi
 
 # Frontend assets are built locally and committed to public/build — this
 # server has no npm/node available, and that's fine: git pull already
 # brought the compiled CSS/JS. Don't try to build here.
 
 echo "==> Running migrations..."
-php artisan migrate --force
+retry php artisan migrate --force
 
 echo "==> Rebuilding caches..."
-# Clear first, then build. Previously this only cleared, which left the app
-# parsing every config file and recompiling every Blade template on each
-# request — a large part of the slow first-byte time on this shared host.
-php artisan config:clear
-php artisan view:clear
-php artisan config:cache
-php artisan view:cache
-
-# NOTE: `php artisan route:cache` is deliberately not here. routes/web.php
-# defines three routes as closures (/nuke-cache and the two /pos entries) and
-# closures cannot be serialised, so route caching fails outright until those
-# are moved into controllers. Worth doing — it is the next easy win on TTFB.
+# Clear first, then build, a step at a time with a short pause between, so
+# no one moment asks too much of the host. Config, routes, events and views
+# are all cached: every request then skips reading them again.
+retry php artisan optimize:clear
+sleep 2
+retry php artisan config:cache
+sleep 2
+retry php artisan route:cache
+sleep 2
+retry php artisan event:cache
+sleep 2
+retry php artisan view:cache
 
 echo "==> Deploy complete. Now at:"
 git log --oneline -1

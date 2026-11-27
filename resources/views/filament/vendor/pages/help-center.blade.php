@@ -82,7 +82,7 @@
                         tag="button"
                         type="button"
                         icon="heroicon-o-play"
-                        x-on:click="window.gpTours?.start(@js($articleTour['key']))"
+                        x-on:click="window.gpTours?.start({{ \Illuminate\Support\Js::from($articleTour['key']) }})"
                         class="shrink-0"
                     >
                         Show me on the real screens
@@ -212,7 +212,7 @@
                                 type="button"
                                 size="sm"
                                 icon="heroicon-o-play"
-                                x-on:click="window.gpTours?.start(@js($tour['key']))"
+                                x-on:click="window.gpTours?.start({{ \Illuminate\Support\Js::from($tour['key']) }})"
                             >
                                 {{ $tour['seen'] ? 'Run it again' : 'Start' }}
                             </x-filament::button>

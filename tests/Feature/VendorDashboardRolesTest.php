@@ -9,6 +9,10 @@ use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 
+// The dashboard's figures load just after the page (HomeDashboard is Lazy);
+// these tests read them, so they render straight away here.
+beforeEach(fn () => Livewire::withoutLazyLoading());
+
 function setupDashboardTestVendor(): array
 {
     $owner = User::factory()->create();

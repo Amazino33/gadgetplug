@@ -37,6 +37,8 @@ class AppServiceProvider extends ServiceProvider
         // Ask GadgetPlug's model call, behind one interface (Phase 1.4). Resolved
         // through AiClient so a test (or another provider) can swap it there.
         $this->app->bind(\App\Services\Assistant\ChatModel::class, fn ($app) => $app->make(\App\Services\Assistant\AiClient::class));
+        // A fresh one per request (and per test): see RequestMemo.
+        $this->app->scoped(\App\Support\RequestMemo::class);
     }
 
     /**
@@ -44,6 +46,24 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Remembered answers (RequestMemo) that a change makes wrong are forgotten.
+        \App\Models\Vendor::saved(fn () => \App\Support\RequestMemo::get()->forget('owns:'));
+        \App\Models\Vendor::deleted(fn () => \App\Support\RequestMemo::get()->forget('owns:'));
+        \App\Models\Store::saved(fn () => \App\Support\RequestMemo::get()->forget('stores:'));
+        \App\Models\Store::deleted(fn () => \App\Support\RequestMemo::get()->forget('stores:'));
+        foreach (['saved', 'deleted'] as $event) {
+            \App\Models\Vendor::$event(fn () => \App\Support\RequestMemo::get()->forget('branch:'));
+            \App\Models\Store::$event(fn () => \App\Support\RequestMemo::get()->forget('branch:'));
+        }
+        // Any role or permission given or taken (Spatie's events, switched on
+        // in config/permission.php): remembered permission answers are wrong now.
+        \Illuminate\Support\Facades\Event::listen([
+            \Spatie\Permission\Events\RoleAttachedEvent::class,
+            \Spatie\Permission\Events\RoleDetachedEvent::class,
+            \Spatie\Permission\Events\PermissionAttachedEvent::class,
+            \Spatie\Permission\Events\PermissionDetachedEvent::class,
+        ], fn () => \App\Models\User::forgetRoleAnswers());
+
         $this->configureDefaults();
         Order::observe(OrderObserver::class);
         Vendor::observe(VendorObserver::class);

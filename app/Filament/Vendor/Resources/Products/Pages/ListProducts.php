@@ -132,6 +132,8 @@ class ListProducts extends ListRecords
             // per-store stock columns, so a bare category_id is ambiguous.
             ->when($this->categoryFilter, fn (Builder $query) => $query->where('products.category_id', $this->categoryFilter))
             ->latest('products.id')
+            // Each row shows its category: loaded with the page, not one by one.
+            ->with('category:id,name')
             ->paginate(self::FIRST_PAGE, pageName: 'productsPage');
     }
 

@@ -137,10 +137,15 @@ final class StockTakeAccess
     /** Belongs to the shop, and may work at this branch of it. */
     public static function reachesBranch(User $user, int $vendorId, int $storeId): bool
     {
-        $vendor = Vendor::find($vendorId);
+        // Asked once per row on some screens: the shop and branch are looked up once per request.
+        [$vendor, $hasBranch] = \App\Support\RequestMemo::get()->remember("branch:{$vendorId}:{$storeId}", function () use ($vendorId, $storeId) {
+            $vendor = Vendor::find($vendorId);
+
+            return [$vendor, $vendor !== null && $vendor->stores()->whereKey($storeId)->exists()];
+        });
 
         // Switched off for this shop: nothing in Stock Take is open to anyone.
-        if (! $vendor || ! $vendor->hasStockTake() || ! $vendor->stores()->whereKey($storeId)->exists()) {
+        if (! $vendor || ! $vendor->hasStockTake() || ! $hasBranch) {
             return false;
         }
 

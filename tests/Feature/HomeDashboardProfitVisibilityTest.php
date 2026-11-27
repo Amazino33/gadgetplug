@@ -16,6 +16,10 @@ use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
+// The dashboard's figures load just after the page (HomeDashboard is Lazy);
+// these tests read them, so they render straight away here.
+beforeEach(fn () => Livewire::withoutLazyLoading());
+
 /*
  * Profit is revenue minus cost: shown next to revenue, it gives the cost away.
  * The Today's Sales tile is for staff holding view_inventory_reports, and must

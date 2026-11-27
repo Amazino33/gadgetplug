@@ -16,10 +16,23 @@ use App\Services\Reporting\SalesReportService;
 use App\Support\Pos\BusinessDate;
 use App\Support\Quantity;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
+use Livewire\Attributes\Lazy;
 use Livewire\Component;
 
+/**
+ * Loaded just after the page opens (Lazy): the dashboard shows at once with a
+ * skeleton here, and today's figures fill in a moment later, instead of the
+ * whole page waiting for them.
+ */
+#[Lazy]
 class HomeDashboard extends Component
 {
+    public function placeholder(): \Illuminate\Contracts\View\View
+    {
+        return view('livewire.vendor.home-dashboard-skeleton');
+    }
+
     public $storeId;
 
     public function mount()

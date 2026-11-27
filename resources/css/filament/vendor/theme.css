@@ -6,6 +6,7 @@
 @source '../../../../app/Filament/Vendor/**/*';
 @source '../../../../resources/views/filament/vendor/**/*';
 @source '../../../../resources/views/livewire/assistant/**/*';
+@source '../../../../resources/views/livewire/vendor/**/*';
 /* The Products list builds some class names in its script (stock and status colours). */
 @source '../../../../resources/js/products-list.js';
 

@@ -67,8 +67,8 @@ class NegativeStockReport extends Page
             ->where('pos_sales.vendor_id', $vendorId)
             ->where('pos_sale_items.cost_estimated', true)
             ->groupBy('pos_sale_items.product_id')
-            ->selectRaw('pos_sale_items.product_id, COUNT(*) as lines')
-            ->pluck('lines', 'product_id');
+            ->selectRaw('pos_sale_items.product_id, COUNT(*) as line_count')
+            ->pluck('line_count', 'product_id');
 
         $estimatedSales = PosSaleItem::query()
             ->join('pos_sales', 'pos_sales.id', '=', 'pos_sale_items.pos_sale_id')

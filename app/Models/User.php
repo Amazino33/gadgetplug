@@ -24,7 +24,45 @@ use Spatie\Permission\Traits\HasRoles;
 class User extends Authenticatable implements FilamentUser, HasTenants
 {
     /** @use HasFactory<UserFactory> */
-    use HasApiTokens, HasFactory, HasRoles, Notifiable, TwoFactorAuthenticatable;
+    use HasFactory, Notifiable, TwoFactorAuthenticatable, HasApiTokens;
+    use HasRoles {
+        assignRole as private hasRolesAssignRole;
+        removeRole as private hasRolesRemoveRole;
+        syncRoles as private hasRolesSyncRoles;
+    }
+
+    // Role changes: the remembered "is super admin / catalogue editor" answers
+    // for this request are forgotten (see RequestMemo).
+    public function assignRole(...$roles)
+    {
+        $result = $this->hasRolesAssignRole(...$roles);
+        self::forgetRoleAnswers();
+
+        return $result;
+    }
+
+    public function removeRole($role)
+    {
+        $result = $this->hasRolesRemoveRole($role);
+        self::forgetRoleAnswers();
+
+        return $result;
+    }
+
+    public function syncRoles(...$roles)
+    {
+        $result = $this->hasRolesSyncRoles(...$roles);
+        self::forgetRoleAnswers();
+
+        return $result;
+    }
+
+    public static function forgetRoleAnswers(): void
+    {
+        \App\Support\RequestMemo::get()->forget('super:');
+        \App\Support\RequestMemo::get()->forget('editor:');
+        \App\Support\RequestMemo::get()->forget('perm:');
+    }
 
     /**
      * The attributes that are mass assignable.
@@ -74,14 +112,15 @@ class User extends Authenticatable implements FilamentUser, HasTenants
     // setPermissionsTeamId(null), so the only reliable way is a raw DB check.
     public function isSuperAdmin(): bool
     {
-        return DB::table('model_has_roles')
+        // Asked on nearly every permission check: once per request is enough.
+        return \App\Support\RequestMemo::get()->remember("super:{$this->id}", fn () => \Illuminate\Support\Facades\DB::table('model_has_roles')
             ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
             ->where('model_has_roles.model_id', $this->id)
             ->where('model_has_roles.model_type', get_class($this))
             ->whereNull('model_has_roles.team_id')
             ->where('roles.name', 'super_admin')
             ->where('roles.guard_name', 'web')
-            ->exists();
+            ->exists());
     }
 
     // The global back-office catalogue editor (team_id null). Raw check for the
@@ -89,14 +128,14 @@ class User extends Authenticatable implements FilamentUser, HasTenants
     // the resolver currently returns.
     public function isCatalogueEditor(): bool
     {
-        return DB::table('model_has_roles')
+        return \App\Support\RequestMemo::get()->remember("editor:{$this->id}", fn () => \Illuminate\Support\Facades\DB::table('model_has_roles')
             ->join('roles', 'roles.id', '=', 'model_has_roles.role_id')
             ->where('model_has_roles.model_id', $this->id)
             ->where('model_has_roles.model_type', get_class($this))
             ->whereNull('model_has_roles.team_id')
             ->where('roles.name', 'catalogue_editor')
             ->where('roles.guard_name', 'web')
-            ->exists();
+            ->exists());
     }
 
     // A permission held through a GLOBAL role (team_id null), checked the same
@@ -327,7 +366,7 @@ class User extends Authenticatable implements FilamentUser, HasTenants
     {
         $roles = (array) $roles;
 
-        if ($this->ownedVendors()->where('id', $vendorId)->exists()) {
+        if ($this->ownsVendor($vendorId)) {
             return true;
         }
 
@@ -337,7 +376,16 @@ class User extends Authenticatable implements FilamentUser, HasTenants
         return $this->hasAnyRole($roles);
     }
 
-    public function hasVendorPermission(int $vendorId, string|array $permission): bool
+    /** Owns this shop. Remembered for the request; a shop saved or deleted forgets it. */
+    public function ownsVendor(int $vendorId): bool
+    {
+        return \App\Support\RequestMemo::get()->remember(
+            "owns:{$this->id}:{$vendorId}",
+            fn () => $this->ownedVendors()->where('id', $vendorId)->exists(),
+        );
+    }
+
+    public function hasVendorPermission(int $vendorId, string|array $permission): bool 
     {
         // The platform's super admin holds no role inside any shop, so a shop's
         // own permissions would refuse them everywhere. They may do anything in
@@ -346,14 +394,22 @@ class User extends Authenticatable implements FilamentUser, HasTenants
             return true;
         }
 
-        if ($this->ownedVendors()->where('id', $vendorId)->exists()) {
+        if ($this->ownsVendor($vendorId)) {
             return true;
         }
 
         setPermissionsTeamId($vendorId);
         $this->unsetRelation('roles');
 
-        return $this->hasAnyPermission((array) $permission);
+        // Remembered for the request: a page asks the same thing dozens of
+        // times. Any role or permission change forgets it (AppServiceProvider).
+        $permissions = (array) $permission;
+        sort($permissions);
+
+        return \App\Support\RequestMemo::get()->remember(
+            "perm:{$this->id}:{$vendorId}:" . implode('|', $permissions),
+            fn () => $this->hasAnyPermission($permissions),
+        );
     }
 
     public function orders()

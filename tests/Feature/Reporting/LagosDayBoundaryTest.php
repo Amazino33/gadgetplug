@@ -32,6 +32,10 @@ require_once __DIR__.'/../CashUp/Helpers.php';
 
 uses(RefreshDatabase::class);
 
+// The dashboard's figures load just after the page (HomeDashboard is Lazy);
+// these tests read them, so they render straight away here.
+beforeEach(fn () => Livewire::withoutLazyLoading());
+
 /*
  * The trading day is the Lagos day. Stored timestamps are UTC, and Lagos is
  * UTC+1, so 00:00–01:00 Lagos is still "yesterday" by the server's clock.

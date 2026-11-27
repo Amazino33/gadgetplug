@@ -137,7 +137,9 @@ return [
      *
      * To enable, set to true, and then create listeners to watch these events.
      */
-    'events_enabled' => false,
+    // On: a role or permission given or taken must forget the permission
+    // answers remembered for the request (App\Support\RequestMemo).
+    'events_enabled' => true,
 
     /*
      * Teams Feature.

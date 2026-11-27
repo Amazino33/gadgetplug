@@ -179,6 +179,20 @@ class VendorPanelProvider extends PanelProvider
                 FilamentShieldPlugin::make()
                     ->navigationGroup('Settings'),
             ])
+            // Moving between panel pages swaps only the page: the menu, styles and
+            // scripts stay loaded, so the next page shows at once and its parts
+            // load behind it. Apps outside the panel still open as full pages.
+            ->spa()
+            ->spaUrlExceptions(fn (): array => [
+                url('/sales-point') . '*',
+                url('/purchases') . '*',
+                url('/stock-take') . '*',
+                url('/pos') . '*',
+                url('/procurement') . '*',
+                url('/admin') . '*',
+                // The Products list runs its own scripts that expect a full load.
+                url('/plug/*/products') . '*',
+            ])
             ->databaseNotifications()
             ->databaseNotificationsPolling('30s')
             // Panel-level context control, so the store the user is operating
