@@ -41,7 +41,7 @@ class CounterResource extends Resource
         $vendor  = filament()->getTenant();
         $storeId = ActiveStore::currentId();
 
-        return $user && $vendor && $storeId && StockTakeAccess::canManage($user, $vendor->id, $storeId);
+        return $user && $vendor && $storeId && StockTakeAccess::canManageCounters($user, $vendor->id, $storeId);
     }
 
     public static function canCreate(): bool { return false; }

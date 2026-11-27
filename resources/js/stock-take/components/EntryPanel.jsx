@@ -84,7 +84,7 @@ export default function EntryPanel({ card, allowHalves, tapMode, onKey, onUnit, 
     const bigUnit = tapMode ? '' : target !== 'good' ? target : (bigValue ? plural(activeUnit?.name ?? baseName, Number(bigValue) || 2) : '');
 
     return (
-        <section className="flex h-full flex-col gap-2 rounded-t-3xl bg-white px-3 pb-2 pt-2.5 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] dark:bg-gray-900" aria-label={`Count ${product.name}`}>
+        <section className="flex min-h-full flex-col gap-2 [@media(max-height:620px)]:gap-1.5 rounded-t-3xl bg-white px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2.5 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] dark:bg-gray-900" aria-label={`Count ${product.name}`}>
             <div className="flex shrink-0 items-center gap-2.5">
                 {product.image
                     ? <img src={product.image} alt="" className="h-11 w-11 shrink-0 rounded-xl bg-gray-100 object-cover" />
@@ -99,10 +99,10 @@ export default function EntryPanel({ card, allowHalves, tapMode, onKey, onUnit, 
                 <button type="button" onMouseDown={press} onClick={onSkip} aria-label="Close without saving" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gray-100 text-xl text-gray-500 active:bg-gray-200 dark:bg-gray-800 dark:text-gray-300">✕</button>
             </div>
 
-            <div className={`flex h-[72px] shrink-0 items-center gap-3 rounded-2xl px-3 ${existing && mode === null ? 'bg-amber-50 ring-1 ring-amber-200 dark:bg-amber-900/30 dark:ring-amber-800' : 'bg-gray-50 dark:bg-gray-800/60'}`} aria-live="polite">
+            <div className={`flex h-[72px] [@media(max-height:620px)]:h-14 shrink-0 items-center gap-3 rounded-2xl px-3 ${existing && mode === null ? 'bg-amber-50 ring-1 ring-amber-200 dark:bg-amber-900/30 dark:ring-amber-800' : 'bg-gray-50 dark:bg-gray-800/60'}`} aria-live="polite">
                 <div className="min-w-0 flex-1">
                     <p className={`flex items-baseline gap-1.5 leading-none ${target === 'good' ? 'text-gray-900 dark:text-white' : 'text-red-700 dark:text-red-300'}`}>
-                        <span className="text-[34px] font-black tabular-nums" data-testid={tapMode ? 'tap-total' : undefined}>{bigValue || <span className="text-gray-300 dark:text-gray-600">0</span>}</span>
+                        <span className="text-[34px] [@media(max-height:620px)]:text-[28px] font-black tabular-nums" data-testid={tapMode ? 'tap-total' : undefined}>{bigValue || <span className="text-gray-300 dark:text-gray-600">0</span>}</span>
                         {bigUnit && <span className="truncate text-base font-bold opacity-70">{bigUnit}</span>}
                     </p>
                     <p className="mt-1 truncate text-sm font-semibold text-gray-600 dark:text-gray-300">{sumLine}</p>
@@ -140,7 +140,7 @@ export default function EntryPanel({ card, allowHalves, tapMode, onKey, onUnit, 
                 </div>
             )}
 
-            <div className="min-h-0 flex-1">
+            <div className="min-h-[12.5rem] [@media(max-height:620px)]:min-h-[10.75rem] flex-1">
                 {card.bigAsk ? (
                     <div role="alertdialog" aria-label="Check this number" className="flex h-full flex-col justify-center gap-2 rounded-2xl bg-amber-50 p-3 text-center ring-1 ring-amber-200 dark:bg-amber-900/40 dark:ring-amber-800">
                         <p className="text-lg font-extrabold text-amber-950 dark:text-amber-50">Save {inPacks ? `${spell(wholeLines)} = ` : ''}{totalText}?</p>

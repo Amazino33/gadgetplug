@@ -122,7 +122,7 @@
     "isEntry": true
   },
   "resources/js/stock-take/main.jsx": {
-    "file": "assets/main-CdjJPTAo.js",
+    "file": "assets/main-Cr6zXHkx.js",
     "name": "main",
     "src": "resources/js/stock-take/main.jsx",
     "isEntry": true,
@@ -135,7 +135,7 @@
       "node_modules/@zxing/browser/esm/index.js"
     ],
     "css": [
-      "assets/main-DzWluQs2.css"
+      "assets/main-DoSOKQJe.css"
     ]
   },
   "resources/js/vendor-tours.js": {

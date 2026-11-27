@@ -13,13 +13,13 @@
  */
 export default function Keypad({ allowHalves, onKey, onSave, canSave, saveLabel = 'Save ✓' }) {
     const keep = (e) => e.preventDefault();
-    const key = 'h-full min-h-12 rounded-2xl bg-white text-2xl font-extrabold text-gray-900 shadow-sm ring-1 ring-gray-200 active:bg-gray-200 dark:bg-gray-800 dark:text-white dark:ring-gray-700 dark:active:bg-gray-700';
+    const key = 'h-full min-h-11 [@media(max-height:620px)]:min-h-10 touch-manipulation rounded-2xl bg-white text-2xl font-extrabold text-gray-900 shadow-sm ring-1 ring-gray-200 active:bg-gray-200 dark:bg-gray-800 dark:text-white dark:ring-gray-700 dark:active:bg-gray-700';
     const digit = (d) => (
         <button key={d} type="button" onMouseDown={keep} onClick={() => onKey(d)} className={key}>{d}</button>
     );
 
     return (
-        <div className="grid h-full max-h-[300px] grid-cols-4 grid-rows-4 gap-1.5" aria-label="Keypad">
+        <div className="grid h-full max-h-[300px] touch-manipulation grid-cols-4 grid-rows-[repeat(4,minmax(2.75rem,1fr))] [@media(max-height:620px)]:grid-rows-[repeat(4,minmax(2.5rem,1fr))] gap-1.5 [@media(max-height:620px)]:gap-1" aria-label="Keypad">
             {digit('1')}{digit('2')}{digit('3')}
             <button type="button" onMouseDown={keep} onClick={() => onKey('back')} aria-label="Delete" className={`${key} text-xl`}>⌫</button>
 

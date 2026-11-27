@@ -30,7 +30,7 @@ class VendorRoles
             'count_stock', 'approve_stock_count',
             'view_store_settlement',
             'view_learn_page',
-            'manage_stock_takes', 'map_aisles',
+            'manage_stock_takes', 'map_aisles', 'manage_counters',
         ],
         'product_manager' => [
             'view_products', 'view_any_products', 'create_products', 'edit_products', 'delete_products',
@@ -60,7 +60,7 @@ class VendorRoles
             'count_stock', 'approve_stock_count',
             'view_store_settlement',
             'view_learn_page',
-            'manage_stock_takes', 'map_aisles',
+            'manage_stock_takes', 'map_aisles', 'manage_counters',
         ],
         'storekeeper' => [
             'view_products', 'view_any_products',

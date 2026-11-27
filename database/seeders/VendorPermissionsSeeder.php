@@ -142,6 +142,9 @@ class VendorPermissionsSeeder extends Seeder
             // is its own grant, so a trusted storekeeper can be given it
             // without being given the count.
             'manage_stock_takes',
+            // Adding counters, resetting their codes and showing the sign-in QR,
+            // apart from running the stock take itself.
+            'manage_counters',
             'perform_stock_takes',
             'map_aisles',
         ];

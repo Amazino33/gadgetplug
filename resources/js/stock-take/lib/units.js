@@ -93,7 +93,9 @@ export function formatQty(value) {
 
 export function plural(word, n) {
     if (n === 1) return word;
-    return /(s|x|ch|sh)$/i.test(word) ? `${word}es` : `${word}s`;
+    // Already plural or an abbreviation ending in s (pcs, kgs, Pieces): as is.
+    if (/s$/i.test(word)) return word;
+    return /(x|ch|sh)$/i.test(word) ? `${word}es` : `${word}s`;
 }
 
 export const key = (unit) => String(unit.id ?? 'base');

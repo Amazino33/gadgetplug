@@ -52,7 +52,7 @@ class RoleResource extends ShieldRoleResource
         'manage_expenses',
         'manage_financial_reports',
         'view_reports_hub',
-        'manage_stock_takes', 'perform_stock_takes', 'map_aisles',
+        'manage_stock_takes', 'perform_stock_takes', 'map_aisles', 'manage_counters',
         // Learn GadgetPlug. Ticked by default on a new role (see
         // DEFAULT_ON_PERMISSIONS), so a vendor takes it away rather than
         // having to know to add it.

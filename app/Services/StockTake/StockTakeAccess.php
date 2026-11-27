@@ -31,10 +31,21 @@ final class StockTakeAccess
     public const MANAGE  = 'manage_stock_takes';
     public const PERFORM = 'perform_stock_takes';
     public const MAP     = 'map_aisles';
+    public const COUNTERS = 'manage_counters';
 
     public static function canManage(User $user, int $vendorId, int $storeId): bool
     {
         return self::allows($user, $vendorId, $storeId, self::MANAGE);
+    }
+
+    /**
+     * Add and remove counters, reset their codes, show the sign-in QR. Its own
+     * permission, so a supervisor can run the counters without being able to
+     * approve counts or close a stock take.
+     */
+    public static function canManageCounters(User $user, int $vendorId, int $storeId): bool
+    {
+        return self::allows($user, $vendorId, $storeId, self::COUNTERS);
     }
 
     public static function canPerform(User $user, int $vendorId, int $storeId): bool

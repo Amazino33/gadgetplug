@@ -112,7 +112,7 @@ export function App() {
 
     return (
         <div className="flex h-dvh flex-col overflow-hidden bg-[#F9FAFB] dark:bg-gray-950" style={{ fontFamily: 'Inter, sans-serif' }}>
-            <div className="shrink-0 bg-teal-700 px-3 py-1.5 text-center text-[11px] font-extrabold uppercase tracking-[0.12em] text-white sm:text-sm" style={{ fontFamily: 'Montserrat, sans-serif' }}>
+            <div className="shrink-0 bg-teal-700 px-3 py-1.5 text-center text-[11px] [@media(max-height:620px)]:hidden font-extrabold uppercase tracking-[0.12em] text-white sm:text-sm" style={{ fontFamily: 'Montserrat, sans-serif' }}>
                 Stock Take
             </div>
             {/* Hidden while counting: the counting screen has its own header, and the camera needs the room. */}

@@ -576,7 +576,7 @@ export default function CountScreen({ session, aisle, aisles = [], onAisle, onWh
                 // Scanning: the camera takes the room. A product open: it shrinks
                 // to a strip that still reads the next barcode, and the number,
                 // chips and keypad below always fit.
-                <div className={`relative shrink-0 transition-[height] duration-200 ${card ? 'h-[92px]' : 'h-[max(170px,calc(100%-330px))]'}`}>
+                <div className={`relative shrink-0 transition-[height] duration-200 ${card ? 'h-[92px] [@media(max-height:640px)]:h-[60px]' : 'h-[max(170px,calc(100%-330px))]'}`}>
                     <Viewfinder
                         mode={mode}
                         onCode={handleCode}
@@ -598,7 +598,7 @@ export default function CountScreen({ session, aisle, aisles = [], onAisle, onWh
                 </div>
             )}
 
-            <div className={`min-h-0 flex-1 ${card ? 'overflow-hidden' : 'overflow-y-auto'} ${wide ? 'mx-auto w-full max-w-xl' : ''}`}>
+            <div className={`min-h-0 flex-1 overflow-y-auto overscroll-contain ${wide ? 'mx-auto w-full max-w-xl' : ''}`}>
                 {card ? (
                     <EntryPanel
                         card={card}

@@ -206,7 +206,7 @@ class StockTakeCounters
     {
         $storeId = $vendor->defaultStore?->id;
 
-        if (! $storeId || ! StockTakeAccess::canManage($by, (int) $vendor->id, (int) $storeId)) {
+        if (! $storeId || ! StockTakeAccess::canManageCounters($by, (int) $vendor->id, (int) $storeId)) {
             throw new AuthorizationException('You cannot manage counters for this shop.');
         }
     }
