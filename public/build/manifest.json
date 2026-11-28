@@ -31,7 +31,7 @@
     "isDynamicEntry": true
   },
   "resources/css/app.css": {
-    "file": "assets/app-FtWvcX-V.css",
+    "file": "assets/app-DWoqoXt1.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "name": "app",
@@ -40,7 +40,7 @@
     ]
   },
   "resources/css/filament/admin/theme.css": {
-    "file": "assets/theme-BB1Fv5Bc.css",
+    "file": "assets/theme-zGDO8GYM.css",
     "src": "resources/css/filament/admin/theme.css",
     "isEntry": true,
     "name": "theme",
@@ -49,7 +49,7 @@
     ]
   },
   "resources/css/filament/vendor/theme.css": {
-    "file": "assets/theme-BXJr8zIU.css",
+    "file": "assets/theme-Bqh4jUAp.css",
     "src": "resources/css/filament/vendor/theme.css"
   },
   "resources/fonts/poppins/poppins-500.woff2": {
@@ -71,7 +71,7 @@
     "isEntry": true
   },
   "resources/js/pos/main.jsx": {
-    "file": "assets/main-BTn9nI63.js",
+    "file": "assets/main-B5SBCDni.js",
     "name": "main",
     "src": "resources/js/pos/main.jsx",
     "isEntry": true,
@@ -81,7 +81,7 @@
       "_ModalShell-CxxVTqvZ.js"
     ],
     "css": [
-      "assets/main-DTFkklUp.css"
+      "assets/main-CyYvahAW.css"
     ],
     "assets": [
       "assets/poppins-500-C8OXljZJ.woff2",
@@ -102,7 +102,7 @@
     "isEntry": true
   },
   "resources/js/purchases/main.jsx": {
-    "file": "assets/main-64ta1N_g.js",
+    "file": "assets/main-CO93YjGG.js",
     "name": "main",
     "src": "resources/js/purchases/main.jsx",
     "isEntry": true,
@@ -112,7 +112,7 @@
       "_CameraScanner-DRGGuZgB.js"
     ],
     "css": [
-      "assets/main-CuIiobTb.css"
+      "assets/main-CUw55vFK.css"
     ]
   },
   "resources/js/pwa.js": {

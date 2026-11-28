@@ -18,6 +18,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
+use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\ViewColumn;
 use Filament\Tables\Filters\Filter;
@@ -65,9 +66,16 @@ class ResultsRelationManager extends RelationManager
                 'recountResult.task.assignee:id,name',
                 'approver:id,name',
             ]))
-            ->defaultSort('id', 'desc')
+            // Biggest problem first: the largest gap in ₦ (in quantity for
+            // those who may not see cost), so the important ones are on top.
+            ->defaultSort(fn (Builder $query): Builder => $money
+                ? $query->orderByRaw('ABS(COALESCE(stock_take_results.variance_value, 0)) DESC')->orderByRaw('ABS(stock_take_results.variance_qty) DESC')->orderByDesc('stock_take_results.id')
+                : $query->orderByRaw('ABS(stock_take_results.variance_qty) DESC')->orderByDesc('stock_take_results.id'))
             // Scopes the phone styles in the vendor theme to this table.
             ->extraAttributes(['class' => 'gp-st-results'])
+            // The list scrolls in its own box: a fuller page by default.
+            ->paginated([10, 25, 50, 100])
+            ->defaultPaginationPageOption(25)
             ->emptyStateHeading('Nothing to decide yet')
             ->emptyStateDescription('Results appear here when a counter hands a task in.')
             ->columns([
@@ -81,85 +89,67 @@ class ResultsRelationManager extends RelationManager
                     ->disabledClick()
                     ->hiddenFrom('md'),
 
+                // Product, with where, who and when underneath: the facts that
+                // used to be three more columns off the right of the screen.
                 TextColumn::make('product.name')
                     ->visibleFrom('md')
                     ->label('Product')
                     ->weight('bold')
                     ->searchable()
-                    ->description(fn (StockTakeResult $r) => $this->aislesOf($r)),
+                    ->wrap()
+                    ->description(fn (StockTakeResult $r) => collect([
+                        $this->aislesOf($r) ?: null,
+                        $r->task?->assignee?->name,
+                        $r->counted_at?->timezone('Africa/Lagos')->format('D j M, g:ia'),
+                    ])->filter()->implode(' · ')),
 
+                // Counted, with the packs it was counted in and anything
+                // damaged or expired (on the shelf, written off on approval).
                 TextColumn::make('total_counted_base')
                     ->visibleFrom('md')
                     ->label('Counted')
                     ->alignEnd()
+                    ->sortable()
+                    ->weight('bold')
                     ->formatStateUsing(fn ($state) => Quantity::format($state))
-                    ->description(fn (StockTakeResult $r) => $this->breakdownOf($r)),
+                    ->description(fn (StockTakeResult $r) => collect([
+                        $this->breakdownOf($r),
+                        (float) $r->damaged_qty_base > 0 ? Quantity::format($r->damaged_qty_base) . ' damaged' : null,
+                        (float) $r->expired_qty_base > 0 ? Quantity::format($r->expired_qty_base) . ' expired' : null,
+                    ])->filter()->implode(' · ') ?: null),
 
-                // Found damaged or expired: on the shelf, so not missing; written off on approval.
-                TextColumn::make('damaged_qty_base')
-                    ->visibleFrom('md')
-                    ->label('Damaged / expired')
-                    ->state(fn (StockTakeResult $r) => (float) $r->damaged_qty_base + (float) $r->expired_qty_base)
-                    ->formatStateUsing(fn ($state, StockTakeResult $r) => (float) $state > 0
-                        ? implode(' · ', array_filter([
-                            (float) $r->damaged_qty_base > 0 ? Quantity::format($r->damaged_qty_base) . ' damaged' : null,
-                            (float) $r->expired_qty_base > 0 ? Quantity::format($r->expired_qty_base) . ' expired' : null,
-                        ])) . ($money && $r->unit_cost !== null ? ' (₦' . number_format(((float) $r->damaged_qty_base + (float) $r->expired_qty_base) * (float) $r->unit_cost, 2) . ')' : '')
-                        : '—')
-                    ->color(fn ($state) => (float) $state > 0 ? 'danger' : 'gray')
-                    ->toggleable(),
+                // What the books said when it was counted. Click: what happened.
                 TextColumn::make('system_qty_at_count')
                     ->visibleFrom('md')
-                    ->label('System at count')
+                    ->label('Books said')
                     ->alignEnd()
+                    ->sortable()
                     ->state(fn (StockTakeResult $r) => $r->applied_system_qty ?? $r->system_qty_at_count)
                     ->formatStateUsing(fn ($state) => Quantity::format($state))
-                    // Click: how the books got there — who sold what, what came in.
                     ->action($this->storyAction())
                     ->tooltip('See what happened')
-                    ->extraAttributes(['class' => 'cursor-pointer underline decoration-dotted underline-offset-4'])
-                    ->description(fn (StockTakeResult $r) => $r->counted_at?->timezone('Africa/Lagos')->format('D j M, g:ia')),
+                    ->extraAttributes(['class' => 'cursor-pointer underline decoration-dotted underline-offset-4']),
 
+                // The gap, and what it is worth (to those who may see cost).
                 TextColumn::make('variance_qty')
                     ->visibleFrom('md')
-                    ->label('Variance')
+                    ->label('Gap')
                     ->alignEnd()
+                    ->sortable()
                     ->action($this->storyAction())
                     ->tooltip('See what happened')
                     ->extraAttributes(['class' => 'cursor-pointer underline decoration-dotted underline-offset-4'])
                     ->state(fn (StockTakeResult $r) => $r->applied_adjustment_qty ?? $r->variance_qty)
-                    ->formatStateUsing(fn ($state) => ($state > 0 ? '+' : '') . Quantity::format($state))
+                    ->formatStateUsing(fn ($state) => (float) $state == 0 ? '✓' : (($state > 0 ? '+' : '−') . Quantity::format(abs((float) $state))))
                     ->color(fn ($state) => $state < 0 ? 'danger' : ($state > 0 ? 'success' : 'gray'))
-                    ->weight('bold'),
+                    ->weight('bold')
+                    ->description(function (StockTakeResult $r) use ($money) {
+                        $value = $money ? self::valueOf($r) : null;
 
-                TextColumn::make('variance_value')
-                    ->visibleFrom('md')
-                    ->label('Variance ₦')
-                    ->alignEnd()
-                    ->visible($money)
-                    ->state(fn (StockTakeResult $r) => self::valueOf($r))
-                    ->formatStateUsing(fn ($state) => $state === null ? '—' : ($state < 0 ? '−' : ($state > 0 ? '+' : '')) . '₦' . number_format(abs($state), 2))
-                    ->color(fn ($state) => $state < 0 ? 'danger' : ($state > 0 ? 'success' : 'gray')),
-
-                TextColumn::make('task.assignee.name')
-                    ->visibleFrom('md')
-                    ->label('Counted by')
-                    ->description(fn (StockTakeResult $r) => $this->pairLine($r, $money)),
-
-                TextColumn::make('flags')
-                    ->visibleFrom('md')
-                    ->label('')
-                    ->badge()
-                    ->separator(',')
-                    ->state(fn (StockTakeResult $r) => $this->flagsOf($r))
-                    ->color(fn (string $state) => match ($state) {
-                        'Recount needed'   => 'danger',
-                        'Recount'          => 'info',
-                        'Not on aisle list', 'Not on shelf' => 'warning',
-                        'Late till sale — not yet corrected' => 'danger',
-                        default            => 'gray',
+                        return $value === null || (float) $value == 0.0 ? null : ($value < 0 ? '−' : '+') . '₦' . number_format(abs($value), 2);
                     }),
 
+                // Where it stands, and anything to watch, in one place.
                 TextColumn::make('status')
                     ->visibleFrom('md')
                     ->badge()
@@ -176,19 +166,14 @@ class ResultsRelationManager extends RelationManager
                         StockTakeResult::STATUS_SENT_TO_RECOUNT => 'info',
                         default                                 => 'warning',
                     })
-                    ->description(fn (StockTakeResult $r) => $r->approver ? "by {$r->approver->name}" : null),
+                    ->description(fn (StockTakeResult $r) => collect([
+                        ...$this->flagsOf($r),
+                        $this->pairLine($r, $money),
+                        $r->approver ? "by {$r->approver->name}" : null,
+                    ])->filter()->implode(' · ') ?: null)
+                    ->wrap(),
             ])
             ->filters([
-                SelectFilter::make('status')
-                    ->options([
-                        StockTakeResult::STATUS_PENDING         => 'To decide',
-                        StockTakeResult::STATUS_SENT_TO_RECOUNT => 'Being recounted',
-                        StockTakeResult::STATUS_APPROVED        => 'Approved',
-                        StockTakeResult::STATUS_REJECTED        => 'Rejected',
-                    ])
-                    ->default(StockTakeResult::STATUS_PENDING),
-                Filter::make('flagged')->label('Flagged for recount only')->query(fn (Builder $query) => $query->where('needs_recount', true)),
-                Filter::make('shortages')->label('Shortages only')->query(fn (Builder $query) => $query->where('variance_qty', '<', 0)),
                 SelectFilter::make('aisle')
                     ->label('Aisle')
                     ->options(fn () => Aisle::query()
@@ -226,6 +211,8 @@ class ResultsRelationManager extends RelationManager
             ])
             ->recordActions([
                 Action::make('approve')
+                    ->iconButton()
+                    ->tooltip(fn (StockTakeResult $r) => $r->recount_of_id || $r->status === StockTakeResult::STATUS_SENT_TO_RECOUNT ? 'Approve this count' : 'Approve')
                     ->label(fn (StockTakeResult $r) => $r->recount_of_id || $r->status === StockTakeResult::STATUS_SENT_TO_RECOUNT ? 'Approve this count' : 'Approve')
                     ->icon('heroicon-o-check')
                     ->color('success')
@@ -246,6 +233,8 @@ class ResultsRelationManager extends RelationManager
                     )),
 
                 Action::make('reject')
+                    ->iconButton()
+                    ->tooltip('Reject')
                     ->label('Reject')
                     ->icon('heroicon-o-x-mark')
                     ->color('gray')
@@ -261,6 +250,8 @@ class ResultsRelationManager extends RelationManager
                     )),
 
                 Action::make('recount')
+                    ->iconButton()
+                    ->tooltip('Send to recount')
                     ->label('Send to recount')
                     ->icon('heroicon-o-arrow-path')
                     ->color('warning')
@@ -270,6 +261,8 @@ class ResultsRelationManager extends RelationManager
                     ->action(fn (StockTakeResult $r, array $data) => $this->sendToRecount(collect([$r]), $data)),
 
                 Action::make('recheck')
+                    ->iconButton()
+                    ->tooltip('Re-check')
                     ->label('Re-check')
                     ->icon('heroicon-o-arrow-path-rounded-square')
                     ->color('danger')
@@ -291,6 +284,47 @@ class ResultsRelationManager extends RelationManager
                     ->action(fn (Collection $records, array $data) => $this->sendToRecount($records, $data))
                     ->deselectRecordsAfterCompletion(),
             ]);
+    }
+
+    /**
+     * What to look at, one tap away, with how many in each: To decide first.
+     *
+     * @return array<string, Tab>
+     */
+    public function getTabs(): array
+    {
+        $base = fn () => StockTakeResult::query()->where('stock_take_id', $this->getOwnerRecord()->id);
+        $pending = fn (Builder $query) => $query->where('status', StockTakeResult::STATUS_PENDING);
+
+        return [
+            'decide' => Tab::make('To decide')
+                ->badge(fn () => $pending($base())->count() ?: null)
+                ->badgeColor('warning')
+                ->modifyQueryUsing($pending),
+            'recount_needed' => Tab::make('Recount needed')
+                ->badge(fn () => $pending($base())->where('needs_recount', true)->count() ?: null)
+                ->badgeColor('danger')
+                ->modifyQueryUsing(fn (Builder $query) => $pending($query)->where('needs_recount', true)),
+            'shortages' => Tab::make('Shortages')
+                ->badge(fn () => $pending($base())->where('variance_qty', '<', 0)->count() ?: null)
+                ->badgeColor('danger')
+                ->modifyQueryUsing(fn (Builder $query) => $pending($query)->where('variance_qty', '<', 0)),
+            'recounting' => Tab::make('Being recounted')
+                ->badge(fn () => $base()->where('status', StockTakeResult::STATUS_SENT_TO_RECOUNT)->count() ?: null)
+                ->modifyQueryUsing(fn (Builder $query) => $query->where('status', StockTakeResult::STATUS_SENT_TO_RECOUNT)),
+            'approved' => Tab::make('Approved')
+                ->badge(fn () => $base()->where('status', StockTakeResult::STATUS_APPROVED)->count() ?: null)
+                ->badgeColor('success')
+                ->modifyQueryUsing(fn (Builder $query) => $query->where('status', StockTakeResult::STATUS_APPROVED)),
+            'rejected' => Tab::make('Rejected')
+                ->modifyQueryUsing(fn (Builder $query) => $query->where('status', StockTakeResult::STATUS_REJECTED)),
+            'all' => Tab::make('All'),
+        ];
+    }
+
+    public function getDefaultActiveTab(): string|int|null
+    {
+        return 'decide';
     }
 
     /**

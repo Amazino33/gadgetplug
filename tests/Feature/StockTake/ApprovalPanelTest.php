@@ -216,12 +216,12 @@ test('a result the automatic re-check could not fix shows a badge and the Re-che
 
     stApprovalAs($ctx, $ctx['admin']);
 
-    stResults($ctx, $st)->set('tableFilters.status.value', 'approved')->assertTableActionHidden('recheck', $result);
+    stResults($ctx, $st)->set('activeTab', 'approved')->assertTableActionHidden('recheck', $result);
     Livewire::test(App\Filament\Vendor\Resources\StockTakes\Widgets\StockTakeProgress::class, ['record' => $st])->assertDontSee('Need re-check');
 
     $result->update(['recheck_needed_at' => now()]);
 
-    stResults($ctx, $st)->set('tableFilters.status.value', 'approved')->assertTableActionVisible('recheck', $result);
+    stResults($ctx, $st)->set('activeTab', 'approved')->assertTableActionVisible('recheck', $result);
     Livewire::test(App\Filament\Vendor\Resources\StockTakes\Widgets\StockTakeProgress::class, ['record' => $st])->assertSee('Need re-check');
 
     expect(App\Filament\Vendor\Resources\StockTakes\StockTakeResource::getNavigationBadge())->toBe('1');
