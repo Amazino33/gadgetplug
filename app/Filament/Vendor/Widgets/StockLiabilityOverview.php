@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Vendor\Widgets;
 
+use App\Support\Visibility;
 use App\Filament\Vendor\Resources\Products\Schemas\ProductForm;
 use App\Models\StockAccountabilityEntry;
 use App\Services\StockAccountabilityLedger;
@@ -20,7 +21,8 @@ class StockLiabilityOverview extends BaseWidget
     // is behind the cost gate rather than blanking individual stats.
     public static function canView(): bool
     {
-        return ProductForm::canSeeCostPrice();
+        // Stock valued at cost: needs both cost prices and stock value.
+        return ProductForm::canSeeCostPrice() && Visibility::stockValue();
     }
 
     protected function getStats(): array

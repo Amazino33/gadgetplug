@@ -145,6 +145,8 @@ class VendorPermissionsSeeder extends Seeder
             // Adding counters, resetting their codes and showing the sign-in QR,
             // apart from running the stock take itself.
             'manage_counters',
+            // What they can see (App\Support\Visibility).
+            'view_profit', 'view_sales_totals', 'view_stock_value', 'view_other_branches',
             'perform_stock_takes',
             'map_aisles',
         ];

@@ -127,7 +127,9 @@ class FinancialReport extends Page
         return $vendor && (
             $user->isSuperAdmin() ||
             $vendor->isOwner($user) ||
-            $user->hasVendorPermission($vendor->id, 'manage_financial_reports')
+            ($user->hasVendorPermission($vendor->id, 'manage_financial_reports')
+                // A profit and loss statement is profit (Visibility).
+                && \App\Support\Visibility::profit($user, $vendor))
         );
     }
 }

@@ -87,6 +87,9 @@ test('a member may only report on the branches they are assigned to', function (
     $member->stores()->attach($branch->id);
     setPermissionsTeamId($vendor->id);
     $member->assignRole('inventory_manager');
+    // Without "Other branches" (App\Support\Visibility), only their own.
+    \Spatie\Permission\Models\Role::where(['name' => 'inventory_manager', 'team_id' => $vendor->id])->first()
+        ->revokePermissionTo('view_other_branches');
 
     actAsInv($vendor, $member);
 

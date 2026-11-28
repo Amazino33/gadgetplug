@@ -7,7 +7,7 @@ use App\Models\StockTake;
 use App\Models\StockTakeUnknownItem;
 use App\Services\StockTake\StockTakePlanner;
 use Filament\Actions\Action;
-use Filament\Forms\Components\Select;
+use Filament\Actions\BulkAction;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Tables\Columns\ImageColumn;
@@ -18,6 +18,7 @@ use Filament\Tables\Table;
 use Filament\Widgets\TableWidget;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\On;
@@ -46,13 +47,15 @@ class UnknownItems extends TableWidget
         $stockTake = $this->record;
 
         return $table
-            ->extraAttributes(['class' => 'gp-phone-cards'])
+            ->extraAttributes(['class' => 'gp-phone-cards gp-st-scroll'])
             ->query(fn () => StockTakeUnknownItem::query()
                 ->where('vendor_id', $stockTake->vendor_id)
                 ->where('store_id', $stockTake->store_id)
                 ->open()
                 ->with(['aisle', 'creator:id,name']))
             ->defaultSort('created_at', 'desc')
+            ->paginated([10, 25, 50, 100])
+            ->defaultPaginationPageOption(25)
             ->emptyStateHeading('No unknown barcodes waiting')
             ->columns([
                 // Phone only: one card per row (mobile-row.blade.php), so nothing
@@ -74,15 +77,45 @@ class UnknownItems extends TableWidget
                     ->view('filament.vendor.stock-take.mobile-row')
                     ->disabledClick()
                     ->hiddenFrom('md'),
-                ImageColumn::make('photo_path')->visibleFrom('md')->label('Photo')->disk('public')->square(),
-                TextColumn::make('name_entered')->visibleFrom('md')->label('Written as')->weight('bold')->searchable(),
-                TextColumn::make('barcode')->visibleFrom('md')->placeholder('—')->searchable(),
-                TextColumn::make('aisle.name')->visibleFrom('md')->label('Found in')->placeholder('—'),
-                TextColumn::make('creator.name')->visibleFrom('md')->label('By'),
-                TextColumn::make('created_at')->visibleFrom('md')->label('When')->dateTime('d M, g:ia', 'Africa/Lagos'),
+                // Three columns that fit a laptop, instead of six that ran off it:
+                // the photo, what the counter wrote with its barcode, and where,
+                // who and when.
+                ImageColumn::make('photo_path')->visibleFrom('md')->label('')->disk('public')->square()->imageSize(40)->grow(false),
+                TextColumn::make('name_entered')
+                    ->visibleFrom('md')
+                    ->label('Written as')
+                    ->weight('bold')
+                    ->wrap()
+                    ->searchable(['name_entered', 'barcode'])
+                    ->description(fn (StockTakeUnknownItem $record) => $record->barcode ?: 'No barcode'),
+                TextColumn::make('created_at')
+                    ->visibleFrom('md')
+                    ->label('Found')
+                    ->sortable()
+                    ->wrap()
+                    ->formatStateUsing(fn (StockTakeUnknownItem $record) => $record->aisle?->name ?? 'No aisle')
+                    ->description(fn (StockTakeUnknownItem $record) => collect([
+                        $record->creator?->name,
+                        $record->created_at?->timezone('Africa/Lagos')->format('D j M, g:ia'),
+                    ])->filter()->implode(' · ')),
             ])
             ->recordActions([
+                // Opens LinkProductPanel straight away in the browser: what the
+                // counter wrote beside the likeliest products, to compare.
+                Action::make('link_product')
+                    ->label('Link to existing')
+                    ->icon('heroicon-o-link')
+                    ->alpineClickHandler(fn (StockTakeUnknownItem $record) => "\$dispatch('gp-link-product', { id: {$record->id} })")
+                    // A pointer resting on it (or a finger landing) starts
+                    // loading, so the pop-up is usually filled by the click.
+                    ->extraAttributes(fn (StockTakeUnknownItem $record) => [
+                        'x-on:mouseenter' => "\$dispatch('gp-link-product-hover', { id: {$record->id} })",
+                        'x-on:mouseleave' => "\$dispatch('gp-link-product-hover', { id: null })",
+                        'x-on:touchstart.passive' => "\$dispatch('gp-link-product-hover', { id: {$record->id} })",
+                    ]),
+
                 Action::make('create_product')
+                    ->color('gray')
                     ->label('Create product')
                     ->icon('heroicon-o-plus')
                     ->fillForm(fn (StockTakeUnknownItem $record) => ['name' => $record->name_entered])
@@ -96,43 +129,57 @@ class UnknownItems extends TableWidget
                         'Product created and put on its aisle',
                     )),
 
-                Action::make('link_product')
-                    ->label('Link to existing')
-                    ->icon('heroicon-o-link')
-                    ->color('gray')
-                    ->schema([
-                        Select::make('product_id')
-                            ->label('Product')
-                            ->searchable()
-                            ->required()
-                            ->getSearchResultsUsing(fn (string $search) => Product::query()
-                                ->where('vendor_id', $stockTake->vendor_id)
-                                ->whereNull('source_product_id')
-                                ->where(fn (Builder $q) => $q->where('name', 'like', "%{$search}%")->orWhere('sku', 'like', "%{$search}%"))
-                                ->orderBy('name')
-                                ->limit(20)
-                                ->pluck('name', 'id')
-                                ->all())
-                            ->getOptionLabelUsing(fn ($value) => Product::query()->where('vendor_id', $stockTake->vendor_id)->whereKey($value)->value('name')),
-                    ])
-                    ->action(fn (StockTakeUnknownItem $record, array $data) => $this->attempt(
-                        fn () => app(StockTakePlanner::class)->linkUnknown(
-                            auth()->user(),
-                            $record,
-                            Product::query()->where('vendor_id', $stockTake->vendor_id)->findOrFail($data['product_id']),
-                        ),
-                        'Barcode linked',
-                    )),
-
                 Action::make('ignore')
                     ->label('Ignore')
+                    ->icon('heroicon-o-eye-slash')
+                    ->iconButton()
+                    ->tooltip('Ignore: set it aside')
+                    ->modalHeading('Set this barcode aside?')
                     ->color('gray')
                     ->requiresConfirmation()
                     ->action(fn (StockTakeUnknownItem $record) => $this->attempt(
                         fn () => app(StockTakePlanner::class)->ignoreUnknown(auth()->user(), $record),
                         'Set aside',
                     )),
+            ])
+            ->toolbarActions([
+                BulkAction::make('ignore_selected')
+                    ->label('Ignore selected')
+                    ->icon('heroicon-o-eye-slash')
+                    ->color('gray')
+                    ->requiresConfirmation()
+                    ->modalHeading(fn (?Collection $records) => 'Set ' . ($records?->count() ?? 0) . ' aside?')
+                    ->modalDescription('They leave this list. Nothing changes in stock.')
+                    ->modalSubmitActionLabel('Ignore')
+                    ->action(function (Collection $records) {
+                        $done = 0;
+                        $left = 0;
+
+                        foreach ($records as $record) {
+                            try {
+                                app(StockTakePlanner::class)->ignoreUnknown(auth()->user(), $record);
+                                $done++;
+                            } catch (ValidationException|AuthorizationException) {
+                                $left++;
+                            }
+                        }
+
+                        Notification::make()
+                            ->title("{$done} set aside")
+                            ->body($left > 0 ? "{$left} could not be: already dealt with, or not allowed." : null)
+                            ->{$done > 0 ? 'success' : 'warning'}()
+                            ->send();
+                        $this->dispatch('stock-take-updated');
+                    })
+                    ->deselectRecordsAfterCompletion(),
             ]);
+    }
+
+    /** "Create it as a new product" from the link pop-up, when nothing matched. */
+    #[On('gp-create-unknown')]
+    public function createUnknown(int $id): void
+    {
+        $this->mountTableAction('create_product', (string) $id);
     }
 
     private function attempt(callable $call, string $success): void

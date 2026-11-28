@@ -31,6 +31,8 @@ class VendorRoles
             'view_store_settlement',
             'view_learn_page',
             'manage_stock_takes', 'map_aisles', 'manage_counters',
+            // What they can see. Profit is the owner's until a role is given it.
+            'view_sales_totals', 'view_stock_value', 'view_other_branches',
         ],
         'product_manager' => [
             'view_products', 'view_any_products', 'create_products', 'edit_products', 'delete_products',
@@ -61,6 +63,8 @@ class VendorRoles
             'view_store_settlement',
             'view_learn_page',
             'manage_stock_takes', 'map_aisles', 'manage_counters',
+            // What they can see. Profit is the owner's until a role is given it.
+            'view_sales_totals', 'view_stock_value', 'view_other_branches',
         ],
         'storekeeper' => [
             'view_products', 'view_any_products',

@@ -58,7 +58,7 @@ it('a storekeeper cannot access the financial report page', function () {
         ->assertRedirect(route('filament.vendor.home', ['tenant' => $data['vendor']->slug]));
 });
 
-it('a role explicitly granted manage_financial_reports can access the page', function () {
+it('a role granted manage_financial_reports and Profit can access the page', function () {
     $data = setUpFinancialReportStore();
 
     $manager = User::factory()->create();
@@ -70,7 +70,19 @@ it('a role explicitly granted manage_financial_reports can access the page', fun
         ->first()
         ->givePermissionTo('manage_financial_reports');
 
-    $this->actingAs($manager)
+    // A profit and loss statement is profit: without "Profit" ticked, the
+    // page sends them away instead of opening.
+    expect($this->actingAs($manager)
+        ->get(route('filament.vendor.pages.financial-report', ['tenant' => $data['vendor']->slug]))
+        ->status())->not->toBe(200);
+
+    Role::where(['name' => 'store_admin', 'team_id' => $data['vendor']->id])
+        ->first()
+        ->givePermissionTo('view_profit');
+    app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+    \App\Support\RequestMemo::get()->forget('perm:');
+
+    $this->actingAs($manager->fresh())
         ->get(route('filament.vendor.pages.financial-report', ['tenant' => $data['vendor']->slug]))
         ->assertOk();
 });

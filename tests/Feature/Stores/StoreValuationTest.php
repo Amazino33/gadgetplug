@@ -163,6 +163,9 @@ test('a member without view_cost_price sees neither the cost value nor the warni
     $member->stores()->attach($vendor->defaultStore->id);
     setPermissionsTeamId($vendor->id);
     $member->assignRole('storekeeper');
+    // Allowed to see what the stock is worth, not what it cost.
+    \Spatie\Permission\Models\Role::where(['name' => 'storekeeper', 'team_id' => $vendor->id])->first()
+        ->givePermissionTo('view_stock_value');
 
     test()->actingAs($member);
     Filament::setCurrentPanel(Filament::getPanel('vendor'));

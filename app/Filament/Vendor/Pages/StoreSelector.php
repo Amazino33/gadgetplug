@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Vendor\Pages;
 
+use App\Support\Visibility;
 use App\Filament\Vendor\Resources\Products\ProductResource;
 use App\Filament\Vendor\Resources\Products\Schemas\ProductForm;
 use App\Models\Store;
@@ -65,6 +66,11 @@ class StoreSelector extends Page
      */
     public function salesToday(): Collection
     {
+        // Not worked out at all for someone who may not see it.
+        if (! Visibility::salesTotals()) {
+            return collect();
+        }
+
         $vendorId = filament()->getTenant()->id;
         $start = CarbonImmutable::now()->startOfDay();
         $end = CarbonImmutable::now()->endOfDay();

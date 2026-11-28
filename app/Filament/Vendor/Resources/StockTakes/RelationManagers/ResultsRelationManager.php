@@ -65,6 +65,7 @@ class ResultsRelationManager extends RelationManager
                 'recountOf.task.assignee:id,name',
                 'recountResult.task.assignee:id,name',
                 'approver:id,name',
+                'recountTask:id,status',
             ]))
             // Biggest problem first: the largest gap in ₦ (in quantity for
             // those who may not see cost), so the important ones are on top.
@@ -126,9 +127,8 @@ class ResultsRelationManager extends RelationManager
                     ->sortable()
                     ->state(fn (StockTakeResult $r) => $r->applied_system_qty ?? $r->system_qty_at_count)
                     ->formatStateUsing(fn ($state) => Quantity::format($state))
-                    ->action($this->storyAction())
                     ->tooltip('See what happened')
-                    ->extraAttributes(['class' => 'cursor-pointer underline decoration-dotted underline-offset-4']),
+                    ->extraAttributes(fn (StockTakeResult $r) => self::storyTrigger($r)),
 
                 // The gap, and what it is worth (to those who may see cost).
                 TextColumn::make('variance_qty')
@@ -136,9 +136,8 @@ class ResultsRelationManager extends RelationManager
                     ->label('Gap')
                     ->alignEnd()
                     ->sortable()
-                    ->action($this->storyAction())
                     ->tooltip('See what happened')
-                    ->extraAttributes(['class' => 'cursor-pointer underline decoration-dotted underline-offset-4'])
+                    ->extraAttributes(fn (StockTakeResult $r) => self::storyTrigger($r))
                     ->state(fn (StockTakeResult $r) => $r->applied_adjustment_qty ?? $r->variance_qty)
                     ->formatStateUsing(fn ($state) => (float) $state == 0 ? '✓' : (($state > 0 ? '+' : '−') . Quantity::format(abs((float) $state))))
                     ->color(fn ($state) => $state < 0 ? 'danger' : ($state > 0 ? 'success' : 'gray'))
@@ -277,6 +276,28 @@ class ResultsRelationManager extends RelationManager
                     )),
             ])
             ->toolbarActions([
+                BulkAction::make('approve_selected')
+                    ->label('Approve selected')
+                    ->icon('heroicon-o-check')
+                    ->color('success')
+                    ->requiresConfirmation()
+                    ->modalHeading(fn (?Collection $records) => 'Approve ' . ($records?->count() ?? 0) . ' selected?')
+                    ->modalDescription('Each one corrects stock by its gap at the moment of counting, worked out again now: sales made since are kept. Any you counted yourself are left for someone else.')
+                    ->modalSubmitActionLabel('Approve')
+                    ->action(fn (Collection $records) => $this->decideSelected($records, true))
+                    ->deselectRecordsAfterCompletion(),
+
+                BulkAction::make('reject_selected')
+                    ->label('Reject selected')
+                    ->icon('heroicon-o-x-mark')
+                    ->color('gray')
+                    ->requiresConfirmation()
+                    ->modalHeading(fn (?Collection $records) => 'Reject ' . ($records?->count() ?? 0) . ' selected?')
+                    ->modalDescription('Stock is left as it is. The counts stay on record. Any you counted yourself are left for someone else.')
+                    ->modalSubmitActionLabel('Reject')
+                    ->action(fn (Collection $records) => $this->decideSelected($records, false))
+                    ->deselectRecordsAfterCompletion(),
+
                 BulkAction::make('recount_selected')
                     ->label('Send selected to recount')
                     ->icon('heroicon-o-arrow-path')
@@ -328,22 +349,23 @@ class ResultsRelationManager extends RelationManager
     }
 
     /**
-     * The story behind a count: what the books said when it was counted and
-     * every movement that got them there (who sold what at the till, what
-     * came in), then what happened after. Opened from the numbers.
+     * Makes a number open "what happened" (CountStoryPanel): the panel slides
+     * in at once with a loading sign, and only the story goes to the server.
      */
-    private function storyAction(): Action
+    public static function storyTrigger(StockTakeResult $r): array
     {
-        return Action::make('story')
-            ->modalHeading(fn (StockTakeResult $record) => $record->product?->name ?? 'What happened')
-            ->modalDescription('What the books said when it was counted, and how they got there.')
-            ->modalContent(fn (StockTakeResult $record) => view('filament.vendor.stock-take.count-story', [
-                's' => app(\App\Services\StockTake\StockTakeStory::class)->for($record),
-            ]))
-            ->slideOver()
-            ->modalWidth('2xl')
-            ->modalSubmitAction(false)
-            ->modalCancelActionLabel('Close');
+        return [
+            'class'      => 'gp-st-link cursor-pointer',
+            'role'       => 'button',
+            'tabindex'   => '0',
+            'x-on:click' => "\$dispatch('gp-count-story', { id: {$r->id} })",
+            'x-on:keydown.enter' => "\$dispatch('gp-count-story', { id: {$r->id} })",
+            // A pointer resting on it (or a finger landing) starts loading,
+            // so the story is usually there by the time of the click.
+            'x-on:mouseenter' => "\$dispatch('gp-count-story-hover', { id: {$r->id} })",
+            'x-on:mouseleave' => "\$dispatch('gp-count-story-hover', { id: null })",
+            'x-on:touchstart.passive' => "\$dispatch('gp-count-story-hover', { id: {$r->id} })",
+        ];
     }
 
     /**
@@ -377,7 +399,19 @@ class ResultsRelationManager extends RelationManager
         return round($qty * $r->unit_cost, 2);
     }
 
+    /** @var array<int, bool> result id => may decide it now, for this request's buttons */
+    private array $decidableCache = [];
+
+    /**
+     * Asked by every decision button, on screen and on the phone card: worked
+     * out once a row per request (it looks up who counted it).
+     */
     private function decidable(StockTakeResult $r): bool
+    {
+        return $this->decidableCache[$r->id] ??= $this->workOutDecidable($r);
+    }
+
+    private function workOutDecidable(StockTakeResult $r): bool
     {
         $open = $r->status === StockTakeResult::STATUS_PENDING
             || ($r->status === StockTakeResult::STATUS_SENT_TO_RECOUNT && $r->recountTask && ! $r->recountTask->isOpen());
@@ -421,6 +455,22 @@ class ResultsRelationManager extends RelationManager
         ];
     }
 
+    private function decideSelected(Collection $records, bool $approve): void
+    {
+        $result = app(StockTakeApprover::class)->decideMany(auth()->user(), $records, $approve);
+        $verb   = $approve ? 'approved' : 'rejected';
+
+        Notification::make()
+            ->title("{$result['done']} {$verb}")
+            ->body($result['left'] > 0 ? "{$result['left']} left: counted by you, or no longer waiting for a decision." : null)
+            ->{$result['done'] > 0 ? 'success' : 'warning'}()
+            ->send();
+
+        $this->entriesCache = null;
+        $this->decidableCache = [];
+        $this->dispatch('stock-take-updated');
+    }
+
     private function sendToRecount(Collection $results, array $data): void
     {
         $this->attempt(fn () => app(StockTakeApprover::class)->sendToRecount(
@@ -431,13 +481,43 @@ class ResultsRelationManager extends RelationManager
         ), 'Sent to recount');
     }
 
+    /** @var array<string, \Illuminate\Support\Collection<int, StockTakeEntry>>|null  "task:product" => entries, for the rows on screen */
+    private ?array $entriesCache = null;
+
+    /**
+     * The entries behind one row. The first row asked loads them for every
+     * row on the page at once (with their aisles), so drawing the list is a
+     * handful of queries, not several a row.
+     *
+     * @return \Illuminate\Support\Collection<int, StockTakeEntry>
+     */
+    private function entriesOf(StockTakeResult $r): \Illuminate\Support\Collection
+    {
+        $key = $r->stock_take_task_id . ':' . $r->product_id;
+
+        if ($this->entriesCache === null || ! array_key_exists($key, $this->entriesCache)) {
+            $page = $this->getTableRecords();
+            $rows  = collect($page instanceof \Illuminate\Contracts\Pagination\Paginator ? $page->items() : $page)->push($r);
+
+            $this->entriesCache = ($this->entriesCache ?? []) + StockTakeEntry::query()
+                ->whereIn('stock_take_task_id', $rows->pluck('stock_take_task_id')->unique()->all())
+                ->whereIn('product_id', $rows->pluck('product_id')->unique()->all())
+                ->with('aisle')
+                ->get()
+                ->groupBy(fn (StockTakeEntry $e) => $e->stock_take_task_id . ':' . $e->product_id)
+                ->all();
+
+            foreach ($rows as $row) {
+                $this->entriesCache[$row->stock_take_task_id . ':' . $row->product_id] ??= collect();
+            }
+        }
+
+        return $this->entriesCache[$key];
+    }
+
     private function aislesOf(StockTakeResult $r): string
     {
-        return StockTakeEntry::query()
-            ->where('stock_take_task_id', $r->stock_take_task_id)
-            ->where('product_id', $r->product_id)
-            ->with('aisle')
-            ->get()
+        return $this->entriesOf($r)
             ->map(fn (StockTakeEntry $e) => $e->aisle?->label())
             ->filter()
             ->unique()
@@ -447,10 +527,7 @@ class ResultsRelationManager extends RelationManager
     /** "3 Crate + 5 Piece", summed over the product's entries in the task. */
     private function breakdownOf(StockTakeResult $r): ?string
     {
-        $lines = StockTakeEntry::query()
-            ->where('stock_take_task_id', $r->stock_take_task_id)
-            ->where('product_id', $r->product_id)
-            ->get()
+        $lines = $this->entriesOf($r)
             ->flatMap(fn (StockTakeEntry $e) => $e->entry_breakdown ?? [])
             ->groupBy('unit')
             ->map(fn ($group, $unit) => Quantity::format(Quantity::add(...$group->pluck('qty')->all())) . " {$unit}");
@@ -485,10 +562,7 @@ class ResultsRelationManager extends RelationManager
     /** @return array<int, string> */
     private function flagsOf(StockTakeResult $r): array
     {
-        $entries = StockTakeEntry::query()
-            ->where('stock_take_task_id', $r->stock_take_task_id)
-            ->where('product_id', $r->product_id)
-            ->get(['is_unlisted', 'is_not_on_shelf']);
+        $entries = $this->entriesOf($r);
 
         return array_values(array_filter([
             $r->needs_recount ? 'Recount needed' : null,
@@ -514,6 +588,8 @@ class ResultsRelationManager extends RelationManager
         }
 
         Notification::make()->title($success)->success()->send();
+        $this->entriesCache = null;
+        $this->decidableCache = [];
         $this->dispatch('stock-take-updated');
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Vendor\Widgets;
 
+use App\Support\Visibility;
 use App\Models\Product;
 use App\Services\Pickings\PickingLedger;
 use App\Support\Quantity;
@@ -56,7 +57,13 @@ class InventoryOverviewWidget extends BaseWidget
         // own figure rather than folded into the ones above.
         $onTrust = PickingLedger::heldTotals($vendorId, $this->storeFilter);
 
-        return [
+        // What the stock is worth (Visibility): its value; at cost also needs
+        // cost prices, and the profit in it needs profit.
+        $value  = Visibility::stockValue();
+        $cost   = $value && Visibility::cost();
+        $profitOk = $value && Visibility::profit();
+
+        return array_values(array_filter([
             Stat::make('Total SKUs', number_format($totalSKUs))
                 ->description('Unique products in your catalogue')
                 ->descriptionIcon('heroicon-m-squares-2x2')
@@ -67,25 +74,27 @@ class InventoryOverviewWidget extends BaseWidget
                 ->descriptionIcon('heroicon-m-cube-transparent')
                 ->color('info'),
 
-            Stat::make('Stock Retail Value', '₦'.number_format($retailValue))
+            ! $value ? null : Stat::make('Stock Retail Value', '₦' . number_format($retailValue))
                 ->description('Revenue if all stock sells today')
                 ->descriptionIcon('heroicon-m-banknotes')
                 ->color('success'),
 
-            Stat::make('Stock Cost Value', '₦'.number_format($costValue))
+            ! $cost ? null : Stat::make('Stock Cost Value', '₦' . number_format($costValue))
                 ->description('Capital tied up in current stock')
                 ->descriptionIcon('heroicon-m-receipt-percent')
                 ->color('warning'),
 
-            Stat::make('Gross Profit Potential', '₦'.number_format($profit))
-                ->description(number_format($margin, 1).'% average gross margin on stock')
+            ! $profitOk ? null : Stat::make('Gross Profit Potential', '₦' . number_format($profit))
+                ->description(number_format($margin, 1) . '% average gross margin on stock')
                 ->descriptionIcon('heroicon-m-arrow-trending-up')
                 ->color($profit >= 0 ? 'success' : 'danger'),
 
             Stat::make('Out on Picking', Quantity::display($onTrust['units']))
                 ->description(
                     $onTrust['units'] > 0
-                        ? '₦'.number_format($onTrust['value']).' with pickers · ₦'.number_format($retailValue + $onTrust['value']).' owned in all'
+                        ? ($value
+                            ? '₦' . number_format($onTrust['value']) . ' with pickers · ₦' . number_format($retailValue + $onTrust['value']) . ' owned in all'
+                            : 'Out with pickers')
                         : 'Nothing is out with pickers'
                 )
                 ->descriptionIcon('heroicon-m-hand-raised')
@@ -99,7 +108,7 @@ class InventoryOverviewWidget extends BaseWidget
                 )
                 ->descriptionIcon($outOfStock > 0 ? 'heroicon-m-exclamation-triangle' : 'heroicon-m-check-circle')
                 ->color($outOfStock > 0 ? 'danger' : ($lowStock > 0 ? 'warning' : 'success')),
-        ];
+        ]));
     }
 
     public static function canView(): bool

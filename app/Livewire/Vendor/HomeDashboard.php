@@ -12,6 +12,7 @@ use App\Models\Order;
 use App\Models\Product;
 use App\Services\ActiveStore;
 use App\Services\Pos\CustomerDebtService;
+use App\Support\Visibility;
 use App\Services\Reporting\SalesReportService;
 use App\Support\Pos\BusinessDate;
 use App\Support\Quantity;
@@ -55,6 +56,15 @@ class HomeDashboard extends Component
                 'tiles' => [],
                 'alerts' => [],
             ]);
+        }
+
+        // "All stores" adds up every branch: only for those who may see every
+        // branch's figures (Visibility::allBranches). Others see one of theirs.
+        $allBranches = Visibility::allBranches($vendor, $user);
+        $mine = ActiveStore::accessibleFor($vendor, $user);
+
+        if ($this->storeId === null && ! $allBranches) {
+            $this->storeId = $mine->first()?->id;
         }
 
         $storeId = $this->storeId;
@@ -138,8 +148,8 @@ class HomeDashboard extends Component
                 'label' => "Today's Sales",
                 'icon' => 'heroicon-o-banknotes',
                 'route' => null,
-                'value' => '₦'.number_format($summary['revenue']),
-                'subtext' => $canSeeCost ? 'Profit: ₦'.number_format($summary['profit']) : null,
+                'value' => '₦' . number_format($summary['revenue']),
+                'subtext' => Visibility::profit($user, $vendor) ? 'Profit: ₦' . number_format($summary['profit']) : null,
                 'permission' => 'view_inventory_reports',
                 'owner_prominence' => 'hidden',
                 'staff_prominence' => 'secondary',
@@ -231,6 +241,10 @@ class HomeDashboard extends Component
                 if ($tile['id'] === 'new_orders' && ! $vendor->online_sales_enabled) {
                     return false;
                 }
+                // The day's takings are a figure to be allowed to see, not part of the job.
+                if ($tile['id'] === 'today_sales' && ! Visibility::salesTotals($user, $vendor)) {
+                    return false;
+                }
                 if ($isOwner) {
                     return true;
                 }
@@ -276,9 +290,13 @@ class HomeDashboard extends Component
             'greeting' => $greeting,
             'tiles' => $tiles,
             'alerts' => $alerts,
-            'summary' => $summary,
+            // No branch of theirs to show (a member of no branch in a shop with
+            // several): no figures rather than the whole business's.
+            'summary' => $storeId === null && ! $allBranches ? null : $summary,
             'storeId' => $storeId,
-            'stores' => ActiveStore::accessibleFor($vendor, $user),
+            'stores' => $mine,
+            'allBranches' => $allBranches,
+            'seesSales' => Visibility::salesTotals($user, $vendor),
         ]);
     }
 
@@ -287,8 +305,10 @@ class HomeDashboard extends Component
         $vendor = filament()->getTenant();
 
         if (empty($storeId) || $storeId === 'all') {
-            $this->storeId = null;
-        } else {
+            if (Visibility::allBranches($vendor, auth()->user())) {
+                $this->storeId = null;
+            }
+        } elseif (ActiveStore::canAccess($vendor, auth()->user(), (int) $storeId)) {
             $this->storeId = $storeId;
             ActiveStore::set($vendor, auth()->user(), $storeId);
         }

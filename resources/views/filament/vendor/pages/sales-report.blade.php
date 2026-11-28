@@ -29,13 +29,14 @@
     @endif
 
     {{-- Headline figures --}}
-    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mt-6">
-        @foreach ([
+    {{-- Profit and margin only for roles allowed to see profit (Visibility). --}}
+    <div class="grid gap-4 sm:grid-cols-2 {{ $seesProfit ? 'lg:grid-cols-4' : '' }} mt-6">
+        @foreach (array_filter([
             ['Revenue', '₦' . number_format($summary['revenue'], 2), $revenueDelta['label'], $revenueDelta['positive']],
-            ['Profit', '₦' . number_format($summary['profit'], 2), $profitDelta['label'], $profitDelta['positive']],
-            ['Margin', number_format($summary['margin'], 1) . '%', $summary['cost_is_estimated'] ? 'partly estimated' : 'of revenue', true],
+            $seesProfit ? ['Profit', '₦' . number_format($summary['profit'], 2), $profitDelta['label'], $profitDelta['positive']] : null,
+            $seesProfit ? ['Margin', number_format($summary['margin'], 1) . '%', $summary['cost_is_estimated'] ? 'partly estimated' : 'of revenue', true] : null,
             ['Sales', number_format($summary['orders']), $summary['units'] . ' items sold', true],
-        ] as [$label, $value, $note, $positive])
+        ]) as [$label, $value, $note, $positive])
             <div class="fi-section rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
                 <p class="text-sm text-gray-500 dark:text-gray-400">{{ $label }}</p>
                 <p class="mt-1 text-2xl font-bold tracking-tight text-gray-950 dark:text-white">{{ $value }}</p>
@@ -48,7 +49,7 @@
         @endforeach
     </div>
 
-    @if ($summary['cost_is_estimated'])
+    @if ($seesProfit && $summary['cost_is_estimated'])
         <div class="mt-4 rounded-xl bg-warning-50 p-4 text-sm text-warning-800 ring-1 ring-warning-600/20 dark:bg-warning-400/10 dark:text-warning-300">
             Some items in this period sold before per-sale cost tracking began, so their profit is
             calculated from the product's current cost price. Figures for periods after this change are exact.
@@ -201,7 +202,9 @@
                             <th class="px-6 py-3 text-left font-medium">Product</th>
                             <th class="px-6 py-3 text-right font-medium">Units</th>
                             <th class="px-6 py-3 text-right font-medium">Revenue</th>
-                            <th class="px-6 py-3 text-right font-medium">Profit</th>
+                            @if ($seesProfit)
+                                <th class="px-6 py-3 text-right font-medium">Profit</th>
+                            @endif
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-200 dark:divide-white/10">
@@ -210,11 +213,13 @@
                                 <td class="px-6 py-3 text-gray-950 dark:text-white">{{ $product['name'] }}</td>
                                 <td class="px-6 py-3 text-right text-gray-700 dark:text-gray-300">{{ \App\Support\Quantity::display($product['units']) }}</td>
                                 <td class="px-6 py-3 text-right font-medium text-gray-950 dark:text-white">₦{{ number_format($product['revenue'], 2) }}</td>
-                                <td @class([
-                                    'px-6 py-3 text-right font-medium',
-                                    'text-success-600 dark:text-success-400' => $product['profit'] >= 0,
-                                    'text-danger-600 dark:text-danger-400' => $product['profit'] < 0,
-                                ])>₦{{ number_format($product['profit'], 2) }}</td>
+                                @if ($seesProfit)
+                                    <td @class([
+                                        'px-6 py-3 text-right font-medium',
+                                        'text-success-600 dark:text-success-400' => $product['profit'] >= 0,
+                                        'text-danger-600 dark:text-danger-400' => $product['profit'] < 0,
+                                    ])>₦{{ number_format($product['profit'], 2) }}</td>
+                                @endif
                             </tr>
                         @endforeach
                     </tbody>

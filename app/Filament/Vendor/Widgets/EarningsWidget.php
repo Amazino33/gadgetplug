@@ -2,6 +2,7 @@
 
 namespace App\Filament\Vendor\Widgets;
 
+use App\Support\Visibility;
 use App\Models\OrderItem;
 use App\Services\Reporting\SalesReportService;
 use Carbon\CarbonImmutable;
@@ -44,13 +45,13 @@ class EarningsWidget extends StatsOverviewWidget
             ->whereHas('order', fn ($q) => $q->whereIn('status', ['confirmed', 'packed', 'shipped', 'delivered'])->whereNull('revenue_recognized_at'))
             ->sum(DB::raw('quantity * unit_price'));
 
-        return [
+        return array_values(array_filter([
             Stat::make('All-Time Revenue', '₦'.number_format($all['revenue'], 2))
                 ->description('Online and shop combined')
                 ->descriptionIcon('heroicon-m-banknotes')
                 ->color('success'),
 
-            Stat::make('All-Time Profit', '₦'.number_format($all['profit'], 2))
+            ! Visibility::profit() ? null : Stat::make('All-Time Profit', '₦'.number_format($all['profit'], 2))
                 ->description(number_format($all['margin'], 1).'% margin'
                     .($all['cost_is_estimated'] ? ' · partly estimated' : ''))
                 ->descriptionIcon('heroicon-m-sparkles')
@@ -65,7 +66,7 @@ class EarningsWidget extends StatsOverviewWidget
                 ->description($all['units'].' items sold all time')
                 ->descriptionIcon('heroicon-m-shopping-bag')
                 ->color('info'),
-        ];
+        ]));
     }
 
     public static function canView(): bool
@@ -76,7 +77,11 @@ class EarningsWidget extends StatsOverviewWidget
         return $vendor && (
             $user->isSuperAdmin() ||
             $vendor->isOwner($user) ||
-            $user->hasVendorPermission($vendor->id, 'view_inventory_reports')
+            ($user->hasVendorPermission($vendor->id, 'view_inventory_reports')
+                // Adds up every branch's takings: for those allowed to see
+                // sales totals and every branch (Visibility).
+                && Visibility::salesTotals($user, $vendor)
+                && Visibility::allBranches($vendor, $user))
         );
     }
 }

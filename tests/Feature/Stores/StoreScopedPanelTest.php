@@ -184,6 +184,9 @@ test('the grid hides the cost value from a member without view_cost_price', func
     $member->stores()->attach($vendor->defaultStore->id);
     setPermissionsTeamId($vendor->id);
     $member->assignRole('storekeeper');
+    // Allowed to see what the stock is worth, not what it cost.
+    \Spatie\Permission\Models\Role::where(['name' => 'storekeeper', 'team_id' => $vendor->id])->first()
+        ->givePermissionTo('view_stock_value');
 
     actAsInPanel($vendor, $member);
 

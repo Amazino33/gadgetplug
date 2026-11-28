@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Vendor\Pages;
 
+use App\Support\Visibility;
 use App\Filament\Vendor\Widgets\InventoryOverviewWidget;
 use App\Filament\Vendor\Widgets\InventoryTableWidget;
 use App\Filament\Vendor\Widgets\StockMovementChart;
@@ -44,6 +45,32 @@ class InventoryPage extends Page
         // Opens on the branch you are working in, so the numbers agree with
         // the rest of the panel until you deliberately widen them.
         $this->storeFilter = ActiveStore::currentId();
+        $this->keepToVisibleBranches();
+    }
+
+    public function updatedStoreFilter(): void
+    {
+        $this->keepToVisibleBranches();
+    }
+
+    /** "Whole business" only for those who may see every branch (Visibility). */
+    public function allBranches(): bool
+    {
+        return Visibility::allBranches(filament()->getTenant(), auth()->user());
+    }
+
+    private function keepToVisibleBranches(): void
+    {
+        $stores = $this->selectableStores();
+
+        if ($this->storeFilter !== null && ! $stores->contains('id', (int) $this->storeFilter)) {
+            $this->storeFilter = null;
+        }
+
+        if ($this->storeFilter === null && ! $this->allBranches()) {
+            // -1 matches nothing: a member of no branch sees no figures.
+            $this->storeFilter = $stores->first()?->id ?? -1;
+        }
     }
 
     /**
@@ -55,7 +82,7 @@ class InventoryPage extends Page
      */
     public function selectableStores(): Collection
     {
-        return ActiveStore::accessibleFor(filament()->getTenant(), auth()->user());
+        return Visibility::reportStores(filament()->getTenant(), auth()->user());
     }
 
     // Passed into every widget on this page. Livewire re-sends it whenever the

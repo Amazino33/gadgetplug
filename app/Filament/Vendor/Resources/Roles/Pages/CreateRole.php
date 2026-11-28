@@ -28,8 +28,11 @@ class CreateRole extends BaseCreateRole
 
     protected function afterCreate(): void
     {
-        $permissionIds = $this->data['permissions'] ?? [];
-        $permissions = Permission::whereIn('id', $permissionIds)->get();
+        // What they can do, and what they can see (its own section).
+        $permissionIds = array_merge($this->data['permissions'] ?? [], $this->data['visibility'] ?? []);
+        $permissions = Permission::whereIn('id', $permissionIds)
+            ->whereIn('name', RoleResource::GRANTABLE_PERMISSIONS)
+            ->get();
         $this->record->syncPermissions($permissions);
         app(PermissionRegistrar::class)->forgetCachedPermissions();
     }

@@ -5,6 +5,7 @@ namespace App\Filament\Vendor\Resources\PosSales;
 use App\Actions\Finance\RecognizePosSaleRevenueAction;
 use App\Actions\Inventory\AdjustStockAction;
 use App\Actions\Pos\RecordSaleReversalAction;
+use App\Support\Visibility;
 use App\Actions\Pos\ReverseCustomerDebtAction;
 use App\Models\PosCustomer;
 use App\Models\PosSale;
@@ -76,9 +77,19 @@ class PosSaleResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()
+        $query = parent::getEloquentQuery()
             ->with(['cashier', 'items', 'store'])
             ->latest('completed_at');
+
+        // Sales of branches this person may see (Visibility::reportStores).
+        $vendor = filament()->getTenant();
+        $user = auth()->user();
+
+        if ($vendor && $user && ! Visibility::otherBranches($user, $vendor)) {
+            $query->whereIn('pos_sales.store_id', array_keys(self::storeOptions()));
+        }
+
+        return $query;
     }
 
     public static function table(Table $table): Table
@@ -146,7 +157,8 @@ class PosSaleResource extends Resource
                     ->label('Total')
                     ->money('NGN')
                     ->sortable()
-                    ->summarize(Sum::make()->label('Takings')->money('NGN')),
+                    // The total of what is listed is a sales total (Visibility).
+                    ->summarize(Sum::make()->label('Takings')->money('NGN')->visible(fn (): bool => Visibility::salesTotals())),
 
                 TextColumn::make('completed_at')
                     ->label('Date')
@@ -309,7 +321,7 @@ class PosSaleResource extends Resource
             return [];
         }
 
-        return ActiveStore::accessibleFor($vendor, $user)->pluck('name', 'id')->all();
+        return Visibility::reportStores($vendor, $user)->pluck('name', 'id')->all();
     }
 
     public static function getPages(): array

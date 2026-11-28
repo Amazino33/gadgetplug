@@ -68,6 +68,10 @@ class ViewStockTake extends ViewRecord
             StockTakeScope::hasQuickCount($this->getRecord()) ? null : Widgets\NotMappedProducts::class,
             Widgets\UnknownItems::class,
             Widgets\CounterAccuracy::class,
+            // Unseen until a number on the results is clicked: "what happened".
+            Widgets\CountStoryPanel::class,
+            // Unseen until "Link to existing" is clicked: the product picker.
+            Widgets\LinkProductPanel::class,
         ]));
     }
 

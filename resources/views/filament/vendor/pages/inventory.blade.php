@@ -17,7 +17,9 @@
                 wire:model.live="storeFilter"
                 class="rounded-lg border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
-                <option value="">All stores — whole business</option>
+                @if ($this->allBranches())
+                    <option value="">All stores — whole business</option>
+                @endif
                 @foreach ($stores as $store)
                     <option value="{{ $store->id }}">
                         {{ $store->name }}@if ($store->is_default) (main) @endif

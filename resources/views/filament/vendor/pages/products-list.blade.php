@@ -50,6 +50,8 @@
                 </section>
             @endforeach
 
+            {{-- What the stock is worth: for roles allowed to see it (Visibility). --}}
+            @if (\App\Support\Visibility::stockValue())
             <section class="rounded-xl border border-gray-200 bg-white p-3 dark:border-white/10 dark:bg-gray-900" aria-label="Stock value">
                 <h3 class="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500">
                     <x-heroicon-o-banknotes class="h-4 w-4"/> Stock value
@@ -67,6 +69,7 @@
                             <span x-show="!loaded" class="gp-shimmer mt-1 block h-5 w-16"></span>
                         </div>
                     </template>
+                    @if (\App\Support\Visibility::profit())
                     <template x-if="cfg.can.cost">
                         <div class="flex min-w-[7.5rem] flex-1 flex-col rounded-lg border border-gray-200 px-3 py-2 dark:border-white/10">
                             <span class="text-xs text-gray-500 dark:text-gray-400">Potential profit</span>
@@ -74,8 +77,10 @@
                             <span x-show="!loaded" class="gp-shimmer mt-1 block h-5 w-16"></span>
                         </div>
                     </template>
+                    @endif
                 </div>
             </section>
+            @endif
         </div>
 
         {{-- ── Toolbar ──────────────────────────────────────────────────────── --}}

@@ -292,6 +292,40 @@ final class StockTakeApprover
         return ['approved' => $approved, 'left' => $left];
     }
 
+    /**
+     * Approve or reject a picked set, one at a time, each with the same rules
+     * as deciding it alone. Those this person may not decide by themselves
+     * (they counted it: a note is needed), or that are no longer waiting
+     * (the other of a recount pair was just decided), are left, and counted.
+     *
+     * @param  iterable<StockTakeResult>  $results
+     * @return array{done: int, left: int}
+     */
+    public function decideMany(User $by, iterable $results, bool $approve): array
+    {
+        $done = 0;
+        $left = 0;
+
+        foreach ($results as $result) {
+            $result = $result->fresh();
+
+            if (! $result || ! StockTakeAccess::canDecide($by, $result) || StockTakeAccess::needsOverrideNote($by, $result)) {
+                $left++;
+
+                continue;
+            }
+
+            try {
+                $approve ? $this->approve($by, $result) : $this->reject($by, $result);
+                $done++;
+            } catch (ValidationException|AuthorizationException) {
+                $left++;
+            }
+        }
+
+        return ['done' => $done, 'left' => $left];
+    }
+
     /** Marked on the audit line of a correction the system posted by itself. */
     public const AUTO_RECHECK_NOTE = 'Auto re-check (late till sale)';
 

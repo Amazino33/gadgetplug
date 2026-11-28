@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Vendor\Widgets;
 
+use App\Support\Visibility;
 use App\Services\Reporting\ReportPeriod;
 use App\Services\Reporting\SalesReportService;
 use Filament\Facades\Filament;
@@ -44,7 +45,7 @@ class RevenueTrendChart extends ChartWidget
             ->dailySeries($vendorId, $period->from, $period->to);
 
         return [
-            'datasets' => [
+            'datasets' => array_values(array_filter([
                 [
                     'label' => 'Revenue (₦)',
                     'data' => $series['revenue'],
@@ -53,7 +54,8 @@ class RevenueTrendChart extends ChartWidget
                     'fill' => true,
                     'tension' => 0.3,
                 ],
-                [
+                // Profit only for those allowed to see it (Visibility).
+                ! Visibility::profit() ? null : [
                     'label' => 'Profit (₦)',
                     'data' => $series['profit'],
                     'borderColor' => '#10b981',
@@ -61,7 +63,7 @@ class RevenueTrendChart extends ChartWidget
                     'fill' => true,
                     'tension' => 0.3,
                 ],
-            ],
+            ])),
             'labels' => $series['labels'],
         ];
     }
@@ -74,7 +76,11 @@ class RevenueTrendChart extends ChartWidget
         return $vendor && (
             $user->isSuperAdmin() ||
             $vendor->isOwner($user) ||
-            $user->hasVendorPermission($vendor->id, 'view_inventory_reports')
+            ($user->hasVendorPermission($vendor->id, 'view_inventory_reports')
+                // Adds up every branch's takings: for those allowed to see
+                // sales totals and every branch (Visibility).
+                && Visibility::salesTotals($user, $vendor)
+                && Visibility::allBranches($vendor, $user))
         );
     }
 }

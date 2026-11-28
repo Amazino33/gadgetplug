@@ -4,7 +4,11 @@
         $metrics = $this->metrics();
         $sales = $this->salesToday();
         $activeId = $this->activeStoreId();
-        $showCost = $this->canSeeCostValue();
+        // What they may see (Visibility): the day's takings, the stock's worth,
+        // and what it cost.
+        $showSales = \App\Support\Visibility::salesTotals();
+        $showValue = \App\Support\Visibility::stockValue();
+        $showCost = $showValue && $this->canSeeCostValue();
     @endphp
 
     @if ($stores->isEmpty())
@@ -59,6 +63,7 @@
                          question an owner opens this page asking. Counter sales and
                          online orders this branch supplied, together — a branch that
                          trades over the till would otherwise read as idle. --}}
+                    @if ($showSales)
                     <div class="mt-4 rounded-lg bg-gray-50 dark:bg-white/5 px-3 py-2">
                         <p class="text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Sold today</p>
                         <p class="mt-0.5 font-montserrat text-lg font-bold text-gray-900 dark:text-white">
@@ -69,6 +74,7 @@
                             {{ $s['orders'] }} {{ Str::plural('sale', $s['orders']) }}
                         </p>
                     </div>
+                    @endif
 
                     <dl class="mt-3 grid grid-cols-2 gap-3 border-t border-gray-100 dark:border-white/10 pt-4">
                         <div>
@@ -83,10 +89,12 @@
                             </dd>
                         </div>
 
+                        @if ($showValue)
                         <div>
                             <dt class="text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Value (retail)</dt>
                             <dd class="mt-0.5 font-montserrat text-base font-bold text-gray-900 dark:text-white">₦{{ number_format($m->retail_value, 2) }}</dd>
                         </div>
+                        @endif
 
                         {{-- Cost is the sensitive figure: it reveals margin. Gated on the
                              same check the product form uses, so a staff member without it

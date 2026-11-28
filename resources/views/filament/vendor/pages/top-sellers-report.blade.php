@@ -25,7 +25,9 @@
                             <th class="px-4 py-3">Category</th>
                             <th class="px-4 py-3 text-right">Units Sold</th>
                             <th class="px-4 py-3 text-right">Daily Velocity</th>
-                            <th class="px-4 py-3 text-right">Revenue</th>
+                            @if ($seesSales)
+                                <th class="px-4 py-3 text-right">Revenue</th>
+                            @endif
                             <th class="px-6 py-3 text-right">Current Stock</th>
                         </tr>
                     </thead>
@@ -42,7 +44,9 @@
                                 <td class="px-4 py-3 text-gray-500 dark:text-gray-400">{{ $row->product->category?->name ?? '—' }}</td>
                                 <td class="px-4 py-3 text-right font-semibold text-gray-900 dark:text-white">{{ \App\Support\Quantity::display($row->unitsSold) }}</td>
                                 <td class="px-4 py-3 text-right text-gray-700 dark:text-gray-300">{{ number_format($row->dailyVelocity, 2) }}/day</td>
-                                <td class="px-4 py-3 text-right text-gray-700 dark:text-gray-300">₦{{ number_format($row->revenue, 2) }}</td>
+                                @if ($seesSales)
+                                    <td class="px-4 py-3 text-right text-gray-700 dark:text-gray-300">₦{{ number_format($row->revenue, 2) }}</td>
+                                @endif
                                 <td class="px-6 py-3 text-right text-gray-700 dark:text-gray-300">{{ \App\Support\Quantity::display($row->product->stock_quantity) }}</td>
                             </tr>
                         @endforeach

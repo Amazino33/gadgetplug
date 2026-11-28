@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Vendor\Pages;
 
+use App\Support\Visibility;
 use App\Models\Category;
 use App\Models\Product;
 use App\Services\Reporting\ProductVelocityService;
@@ -111,6 +112,7 @@ class TopSellersReport extends Page
         return [
             'period' => $period,
             'rows' => $rows,
+            'seesSales' => Visibility::salesTotals(),
         ];
     }
 
@@ -122,7 +124,9 @@ class TopSellersReport extends Page
         return $vendor && (
             $user->isSuperAdmin() ||
             $vendor->isOwner($user) ||
-            $user->hasVendorPermission($vendor->id, 'view_inventory_reports')
+            ($user->hasVendorPermission($vendor->id, 'view_inventory_reports')
+                // Every branch's sales together: for those who may see them all.
+                && Visibility::allBranches($vendor, $user))
         );
     }
 }

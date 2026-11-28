@@ -61,6 +61,7 @@
             {{-- Profit, kept visibly apart from cash: they answer different
                  questions and conflating them is how a credit sale gets
                  mistaken for missing money. --}}
+            @if (\App\Support\Visibility::profit())
             <div class="fi-section rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
                 <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-200">Trading</h3>
                 <dl class="mt-3 space-y-2 text-sm">
@@ -72,6 +73,7 @@
                     Counts every sale however it was paid for. The cash panel counts only the cash tender.
                 </p>
             </div>
+            @endif
         </div>
 
         {{-- The second signal, deliberately next to the cash gap.
@@ -348,17 +350,24 @@
         {{-- What the branch is holding or owed.
              A different question from the cash reconciliation above: not "did
              the right amount come back" but "what is tied up here". --}}
-        @php $pos = $recon['position']; @endphp
+        @php
+            $pos = $recon['position'];
+            // What they may see (Visibility): the stock's worth at cost, and profit.
+            $seesStock = \App\Support\Visibility::stockValue() && \App\Support\Visibility::cost();
+            $seesProfit = \App\Support\Visibility::profit();
+        @endphp
         <div class="fi-section mt-4 rounded-xl bg-white p-6 shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
             <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-200">Where the money is tied up</h3>
 
             <dl class="mt-3 space-y-2 text-sm">
+                @if ($seesStock)
                 <div class="flex justify-between">
                     <dt class="text-gray-500 dark:text-gray-400">
                         Stock on hand <span class="text-xs">(at cost, {{ \App\Support\Quantity::display($pos['stock_units']) }} units)</span>
                     </dt>
                     <dd class="font-mono">{{ $money($pos['stock_at_cost']) }}</dd>
                 </div>
+                @endif
                 <div class="flex justify-between">
                     <dt class="text-gray-500 dark:text-gray-400">Cash still to be handed over</dt>
                     <dd class="font-mono">{{ $money($pos['cash_outstanding']) }}</dd>
@@ -380,13 +389,15 @@
                     <dt class="text-gray-500 dark:text-gray-400">Owed by staff</dt>
                     <dd class="font-mono">{{ $money($pos['staff_debts']) }}</dd>
                 </div>
+                @if ($seesStock)
                 <div class="flex justify-between border-t border-gray-200 pt-2 text-base font-semibold dark:border-gray-700">
                     <dt>Total balance</dt>
                     <dd class="font-mono">{{ $money($pos['total_balance']) }}</dd>
                 </div>
+                @endif
             </dl>
 
-            @if ($pos['stock_uncosted'] > 0)
+            @if ($seesStock && $pos['stock_uncosted'] > 0)
                 <p class="mt-3 rounded-lg bg-warning-50 p-3 text-sm text-warning-800 dark:bg-warning-400/10 dark:text-warning-300">
                     {{ $pos['stock_uncosted'] }} product(s) on the shelf have no cost price recorded, so they are left
                     out of the stock value above. The total is understated by whatever they are worth.
@@ -404,17 +415,23 @@
             <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-200">Trading in this period</h3>
             <dl class="mt-3 grid gap-x-8 gap-y-2 text-sm sm:grid-cols-2">
                 <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Total sold</dt><dd class="font-mono">{{ $money($pos['sold_in_range']) }}</dd></div>
-                <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Cost of what sold</dt><dd class="font-mono">{{ $money($pos['cogs_in_range']) }}</dd></div>
+                @if ($seesProfit)
+                    <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Cost of what sold</dt><dd class="font-mono">{{ $money($pos['cogs_in_range']) }}</dd></div>
+                @endif
                 <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Stock purchased</dt><dd class="font-mono">{{ $money($pos['purchases']) }}</dd></div>
                 <div class="flex justify-between"><dt class="text-gray-500 dark:text-gray-400">Expenses</dt><dd class="font-mono">{{ $money($pos['expenses']) }}</dd></div>
+                @if ($seesProfit)
                 <div class="flex justify-between border-t border-gray-200 pt-2 font-semibold dark:border-gray-700 sm:col-span-2">
                     <dt>Gross profit</dt><dd class="font-mono">{{ $money($pos['profit_in_range']) }}</dd>
                 </div>
+                @endif
             </dl>
+            @if ($seesProfit)
             <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">
                 Gross profit is what sold less what it cost. Expenses and stock purchased are shown beside it but not
                 subtracted from it — buying stock moves money into the shelf, it does not lose it.
             </p>
+            @endif
         </div>
 
         {{-- Frozen copies --}}

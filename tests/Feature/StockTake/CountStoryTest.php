@@ -96,9 +96,11 @@ test('the manager opens it from the numbers on the approval list', function () {
     ActiveStore::set($ctx['vendor'], $ctx['admin'], $ctx['store']);
 
     Livewire::test(ResultsRelationManager::class, ['ownerRecord' => $st, 'pageClass' => ViewStockTake::class])
-        ->mountTableAction('story', $result)
-        ->assertSet('mountedActions.0.name', 'story')
-        ->assertSet('mountedActions.0.context.recordKey', (string) $result->id);
+        ->assertSeeHtml("gp-count-story', { id: {$result->id} })");
+
+    Livewire::test(\App\Filament\Vendor\Resources\StockTakes\Widgets\CountStoryPanel::class, ['record' => $st])
+        ->call('show', $result->id)
+        ->assertSee('2 missing');
 
     $html = view('filament.vendor.stock-take.count-story', ['s' => app(StockTakeStory::class)->for($result)])->render();
 

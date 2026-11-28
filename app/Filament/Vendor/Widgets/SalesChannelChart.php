@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Vendor\Widgets;
 
+use App\Support\Visibility;
 use App\Services\Reporting\ReportPeriod;
 use App\Services\Reporting\SalesReportService;
 use Filament\Facades\Filament;
@@ -64,7 +65,11 @@ class SalesChannelChart extends ChartWidget
         return $vendor && (
             $user->isSuperAdmin() ||
             $vendor->isOwner($user) ||
-            $user->hasVendorPermission($vendor->id, 'view_inventory_reports')
+            ($user->hasVendorPermission($vendor->id, 'view_inventory_reports')
+                // Adds up every branch's takings: for those allowed to see
+                // sales totals and every branch (Visibility).
+                && Visibility::salesTotals($user, $vendor)
+                && Visibility::allBranches($vendor, $user))
         );
     }
 }

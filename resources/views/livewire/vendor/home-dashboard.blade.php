@@ -31,7 +31,8 @@
         <div x-show="open" x-cloak x-transition
              class="absolute left-0 z-50 mt-2 w-full overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg">
             <div class="max-h-72 overflow-y-auto py-1">
-                <!-- All Stores Option -->
+                <!-- All Stores Option: only for those who may see every branch -->
+                @if ($allBranches ?? true)
                 <button type="button"
                     wire:click="switchStore('all')"
                     x-on:click="open = false"
@@ -44,6 +45,7 @@
                         <x-heroicon-m-check class="h-5 w-5 shrink-0"/>
                     @endif
                 </button>
+                @endif
 
                 <!-- Individual Stores -->
                 @foreach ($stores as $store)
@@ -73,7 +75,9 @@
 
     <!-- Live Stat Strip -->
     @if(isset($summary))
-    <div class="grid grid-cols-3 gap-4">
+    <div class="grid {{ ($seesSales ?? true) ? 'grid-cols-3' : 'grid-cols-2' }} gap-4">
+        {{-- The day's takings: only for roles allowed to see sales totals. --}}
+        @if ($seesSales ?? true)
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 text-center border border-gray-200 dark:border-gray-700 relative">
             <p class="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider flex items-center justify-center gap-1">
                 Sales
@@ -94,6 +98,7 @@
                 <span x-show="hideSales" style="display: none;">****</span>
             </p>
         </div>
+        @endif
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 text-center border border-gray-200 dark:border-gray-700">
             <p class="text-xs text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wider flex items-center justify-center gap-1">
                 Orders

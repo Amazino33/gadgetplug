@@ -439,12 +439,14 @@
    own box with the column names kept in view, so the decisions and the
    headings never scroll away, and nothing runs off the right edge. */
 @media (min-width: 768px) {
-    .gp-st-results .fi-ta-content-ctn {
+    .gp-st-results .fi-ta-content-ctn,
+    .gp-st-scroll .fi-ta-content-ctn {
         max-height: max(22rem, calc(100vh - 16rem));
         overflow: auto;
     }
 
-    .gp-st-results .fi-ta-table > thead th {
+    .gp-st-results .fi-ta-table > thead th,
+    .gp-st-scroll .fi-ta-table > thead th {
         position: sticky;
         top: 0;
         z-index: 2;
@@ -452,14 +454,28 @@
         box-shadow: inset 0 -1px 0 var(--gray-200);
     }
 
-    .dark .gp-st-results .fi-ta-table > thead th {
+    .dark .gp-st-results .fi-ta-table > thead th,
+    .dark .gp-st-scroll .fi-ta-table > thead th {
         background-color: var(--gray-900);
         box-shadow: inset 0 -1px 0 rgb(255 255 255 / 0.1);
     }
 
     /* The three decisions side by side, never wrapped under each other. */
-    .gp-st-results .fi-ta-actions {
+    .gp-st-results .fi-ta-actions,
+    .gp-st-scroll .fi-ta-actions {
         flex-wrap: nowrap;
         gap: 0.25rem;
     }
+}
+
+/* A number on the results that opens "what happened": the number itself is
+   underlined (dotted), not the ₦ line under it, which then read as crossed out. */
+.gp-st-link .fi-ta-text-item {
+    text-decoration-line: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 4px;
+}
+
+.gp-st-link:hover .fi-ta-text-item {
+    text-decoration-style: solid;
 }

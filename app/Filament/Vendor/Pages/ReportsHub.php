@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Vendor\Pages;
 
+use App\Support\Visibility;
 use App\Services\Reporting\Cards\AdEfficiencyCardProvider;
 use App\Services\Reporting\Cards\CardSummary;
 use App\Services\Reporting\Cards\DeadStockCardProvider;
@@ -56,6 +57,8 @@ class ReportsHub extends Page
         $vendorId = filament()->getTenant()->id;
 
         return collect(self::CARD_PROVIDERS)
+            // Each card only for those allowed to see what it shows (Visibility).
+            ->filter(fn (string $providerClass) => self::mayShow($providerClass))
             ->map(function (string $providerClass) use ($vendorId) {
                 try {
                     return app($providerClass)->summarize($vendorId);
@@ -73,6 +76,27 @@ class ReportsHub extends Page
                     );
                 }
             });
+    }
+
+    /**
+     * The cards add up the whole business: money (profit, bank and cash),
+     * sales totals, or what slow stock is worth. Each needs its figure, and
+     * every branch.
+     */
+    private static function mayShow(string $providerClass): bool
+    {
+        $vendor = filament()->getTenant();
+        $user = auth()->user();
+        $all = Visibility::allBranches($vendor, $user);
+
+        return match ($providerClass) {
+            MoneyPositionCardProvider::class  => $all && Visibility::profit($user, $vendor),
+            SalesPulseCardProvider::class,
+            PaymentMethodsCardProvider::class,
+            AdEfficiencyCardProvider::class   => $all && Visibility::salesTotals($user, $vendor),
+            DeadStockCardProvider::class      => $all && Visibility::stockValue($user, $vendor),
+            default                           => true,
+        };
     }
 
     public static function canAccess(): bool

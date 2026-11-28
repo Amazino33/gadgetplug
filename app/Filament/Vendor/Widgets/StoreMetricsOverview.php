@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Vendor\Widgets;
 
+use App\Support\Visibility;
 use App\Models\Product;
 use App\Services\Reporting\ReportPeriod;
 use App\Services\Reporting\SalesReportService;
@@ -37,7 +38,7 @@ class StoreMetricsOverview extends BaseWidget
         $stockValue = (float) Product::where('vendor_id', $vendorId)
             ->sum(DB::raw('stock_quantity * price'));
 
-        return [
+        return array_values(array_filter([
             Stat::make('Revenue', '₦'.number_format($current['revenue'], 2))
                 ->description($this->comparison($current['revenue'], $before['revenue']))
                 ->descriptionIcon($current['revenue'] >= $before['revenue']
@@ -45,7 +46,7 @@ class StoreMetricsOverview extends BaseWidget
                     : 'heroicon-m-arrow-trending-down')
                 ->color($current['revenue'] >= $before['revenue'] ? 'success' : 'danger'),
 
-            Stat::make('Profit', '₦'.number_format($current['profit'], 2))
+            ! Visibility::profit() ? null : Stat::make('Profit', '₦'.number_format($current['profit'], 2))
                 ->description($current['cost_is_estimated']
                     // Said plainly rather than hidden: some of these lines sold
                     // before cost was recorded per sale, so their profit leans
@@ -60,11 +61,11 @@ class StoreMetricsOverview extends BaseWidget
                 ->descriptionIcon('heroicon-m-shopping-bag')
                 ->color('info'),
 
-            Stat::make('Stock on Hand', '₦'.number_format($stockValue, 2))
+            ! Visibility::stockValue() ? null : Stat::make('Stock on Hand', '₦'.number_format($stockValue, 2))
                 ->description('Retail value of current inventory')
                 ->descriptionIcon('heroicon-m-cube')
                 ->color('primary'),
-        ];
+        ]));
     }
 
     private function comparison(float $current, float $previous): string
@@ -86,7 +87,11 @@ class StoreMetricsOverview extends BaseWidget
         return $vendor && (
             $user->isSuperAdmin() ||
             $vendor->isOwner($user) ||
-            $user->hasVendorPermission($vendor->id, 'view_inventory_reports')
+            ($user->hasVendorPermission($vendor->id, 'view_inventory_reports')
+                // Adds up every branch's takings: for those allowed to see
+                // sales totals and every branch (Visibility).
+                && Visibility::salesTotals($user, $vendor)
+                && Visibility::allBranches($vendor, $user))
         );
     }
 }

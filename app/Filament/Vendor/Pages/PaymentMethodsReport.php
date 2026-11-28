@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Vendor\Pages;
 
+use App\Support\Visibility;
 use App\Services\ActiveStore;
 use App\Services\Reporting\ReportPeriod;
 use App\Services\Reporting\SalesReportService;
@@ -60,7 +61,9 @@ class PaymentMethodsReport extends Page
                             ->label('Store')
                             ->options(fn (): array => self::selectableStores())
                             ->default(null)
-                            ->placeholder('All stores')
+                            // "All stores" only for those who may see every branch.
+                            ->placeholder(fn (): ?string => Visibility::allBranches(filament()->getTenant(), auth()->user()) ? 'All stores' : null)
+                            ->selectablePlaceholder(fn (): bool => Visibility::allBranches(filament()->getTenant(), auth()->user()))
                             ->live()
                             ->visible(fn (): bool => count(self::selectableStores()) > 1),
 
@@ -109,7 +112,7 @@ class PaymentMethodsReport extends Page
         $days = app(SalesReportService::class)
             ->dailyPayments(filament()->getTenant()->id, $period->from, $period->to, $storeId);
 
-        $storeName = $storeId ? self::selectableStores()[$storeId] : 'all-stores';
+        $storeName = $storeId ? (self::selectableStores()[$storeId] ?? 'none') : 'all-stores';
         $filename = 'payment-methods-'.Str::slug($storeName).'-'
             .$period->from->setTimezone(config('reporting.timezone'))->toDateString().'-to-'
             .$period->to->setTimezone(config('reporting.timezone'))->toDateString().'.csv';
@@ -143,7 +146,7 @@ class PaymentMethodsReport extends Page
     {
         $vendor = filament()->getTenant();
 
-        return ActiveStore::accessibleFor($vendor, auth()->user())
+        return Visibility::reportStores($vendor, auth()->user())
             ->pluck('name', 'id')
             ->all();
     }
@@ -154,9 +157,17 @@ class PaymentMethodsReport extends Page
     {
         $storeId = $this->filters['store'] ?? null;
 
-        return $storeId !== null && array_key_exists((int) $storeId, self::selectableStores())
+        $storeId = $storeId !== null && array_key_exists((int) $storeId, self::selectableStores())
             ? (int) $storeId
             : null;
+
+        // Not allowed every branch's total: the first of their own branches,
+        // and nothing at all when they have none.
+        if ($storeId === null && ! Visibility::allBranches(filament()->getTenant(), auth()->user())) {
+            return array_key_first(self::selectableStores()) ?? -1;
+        }
+
+        return $storeId;
     }
 
     public function getViewData(): array
@@ -182,7 +193,8 @@ class PaymentMethodsReport extends Page
         return $vendor && (
             $user->isSuperAdmin() ||
             $vendor->isOwner($user) ||
-            $user->hasVendorPermission($vendor->id, 'view_inventory_reports')
+            ($user->hasVendorPermission($vendor->id, 'view_inventory_reports')
+                && Visibility::salesTotals($user, $vendor))
         );
     }
 }

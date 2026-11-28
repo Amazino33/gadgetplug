@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Vendor\Pages;
 
 use App\Services\ActiveStore;
+use App\Support\Visibility;
 use App\Services\Reporting\ReportPeriod;
 use App\Services\Reporting\SalesReportService;
 use BackedEnum;
@@ -52,7 +53,10 @@ class SalesReport extends Page
                             ->label('Store')
                             ->options(fn (): array => self::selectableStores())
                             ->default(null)
-                            ->placeholder('All stores')
+                            // "All stores" adds up every branch: only for
+                            // those who may see every branch's figures.
+                            ->placeholder(fn (): ?string => self::allBranches() ? 'All stores' : null)
+                            ->selectablePlaceholder(fn (): bool => self::allBranches())
                             ->live()
                             // One branch means there is nothing to choose
                             // between, and an empty dropdown is just noise.
@@ -92,9 +96,14 @@ class SalesReport extends Page
     {
         $vendor = filament()->getTenant();
 
-        return ActiveStore::accessibleFor($vendor, auth()->user())
+        return Visibility::reportStores($vendor, auth()->user())
             ->pluck('name', 'id')
             ->all();
+    }
+
+    protected static function allBranches(): bool
+    {
+        return Visibility::allBranches(filament()->getTenant(), auth()->user());
     }
 
     /**
@@ -116,6 +125,13 @@ class SalesReport extends Page
             ? (int) $storeId
             : null;
 
+        // Not allowed every branch's total: one of their own branches instead
+        // (the first), and no figures at all when they have none.
+        if ($storeId === null && ! self::allBranches()) {
+            $storeId = array_key_first(self::selectableStores()) ?? -1;
+        }
+        $visibleStores = array_keys(self::selectableStores());
+
         $summary = $reports->summary($vendorId, $period->from, $period->to, $storeId);
 
         return [
@@ -125,7 +141,12 @@ class SalesReport extends Page
             'storeName' => $storeId ? (self::selectableStores()[$storeId] ?? null) : null,
             'previous' => $reports->summary($vendorId, $previous->from, $previous->to, $storeId),
             'channels' => $reports->channelBreakdown($vendorId, $period->from, $period->to, $storeId),
-            'stores' => $reports->storeBreakdown($vendorId, $period->from, $period->to),
+            'stores' => self::allBranches()
+                ? $reports->storeBreakdown($vendorId, $period->from, $period->to)
+                : $reports->storeBreakdown($vendorId, $period->from, $period->to)
+                    ->filter(fn (array $row) => in_array($row['store_id'], $visibleStores, true))
+                    ->values(),
+            'seesProfit' => Visibility::profit(),
             'topProducts' => $reports->topProducts($vendorId, $period->from, $period->to, 10, $storeId),
             'payments' => $reports->paymentBreakdown($vendorId, $period->from, $period->to, $storeId),
             'cashiers' => $reports->cashierBreakdown($vendorId, $period->from, $period->to, $storeId),
@@ -141,7 +162,8 @@ class SalesReport extends Page
         return $vendor && (
             $user->isSuperAdmin() ||
             $vendor->isOwner($user) ||
-            $user->hasVendorPermission($vendor->id, 'view_inventory_reports')
+            ($user->hasVendorPermission($vendor->id, 'view_inventory_reports')
+                && Visibility::salesTotals($user, $vendor))
         );
     }
 }

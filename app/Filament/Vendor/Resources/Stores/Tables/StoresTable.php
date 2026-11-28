@@ -2,6 +2,7 @@
 
 namespace App\Filament\Vendor\Resources\Stores\Tables;
 
+use App\Support\Visibility;
 use App\Filament\Vendor\Resources\Products\Schemas\ProductForm;
 use App\Models\Store;
 use App\Models\User;
@@ -46,6 +47,7 @@ class StoresTable
                 // which today is only the owner anyway.
                 TextColumn::make('stock_value')
                     ->label('Stock value')
+                    ->visible(fn (): bool => Visibility::stockValue())
                     ->state(function (Store $record): string {
                         $m = self::metrics($record);
 

@@ -49,7 +49,8 @@
     {{-- The three figures. Tap: what happened. --}}
     <button
         type="button"
-        wire:click="mountTableAction('story', '{{ $key }}')"
+        x-on:click="$dispatch('gp-count-story', { id: {{ (int) $record->getKey() }} })"
+        x-on:touchstart.passive="$dispatch('gp-count-story-hover', { id: {{ (int) $record->getKey() }} })"
         class="grid w-full grid-cols-3 overflow-hidden rounded-xl border border-gray-200 text-center dark:border-white/10"
         aria-label="See what happened to {{ $record->product?->name }}"
     >

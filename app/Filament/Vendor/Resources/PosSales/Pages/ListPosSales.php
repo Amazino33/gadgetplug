@@ -2,6 +2,7 @@
 
 namespace App\Filament\Vendor\Resources\PosSales\Pages;
 
+use App\Support\Visibility;
 use App\Filament\Vendor\Resources\PosSales\PosSaleResource;
 use App\Models\PosSale;
 use Filament\Resources\Pages\ListRecords;
@@ -38,15 +39,18 @@ class ListPosSales extends ListRecords
             return [];
         }
 
+        // Takings on the tabs are sales totals: only for those who may see them.
+        $sales = Visibility::salesTotals();
+
         $tabs = [
-            'all' => Tab::make('All Stores')
-                ->badge($this->takings(null))
+            'all' => Tab::make(Visibility::otherBranches() ? 'All Stores' : 'All my branches')
+                ->badge($sales ? $this->takings(null) : null)
                 ->badgeColor('gray'),
         ];
 
         foreach ($stores as $id => $name) {
             $tabs['store-'.$id] = Tab::make($name)
-                ->badge($this->takings((int) $id))
+                ->badge($sales ? $this->takings((int) $id) : null)
                 ->badgeColor('success')
                 ->modifyQueryUsing(fn (Builder $query): Builder => $query->where('pos_sales.store_id', $id));
         }
@@ -80,6 +84,8 @@ class ListPosSales extends ListRecords
             ->where('pos_sales.vendor_id', filament()->getTenant()->id)
             ->where('pos_sales.status', '!=', 'voided')
             ->when($storeId, fn (Builder $q) => $q->where('pos_sales.store_id', $storeId))
+            // "All": every branch this person may see, not the whole business.
+            ->when(! $storeId && ! Visibility::otherBranches(), fn (Builder $q) => $q->whereIn('pos_sales.store_id', array_keys(PosSaleResource::storeOptions())))
             ->when($from, fn (Builder $q) => $q->whereRaw(
                 'COALESCE(pos_sales.completed_at, pos_sales.created_at) >= ?',
                 [$from],

@@ -19,8 +19,11 @@ class EditRole extends BaseEditRole
 
     protected function afterSave(): void
     {
-        $permissionIds = $this->data['permissions'] ?? [];
-        $permissions = Permission::whereIn('id', $permissionIds)->get();
+        // What they can do, and what they can see (its own section).
+        $permissionIds = array_merge($this->data['permissions'] ?? [], $this->data['visibility'] ?? []);
+        $permissions = Permission::whereIn('id', $permissionIds)
+            ->whereIn('name', RoleResource::GRANTABLE_PERMISSIONS)
+            ->get();
         $this->record->syncPermissions($permissions);
         app(PermissionRegistrar::class)->forgetCachedPermissions();
     }

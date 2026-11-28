@@ -7,8 +7,10 @@ use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Str;
+use Filament\Schemas\Components\Section;
+use App\Support\Visibility;
 use Spatie\Permission\Models\Permission;
+use Illuminate\Support\Str;
 
 class RoleResource extends ShieldRoleResource
 {
@@ -53,6 +55,9 @@ class RoleResource extends ShieldRoleResource
         'manage_financial_reports',
         'view_reports_hub',
         'manage_stock_takes', 'perform_stock_takes', 'map_aisles', 'manage_counters',
+        // What they can see (App\Support\Visibility), shown in their own
+        // section of the form.
+        'view_profit', 'view_sales_totals', 'view_stock_value', 'view_other_branches',
         // Learn GadgetPlug. Ticked by default on a new role (see
         // DEFAULT_ON_PERMISSIONS), so a vendor takes it away rather than
         // having to know to add it.
@@ -128,12 +133,31 @@ class RoleResource extends ShieldRoleResource
                     modifyRuleUsing: fn ($rule) => $rule->where('team_id', filament()->getTenant()?->id)
                 ),
 
+            // What they can SEE, apart from what they can do: being able to
+            // sell or count does not mean seeing what the business makes.
+            Section::make('What they can see')
+                ->description('Figures people in this role are shown. The owner always sees everything.')
+                ->schema([
+                    CheckboxList::make('visibility')
+                        ->hiddenLabel()
+                        ->options(fn () => self::visibilityPermissions()->mapWithKeys(fn (Permission $p) => [(string) $p->id => Visibility::LABELS[$p->name][0]])->all())
+                        ->descriptions(fn () => self::visibilityPermissions()->mapWithKeys(fn (Permission $p) => [(string) $p->id => Visibility::LABELS[$p->name][1]])->all())
+                        ->formatStateUsing(fn ($record) => $record
+                            ? $record->permissions()->whereIn('name', array_keys(Visibility::LABELS))->pluck('permissions.id')->map(fn ($id) => (string) $id)->all()
+                            : [])
+                        ->dehydrated(false)
+                        ->bulkToggleable()
+                        ->columns(['default' => 1, 'md' => 2]),
+                ]),
+
             CheckboxList::make('permissions')
-                ->label('Permissions')
+                ->label('What they can do')
                 ->relationship(
                     'permissions',
                     'name',
-                    fn ($query) => $query->whereIn('name', self::GRANTABLE_PERMISSIONS)
+                    fn ($query) => $query
+                        ->whereIn('name', self::GRANTABLE_PERMISSIONS)
+                        ->whereNotIn('name', array_keys(Visibility::LABELS))
                 )
                 // "pos" in a permission name is the till, which people call the
                 // Sales Point — in Nigeria a "POS" is the card machine. Matched
@@ -150,6 +174,23 @@ class RoleResource extends ShieldRoleResource
                 ->bulkToggleable()
                 ->columns(3),
         ]);
+    }
+
+    /**
+     * The "What they can see" permissions, in the order Visibility lists them.
+     *
+     * @return \Illuminate\Support\Collection<int, Permission>
+     */
+    public static function visibilityPermissions(): \Illuminate\Support\Collection
+    {
+        $order = array_keys(Visibility::LABELS);
+
+        return Permission::query()
+            ->whereIn('name', $order)
+            ->where('guard_name', 'web')
+            ->get()
+            ->sortBy(fn (Permission $p) => array_search($p->name, $order, true))
+            ->values();
     }
 
     public static function getEloquentQuery(): Builder
