@@ -42,7 +42,7 @@
     x-on:gp-link-product-hover.window="hover($event.detail.id)"
     x-on:stock-take-updated.window="wanted = null; ready = null; req = null"
 >
-    <x-filament::modal id="gp-link-product" width="2xl">
+    <x-filament::modal id="gp-link-product" width="3xl">
         <x-slot name="heading">Link to a product you have</x-slot>
 
         <div x-show="loading" class="space-y-4" role="status" aria-live="polite">
@@ -73,9 +73,12 @@
                     <div class="min-w-0 flex-1">
                         <p class="text-xs font-medium uppercase tracking-wide text-warning-700 dark:text-warning-400">The counter wrote</p>
                         <p class="text-lg font-semibold leading-snug text-gray-950 dark:text-white">{{ $item->name_entered }}</p>
+                        @if ($item->barcode)
+                            <p class="mt-0.5 text-sm text-gray-700 dark:text-gray-200">Barcode <span class="font-mono font-semibold">{{ $item->barcode }}</span></p>
+                        @endif
                         <p class="mt-0.5 text-sm text-gray-600 dark:text-gray-300">
                             {{ collect([
-                                $item->barcode ? 'Barcode ' . $item->barcode : 'No barcode',
+                                $item->barcode ? null : 'No barcode',
                                 $item->aisle?->name,
                                 $item->creator?->name,
                                 $item->created_at?->timezone('Africa/Lagos')->format('D j M, g:ia'),
@@ -107,7 +110,7 @@
                     <ul class="divide-y divide-gray-100 overflow-hidden rounded-xl border border-gray-200 dark:divide-white/5 dark:border-white/10"
                         wire:loading.class="opacity-50" wire:target="search">
                         @forelse ($products as $p)
-                            <li wire:key="lp-{{ $p['id'] }}" class="flex items-center gap-3 px-3 py-2.5">
+                            <li wire:key="lp-{{ $p['id'] }}" class="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5 sm:flex-nowrap">
                                 @if ($p['image'])
                                     <img src="{{ $p['image'] }}" alt="" loading="lazy" class="h-11 w-11 shrink-0 rounded-lg bg-gray-100 object-cover dark:bg-gray-800" />
                                 @else
@@ -117,18 +120,40 @@
                                 @endif
                                 <div class="min-w-0 flex-1">
                                     <p class="truncate font-semibold text-gray-950 dark:text-white" title="{{ $p['name'] }}">{{ $p['name'] }}</p>
-                                    <p class="truncate text-sm text-gray-500 dark:text-gray-400">
+                                    <p class="text-sm text-gray-500 dark:text-gray-400">
                                         {{ collect([
                                             $p['sku'],
                                             '₦' . number_format($p['price'], 0),
                                             $p['stock'] === null ? 'none here' : Quantity::format($p['stock']) . ' in stock here',
-                                            $p['barcode'] ? 'has barcode ' . $p['barcode'] : 'no barcode yet',
                                         ])->filter()->implode(' · ') }}
                                     </p>
+                                    {{-- Its own line: the code to compare with the one the counter scanned. --}}
+                                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                                        @if ($p['barcode'])
+                                            Barcode <span class="font-mono text-gray-700 dark:text-gray-300">{{ $p['barcode'] }}</span>
+                                        @else
+                                            No barcode yet
+                                        @endif
+                                    </p>
                                 </div>
-                                <x-filament::button size="sm" wire:click="link({{ $p['id'] }})" wire:target="link({{ $p['id'] }})" icon="heroicon-o-link">
-                                    Link
-                                </x-filament::button>
+                                {{-- With a barcode already: add this one as another (a second
+                                     variant sold the same), or make it the main one. Without: give it. --}}
+                                <div class="flex w-full shrink-0 flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
+                                    @if ($item->barcode && $p['barcode'])
+                                        <x-filament::button size="sm" wire:click="link({{ $p['id'] }})" wire:target="link({{ $p['id'] }})" icon="heroicon-o-plus"
+                                            tooltip="Keeps {{ $p['barcode'] }} and adds {{ $item->barcode }}: both scan as this product">
+                                            Add as 2nd barcode
+                                        </x-filament::button>
+                                        <x-filament::button size="sm" color="gray" wire:click="link({{ $p['id'] }}, true)" wire:target="link({{ $p['id'] }}, true)"
+                                            tooltip="{{ $item->barcode }} becomes the main barcode; {{ $p['barcode'] }} still scans">
+                                            Make main
+                                        </x-filament::button>
+                                    @else
+                                        <x-filament::button size="sm" wire:click="link({{ $p['id'] }})" wire:target="link({{ $p['id'] }})" icon="heroicon-o-link">
+                                            {{ $item->barcode ? 'Give barcode' : 'Link' }}
+                                        </x-filament::button>
+                                    @endif
+                                </div>
                             </li>
                         @empty
                             <li class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">
@@ -144,7 +169,10 @@
                     </ul>
 
                     @if ($item->barcode)
-                        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">The barcode {{ $item->barcode }} is added to the product you link, so it scans next time.</p>
+                        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                            {{ $item->barcode }} scans as the product you pick from now on. A product that already has a barcode keeps it:
+                            <strong>Add as 2nd barcode</strong> for a second variant sold the same, or <strong>Make main</strong> to print and show the new one first.
+                        </p>
                     @endif
                 </div>
             @else

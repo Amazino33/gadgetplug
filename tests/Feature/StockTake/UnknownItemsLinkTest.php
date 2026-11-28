@@ -113,3 +113,58 @@ test('the pop-up will not open another branch\'s barcode', function () {
         ->call('show', $item->id)
         ->assertSet('itemId', null);
 });
+
+/** Every code that scans as this product: its main one and any others. */
+function ulCodes($product): array
+{
+    return ProductBarcode::query()->where('product_id', $product->id)->whereNull('product_unit_id')
+        ->orderBy('barcode')->pluck('barcode')->all();
+}
+
+test('a product that has a barcode offers "Add as 2nd barcode" and "Make main"; one without, "Give barcode"', function () {
+    $ctx   = stockTakeContext();
+    $st    = ulAs($ctx);
+    $with  = stProduct($ctx, 'Swiss Flower Air Freshener 250ml');
+    $with->update(['barcode' => '6156000227566']);
+    stProduct($ctx, 'Swiss Flower Air Freshener 500ml');
+    $item  = ulItem($ctx, 'swiss air freshener', '6154000107000');
+
+    Livewire::test(LinkProductPanel::class, ['record' => $st])
+        ->call('show', $item->id)
+        ->assertSee('Add as 2nd barcode')
+        ->assertSee('Make main')
+        ->assertSee('Give barcode');
+});
+
+test('Add as 2nd barcode keeps the main one and adds this: both scan as the product', function () {
+    $ctx  = stockTakeContext();
+    $st   = ulAs($ctx);
+    $p    = stProduct($ctx, 'Swiss Flower Air Freshener 250ml');
+    $p->update(['barcode' => '6156000227566']);
+    $item = ulItem($ctx, 'swiss air freshener', '6154000107000');
+
+    Livewire::test(LinkProductPanel::class, ['record' => $st])
+        ->call('show', $item->id)
+        ->call('link', $p->id)
+        ->assertNotified('Barcode linked');
+
+    expect($p->fresh()->barcode)->toBe('6156000227566')
+        ->and(ulCodes($p))->toBe(['6154000107000', '6156000227566']);
+});
+
+test('Make main makes this the main barcode, and the old one still scans', function () {
+    $ctx  = stockTakeContext();
+    $st   = ulAs($ctx);
+    $p    = stProduct($ctx, 'Swiss Flower Air Freshener 250ml');
+    $p->update(['barcode' => '6156000227566']);
+    $item = ulItem($ctx, 'swiss air freshener', '6154000107000');
+
+    Livewire::test(LinkProductPanel::class, ['record' => $st])
+        ->call('show', $item->id)
+        ->call('link', $p->id, true)
+        ->assertNotified('Barcode linked as the main one');
+
+    expect($p->fresh()->barcode)->toBe('6154000107000')
+        ->and(ulCodes($p))->toBe(['6154000107000', '6156000227566'])
+        ->and($p->fresh()->extraBaseBarcodes->pluck('barcode')->all())->toBe(['6156000227566']);
+});

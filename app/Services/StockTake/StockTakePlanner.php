@@ -270,9 +270,13 @@ final class StockTakePlanner
      * An unknown barcode was really an existing product: give that product
      * the barcode, put it on the aisle it was found in, and close the item.
      *
+     * A product that already has a barcode gets this one as another (a second
+     * variant sold the same, say), unless $asMain: then this becomes its main
+     * barcode and the old one stays on as another. Both scan either way.
+     *
      * @throws AuthorizationException|ValidationException
      */
-    public function linkUnknown(User $by, StockTakeUnknownItem $item, Product $product): void
+    public function linkUnknown(User $by, StockTakeUnknownItem $item, Product $product, bool $asMain = false): void
     {
         $this->mustManage($by, (int) $item->vendor_id, (int) $item->store_id);
         $this->mustBeOpen($item);
@@ -281,9 +285,9 @@ final class StockTakePlanner
             throw ValidationException::withMessages(['product_id' => 'That product is not one of this shop\'s.']);
         }
 
-        DB::transaction(function () use ($by, $item, $product) {
+        DB::transaction(function () use ($by, $item, $product, $asMain) {
             if ($item->barcode) {
-                $this->giveBarcode($product, $item->barcode);
+                $this->giveBarcode($product, $item->barcode, $asMain);
             }
 
             $this->resolve($by, $item, $product);
@@ -359,7 +363,7 @@ final class StockTakePlanner
     }
 
     /** The product's main barcode if it has none; otherwise an extra one for its base unit. */
-    private function giveBarcode(Product $product, string $barcode): void
+    private function giveBarcode(Product $product, string $barcode, bool $asMain = false): void
     {
         $owner = Product::query()->where('vendor_id', $product->vendor_id)->where('barcode', $barcode)->value('id')
             ?? ProductBarcode::query()->where('vendor_id', $product->vendor_id)->where('barcode', $barcode)->value('product_id');
@@ -374,6 +378,20 @@ final class StockTakePlanner
 
         if (blank($product->barcode)) {
             $product->update(['barcode' => $barcode]);
+
+            return;
+        }
+
+        if ($asMain) {
+            // The new code becomes the main one (the product's own save moves
+            // the main code's lookup row), and the old one stays as another.
+            $old = (string) $product->barcode;
+            $product->update(['barcode' => $barcode]);
+
+            ProductBarcode::firstOrCreate(
+                ['vendor_id' => $product->vendor_id, 'barcode' => $old],
+                ['product_id' => $product->id, 'product_unit_id' => null],
+            );
 
             return;
         }

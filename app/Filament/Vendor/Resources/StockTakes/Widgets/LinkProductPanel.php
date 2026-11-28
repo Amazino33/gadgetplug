@@ -43,7 +43,12 @@ class LinkProductPanel extends Widget
         $this->search = '';
     }
 
-    public function link(int $productId): void
+    /**
+     * @param  bool  $asMain  the product already has a barcode: make this the
+     *                        main one (the old stays as another) rather than
+     *                        adding it as another
+     */
+    public function link(int $productId, bool $asMain = false): void
     {
         $item = $this->item($this->itemId);
 
@@ -56,6 +61,7 @@ class LinkProductPanel extends Widget
                 auth()->user(),
                 $item,
                 Product::query()->where('vendor_id', $item->vendor_id)->findOrFail($productId),
+                $asMain,
             );
         } catch (ValidationException $e) {
             Notification::make()->title('Not done')->body(collect($e->errors())->flatten()->first())->danger()->send();
@@ -67,7 +73,10 @@ class LinkProductPanel extends Widget
             return;
         }
 
-        Notification::make()->title('Barcode linked')->success()->send();
+        Notification::make()
+            ->title($asMain ? 'Barcode linked as the main one' : 'Barcode linked')
+            ->success()
+            ->send();
         $this->itemId = null;
         $this->dispatch('close-modal', id: 'gp-link-product');
         $this->dispatch('stock-take-updated');
