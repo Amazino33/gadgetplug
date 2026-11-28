@@ -141,8 +141,8 @@
                                 <div class="flex w-full shrink-0 flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
                                     @if ($item->barcode && $p['barcode'])
                                         <x-filament::button size="sm" wire:click="link({{ $p['id'] }})" wire:target="link({{ $p['id'] }})" icon="heroicon-o-plus"
-                                            tooltip="Keeps {{ $p['barcode'] }} and adds {{ $item->barcode }}: both scan as this product">
-                                            Add as 2nd barcode
+                                            tooltip="Keeps its barcode(s) and adds {{ $item->barcode }}: all scan as this product">
+                                            Add as another barcode
                                         </x-filament::button>
                                         <x-filament::button size="sm" color="gray" wire:click="link({{ $p['id'] }}, true)" wire:target="link({{ $p['id'] }}, true)"
                                             tooltip="{{ $item->barcode }} becomes the main barcode; {{ $p['barcode'] }} still scans">
@@ -171,7 +171,7 @@
                     @if ($item->barcode)
                         <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
                             {{ $item->barcode }} scans as the product you pick from now on. A product that already has a barcode keeps it:
-                            <strong>Add as 2nd barcode</strong> for a second variant sold the same, or <strong>Make main</strong> to print and show the new one first.
+                            <strong>Add as another barcode</strong> for another variant sold the same (a product can have any number), or <strong>Make main</strong> to print and show the new one first.
                         </p>
                     @endif
                 </div>

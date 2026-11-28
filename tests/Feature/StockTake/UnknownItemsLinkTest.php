@@ -121,7 +121,7 @@ function ulCodes($product): array
         ->orderBy('barcode')->pluck('barcode')->all();
 }
 
-test('a product that has a barcode offers "Add as 2nd barcode" and "Make main"; one without, "Give barcode"', function () {
+test('a product that has a barcode offers "Add as another barcode" and "Make main"; one without, "Give barcode"', function () {
     $ctx   = stockTakeContext();
     $st    = ulAs($ctx);
     $with  = stProduct($ctx, 'Swiss Flower Air Freshener 250ml');
@@ -131,12 +131,12 @@ test('a product that has a barcode offers "Add as 2nd barcode" and "Make main"; 
 
     Livewire::test(LinkProductPanel::class, ['record' => $st])
         ->call('show', $item->id)
-        ->assertSee('Add as 2nd barcode')
+        ->assertSee('Add as another barcode')
         ->assertSee('Make main')
         ->assertSee('Give barcode');
 });
 
-test('Add as 2nd barcode keeps the main one and adds this: both scan as the product', function () {
+test('Add as another barcode keeps the main one and adds this: both scan as the product', function () {
     $ctx  = stockTakeContext();
     $st   = ulAs($ctx);
     $p    = stProduct($ctx, 'Swiss Flower Air Freshener 250ml');
